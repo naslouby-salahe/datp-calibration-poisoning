@@ -101,6 +101,8 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("data/catalog.py", "DatasetSpec", "device_ids"),
         ("data/catalog.py", "DatasetSpec", "attack_family_dirs"),
         ("data/catalog.py", "DatasetSpec", "expected_client_count"),
+        # CalibrationPoisoningConfig: seed=0 is the canonical default for reproducibility
+        ("attacks/poisoning_config.py", "CalibrationPoisoningConfig", "seed"),
     }
 )
 
