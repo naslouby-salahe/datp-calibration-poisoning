@@ -1,0 +1,55 @@
+{
+  "alphas": [],
+  "axis_labels": {
+    "x": "Reconstruction Error",
+    "y": "Density"
+  },
+  "baseline_order": [
+    "b1"
+  ],
+  "baselines": [
+    "b1"
+  ],
+  "client_counts": {
+    "b1": 9
+  },
+  "client_ids": [
+    "Provision_PT_838_Security_Camera",
+    "Ennio_Doorbell",
+    "SimpleHome_XCS7_1002_WHT_Security_Camera"
+  ],
+  "coverage_ratios": {
+    "b1": 1.0
+  },
+  "dataset": "nbaiot",
+  "eligibility_policy": "selected eligible clients from B1 seed 0",
+  "eligible_counts": {
+    "b1": 9
+  },
+  "evidence_role": "descriptive",
+  "figure": "figure_2",
+  "max_points_per_client": 5000,
+  "metric_names": [
+    "reconstruction_error",
+    "threshold_value"
+  ],
+  "not_confirmatory_warning": "Representative seed only; descriptive evidence, not confirmatory.",
+  "regime": "a",
+  "run_ids": [
+    "a_b1_seed0"
+  ],
+  "seed": 0,
+  "seed_scope": "representative_seed",
+  "seeds": [
+    0
+  ],
+  "source_metrics_files": [
+    "outputs/results/a/b1/seed_0/metrics.json"
+  ],
+  "source_score_manifests": [
+    "outputs/scores/a/seed_0/scoring_manifest.json"
+  ],
+  "tau_global": 0.41798622103200944,
+  "title": "Calibration-error ECDF for three representative N-BaIoT clients with B1 client-averaged threshold \u2014 representative seed, descriptive only",
+  "validation_status": "PASS"
+}

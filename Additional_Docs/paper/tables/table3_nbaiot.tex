@@ -1,0 +1,21 @@
+% Table 3: N-BaIoT Main Results
+\begin{table}[htbp]
+\caption{Table 3: N-BaIoT Main Results}
+\centering
+\begin{tabular}{l c c c c c}
+\toprule
+Baseline & CV(FPR)$\dagger$ & CV(TPR)$\dagger$ & Worst BA & P10 client Macro-F1 & Coverage \\
+\midrule
+B0 (Centralized) & 0.787 ± 0.031 (9/9) & 0.278 ± 0.036 & 0.653 ± 0.010 & 0.403 ± 0.059 & 1.00 (9/9) \\
+B1 (Client-Averaged) & 1.017 ± 0.019 (9/9) & \textbf{0.289 ± 0.029} & 0.649 ± 0.011 & 0.344 ± 0.062 & 1.00 (9/9) \\
+B2 (Per-Client) & \textbf{0.299 ± 0.073} (9/9) & 0.336 ± 0.007 & 0.651 ± 0.001 & 0.300 ± 0.000 & 1.00 (9/9) \\
+B3 (Family-Mean) & 0.964 ± 0.096 (9/9) & 0.336 ± 0.007 & 0.653 ± 0.004 & 0.299 ± 0.000 & 1.00 (9/9) \\
+B4 (Cluster-Mean) & 0.645 ± 0.045 (9/9) & 0.322 ± 0.012 & 0.654 ± 0.007 & 0.299 ± 0.000 & 1.00 (9/9) \\
+\bottomrule
+\end{tabular}
+
+\footnotesize{† Eligible clients only.}
+
+% Eligible counts: B0 (Centralised): 9, B1 (Client-Averaged): 9, B2 (Per-Client): 9, B3 (Family-Mean): 9, B4 (Cluster-Mean): 9
+% Calibration-Pending counts: B0 (Centralised): 0, B1 (Client-Averaged): 0, B2 (Per-Client): 0, B3 (Family-Mean): 0, B4 (Cluster-Mean): 0
+\end{table}

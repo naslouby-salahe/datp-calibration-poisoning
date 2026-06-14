@@ -1,0 +1,44 @@
+\section{Related Work}
+\label{sec:related}
+
+Federated autoencoders for IoT anomaly detection have been applied to
+device-partitioned N-BaIoT by Rey~et~al.~\cite{rey2022federated},
+Khraisat~et~al.~\cite{khraisat2025fediot}, and
+Olanrewaju~et~al.~\cite{olanrewajugeorge2025flae}, who report aggregate detection
+metrics. Thresholds are applied implicitly or globally; none isolates threshold
+calibration scope as a variable or measures per-client FPR dispersion.
+
+Non-IID aggregation work such as FedMSE~\cite{nguyen2025fedmse} improves AUC under
+Dirichlet non-IID N-BaIoT by changing aggregation weights, not post-training threshold
+policy; per-client alarm-rate dispersion is not
+reported~\cite{zhao2018noniid,li2022federated}.
+
+Model-level FL personalization methods such as Per-FedAvg, FedPer, and
+LG-FedAvg~\cite{fallah2020personalized,arivazhagan2019federated,liang2020think} adapt
+weights or training objectives, whereas DATP fixes the shared AE and adapts only the
+post-training alarm boundary.
+
+Threshold-level personalization is acknowledged in
+Kitsune~\cite{mirsky2018kitsune} and DIoT~\cite{nguyen2019diot}, but neither provides
+a controlled comparison fixing encoder, training protocol, and seeds across
+threshold-scope variants. Recent FL-AE IoT IDS and non-IID aggregation studies improve aggregate detection or training behavior, but threshold scope remains implicit, fixed, or unvaried; conversely, local-threshold systems acknowledge per-device calibration without isolating it under a frozen federated encoder. Table~\ref{tab:related_comparison} summarizes this gap.
+
+\begin{table}[!b]
+  \caption{Positioning: adaptation layer and threshold treatment.}
+  \label{tab:related_comparison}
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.2}%
+  \setlength{\tabcolsep}{4pt}%
+  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{2.3cm}@{}}
+    \toprule
+    Work group & Adaptation layer & Threshold treatment \\
+    \midrule
+    FL-AE IoT IDS~\cite{rey2022federated,khraisat2025fediot} & Model (shared AE) & Implicit/global \\
+    FedMSE~\cite{nguyen2025fedmse} & Aggregation weights & Not varied \\
+    Per-FedAvg, FedPer~\cite{fallah2020personalized,arivazhagan2019federated} & Model weights/ objectives & Not addressed \\
+    Kitsune, DIoT~\cite{mirsky2018kitsune,nguyen2019diot} & Local AE & Per-device (no controlled study) \\
+    \textbf{DATP (this work)} & \textbf{Threshold only} & \textbf{Controlled comparison} \\
+    \bottomrule
+  \end{tabular}
+\end{table}

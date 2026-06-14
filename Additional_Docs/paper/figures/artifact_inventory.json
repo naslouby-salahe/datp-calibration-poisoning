@@ -1,0 +1,77 @@
+{
+  "figures": [
+    {
+      "figure": "figure_1",
+      "paper_path": "paper/figures/figure_1.pdf",
+      "sidecar": "outputs/figures/figure_1_data.json",
+      "source": "outputs/figures/figure_1.pdf"
+    },
+    {
+      "figure": "figure_1",
+      "paper_path": "paper/figures/figure_1.png",
+      "sidecar": "outputs/figures/figure_1_data.json",
+      "source": "outputs/figures/figure_1.png"
+    },
+    {
+      "figure": "figure_1",
+      "paper_path": "paper/figures/figure_1_data.json",
+      "sidecar": "outputs/figures/figure_1_data.json",
+      "source": "outputs/figures/figure_1_data.json"
+    },
+    {
+      "figure": "figure_2",
+      "paper_path": "paper/figures/figure_2.pdf",
+      "sidecar": "outputs/figures/figure_2_data.json",
+      "source": "outputs/figures/figure_2.pdf"
+    },
+    {
+      "figure": "figure_2",
+      "paper_path": "paper/figures/figure_2.png",
+      "sidecar": "outputs/figures/figure_2_data.json",
+      "source": "outputs/figures/figure_2.png"
+    },
+    {
+      "figure": "figure_2",
+      "paper_path": "paper/figures/figure_2_data.json",
+      "sidecar": "outputs/figures/figure_2_data.json",
+      "source": "outputs/figures/figure_2_data.json"
+    },
+    {
+      "figure": "figure_3",
+      "paper_path": "paper/figures/figure_3.pdf",
+      "sidecar": "outputs/figures/figure_3_data.json",
+      "source": "outputs/figures/figure_3.pdf"
+    },
+    {
+      "figure": "figure_3",
+      "paper_path": "paper/figures/figure_3.png",
+      "sidecar": "outputs/figures/figure_3_data.json",
+      "source": "outputs/figures/figure_3.png"
+    },
+    {
+      "figure": "figure_3",
+      "paper_path": "paper/figures/figure_3_data.json",
+      "sidecar": "outputs/figures/figure_3_data.json",
+      "source": "outputs/figures/figure_3_data.json"
+    },
+    {
+      "figure": "figure_4",
+      "paper_path": "paper/figures/figure_4.pdf",
+      "sidecar": "outputs/figures/figure_4_data.json",
+      "source": "outputs/figures/figure_4.pdf"
+    },
+    {
+      "figure": "figure_4",
+      "paper_path": "paper/figures/figure_4.png",
+      "sidecar": "outputs/figures/figure_4_data.json",
+      "source": "outputs/figures/figure_4.png"
+    },
+    {
+      "figure": "figure_4",
+      "paper_path": "paper/figures/figure_4_data.json",
+      "sidecar": "outputs/figures/figure_4_data.json",
+      "source": "outputs/figures/figure_4_data.json"
+    }
+  ],
+  "schema_version": "1"
+}

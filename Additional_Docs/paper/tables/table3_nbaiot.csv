@@ -1,0 +1,7 @@
+Baseline,CV(FPR) mean,CV(FPR) std,CV(TPR) mean,CV(TPR) std,Worst BA mean,Worst BA std,P10 client Macro-F1 mean,P10 client Macro-F1 std,Eligible,Pending,Coverage
+B0 (Centralised),0.7874,0.0307,0.2784,0.0359,0.6530,0.0104,0.4028,0.0591,9,0,1.0000
+B1 (Client-Averaged),1.0172,0.0188,0.2886,0.0294,0.6491,0.0114,0.3438,0.0622,9,0,1.0000
+B2 (Per-Client),0.2992,0.0727,0.3358,0.0073,0.6509,0.0011,0.2996,0.0002,9,0,1.0000
+B3 (Family-Mean),0.9643,0.0960,0.3356,0.0074,0.6530,0.0043,0.2992,0.0003,9,0,1.0000
+B4 (Cluster-Mean),0.6454,0.0454,0.3219,0.0123,0.6541,0.0069,0.2993,0.0005,9,0,1.0000
+# † Eligible clients only.

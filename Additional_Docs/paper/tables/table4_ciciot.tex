@@ -1,0 +1,20 @@
+% Table 4: CICIoT2023 Main Results
+\begin{table}[htbp]
+\caption{Table 4: CICIoT2023 Main Results}
+\centering
+\begin{tabular}{l c c c c c}
+\toprule
+Baseline & CV(FPR)$\dagger$ & CV(TPR)$\dagger$ & Worst BA & P10 client Macro-F1 & Coverage \\
+\midrule
+B0 (Centralized) & 0.109 ± 0.020 (63/63) & 0.001 ± 0.000 & 0.954 ± 0.006 & 0.958 ± 0.001 & 1.00 (63/63) \\
+B1 (Client-Averaged) & \textbf{0.099 ± 0.002} (63/63) & \textbf{0.001 ± 0.000} & 0.958 ± 0.002 & 0.958 ± 0.001 & 1.00 (63/63) \\
+B2 (Per-Client) & 0.133 ± 0.007 (63/63) & 0.001 ± 0.000 & 0.956 ± 0.001 & 0.958 ± 0.001 & 1.00 (63/63) \\
+B4 (Cluster-Mean) & 0.101 ± 0.003 (63/63) & 0.001 ± 0.000 & 0.958 ± 0.002 & 0.958 ± 0.001 & 1.00 (63/63) \\
+\bottomrule
+\end{tabular}
+
+\footnotesize{† Eligible clients only.}
+
+% Eligible counts: B0 (Centralised): 63, B1 (Client-Averaged): 63, B2 (Per-Client): 63, B4 (Cluster-Mean): 63
+% Calibration-Pending counts: B0 (Centralised): 0, B1 (Client-Averaged): 0, B2 (Per-Client): 0, B4 (Cluster-Mean): 0
+\end{table}

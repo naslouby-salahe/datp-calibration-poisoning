@@ -1,0 +1,98 @@
+{
+  "alphas": [],
+  "axis_labels": {
+    "x": "Device",
+    "y": "FPR"
+  },
+  "baseline_order": [
+    "b1",
+    "b2"
+  ],
+  "baselines": [
+    "b1",
+    "b2"
+  ],
+  "client_counts": {
+    "b1": 9,
+    "b2": 9
+  },
+  "clients": [
+    {
+      "b1": 0.045846878152673465,
+      "b2": 0.04192355117139334,
+      "client_id": "Danmini_Doorbell"
+    },
+    {
+      "b1": 0.020745131244707875,
+      "b2": 0.06816257408975444,
+      "client_id": "Ecobee_Thermostat"
+    },
+    {
+      "b1": 0.02912759306621199,
+      "b2": 0.049872122762148335,
+      "client_id": "Ennio_Doorbell"
+    },
+    {
+      "b1": 0.008844788232310424,
+      "b2": 0.037534871924930255,
+      "client_id": "Philips_B120N10_Baby_Monitor"
+    },
+    {
+      "b1": 0.003127792672028597,
+      "b2": 0.05218945487042002,
+      "client_id": "Provision_PT_737E_Security_Camera"
+    },
+    {
+      "b1": 0.002537498590278561,
+      "b2": 0.01528138039923311,
+      "client_id": "Provision_PT_838_Security_Camera"
+    },
+    {
+      "b1": 0.08244567533020877,
+      "b2": 0.03184916915210907,
+      "client_id": "Samsung_SNH_1011_N_Webcam"
+    },
+    {
+      "b1": 0.1313938237748897,
+      "b2": 0.04983903660426851,
+      "client_id": "SimpleHome_XCS7_1002_WHT_Security_Camera"
+    },
+    {
+      "b1": 0.041512652829115725,
+      "b2": 0.038100653966448676,
+      "client_id": "SimpleHome_XCS7_1003_WHT_Security_Camera"
+    }
+  ],
+  "coverage_ratios": {
+    "b1": 1.0,
+    "b2": 1.0
+  },
+  "dataset": "nbaiot",
+  "eligibility_policy": "eligible-client intersection",
+  "eligible_counts": {
+    "b1": 9,
+    "b2": 9
+  },
+  "evidence_role": "descriptive",
+  "figure": "figure_1",
+  "metric_names": [
+    "fpr"
+  ],
+  "not_confirmatory_warning": "Representative seed only; descriptive evidence, not confirmatory.",
+  "regime": "a",
+  "run_ids": [
+    "a_b1_seed0",
+    "a_b2_seed0"
+  ],
+  "seed": 0,
+  "seed_scope": "representative_seed",
+  "seeds": [
+    0
+  ],
+  "source_metrics_files": [
+    "outputs/results/a/b1/seed_0/metrics.json",
+    "outputs/results/a/b2/seed_0/metrics.json"
+  ],
+  "title": "Per-device FPR: B1 vs B2, Regime A \u2014 representative seed, descriptive only",
+  "validation_status": "PASS"
+}

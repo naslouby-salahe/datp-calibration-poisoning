@@ -1,0 +1,57 @@
+% DATP: Device-Aware Threshold Personalization — A Controlled Threshold-Calibration Study
+% IEEE Conference Paper — IEEEtran format
+\documentclass[conference]{IEEEtran}
+% \IEEEoverridecommandlockouts  % removed: no \thanks{} used in this paper
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{url}
+\usepackage{siunitx}
+\usepackage{textcase}
+\usepackage[hidelinks]{hyperref}
+
+\sisetup{detect-all, round-mode=places, round-precision=4}
+
+% Protect dataset name casing in captions
+\newcommand{\CICIoT}{\NoCaseChange{CICIoT2023}}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Device-Aware Threshold Personalization:\\ A Controlled Threshold-Calibration Study for\\ Non-IID Federated IoT Anomaly Detection}
+
+\author{
+\IEEEauthorblockN{Salaheddine Naslouby\IEEEauthorrefmark{1},
+Mohamed Lachgar\IEEEauthorrefmark{2},
+Hamid Hrimech\IEEEauthorrefmark{3}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}\IEEEauthorrefmark{3}LAMSAD Laboratory, National School of Applied Sciences (ENSA),
+Hassan First University, Berrechid, Morocco}
+\IEEEauthorblockA{\IEEEauthorrefmark{2}L2IS Laboratory, Higher Normal School (ENS),
+University Cadi Ayyad, Marrakech, Morocco}
+}
+
+\maketitle
+
+\input{sections/abstract}
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/formulation}
+\input{sections/framework}
+\input{sections/experiments}
+\input{sections/results}
+\input{sections/threats}
+\input{sections/conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

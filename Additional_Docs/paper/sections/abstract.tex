@@ -1,0 +1,11 @@
+\begin{abstract}
+\textbf{Objective:} This study isolates threshold calibration scope as the sole experimental variable in a federated IoT anomaly-detection pipeline. A fixed FedAvg autoencoder ($E{=}1$, full participation) is trained once per seed; the same encoder, seeds, and per-client score artifacts are reused across shared (B1), per-client (B2), family-mean (B3), and cluster-mean (B4) threshold policies---a threshold-only controlled comparison.
+\textbf{Protocol:} The primary comparison is B1 vs.\ B2 on N-BaIoT ($K{=}9$ physical devices, $q{=}0.95$, five seeds). Because B2 sets each client's threshold at its own benign $p_{95}$, FPR equalization is expected by construction under stable calibration/test distributions; the empirical contribution is the held-out magnitude, seed consistency, detection-quality tradeoff, and B4's taxonomy-free approximation.
+CICIoT2023 (Regime~B) uses randomized file-level pseudo-clients---not physical devices---as a near-homogeneous applicability boundary.
+\textbf{Results:} B2 reduces CV(FPR) from 1.017 to 0.299 ($\Delta{=}0.718$, bootstrap CI $[0.647,\,0.769]$, all five seed deltas positive). B4 recovers ${\approx}52\%$ without a taxonomy. The gain is not uniform: lower-tail Macro-F1 degradation concentrates in a single low-separability client. Under the CICIoT2023 partition, no improvement is observed.
+\textbf{Limits:} Nine devices; $E{=}1$ limits local drift; five seeds; CICIoT2023 conclusions hold only under the tested randomized partition.
+\end{abstract}
+
+\begin{IEEEkeywords}
+federated learning, IoT anomaly detection, threshold calibration, false-positive-rate dispersion, autoencoder, non-IID data, personalization.
+\end{IEEEkeywords}

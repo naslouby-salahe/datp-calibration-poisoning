@@ -1,0 +1,65 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Federated learning (FL) trains shared models without pooling raw traffic~\cite{mcmahan2017communication}.
+Reconstruction-error autoencoders (AEs) are a natural fit for IoT intrusion detection
+because benign-only training suffices and attack labels are not required at training time.
+
+A standard deployment trains one shared AE via FedAvg, then applies a threshold $\tau$
+above which a reconstruction error signals an intrusion.
+In homogeneous fleets this works well.
+In heterogeneous fleets, however, benign reconstruction-error distributions differ
+substantially across device types: a single shared $\tau$ imposes unequal false-positive
+rates (FPRs).
+Some devices carry a disproportionate false-alarm burden---making them noisy
+or operationally unusable---while others may become under-sensitive.
+A shared server-broadcast threshold is natural in deployments where the system
+exposes a single global alarm boundary or where per-client threshold state is
+not managed independently.
+
+This study asks how large the per-client FPR disparity is under a shared threshold,
+how much per-client calibration reduces it, and what detection-quality tradeoff
+this creates---all under a fixed FedAvg AE with real physical-device heterogeneity.
+The target operational scenario is a fleet of physical IoT devices for which
+local benign calibration data are available, and where reducing unequal
+false-alarm burden across devices is a deployment priority.
+Prior FL-AE work may report aggregate detection metrics or use thresholds implicitly,
+but without fixing the encoder, aggregation protocol, and training hyperparameters and
+varying only threshold scope, it is impossible to attribute per-client alarm-rate
+dispersion to the threshold policy rather than to training differences.
+This controlled-comparison gap motivates the present study.
+
+The primary metric is the coefficient of variation of FPR across eligible clients,
+$\text{CV(FPR)} = \sigma_{\text{FPR}} / \mu_{\text{FPR}}$.
+Four threshold policies are evaluated: a client-averaged shared threshold (B1), full per-client
+personalization (B2), device-family grouping (B3), and unsupervised cluster grouping (B4).
+B1 is constructed as the arithmetic mean of eligible clients' local 95th-percentile
+benign calibration thresholds, broadcast as a single scalar.
+The arithmetic mean treats eligible clients equally and models a simple server-broadcast
+threshold derived from local calibration summaries, avoiding sample-count domination;
+pooled and sample-weighted alternatives are reported as sensitivity checks.
+A centralized baseline (B0) is included as a privacy-incompatible reference
+comparator but is not part of the single-variable B1--B4 comparison.
+
+The study uses N-BaIoT~\cite{meidan2018n} as the primary confirmatory regime (Regime~A),
+CICIoT2023~\cite{neto2023ciciot2023} as a file-level applicability check under
+near-homogeneous conditions (Regime~B), and synthetic Dirichlet partitions of N-BaIoT as a
+heterogeneity severity sweep (Regime~C).
+Five random seeds are used; seed-level descriptive summaries (mean, SD, range, sign consistency) report stability.
+The FL simulation uses Flower~\cite{beutel2020flower}.
+
+This article contributes a threshold-only calibration analysis for federated IoT
+anomaly detection. It quantifies the false-positive-rate disparity induced by shared
+thresholds across heterogeneous physical devices, evaluates per-client, family-mean,
+and cluster-mean calibration under a fixed FedAvg autoencoder, characterizes the
+resulting detection-quality tradeoff, and provides reproducible source code,
+configurations, per-seed results, and figure-generation scripts through an
+archived replication artifact.
+
+The remainder of this article is organized as follows. Section~\ref{sec:related}
+reviews related FL autoencoder, non-IID aggregation, model-personalization, and
+threshold-personalization work; Sections~\ref{sec:formulation}--\ref{sec:experiments}
+define the alarm decision, dispersion metric, threshold-personalization framework,
+datasets, regimes, and evaluation protocol;
+Sections~\ref{sec:results}--\ref{sec:conclusion} report the results, discuss validity
+threats, and conclude with practitioner guidance, limitations, and future work.

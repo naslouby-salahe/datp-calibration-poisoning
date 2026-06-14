@@ -1,0 +1,763 @@
+{
+  "alphas": [
+    "0.1",
+    "0.3",
+    "0.5",
+    "1",
+    "10",
+    "iid"
+  ],
+  "axis_labels": {
+    "x": "Dirichlet alpha",
+    "y": "CV(FPR)"
+  },
+  "baseline_order": [
+    "b1",
+    "b2",
+    "b4"
+  ],
+  "baselines": [
+    "b1",
+    "b2",
+    "b4"
+  ],
+  "client_counts": {
+    "b1": {
+      "0.1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.3": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.5": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "10": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "iid": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    },
+    "b2": {
+      "0.1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.3": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.5": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "10": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "iid": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    },
+    "b4": {
+      "0.1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.3": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.5": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "10": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "iid": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    }
+  },
+  "coverage_ratios": {
+    "b1": {
+      "0.1": [
+        0.95,
+        0.95,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "0.3": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "0.5": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "1": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "10": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "iid": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "b2": {
+      "0.1": [
+        0.95,
+        0.95,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "0.3": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "0.5": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "1": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "10": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "iid": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "b4": {
+      "0.1": [
+        0.95,
+        0.95,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "0.3": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "0.5": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "1": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "10": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "iid": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  "dataset": "nbaiot",
+  "eligibility_policy": "eligible clients only per result row",
+  "eligible_counts": {
+    "b1": {
+      "0.1": [
+        19,
+        19,
+        20,
+        20,
+        20
+      ],
+      "0.3": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.5": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "10": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "iid": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    },
+    "b2": {
+      "0.1": [
+        19,
+        19,
+        20,
+        20,
+        20
+      ],
+      "0.3": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.5": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "10": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "iid": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    },
+    "b4": {
+      "0.1": [
+        19,
+        19,
+        20,
+        20,
+        20
+      ],
+      "0.3": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "0.5": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "1": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "10": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "iid": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    }
+  },
+  "evidence_role": "secondary",
+  "figure": "figure_4",
+  "metric_names": [
+    "cv_fpr"
+  ],
+  "regime": "c",
+  "run_ids": [
+    "c_b1_seed0_alpha0.1",
+    "c_b1_seed1_alpha0.1",
+    "c_b1_seed2_alpha0.1",
+    "c_b1_seed3_alpha0.1",
+    "c_b1_seed4_alpha0.1",
+    "c_b1_seed0_alpha0.3",
+    "c_b1_seed1_alpha0.3",
+    "c_b1_seed2_alpha0.3",
+    "c_b1_seed3_alpha0.3",
+    "c_b1_seed4_alpha0.3",
+    "c_b1_seed0_alpha0.5",
+    "c_b1_seed1_alpha0.5",
+    "c_b1_seed2_alpha0.5",
+    "c_b1_seed3_alpha0.5",
+    "c_b1_seed4_alpha0.5",
+    "c_b1_seed0_alpha1",
+    "c_b1_seed1_alpha1",
+    "c_b1_seed2_alpha1",
+    "c_b1_seed3_alpha1",
+    "c_b1_seed4_alpha1",
+    "c_b1_seed0_alpha10",
+    "c_b1_seed1_alpha10",
+    "c_b1_seed2_alpha10",
+    "c_b1_seed3_alpha10",
+    "c_b1_seed4_alpha10",
+    "c_b1_seed0_alphaiid",
+    "c_b1_seed1_alphaiid",
+    "c_b1_seed2_alphaiid",
+    "c_b1_seed3_alphaiid",
+    "c_b1_seed4_alphaiid",
+    "c_b2_seed0_alpha0.1",
+    "c_b2_seed1_alpha0.1",
+    "c_b2_seed2_alpha0.1",
+    "c_b2_seed3_alpha0.1",
+    "c_b2_seed4_alpha0.1",
+    "c_b2_seed0_alpha0.3",
+    "c_b2_seed1_alpha0.3",
+    "c_b2_seed2_alpha0.3",
+    "c_b2_seed3_alpha0.3",
+    "c_b2_seed4_alpha0.3",
+    "c_b2_seed0_alpha0.5",
+    "c_b2_seed1_alpha0.5",
+    "c_b2_seed2_alpha0.5",
+    "c_b2_seed3_alpha0.5",
+    "c_b2_seed4_alpha0.5",
+    "c_b2_seed0_alpha1",
+    "c_b2_seed1_alpha1",
+    "c_b2_seed2_alpha1",
+    "c_b2_seed3_alpha1",
+    "c_b2_seed4_alpha1",
+    "c_b2_seed0_alpha10",
+    "c_b2_seed1_alpha10",
+    "c_b2_seed2_alpha10",
+    "c_b2_seed3_alpha10",
+    "c_b2_seed4_alpha10",
+    "c_b2_seed0_alphaiid",
+    "c_b2_seed1_alphaiid",
+    "c_b2_seed2_alphaiid",
+    "c_b2_seed3_alphaiid",
+    "c_b2_seed4_alphaiid",
+    "c_b4_seed0_alpha0.1",
+    "c_b4_seed1_alpha0.1",
+    "c_b4_seed2_alpha0.1",
+    "c_b4_seed3_alpha0.1",
+    "c_b4_seed4_alpha0.1",
+    "c_b4_seed0_alpha0.3",
+    "c_b4_seed1_alpha0.3",
+    "c_b4_seed2_alpha0.3",
+    "c_b4_seed3_alpha0.3",
+    "c_b4_seed4_alpha0.3",
+    "c_b4_seed0_alpha0.5",
+    "c_b4_seed1_alpha0.5",
+    "c_b4_seed2_alpha0.5",
+    "c_b4_seed3_alpha0.5",
+    "c_b4_seed4_alpha0.5",
+    "c_b4_seed0_alpha1",
+    "c_b4_seed1_alpha1",
+    "c_b4_seed2_alpha1",
+    "c_b4_seed3_alpha1",
+    "c_b4_seed4_alpha1",
+    "c_b4_seed0_alpha10",
+    "c_b4_seed1_alpha10",
+    "c_b4_seed2_alpha10",
+    "c_b4_seed3_alpha10",
+    "c_b4_seed4_alpha10",
+    "c_b4_seed0_alphaiid",
+    "c_b4_seed1_alphaiid",
+    "c_b4_seed2_alphaiid",
+    "c_b4_seed3_alphaiid",
+    "c_b4_seed4_alphaiid"
+  ],
+  "seed_aggregation_policy": "mean with one-standard-deviation band across configured seeds",
+  "seed_scope": "all_seed",
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "source_metrics_files": [
+    "outputs/results/c/b1/seed_0/alpha_0.1/metrics.json",
+    "outputs/results/c/b1/seed_1/alpha_0.1/metrics.json",
+    "outputs/results/c/b1/seed_2/alpha_0.1/metrics.json",
+    "outputs/results/c/b1/seed_3/alpha_0.1/metrics.json",
+    "outputs/results/c/b1/seed_4/alpha_0.1/metrics.json",
+    "outputs/results/c/b1/seed_0/alpha_0.3/metrics.json",
+    "outputs/results/c/b1/seed_1/alpha_0.3/metrics.json",
+    "outputs/results/c/b1/seed_2/alpha_0.3/metrics.json",
+    "outputs/results/c/b1/seed_3/alpha_0.3/metrics.json",
+    "outputs/results/c/b1/seed_4/alpha_0.3/metrics.json",
+    "outputs/results/c/b1/seed_0/alpha_0.5/metrics.json",
+    "outputs/results/c/b1/seed_1/alpha_0.5/metrics.json",
+    "outputs/results/c/b1/seed_2/alpha_0.5/metrics.json",
+    "outputs/results/c/b1/seed_3/alpha_0.5/metrics.json",
+    "outputs/results/c/b1/seed_4/alpha_0.5/metrics.json",
+    "outputs/results/c/b1/seed_0/alpha_1/metrics.json",
+    "outputs/results/c/b1/seed_1/alpha_1/metrics.json",
+    "outputs/results/c/b1/seed_2/alpha_1/metrics.json",
+    "outputs/results/c/b1/seed_3/alpha_1/metrics.json",
+    "outputs/results/c/b1/seed_4/alpha_1/metrics.json",
+    "outputs/results/c/b1/seed_0/alpha_10/metrics.json",
+    "outputs/results/c/b1/seed_1/alpha_10/metrics.json",
+    "outputs/results/c/b1/seed_2/alpha_10/metrics.json",
+    "outputs/results/c/b1/seed_3/alpha_10/metrics.json",
+    "outputs/results/c/b1/seed_4/alpha_10/metrics.json",
+    "outputs/results/c/b1/seed_0/alpha_iid/metrics.json",
+    "outputs/results/c/b1/seed_1/alpha_iid/metrics.json",
+    "outputs/results/c/b1/seed_2/alpha_iid/metrics.json",
+    "outputs/results/c/b1/seed_3/alpha_iid/metrics.json",
+    "outputs/results/c/b1/seed_4/alpha_iid/metrics.json",
+    "outputs/results/c/b2/seed_0/alpha_0.1/metrics.json",
+    "outputs/results/c/b2/seed_1/alpha_0.1/metrics.json",
+    "outputs/results/c/b2/seed_2/alpha_0.1/metrics.json",
+    "outputs/results/c/b2/seed_3/alpha_0.1/metrics.json",
+    "outputs/results/c/b2/seed_4/alpha_0.1/metrics.json",
+    "outputs/results/c/b2/seed_0/alpha_0.3/metrics.json",
+    "outputs/results/c/b2/seed_1/alpha_0.3/metrics.json",
+    "outputs/results/c/b2/seed_2/alpha_0.3/metrics.json",
+    "outputs/results/c/b2/seed_3/alpha_0.3/metrics.json",
+    "outputs/results/c/b2/seed_4/alpha_0.3/metrics.json",
+    "outputs/results/c/b2/seed_0/alpha_0.5/metrics.json",
+    "outputs/results/c/b2/seed_1/alpha_0.5/metrics.json",
+    "outputs/results/c/b2/seed_2/alpha_0.5/metrics.json",
+    "outputs/results/c/b2/seed_3/alpha_0.5/metrics.json",
+    "outputs/results/c/b2/seed_4/alpha_0.5/metrics.json",
+    "outputs/results/c/b2/seed_0/alpha_1/metrics.json",
+    "outputs/results/c/b2/seed_1/alpha_1/metrics.json",
+    "outputs/results/c/b2/seed_2/alpha_1/metrics.json",
+    "outputs/results/c/b2/seed_3/alpha_1/metrics.json",
+    "outputs/results/c/b2/seed_4/alpha_1/metrics.json",
+    "outputs/results/c/b2/seed_0/alpha_10/metrics.json",
+    "outputs/results/c/b2/seed_1/alpha_10/metrics.json",
+    "outputs/results/c/b2/seed_2/alpha_10/metrics.json",
+    "outputs/results/c/b2/seed_3/alpha_10/metrics.json",
+    "outputs/results/c/b2/seed_4/alpha_10/metrics.json",
+    "outputs/results/c/b2/seed_0/alpha_iid/metrics.json",
+    "outputs/results/c/b2/seed_1/alpha_iid/metrics.json",
+    "outputs/results/c/b2/seed_2/alpha_iid/metrics.json",
+    "outputs/results/c/b2/seed_3/alpha_iid/metrics.json",
+    "outputs/results/c/b2/seed_4/alpha_iid/metrics.json",
+    "outputs/results/c/b4/seed_0/alpha_0.1/metrics.json",
+    "outputs/results/c/b4/seed_1/alpha_0.1/metrics.json",
+    "outputs/results/c/b4/seed_2/alpha_0.1/metrics.json",
+    "outputs/results/c/b4/seed_3/alpha_0.1/metrics.json",
+    "outputs/results/c/b4/seed_4/alpha_0.1/metrics.json",
+    "outputs/results/c/b4/seed_0/alpha_0.3/metrics.json",
+    "outputs/results/c/b4/seed_1/alpha_0.3/metrics.json",
+    "outputs/results/c/b4/seed_2/alpha_0.3/metrics.json",
+    "outputs/results/c/b4/seed_3/alpha_0.3/metrics.json",
+    "outputs/results/c/b4/seed_4/alpha_0.3/metrics.json",
+    "outputs/results/c/b4/seed_0/alpha_0.5/metrics.json",
+    "outputs/results/c/b4/seed_1/alpha_0.5/metrics.json",
+    "outputs/results/c/b4/seed_2/alpha_0.5/metrics.json",
+    "outputs/results/c/b4/seed_3/alpha_0.5/metrics.json",
+    "outputs/results/c/b4/seed_4/alpha_0.5/metrics.json",
+    "outputs/results/c/b4/seed_0/alpha_1/metrics.json",
+    "outputs/results/c/b4/seed_1/alpha_1/metrics.json",
+    "outputs/results/c/b4/seed_2/alpha_1/metrics.json",
+    "outputs/results/c/b4/seed_3/alpha_1/metrics.json",
+    "outputs/results/c/b4/seed_4/alpha_1/metrics.json",
+    "outputs/results/c/b4/seed_0/alpha_10/metrics.json",
+    "outputs/results/c/b4/seed_1/alpha_10/metrics.json",
+    "outputs/results/c/b4/seed_2/alpha_10/metrics.json",
+    "outputs/results/c/b4/seed_3/alpha_10/metrics.json",
+    "outputs/results/c/b4/seed_4/alpha_10/metrics.json",
+    "outputs/results/c/b4/seed_0/alpha_iid/metrics.json",
+    "outputs/results/c/b4/seed_1/alpha_iid/metrics.json",
+    "outputs/results/c/b4/seed_2/alpha_iid/metrics.json",
+    "outputs/results/c/b4/seed_3/alpha_iid/metrics.json",
+    "outputs/results/c/b4/seed_4/alpha_iid/metrics.json"
+  ],
+  "title": "CV(FPR) vs Dirichlet alpha, Regime C",
+  "validation_status": "PASS",
+  "values": {
+    "b1": {
+      "0.1": [
+        0.716113716134807,
+        0.6563446018634409,
+        0.8933884108417317,
+        0.7148948451077584,
+        0.9117977903921877
+      ],
+      "0.3": [
+        0.9316399907421531,
+        0.6534317341334016,
+        1.0111253955430723,
+        0.8405578252489067,
+        0.5299557168110107
+      ],
+      "0.5": [
+        0.5080175128331695,
+        0.7898382853343083,
+        0.9158023641253776,
+        0.6059739136090002,
+        0.3617917674830218
+      ],
+      "1": [
+        0.5608433371627339,
+        0.5387573730130065,
+        0.7002866503415912,
+        0.5802474501812914,
+        0.34060331117633463
+      ],
+      "10": [
+        0.20275512266391277,
+        0.26390498628227055,
+        0.15336943856544713,
+        0.11916677548978441,
+        0.13133617347601345
+      ],
+      "iid": [
+        0.07026377501321199,
+        0.09553756490254944,
+        0.054506615803081915,
+        0.08242727813154817,
+        0.06704014448377812
+      ]
+    },
+    "b2": {
+      "0.1": [
+        0.13779229819831393,
+        0.11409423105834406,
+        0.10774619708974724,
+        0.17964719158679654,
+        0.12971422783229813
+      ],
+      "0.3": [
+        0.1314014781954504,
+        0.1559667277763156,
+        0.11455030940939809,
+        0.07057645728806504,
+        0.11022934875354334
+      ],
+      "0.5": [
+        0.10774483741420632,
+        0.11886053502596666,
+        0.1388268498580526,
+        0.09778917202026642,
+        0.12222758043915195
+      ],
+      "1": [
+        0.08035733411653108,
+        0.08101173286330395,
+        0.13507425133759685,
+        0.08098422412346655,
+        0.10308505503797265
+      ],
+      "10": [
+        0.09777528549865461,
+        0.1414123680295623,
+        0.10288104778900925,
+        0.11336424737889854,
+        0.10099949263127588
+      ],
+      "iid": [
+        0.08991836285828649,
+        0.1273259511808224,
+        0.08279874587067128,
+        0.10138346662075003,
+        0.09869196602124732
+      ]
+    },
+    "b4": {
+      "0.1": [
+        0.6905100755397356,
+        0.45149433220024165,
+        0.5356468241480129,
+        0.5798281742707012,
+        0.3952232013540291
+      ],
+      "0.3": [
+        0.9263096641303755,
+        0.5085677025224644,
+        0.46434746829324036,
+        0.4605851992816096,
+        0.44589276878156187
+      ],
+      "0.5": [
+        0.4806496388286795,
+        0.3934416067318222,
+        0.5340033491011821,
+        0.41482848975681613,
+        0.35816200742167686
+      ],
+      "1": [
+        0.5090406202840666,
+        0.40659237056876435,
+        0.45971579082632336,
+        0.44239297456428295,
+        0.31187618963456804
+      ],
+      "10": [
+        0.13806803243224755,
+        0.11538375552722885,
+        0.15188951756924576,
+        0.12601536704583188,
+        0.13119675509930054
+      ],
+      "iid": [
+        0.06780432959789941,
+        0.09493523934540381,
+        0.058363249375214324,
+        0.08567094046239518,
+        0.06672636330592968
+      ]
+    }
+  }
+}

@@ -1,0 +1,68 @@
+\section{Problem Formulation}
+\label{sec:formulation}
+
+\subsection{Notation}
+Let $\mathcal{K}=\{1,\dots,K\}$ denote the set of FL clients.
+Each client $k$ holds local benign traffic data $\mathcal{D}_k^{\text{ben}}$ and may have
+attack data $\mathcal{D}_k^{\text{atk}}$.
+An autoencoder $h = g \circ f$ maps input $\mathbf{x} \in \mathbb{R}^d$ to a reconstruction
+$\hat{\mathbf{x}} = g(f(\mathbf{x}))$, where $f$ is the encoder and $g$ the decoder.
+The reconstruction error is the per-sample mean squared error:
+\begin{equation}
+  e(\mathbf{x}) = \frac{1}{d}\|\mathbf{x} - \hat{\mathbf{x}}\|_2^2,
+\end{equation}
+where $d$ is the input dimension.
+
+\subsection{Binary Alarm Decision}
+Given a threshold $\tau_k$ for client $k$, the alarm decision is:
+\begin{equation}
+  \text{anomaly}(\mathbf{x}) = \mathbf{1}[e(\mathbf{x}) > \tau_k].
+\end{equation}
+The FPR for client $k$ is $\rho_k = \Pr[e(\mathbf{x}) > \tau_k \mid \mathbf{x} \sim \mathcal{D}_k^{\text{ben}}]$.
+
+\subsection{Dispersion Metric}
+Let $\mathcal{K}_{\mathrm{elig}}\subseteq\mathcal{K}$ denote clients with at least $n_{\min}=100$ benign calibration samples; other clients are calibration-pending and excluded from dispersion metrics. The primary metric is the coefficient of variation of FPR over $\mathcal{K}_{\mathrm{elig}}$:
+\begin{equation}
+  \text{CV(FPR)} = \frac{\sigma_{\rho}}{\mu_{\rho}},\quad
+  \mu_{\rho} = \frac{1}{|\mathcal{K}_{\mathrm{elig}}|}\sum_{k\in\mathcal{K}_{\mathrm{elig}}} \rho_k,
+\end{equation}
+where $\sigma_{\rho}$ is the standard deviation.
+CV(FPR) normalizes cross-client FPR dispersion by the fleet mean, making dispersion
+comparable across regimes with different mean FPR levels; IQR(FPR) and
+max--min FPR are reported as absolute-dispersion checks to guard against small-denominator artifacts.
+
+\textbf{Eligibility and fallback.}
+Calibration-pending clients receive the client-averaged shared threshold $\tau_{\text{global}}$ (B1 value) as a fallback. Coverage is reported as $|\mathcal{K}_{\mathrm{elig}}|/|\mathcal{K}|$ for all conditions.
+
+\textbf{Operational assumption.}
+Percentile calibration assumes each client's benign reconstruction-error distribution
+is sufficiently stable between calibration and test.
+Temporal drift would weaken the calibration guarantee; this paper does not model concept drift.
+
+\subsection{Confirmatory Statistic}
+The primary statistical estimate is the seed-level delta:
+\begin{equation}
+  \Delta_s = \text{CV(FPR)}_{\text{B1},s} - \text{CV(FPR)}_{\text{B2},s},
+\end{equation}
+aggregated over seeds $s \in \mathcal{S}$ via descriptive summaries: mean, standard deviation, range, and sign consistency.
+With only five seeds, these statistics are reported as a seed-level consistency summary---not a high-powered
+population significance test.
+All-positive seed deltas are interpreted as seed-level support
+for RQ2 in this tested protocol.
+
+\subsection{Research Questions}
+\begin{itemize}
+  \item \textbf{RQ1:} Under the client-averaged shared threshold (B1), how large is the variation of FPRs across heterogeneous IoT clients?
+  \item \textbf{RQ2:} What held-out FPR-dispersion reduction does per-client threshold calibration (B2) achieve relative to the client-averaged shared threshold under physical-device heterogeneity, what TPR/Macro-F1 tradeoff does this impose, and how much of the per-client benefit does taxonomy-free cluster grouping (B4) recover?
+  \item \textbf{RQ3:} How much of the B2 dispersion reduction can cluster-mean calibration (B4) recover?
+\end{itemize}
+
+The benign calibration-error distributions of different device types differ substantially
+in location and spread, so the B1 client-averaged threshold $\tau_{\text{global}}$ crosses
+each distribution at a different fraction, producing device-specific FPRs.
+Because B2 uses each client's local benign percentile, FPR equalization is expected
+when calibration and test distributions are stable; the empirical questions are therefore
+the held-out magnitude of this expected calibration effect, its seed-level consistency,
+the detection-quality cost it creates, and the extent to which grouped calibration (B4)
+approximates per-client calibration without a device taxonomy---all under a fixed FL-AE
+setting with real physical-device heterogeneity.
