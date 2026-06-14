@@ -1,0 +1,14 @@
+{
+  "id":  "84da366a-69ce-4428-927a-211e8b831608",
+  "name":  "/home/naslouby/Projects/datp-calibration-poisoning",
+  "projectResources":  {
+    "resources":  [
+      {
+        "gitFolder":  {
+          "folderUri":  "file:///home/naslouby/Projects/datp-calibration-poisoning",
+          "allowWrite":  true
+        }
+      }
+    ]
+  }
+}
