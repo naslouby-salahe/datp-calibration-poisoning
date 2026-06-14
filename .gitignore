@@ -136,6 +136,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
 .envrc
 .venv
 env/
@@ -208,8 +209,13 @@ data/processed/
 
 # Generated run outputs and logs
 outputs/
+outputs_old/
 mlruns/
+mlruns.db
 logs/
+
+# SonarQube
+.sonar/
 
 # Result scratch files
 scratch.py
