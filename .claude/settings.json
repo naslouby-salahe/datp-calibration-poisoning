@@ -1,0 +1,36 @@
+{
+  "model": "claude-sonnet-4-6",
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pytest:*)",
+      "Bash(pip:*)",
+      "Bash(uv:*)",
+      "Bash(uvx:*)",
+      "Bash(git:*)",
+      "Bash(npx:*)",
+      "Bash(dvc:*)",
+      "Bash(datp:*)",
+      "Bash(specify:*)",
+      "Bash(serena:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(du:*)",
+      "Bash(df:*)",
+      "Bash(rg:*)",
+      "Bash(make:*)",
+      "Bash(vulture:*)",
+      "Bash(refurb:*)",
+      "Bash(semgrep:*)"
+    ]
+  },
+  "env": {
+    "HYDRA_FULL_ERROR": "1",
+    "RAY_memory_usage_threshold": "0.90"
+  }
+}
