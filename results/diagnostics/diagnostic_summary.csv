@@ -1,4 +1,0 @@
-regime,seed,alpha,b1_cv_fpr,b2_cv_fpr,delta_cv_fpr,decision,coverage_ratio,pending_count,source_file
-a,0,,1.0547481534601115,0.22699602707787414,0.8277521263822374,regime_a_b1_vs_b2,1.0,0,diagnostic_regime_a_seed0_metrics.json
-b,0,,0.10297357582764385,0.13882321130555825,-0.03584963547791439,regime_b_b1_vs_b2,1.0,0,diagnostic_regime_b_seed0_metrics.json
-c,0,1.0,0.7894061649401072,0.12676728870908333,0.6626388762310238,regime_c_alpha1_b1_vs_b2,1.0,0,diagnostic_regime_c_alpha1_seed0_metrics.json

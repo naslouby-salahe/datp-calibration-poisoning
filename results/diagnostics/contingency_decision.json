@@ -1,9 +1,0 @@
-{
-  "cv_fpr_b1": 1.0547481534601115,
-  "cv_fpr_b2": 0.22699602707787414,
-  "decision": "go",
-  "delta_cv_fpr": 0.8277521263822374,
-  "dispersion_threshold": 0.1,
-  "is_preliminary_diagnostic": true,
-  "rationale": "Phase 3 preliminary check: CV(FPR)_B1 = 1.0547 and CV(FPR)_B2 = 0.2270 indicate a measurable threshold-scope effect. The final primary endpoint is the Regime A B1-vs-B2 per-seed bootstrap CI on CV(FPR)."
-}
