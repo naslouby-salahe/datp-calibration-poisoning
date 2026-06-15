@@ -5,7 +5,7 @@
 
 > **Quick reference.**
 > - **Hypothesis (one sentence):** CP2 tests whether poisoning *only* the benign threshold-calibration set of one to three eligible clients can shift DATP-style thresholds enough to cause security failures (raise → victim TPR degradation) or alarm-burden/disparity failures (lower → FPR dispersion), and whether the threshold policies B1/B2/B4 exhibit *different* vulnerability profiles — with training, aggregation, and test data left clean.
-> - **5 non-negotiables:** (1) calibration channel only; (2) N-BaIoT primary, all reuse is conference-faithful **E=1** artifacts; (3) policy set = **B1_GLOBAL, B2_PERSONALIZED, B4_CLUSTER**; (4) clean-vs-poisoned **paired by training_seed and victim plan**, poisoning is the sole stochastic difference; (5) no journal assets and no broad model-/aggregation-/training-poisoning/evasion/privacy/deployment claims.
+> - **5 non-negotiables:** (1) calibration channel only; (2) N-BaIoT primary, clean and poisoned regimes are CP2-generated under conference-faithful **E=1** settings; (3) policy set = **B1_GLOBAL, B2_PERSONALIZED, B4_CLUSTER**; (4) clean-vs-poisoned **paired by training_seed and victim plan**, poisoning is the sole stochastic difference; (5) no journal assets and no broad model-/aggregation-/training-poisoning/evasion/privacy/deployment claims.
 > - **3 kill triggers:** no material `Δτ` for B2 at the largest fraction across the eligible-victim sweep; threshold shifts that produce no interpretable downstream movement; B1/B2/B4 indistinguishable even after blast radius and spillover are measured.
 > - **MVP matrix (locked):** N-BaIoT, {B1,B2,B4}, score-level proxy, fixed-size replacement with victim-local with-replacement resampling, sources {RANDOM_BENIGN, HIGH_SCORE_BENIGN, LOW_SCORE_BENIGN}, objectives {raise, lower}, fractions {0, 0.10, 0.20, 0.40}, all **eligible** single-client victims, `training_seed=[0,1,2,3,4]`, `poisoning_seed=[100,101,102,103,104]`, no retraining if artifacts pass audit.
 
@@ -15,10 +15,10 @@
 
 - **Working title:** as above. (Internal codename only, never in the manuscript: "The Price of Personalization.")
 - **One sentence:** CP2 isolates the threshold-calibration set as an attack surface and measures whether contaminating only a few clients' benign calibration data shifts DATP-style thresholds enough to cause security or alarm-burden failures, and whether B1/B2/B4 differ in vulnerability.
-- **Relationship to DATP:** identical model family, FedAvg training (E=1), score artifacts, threshold policies, and N-BaIoT client definition. CP2 reuses DATP's clean pipeline as the unattacked baseline.
+- **Relationship to DATP:** identical model family, FedAvg training (E=1), score artifacts, threshold policies, and N-BaIoT client definition. CP2 follows the DATP clean pipeline protocol as the conceptual unattacked baseline; all clean and poisoned runs are executed in this repository.
 - **New vs DATP:** DATP has no adversary. CP2 adds a calibration-only threat model, an attack on the threshold channel, and a per-device-disparity vs detection tradeoff under contamination.
 - **Not part of the paper:** new FL algorithms, model personalization, aggregation variants, privacy mechanisms, training/model/test poisoning, deployment validation, journal datasets/comparators. No robustness claim beyond the calibration channel is made or implied.
-- **Why conference-sized:** one primary dataset, one inherited model, three policies, two objectives, a small fraction grid, 5 seeds, score-level reuse, and one optional defense.
+- **Why conference-sized:** one primary dataset, one CP2-trained model, three policies, two objectives, a small fraction grid, 5 seeds, score-level sharing across policies, and one optional defense.
 - **Manuscript vocabulary:** lead with "per-device FPR disparity," "alarm-burden predictability," and "operating-point disparity" rather than "fairness"; the CV(FPR) mathematics is unchanged.
 
 ## 2. Research Questions
@@ -38,7 +38,7 @@ Three nested variants; all main empirical claims use the gray-box variant only.
 - **Capability (main):** compromises the **local calibration-curation process** of 1–3 eligible clients (admission/retention control over which benign records enter the benign calibration buffer). Cannot alter training data, model updates, server aggregation, or test data.
 - **Goal:** raise or lower the victim's effective threshold to cause missed detections (raise) or excess/uneven false alarms (lower).
 - **Knowledge (main, gray-box):** local reconstruction scores of candidate calibration records. Realistic because in FL each client holds the broadcast AE and can score candidates locally; gray-box access is a property of FL, not an extra assumption.
-- **Location / timing:** the victim's benign calibration set, after training, before threshold computation, within the inherited clean run; no retraining implied.
+- **Location / timing:** the victim's benign calibration set, after training, before threshold computation, within the CP2 clean run; no retraining implied.
 - **Targeting:** eligible clients only; MVP single-victim sweep over all eligible clients; Full adds pre-registered pairs/triples.
 - **Cannot do:** modify the model, gradients, aggregation, server code, or test set; relabel test data; observe other clients' raw data.
 - **Grounding scenario (committed):** a compromised local data collector / rogue device operator that selectively admits or retains benign-looking traffic into the victim device's (or its gateway's) calibration buffer.
@@ -47,7 +47,7 @@ Three nested variants; all main empirical claims use the gray-box variant only.
 
 ## 4. Experimental Regimes
 
-- **`REGIME_A_NBAIOT` (primary).** N-BaIoT; one physical device = one client, K=9; eligibility `n_cal ≥ 100` (DATP reports all 9 eligible in Regime A). Clean baseline = inherited clean per-client calibration/test score arrays under B1/B2/B4. Poisoned variants = {raise, lower} × {RANDOM, HIGH, LOW} × fractions, single-victim sweep over all eligible clients (MVP); pairs/triples (Full). Seeds = 5 paired. Rounds unchanged (artifact reuse) or 40→150 if FB1 fires.
+- **`REGIME_A_NBAIOT` (primary).** N-BaIoT; one physical device = one client, K=9; eligibility `n_cal ≥ 100` (DATP reports all 9 eligible in Regime A). Clean baseline = CP2-generated per-client calibration/test score arrays produced by CP2-controlled clean runs in this repository, under B1/B2/B4. Poisoned variants = {raise, lower} × {RANDOM, HIGH, LOW} × fractions, single-victim sweep over all eligible clients (MVP); pairs/triples (Full). Seeds = 5 paired. Rounds = 40 initial → 150 max under E=1 (clean artifacts must be CP2-generated in this repository; FB1 activates if no confirmed CP2-controlled clean artifacts exist).
 - **`REGIME_STRETCH_CIC` (optional, FB4-gated).** CICIoT2023 file-level pseudo-clients (DATP partition: 63 pseudo-clients, near-homogeneous benign distributions). Documented file/chunk pseudo-clients only; eligibility/calibration only if CP2-safe artifact semantics exist. Clean baseline + reduced poisoned set (one or two best variants); 3–5 seeds. Interpretation is a contrast, **not** natural-client equivalence. **B4 K rule:** the silhouette-selected K is chosen once on the clean condition and **frozen** for every clean/poisoned paired comparison; poisoning may move assignments but never the cluster count. If K cannot be held stable, B4 is dropped from the stretch regime and only B1/B2 run there.
 - **`REGIME_SMOKE_SYNTHETIC`.** Synthetic score arrays, precedes both for invariant validation (§10).
 
@@ -100,7 +100,7 @@ Three nested variants; all main empirical claims use the gray-box variant only.
 - **Calibration-pending clients:** receive `τ_global`, do **not** contribute to `τ_global`, do **not** enter B4 clustering, and are excluded from CV(FPR). They affect no threshold and are **not valid victims**; excluded from the victim sweep.
 - **Eligibility under attack:** fixed-size replacement preserves `n_i`, so no client becomes pending due to the attack; the eligible set is fixed, making every (victim, seed) pair balanced.
 - **Fallback threshold:** the only fallback threshold in scope is DATP's existing `τ_global` for calibration-pending clients; CP2 introduces none.
-- **Artifact provenance (manifest must confirm before reuse):** control-repo origin (not journal); conference protocol with **E=1**; exact checkpoint/round; DATP train/calibration/test semantics; per-client calibration scores present; clean test scores present; no journal-only threshold variants; safe read-only paths. **Any E=5 artifact is rejected.** Manifest also records reservoir-sampling mode and the locked `mu_flag_threshold`.
+- **Artifact provenance (manifest must confirm):** CP2-generated within this repository (not from another repository, not journal); conference protocol with **E=1**; exact checkpoint/round; DATP train/calibration/test semantics; per-client calibration scores present; clean test scores present; no journal-only threshold variants; safe read-only paths. **Any E=5 artifact is rejected.** Manifest also records reservoir-sampling mode and the locked `mu_flag_threshold`.
 
 ## 8. Metrics
 
@@ -164,11 +164,11 @@ Let `i` index clients, `p` index policies.
 - **Dispersion:** `CV(FPR)=σ/µ` (no ε), guarded by `IQR(FPR)` and `max–min FPR`; `mu_flag_threshold` as defined in §8.
 - **Statistics:** two-layer unit; ≥4/5 sign consistency; bootstrap CI on 5 seed-level aggregates (percentile default); strict-majority (`floor(m/2)+1`) aggregate rule; Holm descriptive only; B4 deltas client-indexed.
 - **Primary endpoint:** material `Δτ` with correct sign linked to ≥1 downstream metric (victim ΔTPR for raise; ΔCV(FPR)/worst-client FPR for lower).
-- **Venue:** IEEE CNS primary (characterization standard, defense optional); deadline + backup confirmed pre-Phase-C.
+- **Venue/deadline/submission strategy:** intentionally out of scope; must not gate protocol or ticket progress.
 
 ## 13. Fallback Register
 
-**FB1 — Clean score artifacts fail provenance audit.** Trigger: manifest cannot confirm conference-faithful (E=1, T=40→150, DATP split semantics, control-repo origin) clean per-client calibration/test score arrays. Fallback: one CP1-faithful retrain — exactly `E=1`, `rounds_initial=40`, `rounds_max=150`, same convergence criterion, FedAvg weighted by local benign size, Flower; write fresh score artifacts with a complete manifest. Safe wording: "Clean baselines were reproduced under the published DATP conference protocol; no hyperparameters were re-tuned."
+**FB1 — Clean score artifacts fail provenance audit.** Trigger: manifest cannot confirm conference-faithful (E=1, T=40→150, DATP split semantics, CP2-generated within this repository) clean per-client calibration/test score arrays. Fallback: one CP2-controlled clean retrain executed within this repository — exactly `E=1`, `rounds_initial=40`, `rounds_max=150`, same convergence criterion, FedAvg weighted by local benign size, Flower; write fresh score artifacts with a complete manifest. Safe wording: "Clean baselines were reproduced under the published DATP conference protocol; no hyperparameters were re-tuned."
 
 **FB2 — Victim tail reservoir is degenerate.** Trigger: a victim's fixed 10% tail has fewer than two distinct values in at least one training seed. (Supply is otherwise unconstrained via with-replacement resampling, so `f=0.40` is feasible.) Fallback: mark the (client, fraction) cell INFEASIBLE; exclude from all seeds; report per-client. Does not bind on N-BaIoT.
 
@@ -216,12 +216,12 @@ Edge-IIoTset; FedProx/FedRep/FedPer/Ditto; conformal thresholding; temporal reca
 
 ## 18. Phase Plan and Execution Checklist
 
-**Phases.** A — read-only project audit (paths, stale regimes, journal contamination, artifact provenance, E=1 check, B4 reproducibility, bootstrap-variant location). B — scientific protocol lock. C — MVP implementation (injector, threshold recompute, manifest validation, synthetic tests). D — smoke validation (synthetic invariants 1–11). E — N-BaIoT MVP (eligible-victim sweep), then result audit. F — Full (fractions, multi-client, optional defense, optional CIC). G — paper package.
+**Phases.** A — read-only project audit (paths, stale regimes, journal contamination, CP2 self-containment audit, clean-artifact provenance, E=1 check, B4 reproducibility, bootstrap-variant location). B — scientific protocol lock. C — MVP implementation (injector, threshold recompute, manifest validation, synthetic tests). D — smoke validation (synthetic invariants 1–11). E — N-BaIoT MVP (eligible-victim sweep), then result audit. F — Full (fractions, multi-client, optional defense, optional CIC). G — paper package.
 
 **Phase-A protocol confirmations (gate the Phase-B lock; none blocks the Phase-A audit itself):**
-1. Clean score artifacts produced under **E=1** (else FB1 retrain).
-2. **DATP bootstrap variant** (percentile vs BCa) — locate the bootstrap-CI implementation in the DATP conference training/evaluation script or the threshold-computation module; inherit verbatim, else default percentile.
-3. **B4 procedural reproducibility** against DATP's per-seed assignments/metrics (else FB3).
+1. CP2-generated clean score artifacts confirmed under **E=1** in this repository (else activate FB1 to generate within this repository).
+2. **DATP bootstrap variant** (percentile vs BCa) — locate the bootstrap-CI implementation in this repository's DATP training/evaluation or threshold-computation module; inherit verbatim, else default percentile.
+3. **B4 procedural reproducibility** — confirm the frozen B4 procedure on CP2 clean artifacts yields reproducible per-seed assignments and metrics (else FB3).
 4. Venue/deadline/submission strategy is intentionally out of scope for this CP2 cleanup and must not gate protocol or ticket progress.
 
 **Checklist.**

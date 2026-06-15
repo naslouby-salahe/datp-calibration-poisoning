@@ -47,9 +47,10 @@ produce evidence relevant to the manuscript append here. The final paper ticket
 
 ### PN-0001 — Phase 00 Claim Boundaries (tickets CP2-T002, CP2-T006)
 - Date: 2026-06-15
-- Claim enabled: CP2 may reuse DATP's clean fixed-FedAvg, E=1,
-  threshold-calibration substrate and N-BaIoT physical-device framing as the
-  unattacked baseline context.
+- Claim enabled: CP2 follows the DATP clean fixed-FedAvg, E=1,
+  threshold-calibration protocol and N-BaIoT physical-device framing as the
+  unattacked baseline context; all clean and poisoned runs are CP2-generated in
+  this repository.
 - Claim blocked / not yet supported: No CP2 result claim is enabled yet; no
   threshold shift, downstream harm, defense, or policy-vulnerability claim can be
   written before experiments and result audit.

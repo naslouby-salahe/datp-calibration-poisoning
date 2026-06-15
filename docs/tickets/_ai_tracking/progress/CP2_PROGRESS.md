@@ -50,7 +50,7 @@ See `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`. None recorded yet
 
 | # | Confirmation | Status | Evidence |
 |---|---|---|---|
-| 1 | Clean score artifacts produced under **E=1** (else FB1) | unknown | — |
+| 1 | CP2-generated clean score artifacts confirmed under **E=1** in this repository (else activate FB1 within this repository) | unknown | — |
 | 2 | DATP bootstrap variant located (else percentile default) | unknown | — |
 | 3 | B4 procedural reproducibility (else FB3) | unknown | — |
 | 4 | Venue/deadline/submission strategy intentionally out of scope | not a gate | Venue/deadline/submission strategy is intentionally out of scope for this CP2 cleanup and must not gate protocol or ticket progress. |

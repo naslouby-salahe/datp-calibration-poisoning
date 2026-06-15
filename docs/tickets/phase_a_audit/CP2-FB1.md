@@ -12,8 +12,9 @@
 
 ## 1. Purpose
 **CONDITIONAL.** Activate only if CP2-T007 cannot confirm conference-faithful
-(E=1, DATP split semantics, control-repo origin) clean per-client calibration/test
-score artifacts. Provides one CP1-faithful retrain to regenerate clean artifacts.
+(E=1, DATP split semantics, CP2-generated within this repository) clean per-client
+calibration/test score artifacts. Generates CP2-controlled clean artifacts by
+training within this repository.
 
 ## 2. Pre-start audit
 Read the CP2-T007 verdict and `docs/DATP_CP_Roadmap.md` §13 FB1. Confirm the trigger
