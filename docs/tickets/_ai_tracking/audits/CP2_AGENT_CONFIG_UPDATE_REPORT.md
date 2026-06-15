@@ -105,7 +105,8 @@ Updated file paths throughout to use CP2 paths; stale DATP-journal paths kept as
 
 ## 3. Stale Instructions Removed or Corrected
 
-- Stale `docs/tickets/ticket_inventory.md` / `ticket_progress.md` / `human_interventions.md` paths → replaced with CP2 equivalents in all updated files.
+- Stale legacy DATP journal tracking paths → replaced with CP2 equivalents in
+  all updated files.
 - `docs/journal/*.md` as primary CP2 source → labelled as DATP-journal fallback, not CP2 active.
 - Graphify "not available" assumption → corrected to AVAILABLE in CLAUDE.md and copilot-instructions.md.
 - No file was deleted; stale content was labelled and contextualized.
@@ -138,7 +139,7 @@ Updated file paths throughout to use CP2 paths; stale DATP-journal paths kept as
 | Command | Result |
 |---|---|
 | `rg -n "Edge-IIoTset\|...\|shift_magnitude" .claude CLAUDE.md` | All matches are in "forbid/do-not-do" context — clean |
-| `rg -n "docs/tickets\|DATP_CP_Roadmap\|Graphify\|CP2_PROGRESS\|TICKET_INDEX" CLAUDE.md .github .claude/agents/orchestrator-agent.md .claude/agents/implementation-agent.md` | Historical command included a now-missing `implementation-agent.md`; CP2 paths were present in available files |
+| `rg -n "docs/tickets\|DATP_CP_Roadmap\|Graphify\|CP2_PROGRESS\|TICKET_INDEX" CLAUDE.md .github .claude/agents/orchestrator-agent.md .claude/agents/implementation-agent.md` | Historical command includes `.claude/agents/implementation-agent.md`, which exists in the current repository tree; CP2 paths were present in available files |
 | `grep graphify .claude/settings.json` | `Bash(graphify:*)` present |
 | `python -m ruff check src/datp --select E,F --quiet` | Historical run found pre-existing E501 issues; Phase 00 re-run found 342 E501 + 1 F401 across source files, unrelated to this documentation/config update |
 | `pyright src/datp/attacks src/datp/core src/datp/config` | **0 errors, 0 warnings, 0 informations** |
@@ -175,9 +176,9 @@ and is a prerequisite for all subsequent tickets. It has no dependencies.
 Corrections to the historical update report:
 
 - `.claude/agents/implementation-agent.md` is referenced in the audit/update
-  narrative but is not present in the current repository tree. CP2 guidance is
-  still covered by `CLAUDE.md`, `.github/copilot-instructions.md`, and the
-  available relevant agents/skills.
+  narrative and exists in the current repository tree. CP2 guidance is also
+  covered by `CLAUDE.md`, `.github/copilot-instructions.md`, and the available
+  relevant agents/skills.
 - Graphify was refreshed after this report. Current graph:
   6331 nodes, 15668 edges, 397 communities, built from commit `27c1dc31`.
 - The Ruff `E,F` check currently reports 343 pre-existing diagnostics:
@@ -189,4 +190,4 @@ Corrections to the historical update report:
   `.claude/agents/orchestrator-agent.md`, and
   `.claude/skills/ticket-progress-skill.md`.
 
-Updated verdict: CP2-T003 remains **done, verified with discrepancy recorded**.
+Updated verdict: CP2-T003 remains **done, verified**.

@@ -15,7 +15,7 @@ Track what is done, what is missing, what is blocked, and what must happen next.
 **DATP journal (if that work resumes):**
 1. `docs/tickets/ticket_progress.md`
 2. `docs/tickets/ticket_inventory.md`
-3. `docs/tickets/human_interventions.md`
+3. Restored DATP journal human-intervention tracker, if that separate tree exists
 
 ## Before Starting a Ticket
 

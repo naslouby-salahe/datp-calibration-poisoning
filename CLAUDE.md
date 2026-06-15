@@ -263,7 +263,9 @@ docs/journal/EXPERIMENT_PLAN.md
 docs/journal/POST_EXPERIMENT_PLAN.md
 docs/tickets/ticket_inventory.md
 docs/tickets/ticket_progress.md
-docs/tickets/human_interventions.md
 ```
 
-These paths are stale for CP2 and must not be used for CP2 tickets.
+Legacy DATP journal human-intervention tracking is not present in this CP2 tree.
+These paths are stale for CP2 and must not be used for CP2 tickets; CP2 uses
+`docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` and
+`docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`.

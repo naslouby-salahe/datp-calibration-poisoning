@@ -80,7 +80,7 @@ The ticket generation process must create:
 
 1. `docs/tickets/ticket_inventory.md`
 2. `docs/tickets/ticket_progress.md`
-3. `docs/tickets/human_interventions.md`
+3. Restored DATP journal human-intervention tracker, if that separate tree exists
 4. One `TXX.md` file per ticket
 
 ## Completion Rule

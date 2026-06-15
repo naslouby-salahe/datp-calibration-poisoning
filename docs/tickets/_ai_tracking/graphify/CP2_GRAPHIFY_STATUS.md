@@ -24,15 +24,23 @@
 - HTML viz skipped (6331 nodes > 5000 limit)
 - Built from commit: `27c1dc31`
 
-## Canonical invocation
+## Canonical default invocation
 
 ```bash
 cd /home/naslouby/Projects/datp-calibration-poisoning
-graphify update .    # code-only (no API key needed)
-graphify .           # + LLM semantic extraction (requires GEMINI_API_KEY etc.)
+graphify update .
 ```
 
-Refresh after major refactors, package moves, or scope changes.
+The default CP2 repository graph command is `graphify update .`; it is code-only
+and needs no API key. Refresh after major refactors, package moves, or scope
+changes.
+
+Optional LLM-enriched mode (not the CP2 default, requires `GEMINI_API_KEY` or
+another supported backend key):
+
+```bash
+graphify .
+```
 
 ## Graphify in tickets
 

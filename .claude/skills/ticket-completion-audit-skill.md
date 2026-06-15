@@ -20,7 +20,7 @@ Verify whether one or more tickets were implemented completely and honestly.
 1. Requested ticket file or files
 2. `docs/tickets/ticket_inventory.md`
 3. `docs/tickets/ticket_progress.md`
-4. `docs/tickets/human_interventions.md`
+4. Restored DATP journal human-intervention tracker, if that separate tree exists
 5. Relevant source code, tests, configs, artifacts
 
 ## Audit Checklist

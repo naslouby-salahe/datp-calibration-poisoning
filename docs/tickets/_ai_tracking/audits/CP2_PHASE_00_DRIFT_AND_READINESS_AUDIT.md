@@ -40,11 +40,10 @@ Pass at planning level. Setup docs preserve the two-layer unit of analysis,
 `CV(FPR)=sigma/mu` with no epsilon, coverage reporting, AUROC invariance, and
 `mu_flag_threshold` pre-poison lock.
 
-### Venue/deadline strategy
+### Venue/deadline/submission gating
 
-Pass. Phase 00 did not research, modify, or invent venue/deadline decisions.
-`CP2_PROGRESS.md` still records the Phase-A venue/deadline confirmation as
-unknown, which is the correct setup-state value.
+Venue/deadline/submission strategy is intentionally out of scope for this CP2
+cleanup and must not gate protocol or ticket progress.
 
 ## Post-Edit Consistency Audit
 
@@ -68,8 +67,8 @@ Files changed in Phase 00 execution:
 - `docs/tickets/phase_00_setup/CP2-T005.md`
 - `docs/tickets/phase_00_setup/CP2-T006.md`
 
-No production code, experiment code, result artifacts, or venue/deadline strategy
-files were changed.
+No production code, experiment code, result artifacts, or
+venue/deadline/submission strategy files were changed.
 
 Sidecar-agent findings integrated:
 
@@ -87,7 +86,7 @@ Sidecar-agent findings integrated:
 | CP2-T000 | done | Ticket tree/count audit in `CP2_PHASE_00_EXECUTION_AUDIT.md` |
 | CP2-T001 | done | Repository inventory refresh and `CP2_INITIAL_REPO_AUDIT.md` addendum |
 | CP2-T002 | done | `CP2_ADDITIONAL_DOCS_ALIGNMENT_AUDIT.md` + paper note |
-| CP2-T003 | done, verified | Agent config evidence verified; missing `implementation-agent.md` discrepancy recorded |
+| CP2-T003 | done, verified | Agent config evidence verified; `.claude/agents/implementation-agent.md` exists |
 | CP2-T004 | done, verified | Graphify 0.8.39 refresh recorded |
 | CP2-T005 | done | Setup consistency check and latest Graphify refresh: 6331 nodes, 15668 edges, 397 communities |
 | CP2-T006 | done | This drift/readiness audit + paper note |
@@ -101,7 +100,8 @@ Open unknowns remain exactly as Phase-A confirmations, not Phase 00 blockers:
 1. Clean score artifacts produced under E=1.
 2. DATP bootstrap variant located.
 3. B4 procedural reproducibility.
-4. Venue deadline + backup confirmed.
+4. Venue/deadline/submission strategy is intentionally out of scope for this CP2
+   cleanup and must not gate protocol or ticket progress.
 
 ## Final Decision
 

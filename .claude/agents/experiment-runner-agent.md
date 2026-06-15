@@ -168,7 +168,7 @@ Update:
 
 1. `docs/tickets/ticket_inventory.md` (DATP journal) or `docs/tickets/TICKET_INDEX.md` + `_ai_tracking/progress/CP2_PROGRESS.md` (CP2)
 2. `docs/tickets/ticket_progress.md` (DATP journal) or `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md` (CP2)
-3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` if applicable (CP2) or `docs/tickets/human_interventions.md` (DATP journal)
+3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` if applicable (CP2), or the restored DATP journal human-intervention tracker if that separate work resumes
 
 Do not keep rerunning failing experiments without creating a repair ticket when the root cause is code, config, artifact, data, or scientific ambiguity.
 
@@ -180,7 +180,8 @@ If the experiment requires unavailable data or a user action:
 2. Mark the related ticket as `BLOCKED_HUMAN` if ticket files exist.
 3. Record the blocker in the appropriate file:
    - **CP2 (active):** `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
-   - **DATP journal (if that work resumes):** `docs/tickets/human_interventions.md`
+   - **DATP journal (if that work resumes):** use that restored tree's active
+     human-intervention tracker; do not assume one exists in this CP2 tree
 4. State exactly what the user must provide.
 5. State where it must be placed.
 6. State which command or ticket becomes unblocked afterward.

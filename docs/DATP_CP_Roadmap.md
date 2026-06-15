@@ -218,14 +218,14 @@ Edge-IIoTset; FedProx/FedRep/FedPer/Ditto; conformal thresholding; temporal reca
 
 **Phases.** A — read-only project audit (paths, stale regimes, journal contamination, artifact provenance, E=1 check, B4 reproducibility, bootstrap-variant location). B — scientific protocol lock. C — MVP implementation (injector, threshold recompute, manifest validation, synthetic tests). D — smoke validation (synthetic invariants 1–11). E — N-BaIoT MVP (eligible-victim sweep), then result audit. F — Full (fractions, multi-client, optional defense, optional CIC). G — paper package.
 
-**Four Phase-A confirmations (gate the Phase-B lock; none blocks the Phase-A audit itself):**
+**Phase-A protocol confirmations (gate the Phase-B lock; none blocks the Phase-A audit itself):**
 1. Clean score artifacts produced under **E=1** (else FB1 retrain).
 2. **DATP bootstrap variant** (percentile vs BCa) — locate the bootstrap-CI implementation in the DATP conference training/evaluation script or the threshold-computation module; inherit verbatim, else default percentile.
 3. **B4 procedural reproducibility** against DATP's per-seed assignments/metrics (else FB3).
-4. **Venue deadline + backup** (gates the Full-vs-MVP cut and the defense decision).
+4. Venue/deadline/submission strategy is intentionally out of scope for this CP2 cleanup and must not gate protocol or ticket progress.
 
 **Checklist.**
-- *Pre-coding:* the four confirmations above; surface CP1 calibration/test split semantics; confirm CICIoT2023 client semantics (or pre-drop); lock `mu_flag_threshold = round(M_clean/8, 2 s.f.)` and the material-clean-regression thresholds from clean artifacts before any poisoned run.
+- *Pre-coding:* the protocol confirmations above; surface CP1 calibration/test split semantics; confirm CICIoT2023 client semantics (or pre-drop); lock `mu_flag_threshold = round(M_clean/8, 2 s.f.)` and the material-clean-regression thresholds from clean artifacts before any poisoned run.
 - *Coding:* injector (no in-place mutation; with-replacement victim-local resampling; child-seed scheme; independent co-victim streams); B1/B2/B4 recompute + client-indexed B4 decomposition; manifest validation (E=1 reject; record reservoir mode and `mu_flag_threshold`); synthetic smoke; B3 absent from the default enum.
 - *Experiment:* smoke invariants pass → MVP → result audit before Full.
 - *Defense (if run):* trim threshold **and** B4 fingerprint; primary `t=5%`, `t=10%` appendix; main-text iff `Recovery ≥ 0.5` without material clean regression, else appendix; report regardless of outcome.

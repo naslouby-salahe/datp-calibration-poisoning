@@ -100,7 +100,7 @@ The agent must create or update:
 4. Continue sequentially as needed.
 5. `docs/tickets/ticket_inventory.md`
 6. `docs/tickets/ticket_progress.md`
-7. `docs/tickets/human_interventions.md`
+7. Restored DATP journal human-intervention tracker, if that separate tree exists
 
 Ticket numbering uses two digits until T99:
 
@@ -192,7 +192,8 @@ When human action is required:
 1. Mark the ticket as `BLOCKED_HUMAN`.
 2. Add a clear entry to the appropriate file:
    - **CP2 (active):** `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
-   - **DATP journal (if that work resumes):** `docs/tickets/human_interventions.md`
+   - **DATP journal (if that work resumes):** use that restored tree's active
+     human-intervention tracker; do not assume one exists in this CP2 tree
 3. State exactly what the user must do.
 4. State where the required file or decision should be placed.
 5. State which ticket becomes unblocked afterward.

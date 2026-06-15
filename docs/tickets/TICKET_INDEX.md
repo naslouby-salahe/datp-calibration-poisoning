@@ -2,8 +2,9 @@
 
 Authoritative list of all CP2 tickets. `R` = refactor checkpoint, `D` = scientific
 drift check. Graphify (`Gfy`) and paper-notes (`PN`) columns: `Y`/`N`/`C` (conditional).
-All statuses start `not started`; track real status in
-`_ai_tracking/progress/CP2_PROGRESS.md`.
+Statuses started as `not started` when the ticket program was created. Track
+current status in `_ai_tracking/progress/CP2_PROGRESS.md` and the individual
+ticket headers.
 
 > Do not trust this index or the progress file alone — inspect the repository.
 
@@ -33,7 +34,7 @@ All statuses start `not started`; track real status in
 | CP2-T012 | phase_a_audit/CP2-T012.md | audit | high | T001 | T033,T035 | Scoring/statistics/reporting reuse audit | static | C | Y |
 | CP2-T013 | phase_a_audit/CP2-T013.md | refactor | medium | T007-T012 | — | [R] audit-phase cleanup checkpoint | static, graphify | Y | N |
 | CP2-T014 | phase_a_audit/CP2-T014.md | scientific-drift | high | T009,T011 | T015 | [D] audit-phase drift check | static | C | Y |
-| CP2-T015 | phase_a_audit/CP2-T015.md | audit | critical | T007,T008,T011,T014 | T016 | Phase-A gate report (4 confirmations) | static | C | Y |
+| CP2-T015 | phase_a_audit/CP2-T015.md | audit | critical | T007,T008,T011,T014 | T016 | Phase-A gate report | static | C | Y |
 | CP2-FB1 | phase_a_audit/CP2-FB1.md | scientific-drift | critical | T007 | — | (cond) clean artifacts fail provenance | integration, e2e | C | Y |
 | CP2-FB3 | phase_a_audit/CP2-FB3.md | scientific-drift | high | T011 | — | (cond) B4 not reproducible | unit, integration | C | Y |
 

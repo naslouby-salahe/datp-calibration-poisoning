@@ -164,7 +164,8 @@ If the current Copilot mode cannot do those things, record the limitation in the
 relevant ticket progress entry. For CP2, use
 `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md` and, when a blocker or
 human decision is involved, `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`.
-Use `docs/tickets/human_interventions.md` only for DATP journal fallback work.
+Legacy DATP journal human-intervention tracking is not present in the current
+CP2 tree.
 
 Then continue with any safe inspection or planning work available.
 
@@ -184,13 +185,9 @@ docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md
 docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md
 ```
 
-For DATP journal fallback work, read:
-
-```text
-docs/tickets/ticket_inventory.md
-docs/tickets/ticket_progress.md
-docs/tickets/human_interventions.md
-```
+Legacy DATP journal fallback tracking files are not present in the current CP2
+tree. If a separate DATP journal tree is restored later, read that tree's active
+tracking files rather than assuming paths in this repository exist.
 
 Then determine:
 
@@ -213,8 +210,8 @@ Do not restart from zero unless the progress records are missing, corrupt, or co
 If written state contradicts the repository, repository reality wins.
 
 Record the contradiction in the relevant ticket progress entry. For CP2, use
-`CP2_PROGRESS.md` and `CP2_DECISION_LOG.md`; use
-`docs/tickets/human_interventions.md` only for DATP journal fallback work.
+`CP2_PROGRESS.md` and `CP2_DECISION_LOG.md`. Do not present nonexistent DATP
+journal fallback files as active CP2 paths.
 
 Then continue.
 
@@ -271,8 +268,8 @@ next command to resume
 ```
 
 Update the relevant ticket progress entry before stopping. For CP2 blockers,
-also update `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`; use
-`docs/tickets/human_interventions.md` only for DATP journal fallback work.
+also update `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`. Do not
+present nonexistent DATP journal fallback files as active CP2 paths.
 
 ---
 
@@ -682,13 +679,20 @@ graphify install --platform copilot
 graphify vscode install
 ```
 
-Run from repo root:
+Run the default code-only repository graph command from repo root:
+
+```bash
+graphify update .
+```
+
+Optional LLM-enriched mode is not the CP2 default and requires a supported API
+key such as `GEMINI_API_KEY`:
 
 ```bash
 graphify .
 ```
 
-If slash commands are available:
+If slash commands are available, use this only as optional LLM-enriched mode:
 
 ```text
 /graphify .
@@ -1674,8 +1678,8 @@ DONE
 When stopping, write a handoff in the relevant ticket progress entry or audit report.
 
 For CP2, also update `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
-if a blocker requires human action. Use `docs/tickets/human_interventions.md`
-only for DATP journal fallback work.
+if a blocker requires human action. Legacy DATP journal human-intervention
+tracking is not present in the current CP2 tree.
 
 Include:
 

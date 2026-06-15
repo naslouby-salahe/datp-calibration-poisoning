@@ -3,9 +3,16 @@
 **Audit type:** Ticket-program creation verification
 **Scope:** `docs/tickets/**` for the CP2 (Calibration-Channel Poisoning) paper program
 **Source of truth:** actual files on disk (verified via `find`/`grep`), `docs/DATP_CP_Roadmap.md`, `docs/tickets/TICKET_INDEX.md`
-**Result:** PASS — ticket program is complete and self-consistent. No tickets executed; all statuses are "not started".
+**Result:** PASS — ticket program is complete and self-consistent. At ticket
+creation time, no tickets had executed and all statuses initialized as
+"not started". Current execution status is tracked in
+`_ai_tracking/progress/CP2_PROGRESS.md`.
 
-> Honesty note: this audit verifies the **ticket files and structure only**. It does **not** claim any implementation, test, tool run, experiment, or result. No code was run beyond `find`/`grep`/`ls` for file verification.
+> Honesty note: this audit verifies the **ticket files and structure only** as
+> of ticket creation. It does **not** claim any implementation, test, tool run,
+> experiment, or result. No code was run beyond `find`/`grep`/`ls` for file
+> verification during this creation audit. Later Phase 00 execution is recorded
+> separately in `_ai_tracking/progress/CP2_PROGRESS.md`.
 
 ---
 
@@ -113,11 +120,19 @@ All fallbacks default to "not started" and require an explicit trigger; each rec
 - Graphify is **AVAILABLE** (graphifyy==0.8.39; installed via CP2-T004, 2026-06-15).
   Initial graph: 6229 nodes, 15572 edges, 406 communities. Canonical invocation:
   `graphify update .`. Every ticket's Graphify section remains valid for execution.
-- No code, tests, tools, or experiments have been run. All 63 tickets are "not started".
+- At ticket creation time, no code, tests, tools, or experiments had been run
+  by this audit and all 63 tickets were initialized as "not started". This is
+  historical context; current status is superseded by
+  `_ai_tracking/progress/CP2_PROGRESS.md`.
 - The existing prototype (`src/datp/attacks/calibration_poisoning.py`, `poisoning_config.py`, `experiments/calibration_poisoning.py`) is non-protocol and is scheduled for replacement/removal by CP2-T027/T028 (greenfield, no backward compatibility).
 
 ---
 
 ## 11. Verdict
 
-**PASS.** The CP2 ticket program is complete (63 tickets), uniquely identified, phase-organized, dependency-linked, refactor/drift-bracketed, fallback-gated, and terminates in the fixed experiment → analysis → paper tail. Supporting tracking infrastructure, README, and authoritative index are in place. Ready for execution starting at CP2-T000.
+**PASS.** The CP2 ticket program is complete (63 tickets), uniquely identified,
+phase-organized, dependency-linked, refactor/drift-bracketed, fallback-gated, and
+terminates in the fixed experiment → analysis → paper tail. Supporting tracking
+infrastructure, README, and authoritative index are in place. At creation time,
+execution was ready to start at CP2-T000; current next action is governed by
+`_ai_tracking/progress/CP2_PROGRESS.md`.

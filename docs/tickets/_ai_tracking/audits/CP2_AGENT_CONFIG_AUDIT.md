@@ -75,7 +75,7 @@ working on CP2 tickets:
 | `.github/copilot-instructions.md` | `docs/journal/PRE_CODING_PLAN.md` etc. (journal 4-file plan) |
 | `.github/copilot-instructions.md` | `docs/tickets/ticket_inventory.md` — stale CP2 path |
 | `.github/copilot-instructions.md` | `docs/tickets/ticket_progress.md` — stale CP2 path |
-| `.github/copilot-instructions.md` | `docs/tickets/human_interventions.md` — stale CP2 path |
+| `.github/copilot-instructions.md` | legacy DATP journal human-intervention tracker — stale CP2 path |
 | `.github/copilot-instructions.md` | "conference-to-journal transition" framing |
 | `.github/copilot-instructions.md` | `Journal/Journal_Extension_Master_Roadmap.md` as active |
 | `.claude/agents/orchestrator-agent.md` | `docs/journal/*.md`, `docs/tickets/ticket_inventory.md` / `ticket_progress.md` |

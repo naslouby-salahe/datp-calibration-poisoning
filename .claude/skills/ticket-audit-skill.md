@@ -68,7 +68,8 @@ Check that every ticket includes:
 
 Check that every required user action is recorded in the appropriate tracking file.
 For CP2: `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`.
-For DATP journal: `docs/tickets/human_interventions.md`.
+For DATP journal: use that restored tree's active human-intervention tracker;
+do not assume one exists in this CP2 tree.
 
 No hidden human action is allowed.
 
@@ -101,7 +102,7 @@ The audit must update:
 **DATP journal (if that work resumes):**
 1. `docs/tickets/ticket_inventory.md`
 2. `docs/tickets/ticket_progress.md`
-3. `docs/tickets/human_interventions.md`
+3. Restored DATP journal human-intervention tracker, if that separate tree exists
 4. Any affected `TXX.md` files
 
 ## Pass Criteria
