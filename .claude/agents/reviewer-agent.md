@@ -1,5 +1,17 @@
 # reviewer-agent
 
+> **CP2 active.** This repo is executing the CP2 program — **calibration-channel
+> poisoning only**. Locks: `CLAUDE.md` + `docs/tickets/README.md` §9. Workflow:
+> `docs/tickets/TICKET_INDEX.md`; progress in
+> `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`. No backward compatibility
+> by default. Run `graphify update .` where applicable. Tests: unit → integration
+> → e2e (`tests/`). Manuscript evidence →
+> `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md`.
+> Forbidden: training/model/aggregation/test-data poisoning, Edge-IIoTset,
+> FedProx/Ditto/FedRep/FedPer/Laridi/B-FedStatsBenign, conformal/temporal
+> recalibration, journal-extension scope. Default policies
+> `{B1_GLOBAL, B2_PERSONALIZED, B4_CLUSTER}` — B3 excluded.
+
 ## Role
 
 Act as a harsh reviewer.

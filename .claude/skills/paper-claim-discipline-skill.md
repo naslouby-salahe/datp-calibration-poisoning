@@ -1,5 +1,18 @@
 # Paper Claim Discipline Skill
 
+> **CP2 active.** This repo is executing the CP2 program — **calibration-channel
+> poisoning only**. Locks: `CLAUDE.md` + `docs/tickets/README.md` §9. Workflow:
+> `docs/tickets/TICKET_INDEX.md`; progress in
+> `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`. No backward compatibility
+> by default. Run `graphify update .` where applicable. Tests: unit → integration
+> → e2e (`tests/`). Manuscript evidence →
+> `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md`.
+> Forbidden: training/model/aggregation/test-data poisoning, Edge-IIoTset,
+> FedProx/Ditto/FedRep/FedPer/Laridi/B-FedStatsBenign, conformal/temporal
+> recalibration, journal-extension scope. Default policies
+> `{B1_GLOBAL, B2_PERSONALIZED, B4_CLUSTER}` — B3 excluded. CP2 do-not-claim:
+> privacy/DP, deployment/hardware, broad FL robustness, generic poisoning.
+
 Use this skill for every manuscript, abstract, conclusion, caption, table title, README, report, audit, ticket, or documentation update that mentions DATP scientific findings.
 
 The goal is to ensure every claim is narrower than the evidence.
