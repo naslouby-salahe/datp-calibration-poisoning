@@ -38,8 +38,9 @@ determinism (`training_seed=[0..4]`). Heavy training requires explicit authoriza
 Reuse existing FL training stages; no wrappers; typed config; centralized constants.
 
 ## 7. Implementation guidance
-Use inherited `src/datp/experiments/stages/train_fl.py` + scoring generation. Write
-manifest to `_ai_tracking/manifests/clean_score_artifacts.json`.
+Use or create the appropriate FL training stage module under
+`src/datp/experiments/stages/` (e.g., `train_encoder.py` or equivalent) plus
+scoring generation. Write manifest to `_ai_tracking/manifests/clean_score_artifacts.json`.
 
 ## 8. Tests and diagnostics
 ```text

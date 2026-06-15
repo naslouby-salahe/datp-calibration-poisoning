@@ -91,6 +91,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 The agent must create or update:
 
+> **CP2 note:** CP2 tickets already exist under `docs/tickets/<phase>/CP2-T*.md`.
+> This output list applies to future DATP-journal ticket generation only.
+
 1. `docs/tickets/T01.md`
 2. `docs/tickets/T02.md`
 3. `docs/tickets/T03.md`
@@ -187,7 +190,9 @@ Examples:
 When human action is required:
 
 1. Mark the ticket as `BLOCKED_HUMAN`.
-2. Add a clear entry to `docs/tickets/human_interventions.md`.
+2. Add a clear entry to the appropriate file:
+   - **CP2 (active):** `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
+   - **DATP journal (if that work resumes):** `docs/tickets/human_interventions.md`
 3. State exactly what the user must do.
 4. State where the required file or decision should be placed.
 5. State which ticket becomes unblocked afterward.
@@ -275,7 +280,7 @@ After ticket generation, report only:
 1. Number of tickets created.
 2. Number of blocked-human tickets.
 3. Number of blocked-technical tickets.
-4. Location of `ticket_inventory.md`.
-5. Location of `ticket_progress.md`.
-6. Location of `human_interventions.md`.
+4. Location of ticket index/inventory file.
+5. Location of ticket progress file.
+6. Location of blocker/human-intervention log.
 7. Any immediate human action required.

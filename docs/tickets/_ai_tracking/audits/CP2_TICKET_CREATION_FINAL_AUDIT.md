@@ -54,7 +54,7 @@ Total = 63. **OK.**
 - [x] Initial repo audit exists: `_ai_tracking/audits/CP2_INITIAL_REPO_AUDIT.md`.
 - [x] Decision log exists: `_ai_tracking/decisions/CP2_DECISION_LOG.md`.
 - [x] Consolidated paper notes exist: `_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md`.
-- [x] Graphify status exists: `_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md` (state: NOT AVAILABLE).
+- [x] Graphify status exists: `_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md` (state: AVAILABLE — installed 2026-06-15 via CP2-T004).
 - [x] **Every** ticket contains a Graphify section (grep: 0 missing).
 - [x] **Every** ticket contains a `Dependencies:` field (grep: 0 missing).
 
@@ -110,7 +110,9 @@ All fallbacks default to "not started" and require an explicit trigger; each rec
 
 ## 10. Known open items (honest)
 
-- Graphify is **NOT installed/wired**; every ticket's Graphify section is "run if available; else defer". CP2-T004 owns resolution. This is a deferral, not a pass.
+- Graphify is **AVAILABLE** (graphifyy==0.8.39; installed via CP2-T004, 2026-06-15).
+  Initial graph: 6229 nodes, 15572 edges, 406 communities. Canonical invocation:
+  `graphify update .`. Every ticket's Graphify section remains valid for execution.
 - No code, tests, tools, or experiments have been run. All 63 tickets are "not started".
 - The existing prototype (`src/datp/attacks/calibration_poisoning.py`, `poisoning_config.py`, `experiments/calibration_poisoning.py`) is non-protocol and is scheduled for replacement/removal by CP2-T027/T028 (greenfield, no backward compatibility).
 

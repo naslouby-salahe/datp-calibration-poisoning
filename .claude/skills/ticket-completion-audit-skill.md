@@ -6,14 +6,22 @@ Verify whether one or more tickets were implemented completely and honestly.
 
 ## Required Sources
 
-1. Requested ticket file or files
-2. `docs/tickets/ticket_inventory.md`
-3. `docs/tickets/ticket_progress.md`
-4. `docs/tickets/human_interventions.md`
+**CP2 (active):**
+1. Requested ticket file(s) under `docs/tickets/<phase>/CP2-T*.md`
+2. `docs/tickets/TICKET_INDEX.md`
+3. `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+4. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
 5. Relevant source code
 6. Relevant tests
 7. Relevant configs
 8. Relevant artifacts or logs when applicable
+
+**DATP journal (if that work resumes):**
+1. Requested ticket file or files
+2. `docs/tickets/ticket_inventory.md`
+3. `docs/tickets/ticket_progress.md`
+4. `docs/tickets/human_interventions.md`
+5. Relevant source code, tests, configs, artifacts
 
 ## Audit Checklist
 

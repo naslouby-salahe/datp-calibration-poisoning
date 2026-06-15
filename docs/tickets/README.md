@@ -78,11 +78,16 @@ re-audit; otherwise mark `needs reaudit`.
 
 ## 4. How to use Graphify
 
-Graphify is currently **not installed** (see
+Graphify is **AVAILABLE** — graphifyy==0.8.39 installed 2026-06-15 (see
 [`_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md`](_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md)).
-Every ticket still carries a Graphify section: run it where applicable; otherwise
+The default non-LLM invocation (no API key needed) is:
+
+```bash
+graphify update .
+```
+
+Every ticket carries a Graphify section: run it where applicable; otherwise
 record the deferral with a reason in the status file. Never skip it silently.
-CP2-T004 owns discovery/installation.
 
 ## 5. How to write paper notes
 

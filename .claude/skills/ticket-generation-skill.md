@@ -73,6 +73,9 @@ Each ticket must contain:
 
 ## Required Output Files
 
+> **CP2 note:** CP2 tickets already exist. This skill applies to future DATP-journal
+> ticket generation, not CP2. For CP2, use `TICKET_INDEX.md` and `CP2_PROGRESS.md`.
+
 The ticket generation process must create:
 
 1. `docs/tickets/ticket_inventory.md`

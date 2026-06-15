@@ -150,12 +150,15 @@ plan under `docs/tickets/`.
 
 ## 8. Graphify
 
-- **Graphify is NOT installed and NOT wired into the repo.** The only references
-  are in `.github/copilot-instructions.md` (≈20 mentions). It is absent from
-  `Makefile`, `COMMANDS.md`, `README.md`, `pyproject.toml`, and source.
-- Action: tracked in `docs/tickets/_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md`.
-  Ticket **CP2-T004** owns discovery/installation/documentation. Until available,
-  every ticket records Graphify as deferred-with-reason rather than skipped silently.
+> **Historical note (audit recorded pre-installation):** At the time this audit
+> was written, Graphify was not yet installed. CP2-T004 subsequently completed
+> installation (graphifyy==0.8.39, 2026-06-15). The current state is AVAILABLE.
+> See `_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md`.
+
+- **Graphify is AVAILABLE** — graphifyy==0.8.39 installed via CP2-T004.
+  Initial graph: 6229 nodes, 15572 edges, 406 communities.
+  Canonical invocation: `graphify update .` (no API key needed).
+- Status tracked in `docs/tickets/_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md`.
 
 ---
 
@@ -206,7 +209,8 @@ plan under `docs/tickets/`.
 The repository provides a strong, reusable DATP substrate (thresholding, scoring,
 statistics, validation, reporting, enums, CLI). CP2 attack code exists only as a
 **non-protocol prototype** and must be rebuilt to the `docs/DATP_CP_Roadmap.md`
-contract. No journal contamination is present in code. Graphify is not installed.
+contract. No journal contamination is present in code. Graphify has since been
+installed (CP2-T004; see `_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md`).
 The ticket plan proceeds: setup → read-only audit → protocol lock → core
 implementation → smoke → MVP → optional full → final experiment/analysis/paper,
 with periodic refactor and scientific-drift tickets and conditional fallbacks.

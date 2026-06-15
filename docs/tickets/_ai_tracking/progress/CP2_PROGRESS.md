@@ -29,7 +29,7 @@ scientific-contract evidence, plus a re-audit. Otherwise use `needs reaudit`.
 
 | Phase | Folder | Tickets | Status |
 |---|---|---|---|
-| 00 Setup | `phase_00_setup/` | CP2-T000 … CP2-T006 | not started |
+| 00 Setup | `phase_00_setup/` | CP2-T000 … CP2-T006 | in progress (T003, T004 done; T000–T002, T005–T006 not started) |
 | A Audit | `phase_a_audit/` | CP2-T007 … CP2-T015 (+FB1, FB3) | not started |
 | B Protocol lock | `phase_b_protocol_lock/` | CP2-T016 … CP2-T023 | not started |
 | C Core impl | `phase_c_core_implementation/` | CP2-T024 … CP2-T037 (+FB2) | not started |
@@ -66,7 +66,7 @@ See `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`. None recorded yet
 | Tracking infrastructure | present (audits, decisions, diagnostics, graphify, manifests, paper_notes, progress, run_logs) |
 | Initial repo audit | `_ai_tracking/audits/CP2_INITIAL_REPO_AUDIT.md` |
 | Final ticket-creation audit | `_ai_tracking/audits/CP2_TICKET_CREATION_FINAL_AUDIT.md` (verdict: PASS) |
-| Tickets executed | **0** — all "not started" |
+| Tickets executed | **2** — CP2-T003 (done), CP2-T004 (done); all others "not started" |
 | Graphify | **AVAILABLE** — graphifyy==0.8.39 installed; initial graph: 6229 nodes, 15572 edges, 406 communities |
 
 Verification performed: `find`/`grep`/`ls` only — confirmed 63 unique IDs, every
@@ -81,4 +81,6 @@ tests, tools, or experiments were run.
 ```
 2026-06-15 | CP2-T000 | bootstrap created (ticket system, tracking, audit) | n/a | docs/tickets/** | start CP2-T001
 2026-06-15 | program  | all 63 CP2 tickets created (T000–T058 + FB1–FB4); final ticket-creation audit PASS | find/grep/ls verification | docs/tickets/** | begin execution at CP2-T000
-2026-06-15 | CP2-T004 | done | Graphify installed (graphifyy==0.8.39 via uv tool install); initial graph built: 6229 nodes, 15572 edges, 406 communities | graphify-out/ | update CP2_GRAPHIFY_STATUS.md to AVAILABLE2026-06-15 | config   | agent/config alignment done | rg + pyright + graphify update | CLAUDE.md created; .github/copilot-instructions.md updated (CP2 section prepended); .claude/settings.json (graphify permission added); 6 agent files updated; 2 skill files updated; audit+report written | next: begin CP2-T000```
+2026-06-15 | CP2-T004 | done | Graphify installed (graphifyy==0.8.39 via uv tool install); initial graph built: 6229 nodes, 15572 edges, 406 communities | graphify-out/ | CP2_GRAPHIFY_STATUS.md updated to AVAILABLE | next: CP2-T003
+2026-06-15 | CP2-T003 | done | agent/config alignment done | rg + pyright + graphify update . | CLAUDE.md created; .github/copilot-instructions.md updated (CP2 section prepended); .claude/settings.json (graphify permission added); 6 agent files updated; 2 skill files updated; audit+report written in _ai_tracking/audits/ | next: begin CP2-T000
+```

@@ -3,7 +3,7 @@
 **Date:** 2026-06-15
 **Task:** Align `.claude`, `CLAUDE.md`, and `.github` with the CP2 ticket workflow
 **Audit input:** `CP2_AGENT_CONFIG_AUDIT.md`
-**Result:** COMPLETE — all targeted files updated; validation passed.
+**Result:** COMPLETE — all targeted files updated; validation completed with known pre-existing Ruff E501 warnings (unrelated to this documentation-only update); no new blocking issues introduced.
 
 ---
 
@@ -155,8 +155,8 @@ Updated file paths throughout to use CP2 paths; stale DATP-journal paths kept as
 
 ## 8. Next Recommended Ticket
 
-**CP2-T000** — Environment & Dependency Verification
+**CP2-T000** — Ticket System Bootstrap
 
-This is the first ticket in Phase 00 Setup. It verifies the Python environment,
-key dependencies, and Makefile targets are functional before any implementation
-work. It is a prerequisite for all subsequent tickets.
+This is the first ticket in Phase 00 Setup. It bootstraps the ticket system itself
+(verifies the ticket program is sound, checks structure, confirms tracking files),
+and is a prerequisite for all subsequent tickets. It has no dependencies.

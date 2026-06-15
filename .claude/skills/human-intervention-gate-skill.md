@@ -25,7 +25,9 @@ If human intervention is needed:
 
 1. Stop the task.
 2. Mark the ticket `BLOCKED_HUMAN`.
-3. Add an entry to `docs/tickets/human_interventions.md`.
+3. Add an entry to the appropriate decision/intervention file:
+   - **CP2 (active):** `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
+   - **DATP journal (if that work resumes):** `docs/tickets/human_interventions.md`
 4. State exactly what the user must do.
 5. State where to place the required file or decision.
 6. State which ticket becomes unblocked afterward.

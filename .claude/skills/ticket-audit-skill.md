@@ -66,7 +66,9 @@ Check that every ticket includes:
 
 ### Pass 6 — Human Intervention
 
-Check that every required user action is listed in `human_interventions.md`.
+Check that every required user action is recorded in the appropriate tracking file.
+For CP2: `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`.
+For DATP journal: `docs/tickets/human_interventions.md`.
 
 No hidden human action is allowed.
 
@@ -91,6 +93,12 @@ Flag:
 
 The audit must update:
 
+**CP2 (active):**
+1. `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+2. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` (for blockers)
+3. Any affected `docs/tickets/<phase>/CP2-T*.md` files
+
+**DATP journal (if that work resumes):**
 1. `docs/tickets/ticket_inventory.md`
 2. `docs/tickets/ticket_progress.md`
 3. `docs/tickets/human_interventions.md`

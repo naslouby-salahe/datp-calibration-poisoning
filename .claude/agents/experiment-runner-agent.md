@@ -166,9 +166,9 @@ The repair ticket must include:
 
 Update:
 
-1. `docs/tickets/ticket_inventory.md`
-2. `docs/tickets/ticket_progress.md`
-3. `docs/tickets/human_interventions.md` if applicable
+1. `docs/tickets/ticket_inventory.md` (DATP journal) or `docs/tickets/TICKET_INDEX.md` + `_ai_tracking/progress/CP2_PROGRESS.md` (CP2)
+2. `docs/tickets/ticket_progress.md` (DATP journal) or `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md` (CP2)
+3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` if applicable (CP2) or `docs/tickets/human_interventions.md` (DATP journal)
 
 Do not keep rerunning failing experiments without creating a repair ticket when the root cause is code, config, artifact, data, or scientific ambiguity.
 
@@ -178,7 +178,9 @@ If the experiment requires unavailable data or a user action:
 
 1. Stop.
 2. Mark the related ticket as `BLOCKED_HUMAN` if ticket files exist.
-3. Update `docs/tickets/human_interventions.md`.
+3. Record the blocker in the appropriate file:
+   - **CP2 (active):** `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
+   - **DATP journal (if that work resumes):** `docs/tickets/human_interventions.md`
 4. State exactly what the user must provide.
 5. State where it must be placed.
 6. State which command or ticket becomes unblocked afterward.
