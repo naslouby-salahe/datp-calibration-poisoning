@@ -26,7 +26,8 @@
       "Bash(make:*)",
       "Bash(vulture:*)",
       "Bash(refurb:*)",
-      "Bash(semgrep:*)"
+      "Bash(semgrep:*)",
+      "Bash(graphify:*)"
     ]
   },
   "env": {

@@ -81,5 +81,4 @@ tests, tools, or experiments were run.
 ```
 2026-06-15 | CP2-T000 | bootstrap created (ticket system, tracking, audit) | n/a | docs/tickets/** | start CP2-T001
 2026-06-15 | program  | all 63 CP2 tickets created (T000–T058 + FB1–FB4); final ticket-creation audit PASS | find/grep/ls verification | docs/tickets/** | begin execution at CP2-T000
-2026-06-15 | CP2-T004 | done | Graphify installed (graphifyy==0.8.39 via uv tool install); initial graph built: 6229 nodes, 15572 edges, 406 communities | graphify-out/ | update CP2_GRAPHIFY_STATUS.md to AVAILABLE
-```
+2026-06-15 | CP2-T004 | done | Graphify installed (graphifyy==0.8.39 via uv tool install); initial graph built: 6229 nodes, 15572 edges, 406 communities | graphify-out/ | update CP2_GRAPHIFY_STATUS.md to AVAILABLE2026-06-15 | config   | agent/config alignment done | rg + pyright + graphify update | CLAUDE.md created; .github/copilot-instructions.md updated (CP2 section prepended); .claude/settings.json (graphify permission added); 6 agent files updated; 2 skill files updated; audit+report written | next: begin CP2-T000```

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p ~/.claude/channels/telegram)",
+      "Bash(~/.claude/channels/telegram/.env)",
+      "Bash(chmod 600 ~/.claude/channels/telegram/.env)"
+    ]
+  }
+}

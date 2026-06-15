@@ -14,9 +14,9 @@ Before auditing completion, read:
 
 1. `CLAUDE.md`
 2. `AGENTS.md`
-3. The target ticket.
-4. `docs/tickets/ticket_inventory.md`
-5. `docs/tickets/ticket_progress.md`
+3. The target ticket from `docs/tickets/<phase>/CP2-T*.md`.
+4. **CP2 (active):** `docs/tickets/TICKET_INDEX.md`
+5. **CP2 (active):** `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
 6. `.claude/skills/static-analysis-quality-gate-skill.md`
 7. Changed source files.
 8. Related source files.
@@ -198,7 +198,7 @@ Return:
 14. Sonar status if attempted.
 15. Drift verdict if applicable.
 16. Remaining blockers.
-17. Required status for `ticket_progress.md`.
+17. Required status update for `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`.
 18. Required follow-up tickets, if any.
 
 ---

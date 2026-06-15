@@ -258,3 +258,44 @@ When coordinating a task, report:
 10. Drift verdict.
 11. Remaining blockers.
 12. Final status.
+
+---
+
+## CP2 Active Context
+
+The repository is currently executing the **CP2 ticket program**:
+**Calibration-Channel Poisoning of Federated Threshold Personalization in IoT Anomaly Detection: A Policy-Differentiated Vulnerability Analysis**
+
+### CP2 source-of-truth files (read before any CP2 ticket)
+
+```
+docs/DATP_CP_Roadmap.md          ← CP2 protocol of record
+docs/tickets/TICKET_INDEX.md      ← authoritative ticket spec
+docs/tickets/README.md            ← phase layout and scientific locks
+docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md
+docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md
+docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md
+docs/tickets/_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md
+```
+
+### CP2 ticket workflow
+
+1. Read the active ticket from `docs/tickets/<phase>/CP2-T*.md`.
+2. Read its dependencies before starting.
+3. Inspect actual code, configs, tests, outputs — do not trust progress files alone.
+4. Do not skip dependencies. Do not run experiments before CP2-T056.
+5. After completing work, update `CP2_PROGRESS.md` with evidence.
+6. If the ticket affects claims/methods/figures/limitations, append to `CP2_PAPER_NOTES_CONSOLIDATED.md`.
+7. Run `graphify update .` after structural changes (Graphify is AVAILABLE; see `CP2_GRAPHIFY_STATUS.md`).
+
+### CP2 greenfield rule
+
+CP2 is greenfield inside this repository. Existing code is **not** automatically canonical. No backward compatibility is required unless a ticket explicitly says so.
+
+### CP2 hard stops for this agent
+
+- Do not treat `docs/journal/*.md` as the active CP2 planning layer.
+- Do not reference `docs/tickets/ticket_inventory.md` or `ticket_progress.md` for CP2 — use `TICKET_INDEX.md` and `CP2_PROGRESS.md`.
+- Do not run final experiments before CP2-T056.
+- Do not write the final paper package before CP2-T058.
+- See `CLAUDE.md` for full CP2 scientific locks.

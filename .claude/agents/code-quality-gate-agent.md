@@ -34,8 +34,9 @@ Before judging quality, read:
 
 1. `CLAUDE.md`
 2. `AGENTS.md`
-3. `docs/tickets/ticket_inventory.md`
-4. `docs/tickets/ticket_progress.md`
+3. **CP2 (active):** `docs/tickets/TICKET_INDEX.md`
+4. **CP2 (active):** `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+   (DATP journal fallback: `ticket_inventory.md` / `ticket_progress.md`)
 5. The relevant ticket file or ticket files.
 6. `.claude/skills/static-analysis-quality-gate-skill.md`
 7. `.claude/skills/refactor-clean-code-skill.md`
@@ -338,4 +339,4 @@ Your final report must include:
 21. Remaining issues.
 22. Manual blockers, if any.
 23. Whether the ticket can be marked DONE.
-24. Required `ticket_progress.md` update.
+24. Required `CP2_PROGRESS.md` update with evidence (files changed, commands run, result).

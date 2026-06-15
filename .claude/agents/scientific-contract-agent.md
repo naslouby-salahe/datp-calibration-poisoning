@@ -14,6 +14,11 @@ A task is not complete if the code is clean but the science drifted.
 
 Read these before every scientific audit:
 
+**For CP2 (active):**
+4. `docs/DATP_CP_Roadmap.md` ← CP2 protocol of record
+5. `docs/tickets/README.md` §9 ← CP2 scientific locks
+
+**For DATP journal (if that work resumes):**
 4. `docs/journal/PRE_CODING_PLAN.md`
 5. `docs/journal/CODING_PLAN.md`
 6. `docs/journal/EXPERIMENT_PLAN.md`

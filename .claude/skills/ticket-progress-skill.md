@@ -6,6 +6,13 @@ Track what is done, what is missing, what is blocked, and what must happen next.
 
 ## Required Files
 
+**CP2 (active):**
+1. `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+2. `docs/tickets/TICKET_INDEX.md`
+3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
+4. `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md`
+
+**DATP journal (if that work resumes):**
 1. `docs/tickets/ticket_progress.md`
 2. `docs/tickets/ticket_inventory.md`
 3. `docs/tickets/human_interventions.md`
@@ -14,9 +21,9 @@ Track what is done, what is missing, what is blocked, and what must happen next.
 
 The executing agent must:
 
-1. Open `ticket_progress.md`.
-2. Open `ticket_inventory.md`.
-3. Open the requested ticket.
+1. Open `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`.
+2. Open `docs/tickets/TICKET_INDEX.md`.
+3. Open the requested ticket from `docs/tickets/<phase>/CP2-T*.md`.
 4. Check all previous tickets.
 5. Confirm every previous ticket is `DONE`, `SKIPPED_WITH_REASON`, or correctly blocked.
 6. If a previous ticket is incomplete, stop and return to that ticket first.
@@ -24,7 +31,7 @@ The executing agent must:
 
 ## During a Ticket
 
-Update `ticket_progress.md` with:
+Update `CP2_PROGRESS.md` with:
 
 1. Ticket started
 2. Files inspected
@@ -42,9 +49,9 @@ Update `ticket_progress.md` with:
 Update:
 
 1. The ticket file status.
-2. `ticket_inventory.md`.
-3. `ticket_progress.md`.
-4. `human_interventions.md` if new human action appears.
+2. `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`.
+3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` if a decision was made.
+4. `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md` if the ticket affects claims.
 
 ## Required Status Values
 

@@ -10,7 +10,15 @@ The goal is to prove that the change preserves the DATP scientific contract.
 
 Before applying this skill, inspect:
 
+**CP2 (active):**
+1. `docs/DATP_CP_Roadmap.md` — CP2 protocol of record
+2. `docs/tickets/README.md` §9 — CP2 scientific locks
+3. Relevant `docs/tickets/<phase>/CP2-T*.md`
+
+**DATP journal (if that work resumes):**
 1. Active `docs/journal/*.md`
+
+**Always:**
 2. Relevant tickets.
 3. Relevant code.
 4. Relevant tests.
@@ -19,7 +27,31 @@ Before applying this skill, inspect:
 
 Do not rely on memory.
 
-Do not rely on archived roadmap context when active journal files disagree.
+Do not rely on archived roadmap context when active planning files disagree.
+
+---
+
+## CP2 Core Invariants (always check when touching CP2 code)
+
+1. Calibration-channel poisoning only — never poison training data, model weights,
+   aggregation, or test data.
+2. Injection rule is `REPLACE_FIXED_BUDGET`: replace m_i = max(1, round(f·n_i))
+   positions with values resampled **with replacement** from the victim-local reservoir.
+3. Clean arrays must never be mutated in place; always work on a copy.
+4. Reservoirs are victim-local benign calibration scores. Test scores and training
+   scores are never reservoirs.
+5. Seed scheme: `SeedSequence([training_seed, poisoning_seed, client_id, scope_id])`.
+   No integer seed addition.
+6. B3 is not part of the CP2 default policy enum. Default policies: {B1, B2, B4}.
+7. B4 for N-BaIoT: K=3, k-means++, n_init=10, max_iter=300, random_state=42;
+   fingerprint = [mean, std, skew, p95]; use client-indexed effective thresholds,
+   not raw cluster labels.
+8. CV(FPR) = σ/µ with **no epsilon** denominator. Always report coverage.
+9. AUROC must be invariant (test scores are unchanged by calibration-channel attack).
+10. Two-layer statistics only: per-victim paired seed deltas → 5 seed aggregates
+    → bootstrap CI. Never treat 9×5 as 45 independent samples.
+11. `mu_flag_threshold` must be locked before any poisoned run executes.
+12. Edge-IIoTset is forbidden for CP2. CICIoT2023 is optional stretch, FB4-gated.
 
 ---
 

@@ -14,7 +14,8 @@ A drift issue is blocking when it can cause the project to look correct while be
 
 Before any drift audit, read:
 
-5. Active `docs/journal/*.md`
+**For CP2 (active):** `docs/DATP_CP_Roadmap.md` and `docs/tickets/README.md` §9
+**For DATP journal (if resuming):** `docs/journal/*.md`
 6. Active ticket files.
 7. Relevant source code.
 8. Relevant tests.

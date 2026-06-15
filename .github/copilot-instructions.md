@@ -1,5 +1,54 @@
 # GitHub Copilot Instructions
 
+---
+
+## CP2 ACTIVE — Read This First
+
+The repository is currently executing the **CP2 ticket program.**
+
+**CP2:** Calibration-Channel Poisoning of Federated Threshold Personalization in IoT Anomaly Detection: A Policy-Differentiated Vulnerability Analysis
+
+**Root instructions:** `CLAUDE.md` (always read this first for CP2 work)
+
+**CP2 is greenfield inside this repository.** Existing code is not automatically canonical. No backward compatibility unless a ticket explicitly says so.
+
+### CP2 files (use these, not the DATP journal paths below)
+
+| Purpose | File |
+|---|---|
+| CP2 protocol of record | `docs/DATP_CP_Roadmap.md` |
+| Ticket index | `docs/tickets/TICKET_INDEX.md` |
+| Phase layout + scientific locks | `docs/tickets/README.md` |
+| Progress tracker | `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md` |
+| Decision log | `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` |
+| Paper notes | `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md` |
+| Graphify status | `docs/tickets/_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md` |
+
+### CP2 working rules
+
+- Before editing code, read the active CP2 ticket and its listed dependencies.
+- Inspect actual code, tests, outputs before trusting progress files.
+- Do not use `docs/journal/*.md` as the CP2 planning layer.
+- Do not use `docs/tickets/ticket_inventory.md` or `ticket_progress.md` for CP2 — use `TICKET_INDEX.md` and `CP2_PROGRESS.md`.
+- Do not implement outside the current ticket scope.
+- Do not run final experiments before CP2-T056.
+- Do not run final analysis before CP2-T057.
+- Do not write the final paper package before CP2-T058.
+- Graphify is **AVAILABLE** (`graphify update .` — no API key needed).
+
+### CP2 scientific locks (summary)
+
+- Calibration-channel poisoning only. Training, model weights, aggregation, and test data are never poisoned.
+- Injection: `REPLACE_FIXED_BUDGET` (replace positions with victim-local reservoir values resampled with replacement; never mutate clean arrays in place).
+- Default policies: B1, B2, B4. B3 excluded. Edge-IIoTset forbidden.
+- Seeds via `SeedSequence([training_seed, poisoning_seed, client_id, scope_id])` — no integer addition.
+- `CV(FPR) = σ/µ` (no epsilon). Always report coverage. AUROC invariant.
+- Two-layer statistics: per-victim paired deltas → 5 seed aggregates → bootstrap CI. Not 45 independent.
+- `mu_flag_threshold` locked before any poisoned run.
+- No privacy, deployment, or FL robustness overclaim.
+
+---
+
 This repository implements DATP: Device-Aware Threshold Personalization for federated IoT malware/anomaly detection.
 
 Correctness in this repository means both:
