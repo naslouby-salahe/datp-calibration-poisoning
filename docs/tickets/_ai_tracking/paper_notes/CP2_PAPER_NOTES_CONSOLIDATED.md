@@ -45,4 +45,26 @@ produce evidence relevant to the manuscript append here. The final paper ticket
 
 ## Notes
 
-_None yet._
+### PN-0001 — Phase 00 Claim Boundaries (tickets CP2-T002, CP2-T006)
+- Date: 2026-06-15
+- Claim enabled: CP2 may reuse DATP's clean fixed-FedAvg, E=1,
+  threshold-calibration substrate and N-BaIoT physical-device framing as the
+  unattacked baseline context.
+- Claim blocked / not yet supported: No CP2 result claim is enabled yet; no
+  threshold shift, downstream harm, defense, or policy-vulnerability claim can be
+  written before experiments and result audit.
+- Limitation disclosed: CP2 must disclose score-level proxy abstraction,
+  high-fraction with-replacement repetition, N-BaIoT size/age, 9-client primary
+  regime, and no deployment validation.
+- Figure/table affected: Future threat-model table, experiment-matrix table,
+  claims/evidence table, and limitations.
+- Reviewer-risk relevance (see Roadmap §14): Avoid "just data poisoning" by
+  naming the calibration channel precisely; avoid AUROC confusion by framing
+  AUROC invariance as expected for a threshold-only intervention.
+- Do-not-claim reminder: Do not claim first FL-IDS poisoning work, broad
+  training/model/aggregation robustness, privacy/DP, deployment readiness,
+  Edge-IIoTset, FedProx/Ditto/FedRep/FedPer/Laridi/B-FedStatsBenign, conformal
+  thresholding, temporal recalibration, or venue strategy.
+- Evidence path:
+  `docs/tickets/_ai_tracking/audits/CP2_ADDITIONAL_DOCS_ALIGNMENT_AUDIT.md`;
+  `docs/tickets/_ai_tracking/audits/CP2_PHASE_00_DRIFT_AND_READINESS_AUDIT.md`.

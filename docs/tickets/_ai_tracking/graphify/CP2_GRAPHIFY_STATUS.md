@@ -1,6 +1,6 @@
 # CP2 Graphify Status
 
-**Last checked:** 2026-06-15 (updated after install)
+**Last checked:** 2026-06-15 (Phase 00 refresh)
 **State:** AVAILABLE
 
 ---
@@ -19,11 +19,10 @@
 
 ## Output layout
 
-- `graphify-out/graph.json` — full graph (7.6 MB, 6229 nodes)
-- `graphify-out/GRAPH_REPORT.md` — community report (406 communities; 379 shown,
-  27 thin omitted)
-- HTML viz skipped (6229 nodes > 5000 limit)
-- Built from commit: `cf1f29f8`
+- `graphify-out/graph.json` — full graph (6331 nodes)
+- `graphify-out/GRAPH_REPORT.md` — community report (397 communities)
+- HTML viz skipped (6331 nodes > 5000 limit)
+- Built from commit: `27c1dc31`
 
 ## Canonical invocation
 
@@ -50,4 +49,6 @@ meaningful names), set `GEMINI_API_KEY` or another supported backend key.
 
 ```
 2026-06-15 | CP2-T004 | installed | uv tool install graphifyy → 0.8.39; initial graph: 6229 nodes, 15572 edges, 406 communities
+2026-06-15 | CP2-T005 | refreshed | graphify --version → 0.8.39; graphify update . → 6298 nodes, 15638 edges, 407 communities
+2026-06-15 | CP2-T005 | refreshed after sidecar cleanup | graphify update . → 6331 nodes, 15668 edges, 397 communities
 ```

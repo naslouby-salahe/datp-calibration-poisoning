@@ -160,7 +160,11 @@ chain multiple actions
 update repository progress records
 ```
 
-If the current Copilot mode cannot do those things, record the limitation in the relevant ticket progress entry or in `docs/tickets/human_interventions.md`.
+If the current Copilot mode cannot do those things, record the limitation in the
+relevant ticket progress entry. For CP2, use
+`docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md` and, when a blocker or
+human decision is involved, `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`.
+Use `docs/tickets/human_interventions.md` only for DATP journal fallback work.
 
 Then continue with any safe inspection or planning work available.
 
@@ -172,7 +176,15 @@ Do not pretend autonomous execution is possible if the current mode cannot execu
 
 Every `Start_My_Agent` run may be a resumed session.
 
-Before planning new work, read:
+Before planning new work, read the active progress records. For CP2, read:
+
+```text
+docs/tickets/TICKET_INDEX.md
+docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md
+docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md
+```
+
+For DATP journal fallback work, read:
 
 ```text
 docs/tickets/ticket_inventory.md
@@ -200,7 +212,9 @@ Do not restart from zero unless the progress records are missing, corrupt, or co
 
 If written state contradicts the repository, repository reality wins.
 
-Record the contradiction in the relevant ticket progress entry or in `docs/tickets/human_interventions.md`.
+Record the contradiction in the relevant ticket progress entry. For CP2, use
+`CP2_PROGRESS.md` and `CP2_DECISION_LOG.md`; use
+`docs/tickets/human_interventions.md` only for DATP journal fallback work.
 
 Then continue.
 
@@ -256,7 +270,9 @@ remaining safe work
 next command to resume
 ```
 
-Update the relevant ticket progress entry or `docs/tickets/human_interventions.md` before stopping.
+Update the relevant ticket progress entry before stopping. For CP2 blockers,
+also update `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`; use
+`docs/tickets/human_interventions.md` only for DATP journal fallback work.
 
 ---
 
@@ -327,7 +343,7 @@ paper/sections/
 paper/DATP.pdf
 ```
 
-Journal anchors:
+Journal anchors (DATP journal fallback only; not CP2 planning):
 
 ```text
 docs/journal/PRE_CODING_PLAN.md
@@ -336,13 +352,13 @@ docs/journal/EXPERIMENT_PLAN.md
 docs/journal/POST_EXPERIMENT_PLAN.md
 ```
 
-Ticket ledger:
+Ticket ledger (CP2 active):
 
 ```text
 docs/tickets/
-docs/tickets/ticket_inventory.md
-docs/tickets/ticket_progress.md
-docs/tickets/human_interventions.md
+docs/tickets/TICKET_INDEX.md
+docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md
+docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md
 ```
 
 Tickets are not the default work target.
@@ -412,15 +428,17 @@ Read these before planning or editing:
 4. `paper/DATP.tex`
 5. `paper/sections/*.tex`
 6. `Journal/Journal_Extension_Master_Roadmap.md`
-7. `docs/journal/PRE_CODING_PLAN.md`
-8. `docs/journal/CODING_PLAN.md`
-9. `docs/journal/EXPERIMENT_PLAN.md`
-10. `docs/journal/POST_EXPERIMENT_PLAN.md`
-11. `docs/tickets/ticket_inventory.md`
-12. `docs/tickets/ticket_progress.md`
-13. `docs/tickets/human_interventions.md`
-14. relevant `docs/tickets/T*.md` only when the active task or verified finding needs ticket context
-15. relevant `docs/tickets/audits/*.md` only when auditing ticket evidence or scientific history
+7. CP2 active: `docs/DATP_CP_Roadmap.md`
+8. CP2 active: `docs/tickets/README.md`
+9. CP2 active: `docs/tickets/TICKET_INDEX.md`
+10. CP2 active: `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+11. CP2 active: `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
+12. DATP journal fallback only: `docs/journal/PRE_CODING_PLAN.md`
+13. DATP journal fallback only: `docs/journal/CODING_PLAN.md`
+14. DATP journal fallback only: `docs/journal/EXPERIMENT_PLAN.md`
+15. DATP journal fallback only: `docs/journal/POST_EXPERIMENT_PLAN.md`
+16. relevant `docs/tickets/<phase>/CP2-T*.md` only when the active task or verified finding needs ticket context
+17. relevant `docs/tickets/_ai_tracking/audits/*.md` only when auditing ticket evidence or scientific history
 16. `.claude/agents/*.md`
 17. `.claude/skills/*.md`
 
@@ -441,16 +459,19 @@ Do not treat the existence of many ticket files as a reason to make tickets the 
 Use sources in this order:
 
 1. Actual repository code, tests, configs, scripts, generated artifacts, and command output.
-2. `docs/journal/PRE_CODING_PLAN.md`
-3. `docs/journal/CODING_PLAN.md`
-4. `docs/journal/EXPERIMENT_PLAN.md`
-5. `docs/journal/POST_EXPERIMENT_PLAN.md`
-6. `docs/tickets/ticket_progress.md`
-7. `docs/tickets/ticket_inventory.md`
-8. Individual tickets under `docs/tickets/`
-9. Audit reports under `docs/tickets/audits/`
-10. `.claude/agents/`
-11. `.claude/skills/`
+2. CP2 active: `docs/DATP_CP_Roadmap.md`
+3. CP2 active: `docs/tickets/README.md`
+4. CP2 active: `docs/tickets/TICKET_INDEX.md`
+5. CP2 active: `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+6. CP2 active: `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
+7. Individual CP2 tickets under `docs/tickets/<phase>/`
+8. Audit reports under `docs/tickets/_ai_tracking/audits/`
+9. DATP journal fallback only: `docs/journal/PRE_CODING_PLAN.md`
+10. DATP journal fallback only: `docs/journal/CODING_PLAN.md`
+11. DATP journal fallback only: `docs/journal/EXPERIMENT_PLAN.md`
+12. DATP journal fallback only: `docs/journal/POST_EXPERIMENT_PLAN.md`
+13. `.claude/agents/`
+14. `.claude/skills/`
 12. `Journal/Journal_Extension_Master_Roadmap.md`
 13. `paper/DATP.tex`
 14. `paper/sections/*.tex`
@@ -1652,7 +1673,9 @@ DONE
 
 When stopping, write a handoff in the relevant ticket progress entry or audit report.
 
-Also update `docs/tickets/human_interventions.md` if a blocker requires human action.
+For CP2, also update `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
+if a blocker requires human action. Use `docs/tickets/human_interventions.md`
+only for DATP journal fallback work.
 
 Include:
 

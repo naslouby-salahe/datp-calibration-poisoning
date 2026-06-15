@@ -31,10 +31,10 @@ Before starting or delegating implementation work, read:
 
 1. `CLAUDE.md`
 2. `AGENTS.md`
-3. `docs/tickets/ticket_inventory.md`
-4. `docs/tickets/ticket_progress.md`
-5. The relevant ticket file or files.
-6. Relevant files under `docs/journal/`.
+3. **CP2 active:** `docs/tickets/TICKET_INDEX.md`
+4. **CP2 active:** `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+5. The relevant CP2 ticket file or files under `docs/tickets/<phase>/`.
+6. Relevant files under `docs/journal/` only when DATP journal work resumes.
 7. Relevant `.claude/agents/*.md`.
 8. Relevant `.claude/skills/*.md`.
 9. Existing code, tests, configs, scripts, and artifacts related to the task.
@@ -117,8 +117,10 @@ For every implementation ticket:
 7. Ask `code-quality-gate-agent` to audit changed and related code.
 8. Ask `ticket-completion-auditor-agent` to verify DONE eligibility.
 9. Ask `drift-enforcer-agent` if the ticket touches scientific scope, roadmap, paper claims, or experiment behavior.
-10. Update `docs/tickets/ticket_progress.md`.
-11. Update `docs/tickets/ticket_inventory.md` only if ticket scope or status summary changes.
+10. For CP2, update `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`.
+11. For CP2, update `docs/tickets/TICKET_INDEX.md` only if ticket scope or
+    status summary changes. Use `ticket_progress.md` / `ticket_inventory.md`
+    only for DATP journal fallback work.
 
 ---
 

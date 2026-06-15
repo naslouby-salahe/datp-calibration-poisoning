@@ -214,3 +214,36 @@ installed (CP2-T004; see `_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md`).
 The ticket plan proceeds: setup → read-only audit → protocol lock → core
 implementation → smoke → MVP → optional full → final experiment/analysis/paper,
 with periodic refactor and scientific-drift tickets and conditional fallbacks.
+
+---
+
+## 13. Phase 00 Refresh Addendum
+
+**Date:** 2026-06-15
+**Ticket:** CP2-T001
+
+Phase 00 re-inspected the current repository state and found the core audit still
+substantively current.
+
+Refresh evidence:
+
+- `find src/datp tests -maxdepth 3 -type f | sort`
+- `make help`
+- targeted `rg` scans for `shift_magnitude`, CP2 attack prototype symbols,
+  thresholding/scoring/statistics anchors, Graphify, and forbidden-scope terms
+- `graphify update .`
+
+Current attack inventory remains:
+
+- `src/datp/attacks/calibration_poisoning.py`
+- `src/datp/attacks/poisoning_config.py`
+- `src/datp/attacks/poisoning_metrics.py`
+- `src/datp/experiments/calibration_poisoning.py`
+
+The attack prototype still uses `attack_rate` and `shift_magnitude`; this remains
+non-protocol and is scheduled for later audit/replacement. No Phase 00 production
+code changes were made.
+
+Graphify refresh: `graphify update .` completed during Phase 00. Latest graph
+after sidecar cleanup: 6331 nodes, 15668 edges, and 397 communities. See
+`docs/tickets/_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md`.

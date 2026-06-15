@@ -124,8 +124,12 @@ Updated file paths throughout to use CP2 paths; stale DATP-journal paths kept as
 ## 5. Graphify Status
 
 - Graphify: **AVAILABLE** (graphifyy==0.8.39).
-- `graphify update .` run after all edits: **6266 nodes, 15607 edges, 407 communities** (37 new nodes from the new docs).
-- `CP2_GRAPHIFY_STATUS.md` is current.
+- Historical run at the time of this update report:
+  `graphify update .` → **6266 nodes, 15607 edges, 407 communities**
+  (37 new nodes from the new docs).
+- Phase 00 later refreshed Graphify after sidecar cleanup:
+  **6331 nodes, 15668 edges, 397 communities**. See
+  `CP2_GRAPHIFY_STATUS.md`.
 
 ---
 
@@ -134,11 +138,11 @@ Updated file paths throughout to use CP2 paths; stale DATP-journal paths kept as
 | Command | Result |
 |---|---|
 | `rg -n "Edge-IIoTset\|...\|shift_magnitude" .claude CLAUDE.md` | All matches are in "forbid/do-not-do" context — clean |
-| `rg -n "docs/tickets\|DATP_CP_Roadmap\|Graphify\|CP2_PROGRESS\|TICKET_INDEX" CLAUDE.md .github .claude/agents/orchestrator-agent.md .claude/agents/implementation-agent.md` | 113 matches — CP2 paths are present |
+| `rg -n "docs/tickets\|DATP_CP_Roadmap\|Graphify\|CP2_PROGRESS\|TICKET_INDEX" CLAUDE.md .github .claude/agents/orchestrator-agent.md .claude/agents/implementation-agent.md` | Historical command included a now-missing `implementation-agent.md`; CP2 paths were present in available files |
 | `grep graphify .claude/settings.json` | `Bash(graphify:*)` present |
-| `python -m ruff check src/datp --select E,F --quiet` | Pre-existing E501 line-length issues in `cli/checkpoint_protocol.py` — unrelated to this update; no new issues |
+| `python -m ruff check src/datp --select E,F --quiet` | Historical run found pre-existing E501 issues; Phase 00 re-run found 342 E501 + 1 F401 across source files, unrelated to this documentation/config update |
 | `pyright src/datp/attacks src/datp/core src/datp/config` | **0 errors, 0 warnings, 0 informations** |
-| `graphify update .` | 6266 nodes, 15607 edges, 407 communities — graph updated |
+| `graphify update .` | Historical: 6266 nodes, 15607 edges, 407 communities; Phase 00 refresh after sidecar cleanup: 6331 nodes, 15668 edges, 397 communities |
 
 ---
 
@@ -160,3 +164,29 @@ Updated file paths throughout to use CP2 paths; stale DATP-journal paths kept as
 This is the first ticket in Phase 00 Setup. It bootstraps the ticket system itself
 (verifies the ticket program is sound, checks structure, confirms tracking files),
 and is a prerequisite for all subsequent tickets. It has no dependencies.
+
+---
+
+## 9. Phase 00 Verification Addendum
+
+**Date:** 2026-06-15
+**Context:** CP2-T003 re-verification during Phase 00 execution.
+
+Corrections to the historical update report:
+
+- `.claude/agents/implementation-agent.md` is referenced in the audit/update
+  narrative but is not present in the current repository tree. CP2 guidance is
+  still covered by `CLAUDE.md`, `.github/copilot-instructions.md`, and the
+  available relevant agents/skills.
+- Graphify was refreshed after this report. Current graph:
+  6331 nodes, 15668 edges, 397 communities, built from commit `27c1dc31`.
+- The Ruff `E,F` check currently reports 343 pre-existing diagnostics:
+  342 `E501` line-length findings and one `F401` unused import in
+  `src/datp/experiments/calibration_poisoning.py`. These are not caused by
+  Phase 00 documentation/config work.
+- Additional stale CP2 routing lines were corrected in
+  `.github/copilot-instructions.md`,
+  `.claude/agents/orchestrator-agent.md`, and
+  `.claude/skills/ticket-progress-skill.md`.
+
+Updated verdict: CP2-T003 remains **done, verified with discrepancy recorded**.

@@ -27,7 +27,9 @@ The executing agent must:
 4. Check all previous tickets.
 5. Confirm every previous ticket is `DONE`, `SKIPPED_WITH_REASON`, or correctly blocked.
 6. If a previous ticket is incomplete, stop and return to that ticket first.
-7. Record this decision in `ticket_progress.md`.
+7. For CP2, record this decision in
+   `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`; for DATP journal
+   fallback work, use `ticket_progress.md`.
 
 ## During a Ticket
 
@@ -77,7 +79,16 @@ However, new tickets may still be created by:
 3. `reviewer-agent`
 4. `drift-enforcer-agent`
 
-Repair tickets must use the next available ticket number and must be added to:
+For CP2, repair tickets must use the next available CP2 ticket number only when
+the current CP2 plan explicitly authorizes creating one, and must be added to:
+
+1. `docs/tickets/TICKET_INDEX.md`
+2. `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
+3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` if a blocker or
+   fallback is involved
+
+For DATP journal fallback work, repair tickets must use the next available ticket
+number and must be added to:
 
 1. `ticket_inventory.md`
 2. `ticket_progress.md`
