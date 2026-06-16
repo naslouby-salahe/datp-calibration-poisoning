@@ -1,12 +1,12 @@
-"""Typed schema for the bounded N-BaIoT MVP manifest+results artifact.
+"""Typed schema for the bounded N-BaIoT manifest+results artifact.
 
-The filename is locked by CP2-T018 (``Cp2ManifestFile.NBAIOT_MVP_MANIFEST`` =
-``nbaiot_mvp_manifest.json``, see ``Cp2Layout.nbaiot_mvp_manifest()``). One
+The filename is locked (``ManifestFile.NBAIOT_BOUNDED_SWEEP_MANIFEST`` =
+``nbaiot_bounded_sweep_manifest.json``, see ``PoisonLayout.nbaiot_bounded_sweep_manifest()``). One
 file holds run-level provenance plus the full embedded results array for the
 locked 1620-cell matrix — there is no per-victim directory tree for the
-bounded MVP. This is architecturally distinct from ``Cp2RunManifest``
-(``Cp2CellId``/``Cp2Layout.cell_paths()``), which is the full-scope, per-cell
-manifest gated behind Phase G / CP2-T056 and has no victim dimension of its
+bounded sweep. This is architecturally distinct from ``RunManifest``
+(``CellId``/``PoisonLayout.cell_paths()``), which is the full-scope, per-cell
+manifest and has no victim dimension of its
 own. No change to that schema was made or is needed here.
 """
 
@@ -23,19 +23,19 @@ from datp.attacks.poison_enums import (
     ThresholdPolicy,
 )
 from datp.attacks.run_manifest import (
-    CP2_RESERVOIR_MODE,
-    Cp2ProvenanceRecord,
-    Cp2SeedRecordModel,
+    RESERVOIR_MODE,
+    ProvenanceRecord,
+    SeedRecordModel,
 )
 
 
-class Cp2MvpResultRow(BaseModel):
-    """One bounded-MVP cell result.
+class BoundedSweepResultRow(BaseModel):
+    """One bounded cell result.
 
     Carries the victim's own Δτ family entry, fleet-FPR dispersion metrics,
     the AUROC-invariance check outcome, and blast-radius/spillover summaries
-    — enough to audit (CP2-T046), evaluate kill-triggers (CP2-T047), and
-    drift-check (CP2-T048) without re-running the pipeline.
+    — enough to audit, evaluate kill-triggers, and
+    drift-check without re-running the pipeline.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -48,7 +48,7 @@ class Cp2MvpResultRow(BaseModel):
     victim_id: str
     training_seed: int
     poisoning_seed: int
-    seed_record: Cp2SeedRecordModel
+    seed_record: SeedRecordModel
 
     delta_tau: float
     delta_tau_rel: float
@@ -68,21 +68,21 @@ class Cp2MvpResultRow(BaseModel):
     n_non_victims: int
 
 
-class Cp2MvpManifest(BaseModel):
-    """Run-level provenance + embedded results array for the bounded N-BaIoT MVP."""
+class BoundedSweepManifest(BaseModel):
+    """Run-level provenance + embedded results array for the bounded N-BaIoT."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: str = "1"
     generated_at_utc: str
     dataset: str = "nbaiot"
-    scale: ExperimentScale = ExperimentScale.MVP
+    scale: ExperimentScale = ExperimentScale.BOUNDED
     injection_rule: CalibrationInjectionRule = (
         CalibrationInjectionRule.REPLACE_FIXED_BUDGET
     )
     target_scope: PoisoningTargetScope = PoisoningTargetScope.SINGLE_CLIENT
-    reservoir_mode: str = CP2_RESERVOIR_MODE
-    provenance: Cp2ProvenanceRecord
+    reservoir_mode: str = RESERVOIR_MODE
+    provenance: ProvenanceRecord
 
     policies: tuple[ThresholdPolicy, ...]
     sources: tuple[PoisoningSourceStrategy, ...]
@@ -93,10 +93,10 @@ class Cp2MvpManifest(BaseModel):
     mu_flag_threshold_by_training_seed: dict[int, float]
 
     n_cells: int
-    results: tuple[Cp2MvpResultRow, ...]
+    results: tuple[BoundedSweepResultRow, ...]
 
     @model_validator(mode="after")
-    def _check_consistency(self) -> "Cp2MvpManifest":
+    def _check_consistency(self) -> "BoundedSweepManifest":
         if len(self.training_seeds) != len(self.poisoning_seeds):
             raise ValueError("training_seeds and poisoning_seeds must be paired 1:1")
         if len(self.results) != self.n_cells:

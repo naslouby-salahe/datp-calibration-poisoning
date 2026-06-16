@@ -1,4 +1,4 @@
-"""Tests for CP2 two-layer statistical inference (CP2-T035)."""
+"""Tests for two-layer statistical inference ."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ import math
 import pytest
 
 from datp.attacks.inference import (
-    Cp2HolmResult,
-    Cp2InferenceResult,
-    Cp2PairedDeltas,
-    Cp2SeedDelta,
+    HolmResult,
+    InferenceResult,
+    PairedDeltas,
+    SeedDelta,
     bootstrap_seed_aggregates,
     collect_paired_deltas,
     compute_inference,
@@ -31,19 +31,19 @@ SEEDS = (100, 101, 102, 103, 104)
 def _make_paired(
     victims: dict[str, dict[int, float]],
     feasible_seeds: set[int] | None = None,
-) -> Cp2PairedDeltas:
-    """Build a Cp2PairedDeltas from victim_id → {seed: delta_tau}."""
-    deltas: dict[str, dict[int, Cp2SeedDelta]] = {}
+) -> PairedDeltas:
+    """Build a PairedDeltas from victim_id → {seed: delta_tau}."""
+    deltas: dict[str, dict[int, SeedDelta]] = {}
     for vid, seed_map in victims.items():
         deltas[vid] = collect_paired_deltas(
             victim_id=vid,
             seed_deltas=seed_map,
             feasible_seeds=feasible_seeds,
         )
-    return Cp2PairedDeltas(deltas=deltas)
+    return PairedDeltas(deltas=deltas)
 
 
-def _uniform_paired(n_victims: int = 3, delta: float = 0.05) -> Cp2PairedDeltas:
+def _uniform_paired(n_victims: int = 3, delta: float = 0.05) -> PairedDeltas:
     """All victims, all seeds, same positive delta_tau — fully feasible."""
     victims = {
         f"v{i}": {s: delta for s in SEEDS}
@@ -115,7 +115,7 @@ class TestComputeSeedAggregates:
     def test_missing_seed_in_victim_gives_nan(self) -> None:
         # One victim has no entry for seed 104.
         victims = {
-            "v0": {100: 0.1, 101: 0.1, 102: 0.1, 103: 0.1},  # no 104
+            "v0": {100: 0.1, 101: 0.1, 102: 0.1, 103: 0.1}, # no 104
         }
         paired = _make_paired(victims)
         agg = compute_seed_aggregates(paired, SEEDS)
@@ -123,11 +123,11 @@ class TestComputeSeedAggregates:
 
     def test_infeasible_victims_excluded(self) -> None:
         # v0: all infeasible (delta=0.9); v1: all feasible (delta=0.1)
-        paired = Cp2PairedDeltas(deltas={
+        paired = PairedDeltas(deltas={
             "v0": collect_paired_deltas(
                 victim_id="v0",
                 seed_deltas={s: 0.9 for s in SEEDS},
-                feasible_seeds=set(),  # none feasible
+                feasible_seeds=set(), # none feasible
             ),
             "v1": collect_paired_deltas(
                 victim_id="v1",
@@ -156,7 +156,7 @@ class TestComputeSeedAggregates:
 
 class TestSignTest:
     def test_all_positive_raise_consistent(self) -> None:
-        agg = {s: 0.05 for s in SEEDS}  # 5/5 positive
+        agg = {s: 0.05 for s in SEEDS} # 5/5 positive
         result = sign_test(agg, direction="raise")
         assert result.consistent
         assert result.n_positive == 5
@@ -169,7 +169,7 @@ class TestSignTest:
     def test_3_positive_raise_not_consistent(self) -> None:
         agg = {100: 0.1, 101: 0.1, 102: 0.1, 103: -0.1, 104: -0.1}
         result = sign_test(agg, direction="raise")
-        assert not result.consistent  # 3/5 < threshold 4
+        assert not result.consistent # 3/5 < threshold 4
 
     def test_4_positive_raise_consistent(self) -> None:
         agg = {100: 0.1, 101: 0.1, 102: 0.1, 103: 0.1, 104: -0.1}
@@ -205,7 +205,7 @@ class TestSignTest:
 class TestHolmAdjust:
     def test_returns_holm_result(self) -> None:
         result = holm_adjust([0.01, 0.05, 0.10])
-        assert isinstance(result, Cp2HolmResult)
+        assert isinstance(result, HolmResult)
 
     def test_descriptive_only_flag(self) -> None:
         result = holm_adjust([0.01, 0.05])
@@ -221,7 +221,7 @@ class TestHolmAdjust:
         ps = [0.01, 0.02, 0.03]
         result = holm_adjust(ps)
         for raw, holm in zip(result.raw_p_values, result.holm_p_values):
-            assert holm >= raw - 1e-12  # allow tiny float error
+            assert holm >= raw - 1e-12 # allow tiny float error
 
     def test_single_p_value(self) -> None:
         result = holm_adjust([0.03])
@@ -281,7 +281,7 @@ class TestComputeInference:
             poisoning_seeds=SEEDS,
             direction="raise",
         )
-        assert isinstance(result, Cp2InferenceResult)
+        assert isinstance(result, InferenceResult)
 
     def test_seed_aggregates_populated(self) -> None:
         paired = _uniform_paired(delta=0.05)
@@ -330,7 +330,7 @@ class TestComputeInference:
             holm_p_values=[0.01, 0.02, 0.03],
         )
         assert result.holm is not None
-        assert isinstance(result.holm, Cp2HolmResult)
+        assert isinstance(result.holm, HolmResult)
 
     def test_n_feasible_victims_correct(self) -> None:
         paired = _uniform_paired(n_victims=3)
@@ -343,7 +343,7 @@ class TestComputeInference:
 
     def test_infeasible_victim_excluded_from_count(self) -> None:
         # v0 fully infeasible; v1, v2 feasible
-        paired = Cp2PairedDeltas(deltas={
+        paired = PairedDeltas(deltas={
             "v0": collect_paired_deltas(
                 victim_id="v0",
                 seed_deltas={s: 0.05 for s in SEEDS},

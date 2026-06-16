@@ -108,7 +108,7 @@ def _load_json(path: Path) -> dict[str, Any]:
             f"[reporting] Missing metrics artifact. Expected: {path}. Got: absent."
         )
     payload = json.loads(path.read_text(encoding="utf-8"))
-    
+
     run_kind = payload.get(PayloadKey.RUN_KIND)
     if run_kind != RunKind.CORE_LADDER.value:
         raise ValueError(

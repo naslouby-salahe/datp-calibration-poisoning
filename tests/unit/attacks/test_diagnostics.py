@@ -1,14 +1,10 @@
-"""Tests for CP2 attack diagnostics: ASR, blast radius, spillover (CP2-T034)."""
+"""Tests for attack diagnostics: ASR, blast radius, spillover ."""
 
 from __future__ import annotations
 
-import pytest
 
-from datp.artifacts.poison_names import CP2_Q
+from datp.artifacts.poison_names import THRESHOLD_QUANTILE
 from datp.attacks.diagnostics import (
-    Cp2AsrRecord,
-    Cp2BlastRadiusRecord,
-    Cp2SpilloverRecord,
     compute_asr,
     compute_blast_radius,
     compute_spillover,
@@ -19,7 +15,7 @@ from datp.attacks.poison_enums import AttackerObjective, PoisoningSourceStrategy
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
 from datp.attacks.threshold_recompute import compute_b1_pair, compute_b2_pair
-from datp.core.seed_sequence import make_cp2_rng
+from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
 
@@ -35,15 +31,15 @@ def _make_setup(fraction: float = 0.40):
     reservoir = build_reservoir(
         clean_cal=cal, source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN, tail_mass=0.10
     )
-    rng = make_cp2_rng(training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0)
+    rng = make_seed_rng(training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0)
     inj = inject_fixed_budget(clean_cal=cal, reservoir=reservoir, fraction=fraction, rng=rng)
     pois_cal = {
         cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
         for cid in eligible_ids
     }
 
-    b1 = compute_b1_pair(col, pois_cal, CP2_Q)
-    b2 = compute_b2_pair(col, pois_cal, CP2_Q, b1.tau_global_clean)
+    b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
+    b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, b1.tau_global_clean)
     b1_result = compute_metrics(col, b1, None)
     b2_result = compute_metrics(col, b2, None)
     return col, b1_result, b2_result, victim_id
@@ -84,7 +80,7 @@ class TestAsr:
         raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
         col = build_score_collection(raw)
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, CP2_Q)
+        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
         result = compute_metrics(col, b1, None)
         asr = compute_asr(result, victim_id=list(col.eligible_ids)[0], objective=AttackerObjective.THRESHOLD_RAISE)
         assert asr.asr == 0.0
@@ -131,7 +127,7 @@ class TestSpillover:
     def test_n_non_victims_correct(self) -> None:
         col, b1_result, b2_result, victim_id = _make_setup()
         sp = compute_spillover(b2_result, victim_id=victim_id)
-        assert sp.n_non_victims == 4  # 5 eligible - 1 victim
+        assert sp.n_non_victims == 4 # 5 eligible - 1 victim
 
     def test_spillover_ids_sorted(self) -> None:
         col, b1_result, b2_result, victim_id = _make_setup()

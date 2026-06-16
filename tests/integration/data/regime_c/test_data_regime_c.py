@@ -38,12 +38,12 @@ def _create_synthetic_nbaiot_raw(
         device_dir = raw_dir / device_id
         device_dir.mkdir(parents=True, exist_ok=True)
 
-        benign = pd.DataFrame(rng.standard_normal((n_benign, n_features)), columns=cols)  # type: ignore
+        benign = pd.DataFrame(rng.standard_normal((n_benign, n_features)), columns=cols) # type: ignore
         benign.to_csv(device_dir / "benign_traffic.csv", index=False)
 
         attack_dir = device_dir / "gafgyt_attacks"
         attack_dir.mkdir(parents=True, exist_ok=True)
-        attack = pd.DataFrame(rng.standard_normal((n_attack, n_features)), columns=cols)  # type: ignore
+        attack = pd.DataFrame(rng.standard_normal((n_attack, n_features)), columns=cols) # type: ignore
         attack.to_csv(attack_dir / "combo.csv", index=False)
 
 
@@ -70,7 +70,7 @@ class TestAllAlphaLevels:
                 alpha=alpha,
                 seed=SEED,
                 n_clients=N_CLIENTS,
-                n_min=10,  # Low threshold for synthetic data
+                n_min=10, # Low threshold for synthetic data
                 train_frac=TRAIN_FRAC,
                 cal_frac=CAL_FRAC,
             )

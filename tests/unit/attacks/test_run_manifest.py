@@ -1,4 +1,4 @@
-"""Tests for CP2 run manifest schema."""
+"""Tests for run manifest schema."""
 
 from __future__ import annotations
 
@@ -14,22 +14,22 @@ from datp.attacks.poison_enums import (
     ThresholdPolicy,
 )
 from datp.attacks.run_manifest import (
-    CP2_RESERVOIR_MODE,
-    CP2_SPLIT_SEMANTICS,
-    Cp2ProvenanceRecord,
-    Cp2RunManifest,
-    Cp2SeedRecordModel,
+    RESERVOIR_MODE,
+    SPLIT_SEMANTICS,
+    ProvenanceRecord,
+    RunManifest,
+    SeedRecordModel,
 )
-from datp.core.seed_sequence import Cp2SeedRecord, derive_cp2_seed_record
+from datp.core.seed_sequence import SeedRecord, derive_seed_record
 
 
-def _valid_provenance(**overrides: object) -> Cp2ProvenanceRecord:
+def _valid_provenance(**overrides: object) -> ProvenanceRecord:
     defaults: dict[str, object] = {
         "local_epochs": 1,
         "repository": "/home/user/datp-calibration-poisoning",
     }
     defaults.update(overrides)
-    return Cp2ProvenanceRecord(**defaults)  # type: ignore[arg-type]
+    return ProvenanceRecord(**defaults) # type: ignore[arg-type]
 
 
 def _seed_record_model(
@@ -37,20 +37,20 @@ def _seed_record_model(
     poisoning_seed: int = 100,
     client_idx: int = 0,
     scope_idx: int = 0,
-) -> Cp2SeedRecordModel:
-    record = derive_cp2_seed_record(
+) -> SeedRecordModel:
+    record = derive_seed_record(
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
         client_idx=client_idx,
         scope_idx=scope_idx,
     )
-    return Cp2SeedRecordModel.from_record(record)
+    return SeedRecordModel.from_record(record)
 
 
-def _valid_manifest(**overrides: object) -> Cp2RunManifest:
+def _valid_manifest(**overrides: object) -> RunManifest:
     defaults: dict[str, object] = {
         "dataset": "nbaiot",
-        "scale": ExperimentScale.MVP,
+        "scale": ExperimentScale.BOUNDED,
         "policy": ThresholdPolicy.B1_GLOBAL,
         "objective": AttackerObjective.THRESHOLD_RAISE,
         "source": PoisoningSourceStrategy.RANDOM_BENIGN,
@@ -66,10 +66,10 @@ def _valid_manifest(**overrides: object) -> Cp2RunManifest:
         "generated_at_utc": "2026-06-16T00:00:00Z",
     }
     defaults.update(overrides)
-    return Cp2RunManifest(**defaults)  # type: ignore[arg-type]
+    return RunManifest(**defaults) # type: ignore[arg-type]
 
 
-class TestCp2ProvenanceRecord:
+class TestProvenanceRecord:
     def test_e1_accepted(self) -> None:
         prov = _valid_provenance(local_epochs=1)
         assert prov.local_epochs == 1
@@ -84,11 +84,11 @@ class TestCp2ProvenanceRecord:
 
     def test_default_split_semantics(self) -> None:
         prov = _valid_provenance()
-        assert prov.split_semantics == CP2_SPLIT_SEMANTICS
+        assert prov.split_semantics == SPLIT_SEMANTICS
 
-    def test_cp2_generated_true_by_default(self) -> None:
+    def test_pipeline_generated_true_by_default(self) -> None:
         prov = _valid_provenance()
-        assert prov.cp2_generated is True
+        assert prov.pipeline_generated is True
 
     def test_checkpoint_round_optional(self) -> None:
         prov = _valid_provenance(checkpoint_round=42)
@@ -96,31 +96,31 @@ class TestCp2ProvenanceRecord:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            _valid_provenance(bogus=1)  # type: ignore[call-arg]
+            _valid_provenance(bogus=1) # type: ignore[call-arg]
 
 
-class TestCp2SeedRecordModel:
+class TestSeedRecordModel:
     def test_from_record_round_trip(self) -> None:
-        original = Cp2SeedRecord(
+        original = SeedRecord(
             training_seed=1, poisoning_seed=101, client_idx=3, scope_idx=0
         )
-        model = Cp2SeedRecordModel.from_record(original)
+        model = SeedRecordModel.from_record(original)
         assert model.training_seed == 1
         assert model.poisoning_seed == 101
         assert model.client_idx == 3
         assert model.scope_idx == 0
         assert model.entropy == (1, 101, 3, 0)
 
-    def test_to_record_restores_cp2_seed_record(self) -> None:
-        original = Cp2SeedRecord(
+    def test_to_record_restores_seed_record(self) -> None:
+        original = SeedRecord(
             training_seed=2, poisoning_seed=102, client_idx=5, scope_idx=1
         )
-        model = Cp2SeedRecordModel.from_record(original)
+        model = SeedRecordModel.from_record(original)
         restored = model.to_record()
         assert restored.entropy == original.entropy
 
 
-class TestCp2RunManifest:
+class TestRunManifest:
     def test_valid_manifest_constructed(self) -> None:
         m = _valid_manifest()
         assert m.schema_version == "1"
@@ -130,7 +130,7 @@ class TestCp2RunManifest:
 
     def test_default_reservoir_mode(self) -> None:
         m = _valid_manifest()
-        assert m.reservoir_mode == CP2_RESERVOIR_MODE
+        assert m.reservoir_mode == RESERVOIR_MODE
         assert "victim_local" in m.reservoir_mode
 
     def test_mu_flag_threshold_can_be_set(self) -> None:
@@ -151,8 +151,8 @@ class TestCp2RunManifest:
     def test_frozen(self) -> None:
         m = _valid_manifest()
         with pytest.raises(ValidationError):
-            m.dataset = "other"  # type: ignore[misc]
+            m.dataset = "other" # type: ignore[misc]
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            _valid_manifest(bogus=1)  # type: ignore[call-arg]
+            _valid_manifest(bogus=1) # type: ignore[call-arg]

@@ -42,11 +42,11 @@ def _make_synthetic_client(
     cols = [f"f{i}" for i in range(n_features)]
 
     def _benign(n: int) -> pd.DataFrame:
-        return pd.DataFrame(rng.normal(0.0, 0.1, size=(n, n_features)), columns=cols)  # type: ignore[call-arg]
+        return pd.DataFrame(rng.normal(0.0, 0.1, size=(n, n_features)), columns=cols) # type: ignore[call-arg]
 
     def _attack(n: int) -> pd.DataFrame:
         return pd.DataFrame(
-            rng.normal(attack_shift, 0.1, size=(n, n_features)), columns=cols  # type: ignore[call-arg]
+            rng.normal(attack_shift, 0.1, size=(n, n_features)), columns=cols # type: ignore[call-arg]
         )
 
     _benign(n_train).to_parquet(client_dir / SPLIT_FILENAME[Split.TRAIN], index=False)
@@ -275,7 +275,7 @@ class TestB0SeparableData:
             tmp_path / "prepared",
             n_clients=2,
             n_features=n_features,
-            attack_shift=10.0,  # very large shift
+            attack_shift=10.0, # very large shift
         )
         output = tmp_path / "output"
 

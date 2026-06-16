@@ -12,7 +12,7 @@ from datp.config.models import DatpConfig
 from datp.core.enums import Baseline, Regime
 from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
 
-_REAL_DEVICES = list(DEVICE_FAMILY_MAP.keys())  # 9 real N-BaIoT device names
+_REAL_DEVICES = list(DEVICE_FAMILY_MAP.keys()) # 9 real N-BaIoT device names
 
 
 def _make_cal_errors(

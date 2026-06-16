@@ -47,10 +47,10 @@ def conformal_threshold(errors: np.ndarray, alpha: float) -> float:
     """Per‑client split‑conformal threshold.
 
     k = ceil((n + 1) * (1 − alpha))
-    τ = sorted_errors[k − 1]  (0‑indexed)
+    τ = sorted_errors[k − 1] (0‑indexed)
 
     If k > n (insufficient samples for the requested alpha), returns max(errors)
-    as a conservative fallback.  Raises ValueError if errors is empty.
+    as a conservative fallback. Raises ValueError if errors is empty.
 
     Primary anchor: Lu et al. ICML 2023; co‑anchor: Humbert et al. ICML 2023.
     """

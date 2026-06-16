@@ -39,7 +39,7 @@ def client_errors() -> dict[str, np.ndarray]:
         "client_a": _make_errors(200, seed=1),
         "client_b": _make_errors(150, seed=2),
         "client_c": _make_errors(300, seed=3),
-        "client_d": _make_errors(50, seed=4),  # Calibration-Pending
+        "client_d": _make_errors(50, seed=4), # Calibration-Pending
     }
 
 

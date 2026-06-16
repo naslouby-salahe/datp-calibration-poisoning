@@ -1,10 +1,10 @@
-"""Single-victim injection and threshold-recompute orchestration for one CP2 cell.
+"""Single-victim injection and threshold-recompute orchestration for one cell.
 
 Pure orchestration over already-tested core modules (reservoir/source
 selection, fixed-budget injection, B1/B2/B4 threshold recompute) — no science
-of its own. Shared by the Phase D synthetic smoke harness
-(``datp.testsupport.cp2_smoke_harness``) and the Phase E real-data MVP runner
-(``datp.attacks.mvp_runner``) so both run the identical pipeline. All
+of its own. Shared by the synthetic smoke harness
+(``datp.testsupport.smoke_harness``) and the real-data bounded runner
+(``datp.attacks.bounded_sweep_cell``) so both run the identical pipeline. All
 randomness flows through ``SeedSequence`` (no integer seed addition); clean
 arrays are never mutated in place.
 """
@@ -16,24 +16,24 @@ from typing import assert_never
 
 import numpy as np
 
-from datp.artifacts.poison_names import CP2_Q, CP2_TAIL_MASS
-from datp.attacks.b4_recompute import Cp2B4ThresholdPair, compute_b4_pair
+from datp.artifacts.poison_names import THRESHOLD_QUANTILE, TAIL_MASS
+from datp.attacks.b4_recompute import B4ThresholdPair, compute_b4_pair
 from datp.attacks.injector import InjectionResult, inject_fixed_budget
 from datp.attacks.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.attacks.reservoir import ReservoirResult
-from datp.attacks.score_containers import Cp2ScoreCollection
+from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.source_strategies import select_reservoir
 from datp.attacks.threshold_recompute import (
-    Cp2ThresholdPair,
+    ThresholdPair,
     compute_b1_pair,
     compute_b2_pair,
 )
-from datp.core.seed_sequence import make_cp2_rng
+from datp.core.seed_sequence import make_seed_rng
 
-PolicyPair = Cp2ThresholdPair | Cp2B4ThresholdPair
+PolicyPair = ThresholdPair | B4ThresholdPair
 
 
-def _client_idx(collection: Cp2ScoreCollection, client_id: str) -> int:
+def _client_idx(collection: ScoreCollection, client_id: str) -> int:
     """Deterministic per-client index for SeedSequence (position in sorted ids)."""
     return collection.all_ids.index(client_id)
 
@@ -54,7 +54,7 @@ class InjectionOutcome:
 
 
 def inject_single_victim(
-    collection: Cp2ScoreCollection,
+    collection: ScoreCollection,
     *,
     victim_id: str,
     source: PoisoningSourceStrategy,
@@ -62,7 +62,7 @@ def inject_single_victim(
     training_seed: int,
     poisoning_seed: int,
     scope_idx: int = 0,
-    tail_mass: float = CP2_TAIL_MASS,
+    tail_mass: float = TAIL_MASS,
 ) -> InjectionOutcome:
     """Build the poisoned calibration dict for a single-client attack.
 
@@ -74,7 +74,7 @@ def inject_single_victim(
     reservoir = select_reservoir(
         source=source, clean_cal=victim_clean, tail_mass=tail_mass
     )
-    rng = make_cp2_rng(
+    rng = make_seed_rng(
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
         client_idx=_client_idx(collection, victim_id),
@@ -104,11 +104,11 @@ def inject_single_victim(
 
 
 def recompute_pair(
-    collection: Cp2ScoreCollection,
+    collection: ScoreCollection,
     poisoned_cal: dict[str, np.ndarray],
     policy: ThresholdPolicy,
     *,
-    q: float = CP2_Q,
+    q: float = THRESHOLD_QUANTILE,
     seed: int = 0,
 ) -> PolicyPair:
     """Recompute the clean/poisoned threshold pair for one policy."""

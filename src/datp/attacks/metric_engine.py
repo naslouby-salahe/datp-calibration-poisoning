@@ -1,4 +1,4 @@
-"""CP2 metric engine: Δτ family, CV(FPR)+coverage, guard metrics, AUROC invariance.
+"""metric engine: Δτ family, CV(FPR)+coverage, guard metrics, AUROC invariance.
 
 All metrics operate on saved threshold pairs and score collections.
 No score recomputation. No ε in the CV(FPR) denominator.
@@ -17,16 +17,16 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.artifacts.poison_names import CP2_MATERIALITY_FACTOR
-from datp.attacks.b4_recompute import Cp2B4ThresholdPair
+from datp.artifacts.poison_names import MATERIALITY_FACTOR
+from datp.attacks.b4_recompute import B4ThresholdPair
 from datp.attacks.poison_enums import ThresholdPolicy
-from datp.attacks.score_containers import Cp2ScoreCollection
-from datp.attacks.threshold_recompute import Cp2ThresholdPair
+from datp.attacks.score_containers import ScoreCollection
+from datp.attacks.threshold_recompute import ThresholdPair
 from datp.evaluation.ranking import compute_binary_ranking_metrics
 from datp.statistics.cv import cv
 
 # ε used only in Δτ_rel to avoid division by zero.
-# NOT used in CV(FPR) — CP2 lock mandates no ε in CV denominator.
+# NOT used in CV(FPR) — protocol lock mandates no ε in CV denominator.
 _DELTA_TAU_REL_EPS: float = 1e-9
 
 # IQR percentiles for per-client significance scale.
@@ -39,7 +39,7 @@ _IQR_P75: float = 75.0
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2DeltaTauEntry:
+class DeltaTauEntry:
     """Per-victim threshold shift for one policy."""
 
     client_id: str
@@ -57,7 +57,7 @@ class Cp2DeltaTauEntry:
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2FleetFprMetrics:
+class FleetFprMetrics:
     """CV(FPR) + coverage + guard metrics for one policy (eligible clients only).
 
     cv_fpr = σ/µ with no ε; nan when µ = 0 or fewer than 2 eligible clients.
@@ -83,7 +83,7 @@ class Cp2FleetFprMetrics:
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2AurocRecord:
+class AurocRecord:
     """AUROC per eligible client (invariant under calibration-channel attack)."""
 
     client_id: str
@@ -95,7 +95,7 @@ class Cp2AurocRecord:
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2MetricResult:
+class MetricResult:
     """Full metric output for one threshold-pair evaluation.
 
     delta_tau: per-victim Δτ family (eligible clients only).
@@ -105,9 +105,9 @@ class Cp2MetricResult:
     """
 
     policy: ThresholdPolicy
-    delta_tau: dict[str, Cp2DeltaTauEntry]
-    fleet_fpr: Cp2FleetFprMetrics
-    auroc_records: dict[str, Cp2AurocRecord]
+    delta_tau: dict[str, DeltaTauEntry]
+    fleet_fpr: FleetFprMetrics
+    auroc_records: dict[str, AurocRecord]
     mu_flag_threshold: float | None
 
 
@@ -129,15 +129,15 @@ def _client_fpr(
 # ---------------------------------------------------------------------------
 
 def compute_delta_tau(
-    collection: Cp2ScoreCollection,
-    pair: Cp2ThresholdPair | Cp2B4ThresholdPair,
-) -> dict[str, Cp2DeltaTauEntry]:
+    collection: ScoreCollection,
+    pair: ThresholdPair | B4ThresholdPair,
+) -> dict[str, DeltaTauEntry]:
     """Compute per-victim Δτ family for all eligible clients.
 
     delta_tau_scale = 0.1 × IQR(clean calibration scores_i) per client.
     delta_tau_rel = Δτ / max(|τ_clean|, ε) where ε is for division-by-zero only.
     """
-    result: dict[str, Cp2DeltaTauEntry] = {}
+    result: dict[str, DeltaTauEntry] = {}
     for cid in collection.eligible_ids:
         tc = pair.thresholds_clean[cid]
         tp = pair.thresholds_pois[cid]
@@ -147,8 +147,8 @@ def compute_delta_tau(
         iqr = float(
             np.percentile(clean_cal, _IQR_P75) - np.percentile(clean_cal, _IQR_P25)
         )
-        scale = CP2_MATERIALITY_FACTOR * iqr
-        result[cid] = Cp2DeltaTauEntry(
+        scale = MATERIALITY_FACTOR * iqr
+        result[cid] = DeltaTauEntry(
             client_id=cid,
             policy=pair.policy,
             tau_clean=tc,
@@ -166,14 +166,14 @@ def compute_delta_tau(
 # ---------------------------------------------------------------------------
 
 def compute_fleet_fpr(
-    collection: Cp2ScoreCollection,
-    pair: Cp2ThresholdPair | Cp2B4ThresholdPair,
+    collection: ScoreCollection,
+    pair: ThresholdPair | B4ThresholdPair,
     mu_flag_threshold: float | None,
-) -> Cp2FleetFprMetrics:
+) -> FleetFprMetrics:
     """Compute CV(FPR) + coverage + guard metrics under poisoned thresholds.
 
     Only eligible clients contribute.
-    CV(FPR) = σ/µ with no ε.  Returns nan when µ=0 or n_eligible < 2.
+    CV(FPR) = σ/µ with no ε. Returns nan when µ=0 or n_eligible < 2.
     """
     eligible_ids = list(collection.eligible_ids)
     fprs: list[float] = []
@@ -213,7 +213,7 @@ def compute_fleet_fpr(
         else False
     )
 
-    return Cp2FleetFprMetrics(
+    return FleetFprMetrics(
         policy=pair.policy,
         cv_fpr=cv_fpr,
         mean_fpr=mean_fpr,
@@ -234,18 +234,18 @@ def compute_fleet_fpr(
 # ---------------------------------------------------------------------------
 
 def compute_auroc_records(
-    collection: Cp2ScoreCollection,
-) -> dict[str, Cp2AurocRecord]:
+    collection: ScoreCollection,
+) -> dict[str, AurocRecord]:
     """Compute AUROC per eligible client from test scores.
 
-    Test scores are NEVER modified by CP2 calibration poisoning.
+    Test scores are NEVER modified by calibration poisoning.
     AUROC is therefore invariant; this function records it for auditability.
     """
-    records: dict[str, Cp2AurocRecord] = {}
+    records: dict[str, AurocRecord] = {}
     for cid in collection.eligible_ids:
         c = collection.clients[cid]
         ranking = compute_binary_ranking_metrics(c.test_benign, c.test_attack)
-        records[cid] = Cp2AurocRecord(client_id=cid, auroc=ranking.auroc)
+        records[cid] = AurocRecord(client_id=cid, auroc=ranking.auroc)
     return records
 
 
@@ -274,13 +274,13 @@ def compute_mu_flag_threshold(mean_clean_fpr: float) -> float:
 # ---------------------------------------------------------------------------
 
 def compute_metrics(
-    collection: Cp2ScoreCollection,
-    pair: Cp2ThresholdPair | Cp2B4ThresholdPair,
+    collection: ScoreCollection,
+    pair: ThresholdPair | B4ThresholdPair,
     mu_flag_threshold: float | None,
     *,
-    auroc_records: dict[str, Cp2AurocRecord] | None = None,
-) -> Cp2MetricResult:
-    """Compute full CP2 metric result for one threshold pair.
+    auroc_records: dict[str, AurocRecord] | None = None,
+) -> MetricResult:
+    """Compute full metric result for one threshold pair.
 
     mu_flag_threshold must be pre-computed from clean artifacts and passed in.
     auroc_records is invariant across every cell sharing the same collection
@@ -288,14 +288,14 @@ def compute_metrics(
     sweeping many cells for one collection may precompute it once via
     ``compute_auroc_records`` and pass it here to avoid redundant recompute.
     When omitted, it is computed internally as before.
-    Returns Cp2MetricResult with all CP2 metrics.
+    Returns MetricResult with all metrics.
     """
     delta_tau = compute_delta_tau(collection, pair)
     fleet_fpr = compute_fleet_fpr(collection, pair, mu_flag_threshold)
     if auroc_records is None:
         auroc_records = compute_auroc_records(collection)
 
-    return Cp2MetricResult(
+    return MetricResult(
         policy=pair.policy,
         delta_tau=delta_tau,
         fleet_fpr=fleet_fpr,

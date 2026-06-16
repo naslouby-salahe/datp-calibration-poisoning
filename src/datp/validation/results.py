@@ -2057,7 +2057,7 @@ def _write_warnings(path: Path, warnings: list[WarningRecord]) -> None:
     for warning in warnings:
         lines.append(f"- **{warning.severity} `{warning.code}`**: {warning.message}")
         if warning.exact_command:
-            lines.append(f"  Command: `{warning.exact_command}`")
+            lines.append(f" Command: `{warning.exact_command}`")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

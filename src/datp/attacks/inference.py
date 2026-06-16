@@ -1,4 +1,4 @@
-"""CP2 two-layer statistical inference.
+"""Two-layer statistical inference.
 
 Two-layer design (never 9×5=45 independent replicates):
   Layer 1: per-victim paired seed deltas (Δτ_{v,s} per poisoning seed s and victim v).
@@ -27,7 +27,7 @@ from statsmodels.stats.multitest import multipletests
 from datp.statistics.bootstrap import BootstrapResult, bootstrap_ci
 
 
-# CP2-locked inference parameters.
+# Locked inference parameters.
 _N_POISONING_SEEDS: int = 5
 _SIGN_CONSISTENCY_THRESHOLD: int = 4  # ≥4/5
 _DEFAULT_CI: float = 0.95
@@ -40,7 +40,7 @@ _DEFAULT_ANALYSIS_SEED: int = 300
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2SeedDelta:
+class SeedDelta:
     """One (victim, seed) delta in the two-layer structure."""
 
     victim_id: str
@@ -50,14 +50,14 @@ class Cp2SeedDelta:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2PairedDeltas:
+class PairedDeltas:
     """All (victim, seed) deltas for one (policy, fraction, source, objective) cell.
 
-    structured as deltas[victim_id][poisoning_seed] = Cp2SeedDelta.
+    structured as deltas[victim_id][poisoning_seed] = SeedDelta.
     Only feasible (victim, seed) pairs contribute to seed-level aggregates.
     """
 
-    deltas: dict[str, dict[int, Cp2SeedDelta]]
+    deltas: dict[str, dict[int, SeedDelta]]
 
 
 def collect_paired_deltas(
@@ -65,12 +65,12 @@ def collect_paired_deltas(
     victim_id: str,
     seed_deltas: dict[int, float],
     feasible_seeds: set[int] | None = None,
-) -> dict[int, Cp2SeedDelta]:
+) -> dict[int, SeedDelta]:
     """Build the Layer-1 dict for one victim."""
     if feasible_seeds is None:
         feasible_seeds = set(seed_deltas.keys())
     return {
-        s: Cp2SeedDelta(
+        s: SeedDelta(
             victim_id=victim_id,
             poisoning_seed=s,
             delta_tau=dt,
@@ -85,7 +85,7 @@ def collect_paired_deltas(
 # ---------------------------------------------------------------------------
 
 def compute_seed_aggregates(
-    paired: Cp2PairedDeltas,
+    paired: PairedDeltas,
     poisoning_seeds: tuple[int, ...],
 ) -> dict[int, float]:
     """Layer 2: aggregate feasible victim deltas per seed.
@@ -112,10 +112,10 @@ def compute_seed_aggregates(
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2SignTestResult:
+class SignTestResult:
     """Sign test on seed-level aggregates.
 
-    Supporting evidence only.  ≥4/5 sign consistency in the expected direction
+    Supporting evidence only. ≥4/5 sign consistency in the expected direction
     is the threshold for 'consistent' (not 'significant').
     """
 
@@ -133,7 +133,7 @@ def sign_test(
     seed_aggregates: dict[int, float],
     *,
     direction: Literal["raise", "lower"],
-) -> Cp2SignTestResult:
+) -> SignTestResult:
     """Supporting sign test on seed-level aggregates.
 
     'raise' direction: count seeds where δ_s > 0.
@@ -152,7 +152,7 @@ def sign_test(
     else:
         n_consistent = n_negative
 
-    return Cp2SignTestResult(
+    return SignTestResult(
         n_positive=n_positive,
         n_negative=n_negative,
         n_zero=n_zero,
@@ -169,12 +169,12 @@ def sign_test(
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2HolmResult:
+class HolmResult:
     """Holm-adjusted p-values for seed-level aggregates.
 
     DESCRIPTIVE ONLY — never used to claim significance.
     p-values here come from a one-sample t-test (H0: mean=0) applied to
-    the seed-level aggregates.  The Holm correction adjusts for multiple
+    the seed-level aggregates. The Holm correction adjusts for multiple
     comparisons across policies/fractions.
 
     This is a reporting convenience, not a substitute for the primary
@@ -192,8 +192,8 @@ def holm_adjust(
     raw_p_values: list[float],
     *,
     alpha: float = 0.05,
-) -> Cp2HolmResult:
-    """Apply Holm correction to raw p-values.  DESCRIPTIVE ONLY.
+) -> HolmResult:
+    """Apply Holm correction to raw p-values. DESCRIPTIVE ONLY.
 
     Any nan p-values are passed through as nan; only finite values are corrected.
     """
@@ -201,7 +201,7 @@ def holm_adjust(
         raw_p_values, alpha=alpha, method="holm"
     )
     assert pvals_corrected is not None  # statsmodels type stubs are imprecise
-    return Cp2HolmResult(
+    return HolmResult(
         raw_p_values=tuple(float(p) for p in raw_p_values),
         holm_p_values=tuple(float(p) for p in pvals_corrected),
         reject_h0=tuple(bool(r) for r in reject_arr),
@@ -223,7 +223,7 @@ def bootstrap_seed_aggregates(
 ) -> BootstrapResult:
     """Percentile bootstrap CI on the 5 seed-level aggregates.
 
-    Only finite aggregates contribute.  If fewer than 2 finite seeds remain,
+    Only finite aggregates contribute. If fewer than 2 finite seeds remain,
     raises ValueError.
 
     This is the PRIMARY inferential tool (not the sign test, not Holm).
@@ -249,7 +249,7 @@ def bootstrap_seed_aggregates(
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class Cp2InferenceResult:
+class InferenceResult:
     """Full two-layer inference result for one (policy, fraction, source, objective)
     cell.
 
@@ -262,13 +262,13 @@ class Cp2InferenceResult:
 
     seed_aggregates: dict[int, float]
     bootstrap_ci: BootstrapResult
-    sign_test: Cp2SignTestResult
-    holm: Cp2HolmResult | None
+    sign_test: SignTestResult
+    holm: HolmResult | None
     n_feasible_victims: int
 
 
 def compute_inference(
-    paired: Cp2PairedDeltas,
+    paired: PairedDeltas,
     *,
     poisoning_seeds: tuple[int, ...],
     direction: Literal["raise", "lower"],
@@ -278,7 +278,7 @@ def compute_inference(
     include_holm: bool = False,
     holm_p_values: list[float] | None = None,
     holm_alpha: float = 0.05,
-) -> Cp2InferenceResult:
+) -> InferenceResult:
     """Compute full two-layer inference.
 
     Steps:
@@ -307,7 +307,7 @@ def compute_inference(
         if any(sd.feasible for sd in victim_dict.values())
     )
 
-    return Cp2InferenceResult(
+    return InferenceResult(
         seed_aggregates=seed_aggregates,
         bootstrap_ci=boot,
         sign_test=sign,

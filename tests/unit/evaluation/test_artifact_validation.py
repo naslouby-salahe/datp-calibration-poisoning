@@ -179,7 +179,7 @@ class TestEligibilityValidation:
         payload = _valid_payload(
             per_client=[
                 _base_client("c1"),
-                _base_client("c2", calibration_pending=False),  # flag missing
+                _base_client("c2", calibration_pending=False), # flag missing
             ],
             eligible_ids=["c1"],
             pending_ids=["c2"],

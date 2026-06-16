@@ -28,11 +28,11 @@ class TestEnforceRegimeDecoration:
 
     def test_non_regime_allowed_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="allowed values must be Regime"):
-            enforce_regime("a")  # type: ignore[arg-type]
+            enforce_regime("a") # type: ignore[arg-type]
 
     def test_mixed_regime_and_string_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="allowed values must be Regime"):
-            enforce_regime(Regime.A, "b")  # type: ignore[arg-type]
+            enforce_regime(Regime.A, "b") # type: ignore[arg-type]
 
 
 class TestEnforceRegimeHappyPath:
@@ -66,19 +66,19 @@ class TestEnforceRegimeDisallowed:
 class TestEnforceRegimeMissingOrWrongType:
     def test_missing_regime_kwarg_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="requires 'regime'"):
-            _single_a()  # type: ignore[call-arg]
+            _single_a() # type: ignore[call-arg]
 
     def test_string_instead_of_enum_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="requires regime as Regime enum"):
-            _single_a(regime="a")  # type: ignore[arg-type]
+            _single_a(regime="a") # type: ignore[arg-type]
 
     def test_none_regime_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="requires 'regime'"):
-            _single_a(regime=None)  # type: ignore[arg-type]
+            _single_a(regime=None) # type: ignore[arg-type]
 
     def test_int_instead_of_enum_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="requires regime as Regime enum"):
-            _single_a(regime=42)  # type: ignore[arg-type]
+            _single_a(regime=42) # type: ignore[arg-type]
 
 
 class TestEnforceRegimePreservesFunction:

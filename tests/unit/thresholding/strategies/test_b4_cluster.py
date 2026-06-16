@@ -114,7 +114,7 @@ class TestB4SilhouetteMode:
             q=0.95,
             random_state=42,
             k_regime_a=0,
-            k_candidates=[2, 3, 100],  # k=100 >= n_eligible=3, will be skipped
+            k_candidates=[2, 3, 100], # k=100 >= n_eligible=3, will be skipped
             n_init=10,
             run=_run(Regime.B),
             regime=Regime.B,
@@ -156,7 +156,7 @@ class TestB4FingerprintRobustness:
     def test_identical_fingerprints_raises_via_compute(self) -> None:
         errors = {
             "c0": np.full(200, 0.5, dtype=np.float32),
-            "c1": np.full(200, 0.5, dtype=np.float32),  # identical to c0
+            "c1": np.full(200, 0.5, dtype=np.float32), # identical to c0
         }
         # Two clients with identical errors → identical fingerprints → degenerate
         with pytest.raises(ValueError, match="Degenerate fingerprints"):
@@ -197,7 +197,7 @@ class TestB4FingerprintRobustness:
             "eligible": np.random.default_rng(0)
             .exponential(0.3, size=200)
             .astype(np.float32),
-            "pending": _make_errors(5, seed=99),  # 5 samples < n_min=100 → pending
+            "pending": _make_errors(5, seed=99), # 5 samples < n_min=100 → pending
         }
         fps = compute_fingerprints(errors, ["eligible"], q=0.95)
         assert "pending" not in fps

@@ -155,6 +155,34 @@ Seed scheme: `numpy.random.SeedSequence([training_seed, poisoning_seed, client_i
 - Remove or quarantine stale journal logic.
 - No in-place mutation of clean calibration arrays.
 
+### 4.1 Production-naming rules (paper-neutral code)
+
+Production code (everything under `src/`, `tests/`, and any generated runtime
+artifact name) must be **domain-named, not paper-coded**.
+
+- **Forbidden in production names:** `CP2`, `cp2`, `MVP`, `mvp`, phase labels
+  (`phase_e`, `Phase E`), and ticket IDs (`CP2-T044`, `FB1`, …) in module
+  filenames, class names, function names, variable names, enum members,
+  constants, CLI command names, and generated artifact filenames / JSON field
+  values.
+- **Use domain names instead:** e.g. `calibration_poisoning`,
+  `threshold_calibration`, `bounded_sweep`, `single_victim_sweep`,
+  `victim_plan`, `ExperimentStage`, `BoundedSweepManifest`,
+  `CALIBRATION_POISONING_OUTPUT_ROOT`. Scale members are domain words
+  (`BOUNDED`, `FULL`), not `MVP`.
+- **Ticket / phase / `CP2` labels belong only** in `docs/tickets/**`,
+  `docs/**` tracking files, and decision/progress logs — never in shipped code,
+  docstrings, comments, error-message strings, or persisted artifact fields.
+- **Docstrings and comments are short and technical.** No AI-assistant phrasing
+  ("This module provides…", "Here we…"), no ticket numbers, no phase narration,
+  no restating the code. Describe behavior and scientific locks in domain terms
+  (e.g. "Calibration-poisoning guardrail:" not "CP2 guardrail:").
+- **Do not preserve bad names via compatibility aliases.** Rename the symbol and
+  update every import, test, and doc reference. No wrappers, re-exports, or
+  redirect shims kept only to honor an old paper-coded name.
+- A ticket is **not** `done` if it left `CP2`/`MVP`/ticket-coded identifiers,
+  artifact names, or AI-looking docstrings in production code.
+
 ---
 
 ## 5. Test Taxonomy

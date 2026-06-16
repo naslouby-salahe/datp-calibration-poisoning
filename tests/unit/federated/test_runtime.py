@@ -78,7 +78,7 @@ class TestGetAvailableRamGb:
 
     def test_falls_back_to_proc_meminfo(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         meminfo = tmp_path / "meminfo"
-        meminfo.write_text("MemAvailable:   16777216 kB\n")
+        meminfo.write_text("MemAvailable: 16777216 kB\n")
         monkeypatch.setattr("datp.federated.runtime._MEMINFO_PATH", meminfo)
         monkeypatch.setitem(sys.modules, "psutil", None)
         assert get_available_ram_gb() == pytest.approx(16.0)
@@ -126,7 +126,7 @@ class TestDeriveClientResources:
             require_cuda=False,
             ray_num_gpus_per_client=0.0,
         )
-        assert result["num_cpus"] == 2.0  # ceil(8 / 4)
+        assert result["num_cpus"] == 2.0 # ceil(8 / 4)
 
     def test_device_and_resources_agree_cuda(
         self, monkeypatch: pytest.MonkeyPatch

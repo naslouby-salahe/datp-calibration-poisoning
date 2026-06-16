@@ -114,7 +114,7 @@ def test_all_summary_fields_populated() -> None:
         threshold=BASE_CONFIG.quality_gates.ciciot_homogeneity_threshold,
     )
     assert result.js_summary.n_compared == 4
-    assert result.js_summary.n_pairs == 6  # C(4,2)
+    assert result.js_summary.n_pairs == 6 # C(4,2)
     assert result.js_summary.mean is not None
     assert result.js_summary.std is not None
     assert result.js_summary.p50 is not None

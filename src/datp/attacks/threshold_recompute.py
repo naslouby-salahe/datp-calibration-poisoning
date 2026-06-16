@@ -1,7 +1,7 @@
-"""B1/B2 threshold recomputation under CP2 calibration poisoning.
+"""B1/B2 threshold recomputation under calibration poisoning.
 
-Thin adapter over the inherited thresholding strategies.  Accepts a clean
-Cp2ScoreCollection and a poisoned calibration dict, and returns typed
+Thin adapter over the inherited thresholding strategies. Accepts a clean
+ScoreCollection and a poisoned calibration dict, and returns typed
 clean/poisoned threshold pairs.
 
 Eligibility is fixed from the clean collection (cardinality is preserved under
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from datp.attacks.poison_enums import ThresholdPolicy
-from datp.attacks.score_containers import Cp2ScoreCollection
+from datp.attacks.score_containers import ScoreCollection
 from datp.thresholding.eligibility import (
     compute_client_thresholds,
     compute_tau_global,
@@ -30,7 +30,7 @@ from datp.thresholding.eligibility import (
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2ThresholdPair:
+class ThresholdPair:
     """Clean and poisoned threshold pair for one policy over all clients.
 
     thresholds_clean / thresholds_pois: eligible-client-indexed thresholds.
@@ -46,10 +46,10 @@ class Cp2ThresholdPair:
 
 
 def compute_b1_pair(
-    collection: Cp2ScoreCollection,
+    collection: ScoreCollection,
     poisoned_cal: dict[str, np.ndarray],
     q: float,
-) -> Cp2ThresholdPair:
+) -> ThresholdPair:
     """Compute B1 (global) threshold pair from clean vs poisoned cal.
 
     B1 tau_global = (1/K_elig) × Σ τᵢ over eligible clients.
@@ -73,7 +73,7 @@ def compute_b1_pair(
     thresholds_clean = dict.fromkeys(eligible_ids, tau_global_clean)
     thresholds_pois = dict.fromkeys(eligible_ids, tau_global_pois)
 
-    return Cp2ThresholdPair(
+    return ThresholdPair(
         policy=ThresholdPolicy.B1_GLOBAL,
         tau_global_clean=tau_global_clean,
         tau_global_pois=tau_global_pois,
@@ -83,11 +83,11 @@ def compute_b1_pair(
 
 
 def compute_b2_pair(
-    collection: Cp2ScoreCollection,
+    collection: ScoreCollection,
     poisoned_cal: dict[str, np.ndarray],
     q: float,
     tau_global_clean: float,
-) -> Cp2ThresholdPair:
+) -> ThresholdPair:
     """Compute B2 (personalized) threshold pair from clean vs poisoned cal.
 
     B2: each eligible client has τᵢ = percentile_q(cal_i).
@@ -108,7 +108,7 @@ def compute_b2_pair(
 
     tau_global_pois = compute_tau_global(taus_pois)
 
-    return Cp2ThresholdPair(
+    return ThresholdPair(
         policy=ThresholdPolicy.B2_PERSONALIZED,
         tau_global_clean=tau_global_clean,
         tau_global_pois=tau_global_pois,

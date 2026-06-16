@@ -28,6 +28,24 @@ For every ticket, repair, or refactor, inspect:
 
 ---
 
+## Production-naming gate (paper-neutral code)
+
+Reject the surface if production code (`src/`, `tests/`, generated runtime
+artifact names) contains paper-coded identifiers. See `CLAUDE.md` §4.1.
+
+- FAIL if any module filename, class, function, variable, enum member,
+  constant, CLI command, or persisted artifact filename / JSON field value
+  contains `CP2`, `cp2`, `MVP`, `mvp`, a phase label, or a ticket ID
+  (`CP2-T044`, `FB1`, …).
+- FAIL if docstrings/comments in production code carry ticket numbers, phase
+  narration, or AI-assistant phrasing ("This module provides…", "Here we…").
+- FAIL if a paper-coded name is preserved via a wrapper, re-export, or alias
+  instead of being renamed outright.
+- Ticket / phase / `CP2` labels are allowed only in `docs/**` and tracking
+  files, never in shipped code.
+
+---
+
 ## Mandatory Inputs
 
 Before judging quality, read:

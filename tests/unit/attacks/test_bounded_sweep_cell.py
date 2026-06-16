@@ -1,10 +1,10 @@
-"""Unit tests for the Phase E MVP cell runner (CP2-T044)."""
+"""Unit tests for the bounded sweep cell runner ."""
 
 from __future__ import annotations
 
 import math
 
-from datp.attacks.mvp_runner import lock_mu_flag_threshold, run_mvp_cell
+from datp.attacks.bounded_sweep_cell import lock_mu_flag_threshold, run_sweep_cell
 from datp.attacks.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.attacks.score_containers import build_score_collection
 from datp.testsupport.synthetic_scores import make_standard_score_set
@@ -24,11 +24,11 @@ def test_lock_mu_flag_threshold_is_deterministic_and_b1_derived():
     assert mu_a >= 0.0
 
 
-def test_run_mvp_cell_zero_fraction_gives_zero_delta():
+def test_run_sweep_cell_zero_fraction_gives_zero_delta():
     col = _make_collection()
     mu_flag = lock_mu_flag_threshold(col)
     victim_id = col.eligible_ids[0]
-    result = run_mvp_cell(
+    result = run_sweep_cell(
         col,
         victim_id=victim_id,
         policy=ThresholdPolicy.B1_GLOBAL,
@@ -42,11 +42,11 @@ def test_run_mvp_cell_zero_fraction_gives_zero_delta():
     assert math.isclose(delta, 0.0, abs_tol=1e-12)
 
 
-def test_run_mvp_cell_high_source_raises_threshold():
+def test_run_sweep_cell_high_source_raises_threshold():
     col = _make_collection()
     mu_flag = lock_mu_flag_threshold(col)
     victim_id = col.eligible_ids[0]
-    result = run_mvp_cell(
+    result = run_sweep_cell(
         col,
         victim_id=victim_id,
         policy=ThresholdPolicy.B2_PERSONALIZED,
@@ -60,12 +60,12 @@ def test_run_mvp_cell_high_source_raises_threshold():
     assert delta > 0.0
 
 
-def test_run_mvp_cell_uses_passed_mu_flag_not_recomputed():
+def test_run_sweep_cell_uses_passed_mu_flag_not_recomputed():
     col = _make_collection()
     victim_id = col.eligible_ids[0]
     real_mu = lock_mu_flag_threshold(col)
     sentinel_mu = real_mu + 999.0
-    result = run_mvp_cell(
+    result = run_sweep_cell(
         col,
         victim_id=victim_id,
         policy=ThresholdPolicy.B4_CLUSTER,

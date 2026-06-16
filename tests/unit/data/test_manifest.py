@@ -178,7 +178,7 @@ class TestSelfValidatingLoad:
     def test_self_validating_load_empty_dataset(self, tmp_path):
         p = tmp_path / "manifest.json"
         data = _valid_manifest_dict()
-        data["dataset"] = "  "
+        data["dataset"] = " "
         _write_json(p, data)
 
         with pytest.raises(RuntimeError, match="dataset"):

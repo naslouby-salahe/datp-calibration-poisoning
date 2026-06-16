@@ -1,78 +1,78 @@
-"""Unit tests for the CP2 CLI subcommand."""
+"""Unit tests for the CLI subcommand."""
 
 from __future__ import annotations
 
 from datp.app.cli import app
-from datp.config.stages import Cp2Stage
+from datp.config.stages import ExperimentStage
 
 from typer.testing import CliRunner
 
 _runner = CliRunner()
 
 
-class TestCp2Preview:
+class TestPreview:
     def test_preview_exits_zero(self) -> None:
-        result = _runner.invoke(app, ["cp2", "preview", "--stage", "nbaiot_mvp"])
+        result = _runner.invoke(app, ["poison", "preview", "--stage", "nbaiot_bounded"])
         assert result.exit_code == 0
 
     def test_preview_contains_stage_name(self) -> None:
-        result = _runner.invoke(app, ["cp2", "preview", "--stage", "nbaiot_mvp"])
-        assert "nbaiot_mvp" in result.output
+        result = _runner.invoke(app, ["poison", "preview", "--stage", "nbaiot_bounded"])
+        assert "nbaiot_bounded" in result.output
 
     def test_preview_contains_scale(self) -> None:
-        result = _runner.invoke(app, ["cp2", "preview", "--stage", "nbaiot_smoke"])
+        result = _runner.invoke(app, ["poison", "preview", "--stage", "nbaiot_smoke"])
         assert "smoke" in result.output.lower()
 
     def test_preview_gated_stage_exits_zero(self) -> None:
-        result = _runner.invoke(app, ["cp2", "preview", "--stage", "nbaiot_full"])
+        result = _runner.invoke(app, ["poison", "preview", "--stage", "nbaiot_full"])
         assert result.exit_code == 0
 
 
-class TestCp2DryRun:
+class TestDryRun:
     def test_dry_run_exits_zero(self) -> None:
-        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_mvp"])
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_bounded"])
         assert result.exit_code == 0
 
     def test_dry_run_contains_stage_info(self) -> None:
-        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_mvp"])
-        assert "nbaiot_mvp" in result.output
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_bounded"])
+        assert "nbaiot_bounded" in result.output
 
     def test_dry_run_blocked_stage_shows_notice(self) -> None:
-        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_full"])
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_full"])
         # CliRunner mixes stdout+stderr into result.output by default.
         assert "blocked" in result.output.lower()
 
-    def test_dry_run_nbaiot_mvp_no_longer_blocked(self) -> None:
-        # CP2-T044 is done; allow_run=True for this stage now, so the
+    def test_dry_run_nbaiot_bounded_sweep_no_longer_blocked(self) -> None:
+        # is done; allow_run=True for this stage now, so the
         # Phase-B blocked notice must not appear.
-        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_mvp"])
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_bounded"])
         assert "blocked" not in result.output.lower()
 
     def test_dry_run_gated_stage_mentions_gate(self) -> None:
-        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_full"])
-        assert "FB3" in result.output
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_full"])
+        assert "full_scope_continue_decision" in result.output
 
 
-class TestCp2Smoke:
+class TestSmoke:
     def test_smoke_exits_zero(self) -> None:
-        result = _runner.invoke(app, ["cp2", "smoke"])
+        result = _runner.invoke(app, ["poison", "smoke"])
         assert result.exit_code == 0
 
     def test_smoke_mentions_nbaiot(self) -> None:
-        result = _runner.invoke(app, ["cp2", "smoke"])
+        result = _runner.invoke(app, ["poison", "smoke"])
         assert "nbaiot" in result.output.lower()
 
 
-class TestCp2Stages:
+class TestStages:
     def test_stages_exits_zero(self) -> None:
-        result = _runner.invoke(app, ["cp2", "stages"])
+        result = _runner.invoke(app, ["poison", "stages"])
         assert result.exit_code == 0
 
     def test_stages_output_contains_all_stages(self) -> None:
-        result = _runner.invoke(app, ["cp2", "stages"])
-        for stage in Cp2Stage:
+        result = _runner.invoke(app, ["poison", "stages"])
+        for stage in ExperimentStage:
             assert str(stage) in result.output, f"Stage {stage!r} missing from output"
 
     def test_stages_output_contains_blocked(self) -> None:
-        result = _runner.invoke(app, ["cp2", "stages"])
+        result = _runner.invoke(app, ["poison", "stages"])
         assert "BLOCKED" in result.output

@@ -1,6 +1,6 @@
-"""CP2 attack diagnostics: ASR, blast radius, spillover.
+"""Attack diagnostics: ASR, blast radius, spillover.
 
-Pure functions over Cp2MetricResult objects.  No new scoring or thresholding.
+Pure functions over MetricResult objects. No new scoring or thresholding.
 
 Definitions:
   ASR (Attack Success Rate): fraction of victim instances where |Δτ| > δ_τ,i
@@ -19,12 +19,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from datp.attacks.metric_engine import Cp2MetricResult
+from datp.attacks.metric_engine import MetricResult
 from datp.attacks.poison_enums import AttackerObjective, ThresholdPolicy
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2AsrRecord:
+class AsrRecord:
     """Attack Success Rate for one (policy, victim, condition) cell."""
 
     policy: ThresholdPolicy
@@ -36,7 +36,7 @@ class Cp2AsrRecord:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2BlastRadiusRecord:
+class BlastRadiusRecord:
     """Blast radius: number of clients with |Δτ| > δ_τ,i per cell."""
 
     policy: ThresholdPolicy
@@ -47,7 +47,7 @@ class Cp2BlastRadiusRecord:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2SpilloverRecord:
+class SpilloverRecord:
     """Spillover: non-victim clients with |Δτ| > δ_τ,i."""
 
     policy: ThresholdPolicy
@@ -58,11 +58,11 @@ class Cp2SpilloverRecord:
 
 
 def compute_asr(
-    result: Cp2MetricResult,
+    result: MetricResult,
     *,
     victim_id: str,
     objective: AttackerObjective,
-) -> Cp2AsrRecord:
+) -> AsrRecord:
     """Compute ASR for one victim: fraction of eligible clients with significant,
     directional Δτ.
 
@@ -82,7 +82,7 @@ def compute_asr(
                 n_significant += 1
 
     asr = n_significant / n_total if n_total > 0 else 0.0
-    return Cp2AsrRecord(
+    return AsrRecord(
         policy=result.policy,
         victim_id=victim_id,
         objective=objective,
@@ -93,10 +93,10 @@ def compute_asr(
 
 
 def compute_blast_radius(
-    result: Cp2MetricResult,
+    result: MetricResult,
     *,
     victim_id: str | None = None,
-) -> Cp2BlastRadiusRecord:
+) -> BlastRadiusRecord:
     """Compute blast radius: number of eligible clients with significant |Δτ|.
 
     victim_id is optional metadata only; it does not filter the count.
@@ -108,7 +108,7 @@ def compute_blast_radius(
     n_significant = sum(1 for e in entries.values() if e.is_significant)
     n_eligible = len(entries)
     blast_fraction = n_significant / n_eligible if n_eligible > 0 else 0.0
-    return Cp2BlastRadiusRecord(
+    return BlastRadiusRecord(
         policy=result.policy,
         victim_id=victim_id,
         n_significant=n_significant,
@@ -118,10 +118,10 @@ def compute_blast_radius(
 
 
 def compute_spillover(
-    result: Cp2MetricResult,
+    result: MetricResult,
     *,
     victim_id: str,
-) -> Cp2SpilloverRecord:
+) -> SpilloverRecord:
     """Compute spillover: non-victim clients with significant |Δτ|.
 
     Spillover is mechanistic (policy propagation), not an independence violation.
@@ -136,7 +136,7 @@ def compute_spillover(
         if cid != victim_id and entry.is_significant
     ]
     n_non_victims = len(entries) - (1 if victim_id in entries else 0)
-    return Cp2SpilloverRecord(
+    return SpilloverRecord(
         policy=result.policy,
         victim_id=victim_id,
         spillover_client_ids=tuple(sorted(spillover_ids)),

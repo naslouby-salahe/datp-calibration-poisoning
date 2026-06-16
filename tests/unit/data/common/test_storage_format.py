@@ -90,13 +90,13 @@ class TestAssertNoCsvArtifacts:
     def test_passes_on_parquet_only(self, tmp_path, sample_df):
         write_artifact(sample_df, tmp_path / "train.parquet")
         write_artifact(sample_df, tmp_path / "cal.parquet")
-        assert_no_csv_artifacts(tmp_path)  # should not raise
+        assert_no_csv_artifacts(tmp_path) # should not raise
 
     def test_passes_on_empty_directory(self, tmp_path):
-        assert_no_csv_artifacts(tmp_path)  # should not raise
+        assert_no_csv_artifacts(tmp_path) # should not raise
 
     def test_passes_on_nonexistent_directory(self, tmp_path):
-        assert_no_csv_artifacts(tmp_path / "does_not_exist")  # should not raise
+        assert_no_csv_artifacts(tmp_path / "does_not_exist") # should not raise
 
     def test_fails_if_csv_present(self, tmp_path, sample_df):
         write_artifact(sample_df, tmp_path / "train.parquet")

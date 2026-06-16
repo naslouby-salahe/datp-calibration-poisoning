@@ -26,7 +26,7 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
     {
         # SimClientConfig: options object with true domain-invariant defaults
         # (DatpClient is the standard FL client, encoder_only=False is FedAvg,
-        #  score_after=True is the standard protocol)
+        # score_after=True is the standard protocol)
         ("federated/simulation.py", "SimClientConfig", "client_cls"),
         ("federated/simulation.py", "SimClientConfig", "client_extra_kwargs"),
         ("federated/simulation.py", "SimClientConfig", "encoder_only"),
@@ -101,16 +101,19 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("data/catalog.py", "DatasetSpec", "device_ids"),
         ("data/catalog.py", "DatasetSpec", "attack_family_dirs"),
         ("data/catalog.py", "DatasetSpec", "expected_client_count"),
-        # Cp2HolmResult.descriptive_only: CP2 protocol lock — Holm is ALWAYS descriptive
-        # only in CP2; True is the only valid value; False would be a protocol violation
-        ("attacks/inference.py", "Cp2HolmResult", "descriptive_only"),
-        # Cp2ScoreCollection.n_min: canonical CP2_N_MIN=100 lock (Calibration-Pending
+        # HolmResult.descriptive_only: protocol lock — Holm is ALWAYS descriptive
+        # only here; True is the only valid value; False would be a protocol violation
+        ("attacks/inference.py", "HolmResult", "descriptive_only"),
+        # ScoreCollection.n_min: canonical N_MIN=100 lock (Calibration-Pending
         # boundary); any deviation from 100 is a protocol violation
-        ("attacks/score_containers.py", "Cp2ScoreCollection", "n_min"),
-        # Cp2ScoreCollection._eligible_ids/_pending_ids: computed in __post_init__ from
+        ("attacks/score_containers.py", "ScoreCollection", "n_min"),
+        # ScoreCollection._eligible_ids/_pending_ids: computed in __post_init__ from
         # the clients dict; None is the uninitialized sentinel for the lazy-init pattern
-        ("attacks/score_containers.py", "Cp2ScoreCollection", "_eligible_ids"),
-        ("attacks/score_containers.py", "Cp2ScoreCollection", "_pending_ids"),
+        ("attacks/score_containers.py", "ScoreCollection", "_eligible_ids"),
+        ("attacks/score_containers.py", "ScoreCollection", "_pending_ids"),
+        # BoundedSweepCellSpec.target_scope: protocol lock — the bounded sweep
+        # matrix is always SINGLE_CLIENT; any other scope is out of scope here
+        ("attacks/bounded_sweep_matrix.py", "BoundedSweepCellSpec", "target_scope"),
     }
 )
 
@@ -211,6 +214,6 @@ class TestNoUnjustifiedDataclassDefaults:
                     violations.append(f"{rel}::{cls}.{field}")
         assert not violations, (
             "Dataclass fields with unjustified defaults found:\n"
-            + "\n".join(f"  {v}" for v in violations)
+            + "\n".join(f" {v}" for v in violations)
             + "\nAdd to _DEFAULTS_ALLOWLIST with a documented reason, or remove the default."
         )

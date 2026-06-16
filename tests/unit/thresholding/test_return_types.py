@@ -24,7 +24,7 @@ def test_client_metrics_is_frozen_dataclass():
     from datp.evaluation.metrics import ClientEvaluationRecord
 
     assert dataclasses.is_dataclass(ClientEvaluationRecord)
-    assert ClientEvaluationRecord.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert ClientEvaluationRecord.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_evaluation_result_is_frozen_dataclass():
@@ -33,7 +33,7 @@ def test_evaluation_result_is_frozen_dataclass():
     from datp.evaluation.metrics import EvaluationResult
 
     assert dataclasses.is_dataclass(EvaluationResult)
-    assert EvaluationResult.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert EvaluationResult.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_baseline_result_required_keys():
@@ -113,14 +113,14 @@ def test_threshold_result_is_frozen_dataclass():
     from datp.core.types import ThresholdResult
 
     assert dataclasses.is_dataclass(ThresholdResult)
-    assert ThresholdResult.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert ThresholdResult.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_client_threshold_is_frozen_dataclass():
     from datp.core.types import ClientThreshold
 
     assert dataclasses.is_dataclass(ClientThreshold)
-    assert ClientThreshold.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert ClientThreshold.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_threshold_result_client_thresholds_is_tuple():
@@ -141,7 +141,7 @@ def test_b3_b4_metadata_are_frozen_dataclasses():
 
     for cls in (B3FamilyInfo, B3Metadata, B4ClusterInfo, B4Metadata):
         assert dataclasses.is_dataclass(cls), f"{cls.__name__} must be a dataclass"
-        assert cls.__dataclass_params__.frozen, f"{cls.__name__} must be frozen"  # type: ignore[attr-defined]
+        assert cls.__dataclass_params__.frozen, f"{cls.__name__} must be frozen" # type: ignore[attr-defined]
 
 
 def test_identity_classes_are_frozen_dataclasses():
@@ -149,7 +149,7 @@ def test_identity_classes_are_frozen_dataclasses():
 
     for cls in (TrainingCellId, BaselineRunId):
         assert dataclasses.is_dataclass(cls), f"{cls.__name__} must be a dataclass"
-        assert cls.__dataclass_params__.frozen, f"{cls.__name__} must be frozen"  # type: ignore[attr-defined]
+        assert cls.__dataclass_params__.frozen, f"{cls.__name__} must be frozen" # type: ignore[attr-defined]
 
 
 def test_serialization_boundary_classes_are_pydantic():
@@ -169,7 +169,7 @@ def test_score_cell_id_is_frozen_dataclass():
     from datp.core.identity import TrainingCellId
 
     assert dataclasses.is_dataclass(TrainingCellId)
-    assert TrainingCellId.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert TrainingCellId.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_score_cell_id_delegates_to_cell():
@@ -187,14 +187,14 @@ def test_dispersion_metrics_is_frozen_dataclass():
     from datp.evaluation.metrics import DispersionMetrics
 
     assert dataclasses.is_dataclass(DispersionMetrics)
-    assert DispersionMetrics.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert DispersionMetrics.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_confusion_counts_is_frozen_dataclass():
     from datp.evaluation.metrics import ConfusionCounts
 
     assert dataclasses.is_dataclass(ConfusionCounts)
-    assert ConfusionCounts.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert ConfusionCounts.__dataclass_params__.frozen # type: ignore[attr-defined]
     cc = ConfusionCounts(tp=10, fp=2, tn=88, fn=5)
     assert cc.fp + cc.tn == 90
     assert cc.tp + cc.fn == 15
@@ -204,28 +204,28 @@ def test_client_evaluation_record_is_frozen_dataclass():
     from datp.evaluation.metrics import ClientEvaluationRecord
 
     assert dataclasses.is_dataclass(ClientEvaluationRecord)
-    assert ClientEvaluationRecord.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert ClientEvaluationRecord.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_artifact_layout_is_frozen_dataclass():
     from datp.artifacts.layout import ArtifactLayout
 
     assert dataclasses.is_dataclass(ArtifactLayout)
-    assert ArtifactLayout.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert ArtifactLayout.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_score_cell_paths_is_frozen_dataclass():
     from datp.artifacts.layout import ScoreCellPaths
 
     assert dataclasses.is_dataclass(ScoreCellPaths)
-    assert ScoreCellPaths.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert ScoreCellPaths.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_baseline_run_paths_is_frozen_dataclass():
     from datp.artifacts.layout import BaselineRunPaths
 
     assert dataclasses.is_dataclass(BaselineRunPaths)
-    assert BaselineRunPaths.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert BaselineRunPaths.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
 def test_path_contracts_compose_with_identity():

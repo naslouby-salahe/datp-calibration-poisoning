@@ -1,4 +1,4 @@
-"""Typed CP2 score containers and victim-set model.
+"""Typed Score containers and victim-set model.
 
 Reuses inherited eligibility logic from thresholding.eligibility. Calibration-Pending
 clients receive tau_global, are excluded from CV(FPR), victim sets, and B4 clustering.
@@ -10,13 +10,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.artifacts.poison_names import CP2_N_MIN
+from datp.artifacts.poison_names import N_MIN
 from datp.thresholding.eligibility import identify_eligible
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2ClientScores:
-    """Per-client score arrays for one CP2 experiment.
+class ClientScores:
+    """Per-client score arrays for one experiment.
 
     cal: benign calibration scores (reconstruction errors).
     test_benign: benign test scores.
@@ -34,15 +34,15 @@ class Cp2ClientScores:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2ScoreCollection:
+class ScoreCollection:
     """Holds all client scores and partitions them into eligible/pending sets.
 
     Delegates to the inherited eligibility logic (identify_eligible).
     Eligible/pending IDs are eagerly computed and stored as tuple fields.
     """
 
-    clients: dict[str, Cp2ClientScores]
-    n_min: int = CP2_N_MIN
+    clients: dict[str, ClientScores]
+    n_min: int = N_MIN
     _eligible_ids: tuple[str, ...] = ()
     _pending_ids: tuple[str, ...] = ()
 
@@ -81,7 +81,7 @@ class Cp2ScoreCollection:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2VictimSet:
+class VictimSet:
     """The set of eligible clients that can be poisoned.
 
     Only eligible clients (n_cal >= n_min) are valid victims. Calibration-Pending
@@ -90,7 +90,7 @@ class Cp2VictimSet:
     """
 
     eligible_ids: tuple[str, ...]
-    collection: Cp2ScoreCollection
+    collection: ScoreCollection
 
     @property
     def n_victims(self) -> int:
@@ -106,9 +106,9 @@ class Cp2VictimSet:
         return self.collection.clients[victim_id].cal
 
 
-def build_victim_set(collection: Cp2ScoreCollection) -> Cp2VictimSet:
+def build_victim_set(collection: ScoreCollection) -> VictimSet:
     """Build the victim set from a score collection (eligible clients only)."""
-    return Cp2VictimSet(
+    return VictimSet(
         eligible_ids=collection.eligible_ids,
         collection=collection,
     )
@@ -116,14 +116,14 @@ def build_victim_set(collection: Cp2ScoreCollection) -> Cp2VictimSet:
 
 def build_score_collection(
     client_scores: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]],
-    n_min: int = CP2_N_MIN,
-) -> Cp2ScoreCollection:
-    """Build a Cp2ScoreCollection from raw arrays.
+    n_min: int = N_MIN,
+) -> ScoreCollection:
+    """Build a ScoreCollection from raw arrays.
 
     Each value is (cal, test_benign, test_attack).
     """
     clients = {
-        cid: Cp2ClientScores(
+        cid: ClientScores(
             client_id=cid,
             cal=cal,
             test_benign=test_benign,
@@ -131,4 +131,4 @@ def build_score_collection(
         )
         for cid, (cal, test_benign, test_attack) in client_scores.items()
     }
-    return Cp2ScoreCollection(clients=clients, n_min=n_min)
+    return ScoreCollection(clients=clients, n_min=n_min)

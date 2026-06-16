@@ -104,7 +104,7 @@ def test_regime_b_smoke(tmp_path) -> None:
 @pytest.mark.integration
 def test_regime_c_loop(tmp_path) -> None:
     alpha_levels = [0.1, 0.5, 1.0, 5.0, 10.0, float("inf")]
-    n_virtual_clients = 4  # Reduced from 20 for test speed
+    n_virtual_clients = 4 # Reduced from 20 for test speed
 
     for alpha in alpha_levels:
         cfg = _make_cfg(regime=Regime.C, rounds=2)

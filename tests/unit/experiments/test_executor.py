@@ -112,7 +112,7 @@ class TestIsolatedBaselineExecutor:
         request = _make_request(Baseline.B0, tmp_path)
 
         with patch("datp.experiments.baselines.b0_centralized.run_b0"):
-            executor.run(request)  # should not raise
+            executor.run(request) # should not raise
 
     def test_error_message_includes_isolated_baselines(self, tmp_path: Path) -> None:
         executor = IsolatedBaselineExecutor(step_fn=None)
@@ -167,7 +167,7 @@ class TestSharedTrainingExecutor:
 
         mock_ensure.assert_called_once()
         assert isinstance(ctx, SharedPipelineContext)
-        assert len(step_calls) >= 3  # LOAD_CAL_SCORES, COMPUTE_ELIGIBILITY, COMPUTE_TAU_GLOBAL, INIT_SCORE_PROVIDER
+        assert len(step_calls) >= 3 # LOAD_CAL_SCORES, COMPUTE_ELIGIBILITY, COMPUTE_TAU_GLOBAL, INIT_SCORE_PROVIDER
 
     def test_build_context_returns_typed_context(self, tmp_path: Path) -> None:
         executor = SharedTrainingExecutor(
@@ -300,7 +300,7 @@ class TestThresholdEvaluationExecutor:
         ):
             executor.run(request, ctx)
 
-        assert len(step_calls) >= 3  # DERIVE_THRESHOLD, EVALUATE, WRITE_METRICS
+        assert len(step_calls) >= 3 # DERIVE_THRESHOLD, EVALUATE, WRITE_METRICS
         assert step_calls[0][0] == SweepStep.DERIVE_THRESHOLD
 
 

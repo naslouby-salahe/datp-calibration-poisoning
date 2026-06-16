@@ -49,7 +49,7 @@ class TestMakeRunId:
         assert rid.startswith("a_seed42_")
         ts_part = rid.split("_")[-1]
         assert ts_part.isdigit()
-        assert len(ts_part) >= 13  # ms since epoch
+        assert len(ts_part) >= 13 # ms since epoch
 
     def test_collision_proof_format_with_alpha(self) -> None:
         rid = make_run_id(Regime.C, seed=7, alpha=0.5)

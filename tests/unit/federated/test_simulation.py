@@ -73,7 +73,7 @@ class TestSimClientConfig:
     def test_is_frozen(self) -> None:
         c = SimClientConfig()
         with pytest.raises(Exception):
-            c.encoder_only = True  # type: ignore[misc]
+            c.encoder_only = True # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ class TestTrainingResult:
     def test_is_frozen(self, tmp_path: Path) -> None:
         r = self._make(tmp_path)
         with pytest.raises(Exception):
-            r.seed = 99  # type: ignore[misc]
+            r.seed = 99 # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ class TestClientDataNotMutated:
                 client_data=original_data,
                 seed=0,
                 alpha=None,
-                model_cls=None,  # type: ignore[arg-type]
+                model_cls=None, # type: ignore[arg-type]
                 ckpt_dir=tmp_path,
                 score_base=tmp_path,
                 label="test",
@@ -289,7 +289,7 @@ class TestExecuteFlowerSimulation:
 
         sim_mod._execute_flower_simulation(
             BASE_CONFIG,
-            lambda _ctx: None,  # type: ignore[arg-type]
+            lambda _ctx: None, # type: ignore[arg-type]
             7,
             None,
             "test",
@@ -319,7 +319,7 @@ class TestExecuteFlowerSimulation:
         with pytest.raises(RuntimeError, match="sim-boom"):
             sim_mod._execute_flower_simulation(
                 BASE_CONFIG,
-                lambda _ctx: None,  # type: ignore[arg-type]
+                lambda _ctx: None, # type: ignore[arg-type]
                 1,
                 None,
                 "test",

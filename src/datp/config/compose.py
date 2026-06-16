@@ -213,7 +213,7 @@ def compose_config(
     """Build a validated runtime config from Hydra-composed defaults + overrides.
 
     Accepts ``Regime``/``Baseline`` enum values or string representations
-    (case-insensitive) at the boundary.  Strings are normalized to enums
+    (case-insensitive) at the boundary. Strings are normalized to enums
     internally via :class:`ComposeRequest`.
     """
     _, cfg = _compose_and_validate(
@@ -232,7 +232,7 @@ def compose_analysis_config() -> DatpConfig:
     """Return the base config for post-hoc analysis modules.
 
     Analysis functions operate over all verified cells and do not have a single
-    regime, baseline, or seed.  This function returns scalar threshold/analysis
+    regime, baseline, or seed. This function returns scalar threshold/analysis
     parameters (q, n_min, b4_random_state, cal_sweep_n_cal, …) from canonical
     defaults without attaching misleading experiment context.
     """

@@ -36,7 +36,7 @@ def client_errors() -> dict[str, np.ndarray]:
         "client_a": _make_errors(200, seed=1),
         "client_b": _make_errors(150, seed=2),
         "client_c": _make_errors(300, seed=3),
-        "client_d": _make_errors(50, seed=4),  # Cal-Pending
+        "client_d": _make_errors(50, seed=4), # Cal-Pending
     }
 
 
@@ -389,7 +389,7 @@ class TestB4:
                 k_candidates=[2, 3, 4, 5],
                 n_init=10,
                 run=_run(Baseline.B4, regime=Regime.A),
-                regime="X",  # type: ignore[arg-type]
+                regime="X", # type: ignore[arg-type]
             )
 
     def test_return_type(self, large_errors: dict[str, np.ndarray]) -> None:

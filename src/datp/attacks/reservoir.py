@@ -1,4 +1,4 @@
-"""Victim-local reservoir selection for CP2 calibration poisoning.
+"""Victim-local reservoir selection for calibration poisoning.
 
 Reservoirs are built exclusively from the victim's own clean calibration scores.
 Test scores are NEVER a reservoir. Training scores are NOT a reservoir.
@@ -9,7 +9,7 @@ Source strategies:
   HIGH_SCORE_BENIGN: upper tail_mass fraction of sorted cal scores.
   LOW_SCORE_BENIGN: lower tail_mass fraction of sorted cal scores.
 
-Degenerate tails (< 2 distinct values) are flagged INFEASIBLE → FB2 path.
+Degenerate tails (< 2 distinct values) are flagged INFEASIBLE.
 """
 
 from __future__ import annotations

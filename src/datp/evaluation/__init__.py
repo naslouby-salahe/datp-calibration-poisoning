@@ -2,7 +2,7 @@ from __future__ import annotations
 
 # Lazy attribute access breaks an import cycle: evaluation modules import
 # from baselines and core, while downstream consumers (reporting, audit, CLI)
-# import from evaluation.  Deferring actual imports to first attribute access
+# import from evaluation. Deferring actual imports to first attribute access
 # prevents circular-import failures at module-load time.
 
 __all__ = [

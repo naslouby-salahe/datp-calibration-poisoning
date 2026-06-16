@@ -1,15 +1,15 @@
-"""CP2 synthetic smoke harness (CPU-only, deterministic, no real data).
+"""Synthetic smoke harness (CPU-only, deterministic, no real data).
 
-Wires the full CP2 calibration-poisoning pipeline end to end on synthetic score
-arrays so the Phase D smoke invariants can be asserted before any real N-BaIoT
+Wires the full calibration poisoning pipeline end to end on synthetic score
+arrays so the smoke invariants can be asserted before any real N-BaIoT
 artifact is touched:
 
     synthetic scores
-      -> Cp2ScoreCollection / Cp2VictimSet
+      -> ScoreCollection / VictimSet
       -> victim-local reservoir (source strategy)
       -> REPLACE_FIXED_BUDGET injection (no in-place mutation)
       -> B1 / B2 / B4 threshold recomputation (+ B4 Δτ decomposition)
-      -> CP2 metric engine (Δτ family, CV(FPR)+coverage, AUROC invariance)
+      -> metric engine (Δτ family, CV(FPR)+coverage, AUROC invariance)
       -> two-layer inference (bootstrap on 5 seed-level aggregates)
       -> run manifest emission / round-trip
 
@@ -25,11 +25,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from datp.artifacts.poison_names import (
-    CP2_B4_K,
-    CP2_B4_N_INIT,
-    CP2_B4_RANDOM_STATE,
-    CP2_N_MIN,
-    CP2_Q,
+    B4_K,
+    B4_N_INIT,
+    B4_RANDOM_STATE,
+    N_MIN,
+    THRESHOLD_QUANTILE,
 )
 from datp.attacks.cell_runner import (
     InjectionOutcome,
@@ -39,7 +39,7 @@ from datp.attacks.cell_runner import (
     recompute_pair,
 )
 from datp.attacks.metric_engine import (
-    Cp2MetricResult,
+    MetricResult,
     compute_metrics,
     compute_mu_flag_threshold,
 )
@@ -48,8 +48,8 @@ from datp.attacks.poison_enums import (
     ThresholdPolicy,
 )
 from datp.attacks.score_containers import (
-    Cp2ScoreCollection,
-    Cp2VictimSet,
+    ScoreCollection,
+    VictimSet,
     build_score_collection,
     build_victim_set,
 )
@@ -72,13 +72,13 @@ __all__ = [
 # Building blocks
 # ---------------------------------------------------------------------------
 
-def collection_from_score_set(score_set: SyntheticScoreSet) -> Cp2ScoreCollection:
-    """Build a Cp2ScoreCollection from a synthetic score set."""
+def collection_from_score_set(score_set: SyntheticScoreSet) -> ScoreCollection:
+    """Build a ScoreCollection from a synthetic score set."""
     raw = {
         c.client_id: (c.cal, c.test_benign, c.test_attack)
         for c in score_set.clients
     }
-    return build_score_collection(raw, n_min=CP2_N_MIN)
+    return build_score_collection(raw, n_min=N_MIN)
 
 
 # ---------------------------------------------------------------------------
@@ -96,13 +96,13 @@ class SmokeCellResult:
     outcome: InjectionOutcome
     clean_pair: PolicyPair
     poisoned_pair: PolicyPair
-    clean_metrics: Cp2MetricResult
-    poisoned_metrics: Cp2MetricResult
+    clean_metrics: MetricResult
+    poisoned_metrics: MetricResult
     mu_flag_threshold: float
 
 
 def run_smoke_cell(
-    collection: Cp2ScoreCollection,
+    collection: ScoreCollection,
     *,
     victim_id: str,
     policy: ThresholdPolicy,
@@ -111,7 +111,7 @@ def run_smoke_cell(
     training_seed: int = 0,
     poisoning_seed: int = 100,
     scope_idx: int = 0,
-    q: float = CP2_Q,
+    q: float = THRESHOLD_QUANTILE,
     b4_seed: int = 0,
 ) -> SmokeCellResult:
     """Run one full smoke cell.
@@ -171,7 +171,7 @@ def run_smoke_cell(
 # ---------------------------------------------------------------------------
 
 def victim_seed_deltas(
-    collection: Cp2ScoreCollection,
+    collection: ScoreCollection,
     *,
     victim_id: str,
     policy: ThresholdPolicy,
@@ -180,7 +180,7 @@ def victim_seed_deltas(
     poisoning_seeds: tuple[int, ...],
     training_seed: int = 0,
     scope_idx: int = 0,
-    q: float = CP2_Q,
+    q: float = THRESHOLD_QUANTILE,
 ) -> dict[int, float]:
     """Per-seed victim Δτ for one victim across the poisoning-seed pool.
 
@@ -211,12 +211,12 @@ def victim_seed_deltas(
 def b4_cluster_count(
     cal_dict: dict[str, np.ndarray],
     *,
-    q: float = CP2_Q,
-    n_min: int = CP2_N_MIN,
+    q: float = THRESHOLD_QUANTILE,
+    n_min: int = N_MIN,
     seed: int = 0,
-    k: int = CP2_B4_K,
-    n_init: int = CP2_B4_N_INIT,
-    random_state: int = CP2_B4_RANDOM_STATE,
+    k: int = B4_K,
+    n_init: int = B4_N_INIT,
+    random_state: int = B4_RANDOM_STATE,
 ) -> int:
     """Run B4 on a calibration dict and return the realized cluster count K.
 
@@ -246,6 +246,6 @@ def b4_cluster_count(
     return result.metadata.b4.k
 
 
-def build_smoke_victim_set(score_set: SyntheticScoreSet) -> Cp2VictimSet:
+def build_smoke_victim_set(score_set: SyntheticScoreSet) -> VictimSet:
     """Convenience: synthetic score set -> victim set (eligible clients only)."""
     return build_victim_set(collection_from_score_set(score_set))

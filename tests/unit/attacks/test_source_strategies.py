@@ -1,4 +1,4 @@
-"""Tests for CP2 source strategy dispatch (CP2-T029)."""
+"""Tests for source strategy dispatch ."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ _TAIL_MASS = 0.10
 
 
 class TestIsDiagnosticSource:
-    def test_mvp_sources_not_diagnostic(self) -> None:
+    def test_bounded_sources_not_diagnostic(self) -> None:
         for source in [
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -43,7 +43,7 @@ class TestSelectReservoirMvp:
             PoisoningSourceStrategy.LOW_SCORE_BENIGN,
         ],
     )
-    def test_mvp_sources_succeed(self, source: PoisoningSourceStrategy) -> None:
+    def test_bounded_sources_succeed(self, source: PoisoningSourceStrategy) -> None:
         c = make_eligible_client()
         res = select_reservoir(
             source=source, clean_cal=c.cal, tail_mass=_TAIL_MASS
@@ -127,10 +127,10 @@ class TestDirectionalEffects:
     ) -> tuple[float, float]:
         """Return (tau_clean, tau_pois) for one synthetic eligible client."""
         from datp.attacks.injector import inject_fixed_budget
-        from datp.core.seed_sequence import make_cp2_rng
+        from datp.core.seed_sequence import make_seed_rng
 
         c = make_eligible_client(client_idx=0)
-        rng = make_cp2_rng(
+        rng = make_seed_rng(
             training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0
         )
         reservoir = select_reservoir(

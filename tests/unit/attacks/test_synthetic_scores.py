@@ -1,11 +1,11 @@
-"""Tests for synthetic score fixtures (CP2-T024)."""
+"""Tests for synthetic score fixtures ."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from datp.artifacts.poison_names import CP2_N_MIN
+from datp.artifacts.poison_names import N_MIN
 from datp.scoring.schema import SCORE_COLUMN
 from datp.testsupport.synthetic_scores import (
     make_degenerate_tail_client,
@@ -64,19 +64,19 @@ class TestEligibility:
     def test_eligible_client_is_eligible(self) -> None:
         c = make_eligible_client()
         assert c.is_eligible
-        assert c.n_cal >= CP2_N_MIN
+        assert c.n_cal >= N_MIN
 
     def test_pending_client_is_not_eligible(self) -> None:
         c = make_pending_client()
         assert not c.is_eligible
-        assert c.n_cal < CP2_N_MIN
+        assert c.n_cal < N_MIN
 
     def test_boundary_eligible(self) -> None:
-        c = make_synthetic_client(client_id="c0", n_cal=CP2_N_MIN)
+        c = make_synthetic_client(client_id="c0", n_cal=N_MIN)
         assert c.is_eligible
 
     def test_boundary_pending(self) -> None:
-        c = make_synthetic_client(client_id="c0", n_cal=CP2_N_MIN - 1)
+        c = make_synthetic_client(client_id="c0", n_cal=N_MIN - 1)
         assert not c.is_eligible
 
 

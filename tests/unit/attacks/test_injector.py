@@ -1,4 +1,4 @@
-"""Tests for the fixed-budget replacement injector (CP2-T027)."""
+"""Tests for the fixed-budget replacement injector ."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 from datp.attacks.injector import inject_fixed_budget
 from datp.attacks.poison_enums import PoisoningSourceStrategy
 from datp.attacks.reservoir import ReservoirResult, ReservoirStatus, build_reservoir
-from datp.core.seed_sequence import make_cp2_rng
+from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import (
     make_degenerate_tail_client,
     make_eligible_client,
@@ -16,7 +16,7 @@ from datp.testsupport.synthetic_scores import (
 
 
 def _rng(seed: int = 100) -> np.random.Generator:
-    return make_cp2_rng(
+    return make_seed_rng(
         training_seed=0, poisoning_seed=seed, client_idx=0, scope_idx=0
     )
 

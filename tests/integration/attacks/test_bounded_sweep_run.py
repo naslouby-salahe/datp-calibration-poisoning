@@ -1,7 +1,7 @@
-"""Integration test for the single CP2 bounded-MVP run path (CP2-T045).
+"""Integration test for the single bounded sweep run path .
 
 Exercises the same wiring the real 1620-cell N-BaIoT execution uses:
-real_score_loader -> mvp_matrix -> mvp_runner -> mvp_manifest, end to end,
+real_score_loader -> bounded_matrix -> bounded_runner -> bounded_manifest, end to end,
 against tiny FL-trained artifacts for all 5 locked seeds.
 """
 
@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from datp.artifacts.poison_names import CP2_POISONING_SEEDS, CP2_TRAINING_SEEDS
-from datp.attacks.mvp_run import run_nbaiot_mvp, write_nbaiot_mvp_manifest
+from datp.artifacts.poison_names import POISONING_SEEDS, TRAINING_SEEDS
+from datp.attacks.bounded_sweep_run import run_nbaiot_bounded_sweep, write_nbaiot_bounded_sweep_manifest
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import ConvergenceConfig, DatpConfig, FederationConfig
 from datp.core.device import resolve_device
@@ -24,7 +24,7 @@ _N_FEATURES = 10
 _N_TRAIN = 200
 _N_CAL = 150
 _N_TEST = 50
-_N_CLIENTS = 4  # B4_CLUSTER's locked K=3 requires eligible_count > k
+_N_CLIENTS = 4 # B4_CLUSTER's locked K=3 requires eligible_count > k
 
 
 def _make_client_data(seed: int) -> dict[str, ClientData]:
@@ -69,9 +69,9 @@ def _make_cfg() -> DatpConfig:
 
 
 @pytest.mark.integration
-def test_run_nbaiot_mvp_end_to_end(tmp_path) -> None:
+def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
     cfg = _make_cfg()
-    for training_seed in CP2_TRAINING_SEEDS:
+    for training_seed in TRAINING_SEEDS:
         set_seeds(training_seed)
         client_data = _make_client_data(training_seed)
         run_fl_training(
@@ -82,13 +82,13 @@ def test_run_nbaiot_mvp_end_to_end(tmp_path) -> None:
             base_dir=tmp_path,
         )
 
-    manifest = run_nbaiot_mvp(base_dir=tmp_path)
+    manifest = run_nbaiot_bounded_sweep(base_dir=tmp_path)
 
-    assert manifest.n_cells == len(CP2_TRAINING_SEEDS) * _N_CLIENTS * 3 * 3 * 4
+    assert manifest.n_cells == len(TRAINING_SEEDS) * _N_CLIENTS * 3 * 3 * 4
     assert len(manifest.results) == manifest.n_cells
-    assert set(manifest.mu_flag_threshold_by_training_seed) == set(CP2_TRAINING_SEEDS)
-    assert tuple(sorted(manifest.training_seeds)) == tuple(sorted(CP2_TRAINING_SEEDS))
-    assert tuple(sorted(manifest.poisoning_seeds)) == tuple(sorted(CP2_POISONING_SEEDS))
+    assert set(manifest.mu_flag_threshold_by_training_seed) == set(TRAINING_SEEDS)
+    assert tuple(sorted(manifest.training_seeds)) == tuple(sorted(TRAINING_SEEDS))
+    assert tuple(sorted(manifest.poisoning_seeds)) == tuple(sorted(POISONING_SEEDS))
     assert manifest.provenance.local_epochs == 1
 
     # Calibration-channel-only invariant: every cell's test scores were untouched.
@@ -101,9 +101,9 @@ def test_run_nbaiot_mvp_end_to_end(tmp_path) -> None:
 
 
 @pytest.mark.integration
-def test_write_nbaiot_mvp_manifest_writes_canonical_path(tmp_path) -> None:
+def test_write_nbaiot_bounded_sweep_manifest_writes_canonical_path(tmp_path) -> None:
     cfg = _make_cfg()
-    for training_seed in CP2_TRAINING_SEEDS:
+    for training_seed in TRAINING_SEEDS:
         set_seeds(training_seed)
         client_data = _make_client_data(training_seed)
         run_fl_training(
@@ -114,7 +114,7 @@ def test_write_nbaiot_mvp_manifest_writes_canonical_path(tmp_path) -> None:
             base_dir=tmp_path,
         )
 
-    out_path = write_nbaiot_mvp_manifest(tmp_path)
+    out_path = write_nbaiot_bounded_sweep_manifest(tmp_path)
 
-    assert out_path.name == "nbaiot_mvp_manifest.json"
+    assert out_path.name == "nbaiot_bounded_sweep_manifest.json"
     assert out_path.exists()

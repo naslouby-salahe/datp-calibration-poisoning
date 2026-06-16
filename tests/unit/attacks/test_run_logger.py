@@ -1,4 +1,4 @@
-"""Tests for CP2 manifest emission and run logging (CP2-T035)."""
+"""Tests for manifest emission and run logging ."""
 
 from __future__ import annotations
 
@@ -15,14 +15,14 @@ from datp.attacks.poison_enums import (
     ThresholdPolicy,
 )
 from datp.attacks.run_logger import (
-    Cp2RunLogEntry,
+    RunLogEntry,
     ManifestEmissionError,
     build_manifest,
     emit_manifest,
     load_manifest,
     write_run_log_entry,
 )
-from datp.attacks.run_manifest import Cp2RunManifest
+from datp.attacks.run_manifest import RunManifest
 
 
 _COMMON = dict(
@@ -44,7 +44,7 @@ _COMMON = dict(
 class TestBuildManifest:
     def test_returns_manifest(self) -> None:
         m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
-        assert isinstance(m, Cp2RunManifest)
+        assert isinstance(m, RunManifest)
 
     def test_mu_flag_threshold_recorded(self) -> None:
         m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
@@ -73,7 +73,7 @@ class TestBuildManifest:
 
     def test_generated_at_utc_present(self) -> None:
         m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
-        assert m.generated_at_utc  # non-empty ISO string
+        assert m.generated_at_utc # non-empty ISO string
 
     def test_schema_version_is_1(self) -> None:
         m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
@@ -114,8 +114,8 @@ class TestEmitManifest:
 
 
 class TestWriteRunLog:
-    def _make_entry(self, mu: float = 0.005) -> Cp2RunLogEntry:
-        return Cp2RunLogEntry(
+    def _make_entry(self, mu: float = 0.005) -> RunLogEntry:
+        return RunLogEntry(
             dataset="nbaiot_regime_a",
             policy="b1_global",
             objective="threshold_raise",
@@ -124,7 +124,7 @@ class TestWriteRunLog:
             training_seed=0,
             poisoning_seed=100,
             mu_flag_threshold=mu,
-            manifest_path="/some/path/cp2_run_manifest.json",
+            manifest_path="/some/path/run_manifest.json",
             generated_at_utc="2026-06-16T00:00:00+00:00",
         )
 

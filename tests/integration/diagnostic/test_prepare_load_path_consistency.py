@@ -18,7 +18,7 @@ from datp.data.datasets.nbaiot import prepare_nbaiot
 from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 
 _N_FEATURES = 10
-_N_BENIGN = 300  # Enough for all splits above n_min=100
+_N_BENIGN = 300 # Enough for all splits above n_min=100
 _N_ATTACK = 50
 _DEVICES = ["TestDev_A", "TestDev_B"]
 
@@ -74,7 +74,7 @@ class TestPrepareLoadPathConsistency:
         assert sorted(client_data.keys()) == sorted(_DEVICES)
         for cid, splits in client_data.items():
             assert splits.train is not None
-            assert splits.val is not None  # cal → val
+            assert splits.val is not None # cal → val
 
     def test_no_extra_nesting(self, prepared_dir: Path) -> None:
         nested = prepared_dir / "nbaiot"

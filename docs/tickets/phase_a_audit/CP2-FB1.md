@@ -3,8 +3,8 @@
 **Phase:** A — Read-only audit (fallback)
 **Type:** scientific-drift / implementation (conditional)
 **Priority:** critical
-**Status:** blocked — TRIGGERED 2026-06-16 (CP2-T007), execution blocked
-**Audited:** 2026-06-16 — trigger confirmed in `_ai_tracking/decisions/CP2_DECISION_LOG.md`; blocked on `config.yaml` E=1 fix + retraining authorization. CP2 enforces E=1 in attack_config/run_manifest/provenance_gate so no E=5 artifact is consumable.
+**Status:** done — TRIGGERED 2026-06-16 (CP2-T007), executed and closed
+**Audited:** 2026-06-16 — trigger confirmed in `_ai_tracking/decisions/CP2_DECISION_LOG.md`; E=1 retrain authorized and executed. Evidence: `config.yaml` `local_epochs: 1`; per-seed checkpoints `outputs/checkpoints/a/seed_{0..4}/model.pt` (+ `DONE.txt`, `convergence_summary.json`) and shared score artifacts `outputs/scores/a/seed_{0..4}/{cal,test_benign,test_attack}/` with `scoring_manifest.json` + `SCORING_DONE.txt`. E=1 is enforced in attack_config/run_manifest/provenance_gate so no E=5 artifact is consumable.
 **Dependencies:** CP2-T007
 **Blocks:** —
 **Expected test level:** integration, e2e

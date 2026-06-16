@@ -1,14 +1,13 @@
-"""Tests for CP2 score containers and victim-set model (CP2-T025)."""
+"""Tests for score containers and victim-set model ."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from datp.artifacts.poison_names import CP2_N_MIN
+from datp.artifacts.poison_names import N_MIN
 from datp.attacks.score_containers import (
-    Cp2ScoreCollection,
-    Cp2VictimSet,
+    ScoreCollection,
     build_score_collection,
     build_victim_set,
 )
@@ -19,7 +18,7 @@ from datp.testsupport.synthetic_scores import (
 )
 
 
-def _collection_from_synthetics() -> Cp2ScoreCollection:
+def _collection_from_synthetics() -> ScoreCollection:
     ss = make_standard_score_set(n_eligible=3, n_pending=1)
     raw = {
         c.client_id: (c.cal, c.test_benign, c.test_attack)
@@ -28,7 +27,7 @@ def _collection_from_synthetics() -> Cp2ScoreCollection:
     return build_score_collection(raw)
 
 
-class TestCp2ScoreCollection:
+class TestScoreCollection:
     def test_eligible_pending_partition(self) -> None:
         col = _collection_from_synthetics()
         assert len(col.eligible_ids) == 3
@@ -71,7 +70,7 @@ class TestCp2ScoreCollection:
         assert p.client_id in col.pending_ids
 
 
-class TestCp2VictimSet:
+class TestVictimSet:
     def test_victims_are_eligible(self) -> None:
         col = _collection_from_synthetics()
         vs = build_victim_set(col)
@@ -88,7 +87,7 @@ class TestCp2VictimSet:
         for vid in vs.eligible_ids:
             cal = vs.victim_cal(vid)
             assert isinstance(cal, np.ndarray)
-            assert cal.shape[0] >= CP2_N_MIN
+            assert cal.shape[0] >= N_MIN
 
     def test_pending_not_victim(self) -> None:
         col = _collection_from_synthetics()

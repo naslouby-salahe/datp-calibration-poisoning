@@ -23,13 +23,13 @@ from dataclasses import dataclass
 import numpy as np
 
 from datp.artifacts.poison_names import (
-    CP2_B4_K,
-    CP2_B4_N_INIT,
-    CP2_B4_RANDOM_STATE,
-    CP2_N_MIN,
+    B4_K,
+    B4_N_INIT,
+    B4_RANDOM_STATE,
+    N_MIN,
 )
 from datp.attacks.poison_enums import ThresholdPolicy
-from datp.attacks.score_containers import Cp2ScoreCollection
+from datp.attacks.score_containers import ScoreCollection
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
 from datp.core.types import B4Metadata
@@ -38,7 +38,7 @@ from datp.thresholding.strategies.b4_cluster import compute as b4_compute
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2B4DecompEntry:
+class B4DecompEntry:
     """Per-client B4 decomposition for one poisoned condition."""
 
     client_id: str
@@ -51,7 +51,7 @@ class Cp2B4DecompEntry:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2B4ThresholdPair:
+class B4ThresholdPair:
     """B4 threshold pair with client-indexed Δτ decomposition."""
 
     policy: ThresholdPolicy
@@ -59,7 +59,7 @@ class Cp2B4ThresholdPair:
     tau_global_pois: float
     thresholds_clean: dict[str, float]
     thresholds_pois: dict[str, float]
-    decomposition: dict[str, Cp2B4DecompEntry]
+    decomposition: dict[str, B4DecompEntry]
 
 
 def _run_b4(
@@ -74,13 +74,13 @@ def _run_b4(
 ) -> tuple[dict[str, float], B4Metadata]:
     """Run B4 and return (eligible_client -> effective_threshold, metadata).
 
-    All CP2 hyperparameters are injected; never uses silhouette K selection.
+    All hyperparameters are injected; never uses silhouette K selection.
     """
     cell = TrainingCellId(regime=Regime.A, seed=seed, alpha=None)
     run = BaselineRunId(cell=cell, baseline=Baseline.B4)
 
     # k_candidates=[k] so B4 never silently deviates to a different K.
-    # max_iter defaults to 300 in sklearn KMeans (matches CP2 lock).
+    # max_iter defaults to 300 in sklearn KMeans (matches protocol lock).
     result = b4_compute(
         cal_dict,
         n_min=n_min,
@@ -122,7 +122,7 @@ def _agg_thresholds(
     """τ_i^{eff,agg}: frozen clean assignments + poisoned per-client taus re-averaged.
 
     For each cluster (using clean assignments), compute the mean of the poisoned
-    per-client taus for all members.  τ_i^{eff,agg} = that cluster's new mean.
+    per-client taus for all members. τ_i^{eff,agg} = that cluster's new mean.
     """
     cluster_pois_taus: dict[str, list[float]] = defaultdict(list)
     for cid in eligible_ids:
@@ -139,19 +139,19 @@ def _agg_thresholds(
 
 
 def compute_b4_pair(
-    collection: Cp2ScoreCollection,
+    collection: ScoreCollection,
     poisoned_cal: dict[str, np.ndarray],
     q: float,
     *,
-    k: int = CP2_B4_K,
-    n_init: int = CP2_B4_N_INIT,
-    random_state: int = CP2_B4_RANDOM_STATE,
-    n_min: int = CP2_N_MIN,
+    k: int = B4_K,
+    n_init: int = B4_N_INIT,
+    random_state: int = B4_RANDOM_STATE,
+    n_min: int = N_MIN,
     seed: int = 0,
-) -> Cp2B4ThresholdPair:
+) -> B4ThresholdPair:
     """Compute B4 threshold pair and client-indexed Δτ decomposition.
 
-    poisoned_cal must contain entries for all eligible clients.  Pending clients
+    poisoned_cal must contain entries for all eligible clients. Pending clients
     are supplied their clean cal for the B4 run (they never enter clustering).
     """
     eligible_ids = list(collection.eligible_ids)
@@ -194,7 +194,7 @@ def compute_b4_pair(
     )
 
     # Decomposition.
-    decomposition: dict[str, Cp2B4DecompEntry] = {}
+    decomposition: dict[str, B4DecompEntry] = {}
     for cid in eligible_ids:
         tc = eff_clean[cid]
         ta = tau_agg[cid]
@@ -202,7 +202,7 @@ def compute_b4_pair(
         d_agg = ta - tc
         d_total = tp - tc
         d_churn = d_total - d_agg
-        decomposition[cid] = Cp2B4DecompEntry(
+        decomposition[cid] = B4DecompEntry(
             client_id=cid,
             tau_clean=tc,
             tau_agg=ta,
@@ -212,7 +212,7 @@ def compute_b4_pair(
             delta_tau_total=d_total,
         )
 
-    return Cp2B4ThresholdPair(
+    return B4ThresholdPair(
         policy=ThresholdPolicy.B4_CLUSTER,
         tau_global_clean=tau_global_clean,
         tau_global_pois=tau_global_pois,

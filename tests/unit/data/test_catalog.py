@@ -64,7 +64,7 @@ class TestSplitPolicy:
             ratios={},
         )
         with pytest.raises(Exception):
-            sp.name = "other"  # type: ignore[misc]
+            sp.name = "other" # type: ignore[misc]
 
 
 class TestCapPolicy:
@@ -81,7 +81,7 @@ class TestCapPolicy:
     def test_frozen(self) -> None:
         cp = CapPolicy(total=100, attack_reserve=10, strategy="random")
         with pytest.raises(Exception):
-            cp.total = 200  # type: ignore[misc]
+            cp.total = 200 # type: ignore[misc]
 
 
 def _make_spec(feature_count: int = 10) -> DatasetSpec:
@@ -120,7 +120,7 @@ class TestDatasetSpec:
     def test_frozen(self) -> None:
         spec = _make_spec()
         with pytest.raises(Exception):
-            spec.feature_count = 99  # type: ignore[misc]
+            spec.feature_count = 99 # type: ignore[misc]
 
 
 class TestDatasetSpecHelper:
@@ -144,7 +144,7 @@ class TestDatasetSpecHelper:
 
     def test_raises_keyerror_for_invalid_id(self) -> None:
         with pytest.raises(KeyError):
-            dataset_spec("not_an_enum")  # type: ignore[arg-type]
+            dataset_spec("not_an_enum") # type: ignore[arg-type]
 
 
 class TestDatasetDisplayName:

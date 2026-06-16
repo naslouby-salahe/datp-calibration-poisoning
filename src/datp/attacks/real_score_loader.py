@@ -1,4 +1,4 @@
-"""Load real DATP-generated N-BaIoT clean scores into a CP2 score collection.
+"""Load real DATP-generated N-BaIoT clean scores into a score collection.
 
 Read-only: wraps the existing DATP scoring loaders (``cal_loading``,
 ``scoring.loading``) and the canonical artifact layout; performs no writes,
@@ -10,8 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from datp.artifacts.layout import ArtifactLayout
-from datp.artifacts.poison_names import CP2_N_MIN
-from datp.attacks.score_containers import Cp2ScoreCollection, build_score_collection
+from datp.artifacts.poison_names import N_MIN
+from datp.attacks.score_containers import ScoreCollection, build_score_collection
 from datp.core.enums import Regime, ScoringStage
 from datp.core.identity import TrainingCellId
 from datp.scoring.cal_loading import load_main_cal_errors
@@ -25,9 +25,9 @@ def load_real_score_collection(
     base_dir: Path,
     alpha: float | None = None,
     checkpoint_round: int | None = None,
-    n_min: int = CP2_N_MIN,
-) -> Cp2ScoreCollection:
-    """Build a ``Cp2ScoreCollection`` from real per-client DATP score artifacts.
+    n_min: int = N_MIN,
+) -> ScoreCollection:
+    """Build a ``ScoreCollection`` from real per-client DATP score artifacts.
 
     Raises ``FileNotFoundError`` if calibration, test_benign, or test_attack
     artifacts are missing for the given (regime, seed, alpha) training cell.

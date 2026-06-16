@@ -64,7 +64,7 @@ def inject_fixed_budget(
         raise ValueError(
             f"Cannot inject: reservoir is INFEASIBLE "
             f"(degenerate tail, {reservoir.n_distinct} distinct values). "
-            f"Mark cell INFEASIBLE per FB2."
+            f"Mark cell INFEASIBLE."
         )
 
     m = max(1, round(fraction * n))

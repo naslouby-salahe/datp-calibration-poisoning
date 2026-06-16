@@ -78,9 +78,9 @@ class _StatusReport:
         lines: list[str] = []
         for label, complete, missing, aborted, total in self.summary_rows():
             lines.append(
-                f"{label}:  complete={complete}  "
-                f"missing={missing}  "
-                f"aborted={aborted}  "
+                f"{label}: complete={complete} "
+                f"missing={missing} "
+                f"aborted={aborted} "
                 f"(total={total})"
             )
         return lines

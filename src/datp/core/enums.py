@@ -149,7 +149,7 @@ def classify_absorption(
 
     Thresholds are config-driven — read from
     ``ExperimentConfig.absorption_strong_retention`` and
-    ``ExperimentConfig.absorption_partial``.  Do not hardcode.
+    ``ExperimentConfig.absorption_partial``. Do not hardcode.
     """
     if ratio >= strong_retention_threshold:
         return AbsorptionClass.STRONG_RETENTION

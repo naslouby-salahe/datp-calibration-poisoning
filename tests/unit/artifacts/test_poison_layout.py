@@ -1,4 +1,4 @@
-"""Tests for CP2 canonical run-path builder."""
+"""Tests for canonical run-path builder."""
 
 from __future__ import annotations
 
@@ -6,22 +6,22 @@ from pathlib import Path
 
 import pytest
 
-from datp.artifacts.poison_layout import Cp2CellId, Cp2Layout
+from datp.artifacts.poison_layout import CellId, PoisonLayout
 from datp.artifacts.poison_names import (
-    CP2_B4_K,
-    CP2_B4_MAX_ITER,
-    CP2_B4_N_INIT,
-    CP2_B4_RANDOM_STATE,
-    CP2_COMPROMISE_PATTERN_SEED,
-    CP2_MATERIALITY_FACTOR,
-    CP2_N_MIN,
-    CP2_OUTPUT_ROOT,
-    CP2_TAIL_MASS,
-    Cp2ManifestFile,
-    Cp2RunFile,
+    B4_K,
+    B4_MAX_ITER,
+    B4_N_INIT,
+    B4_RANDOM_STATE,
+    COMPROMISE_PATTERN_SEED,
+    MATERIALITY_FACTOR,
+    N_MIN,
+    CALIBRATION_POISONING_OUTPUT_ROOT,
+    TAIL_MASS,
+    ManifestFile,
+    RunFile,
 )
 from datp.attacks.poison_enums import (
-    CP2_MVP_FRACTIONS,
+    BOUNDED_SWEEP_FRACTIONS,
     AttackerObjective,
     ExperimentScale,
     PoisoningSourceStrategy,
@@ -34,9 +34,9 @@ def _cell(
     fraction: float = 0.10,
     training_seed: int = 0,
     poisoning_seed: int = 100,
-) -> Cp2CellId:
-    return Cp2CellId(
-        scale=ExperimentScale.MVP,
+) -> CellId:
+    return CellId(
+        scale=ExperimentScale.BOUNDED,
         dataset="nbaiot",
         policy=ThresholdPolicy.B1_GLOBAL,
         objective=AttackerObjective.THRESHOLD_RAISE,
@@ -49,16 +49,16 @@ def _cell(
 
 
 _BASE = Path("/tmp/outputs")
-_LAYOUT = Cp2Layout(base_dir=_BASE)
+_LAYOUT = PoisonLayout(base_dir=_BASE)
 
 
-class TestCp2Layout:
-    def test_cp2_root_under_base(self) -> None:
-        assert _LAYOUT.cp2_root == _BASE / CP2_OUTPUT_ROOT
+class TestLayout:
+    def test_root_under_base(self) -> None:
+        assert _LAYOUT.poison_output_root == _BASE / CALIBRATION_POISONING_OUTPUT_ROOT
 
     def test_run_dir_contains_scale(self) -> None:
         d = _LAYOUT.run_dir(_cell())
-        assert "mvp" in d.parts
+        assert "bounded" in d.parts
 
     def test_run_dir_contains_dataset(self) -> None:
         d = _LAYOUT.run_dir(_cell())
@@ -102,7 +102,7 @@ class TestCp2Layout:
 
     def test_run_dir_depth(self) -> None:
         d = _LAYOUT.run_dir(_cell())
-        relative = d.relative_to(_LAYOUT.cp2_root)
+        relative = d.relative_to(_LAYOUT.poison_output_root)
         assert len(relative.parts) == 9
 
     def test_different_seeds_produce_different_paths(self) -> None:
@@ -116,7 +116,7 @@ class TestCp2Layout:
         assert d10 != d20
 
 
-class TestCp2CellPaths:
+class TestCellPaths:
     def test_all_files_under_run_dir(self) -> None:
         paths = _LAYOUT.cell_paths(_cell())
         rd = paths.run_dir
@@ -137,31 +137,31 @@ class TestCp2CellPaths:
         assert paths.cell_metrics.suffix == ".json"
 
 
-class TestCp2ManifestPaths:
-    def test_project_audit_report_under_cp2_root(self) -> None:
+class TestManifestPaths:
+    def test_project_audit_report_under_root(self) -> None:
         p = _LAYOUT.project_audit_report()
-        assert p.parent == _LAYOUT.cp2_root
-        assert p.name == Cp2ManifestFile.PROJECT_AUDIT_REPORT
+        assert p.parent == _LAYOUT.poison_output_root
+        assert p.name == ManifestFile.PROJECT_AUDIT_REPORT
 
-    def test_clean_score_artifacts_under_cp2_root(self) -> None:
+    def test_clean_score_artifacts_under_root(self) -> None:
         p = _LAYOUT.clean_score_artifacts_manifest()
-        assert p.parent == _LAYOUT.cp2_root
-        assert p.name == Cp2ManifestFile.CLEAN_SCORE_ARTIFACTS
+        assert p.parent == _LAYOUT.poison_output_root
+        assert p.name == ManifestFile.CLEAN_SCORE_ARTIFACTS
 
-    def test_nbaiot_mvp_manifest_under_cp2_root(self) -> None:
-        p = _LAYOUT.nbaiot_mvp_manifest()
-        assert p.parent == _LAYOUT.cp2_root
+    def test_nbaiot_bounded_sweep_manifest_under_root(self) -> None:
+        p = _LAYOUT.nbaiot_bounded_sweep_manifest()
+        assert p.parent == _LAYOUT.poison_output_root
 
-    def test_paper_figure_manifest_under_cp2_root(self) -> None:
+    def test_paper_figure_manifest_under_root(self) -> None:
         p = _LAYOUT.paper_figure_manifest()
-        assert p.parent == _LAYOUT.cp2_root
+        assert p.parent == _LAYOUT.poison_output_root
 
 
-class TestCp2CellId:
+class TestCellId:
     def test_fraction_outside_bounds_raises(self) -> None:
         with pytest.raises(ValueError, match="outside"):
-            Cp2CellId(
-                scale=ExperimentScale.MVP,
+            CellId(
+                scale=ExperimentScale.BOUNDED,
                 dataset="nbaiot",
                 policy=ThresholdPolicy.B1_GLOBAL,
                 objective=AttackerObjective.THRESHOLD_RAISE,
@@ -174,8 +174,8 @@ class TestCp2CellId:
 
     def test_empty_dataset_raises(self) -> None:
         with pytest.raises(ValueError, match="dataset"):
-            Cp2CellId(
-                scale=ExperimentScale.MVP,
+            CellId(
+                scale=ExperimentScale.BOUNDED,
                 dataset="",
                 policy=ThresholdPolicy.B1_GLOBAL,
                 objective=AttackerObjective.THRESHOLD_RAISE,
@@ -187,44 +187,44 @@ class TestCp2CellId:
             )
 
 
-class TestCp2Constants:
+class TestConstants:
     def test_n_min(self) -> None:
-        assert CP2_N_MIN == 100
+        assert N_MIN == 100
 
     def test_tail_mass(self) -> None:
-        assert abs(CP2_TAIL_MASS - 0.10) < 1e-9
+        assert abs(TAIL_MASS - 0.10) < 1e-9
 
     def test_materiality_factor(self) -> None:
-        assert abs(CP2_MATERIALITY_FACTOR - 0.1) < 1e-9
+        assert abs(MATERIALITY_FACTOR - 0.1) < 1e-9
 
     def test_b4_k(self) -> None:
-        assert CP2_B4_K == 3
+        assert B4_K == 3
 
     def test_b4_n_init(self) -> None:
-        assert CP2_B4_N_INIT == 10
+        assert B4_N_INIT == 10
 
     def test_b4_max_iter(self) -> None:
-        assert CP2_B4_MAX_ITER == 300
+        assert B4_MAX_ITER == 300
 
     def test_b4_random_state(self) -> None:
-        assert CP2_B4_RANDOM_STATE == 42
+        assert B4_RANDOM_STATE == 42
 
     def test_compromise_pattern_seed(self) -> None:
-        assert CP2_COMPROMISE_PATTERN_SEED == 400
+        assert COMPROMISE_PATTERN_SEED == 400
 
-    def test_mvp_fraction_grid(self) -> None:
-        assert CP2_MVP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
+    def test_bounded_fraction_grid(self) -> None:
+        assert BOUNDED_SWEEP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
 
     def test_output_root_name(self) -> None:
-        assert CP2_OUTPUT_ROOT == "conference_calibration_poisoning"
+        assert CALIBRATION_POISONING_OUTPUT_ROOT == "conference_calibration_poisoning"
 
     def test_manifest_file_names(self) -> None:
-        assert Cp2ManifestFile.PROJECT_AUDIT_REPORT == "project_audit_report.json"
-        assert Cp2ManifestFile.CLEAN_SCORE_ARTIFACTS == "clean_score_artifacts.json"
-        assert Cp2ManifestFile.NBAIOT_MVP_MANIFEST == "nbaiot_mvp_manifest.json"
-        assert Cp2ManifestFile.PAPER_FIGURE_MANIFEST == "paper_figure_manifest.json"
+        assert ManifestFile.PROJECT_AUDIT_REPORT == "project_audit_report.json"
+        assert ManifestFile.CLEAN_SCORE_ARTIFACTS == "clean_score_artifacts.json"
+        assert ManifestFile.NBAIOT_BOUNDED_SWEEP_MANIFEST == "nbaiot_bounded_sweep_manifest.json"
+        assert ManifestFile.PAPER_FIGURE_MANIFEST == "paper_figure_manifest.json"
 
     def test_run_file_names(self) -> None:
-        assert Cp2RunFile.POISONED_SCORES.endswith(".parquet")
-        assert Cp2RunFile.THRESHOLD_DELTAS.endswith(".json")
-        assert Cp2RunFile.CELL_METRICS.endswith(".json")
+        assert RunFile.POISONED_SCORES.endswith(".parquet")
+        assert RunFile.THRESHOLD_DELTAS.endswith(".json")
+        assert RunFile.CELL_METRICS.endswith(".json")

@@ -10,7 +10,7 @@ class TestBinaryRankingMetrics:
     def test_is_frozen_dataclass(self) -> None:
         m = BinaryRankingMetrics(auroc=0.9, pr_auc=0.8)
         with pytest.raises(Exception):
-            m.auroc = 0.5  # type: ignore[misc]
+            m.auroc = 0.5 # type: ignore[misc]
 
     def test_construct_with_values(self) -> None:
         m = BinaryRankingMetrics(auroc=0.95, pr_auc=0.87)
@@ -63,14 +63,14 @@ class TestComputeBinaryRankingMetrics:
 
     def test_none_benign_returns_none(self) -> None:
         result = compute_binary_ranking_metrics(
-            None, np.array([0.5, 0.6])  # type: ignore[arg-type]
+            None, np.array([0.5, 0.6]) # type: ignore[arg-type]
         )
         assert result.auroc is None
         assert result.pr_auc is None
 
     def test_none_attack_returns_none(self) -> None:
         result = compute_binary_ranking_metrics(
-            np.array([0.1, 0.2]), None  # type: ignore[arg-type]
+            np.array([0.1, 0.2]), None # type: ignore[arg-type]
         )
         assert result.auroc is None
         assert result.pr_auc is None

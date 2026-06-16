@@ -1,6 +1,6 @@
-"""CP2 canonical run-path builder.
+"""Canonical run-path builder for calibration-poisoning outputs.
 
-Single owner of all CP2 output path construction. Do not scatter path-string
+Single owner of all output path construction. Do not scatter path-string
 construction across modules — import and call from here.
 
 Canonical path structure:
@@ -22,9 +22,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from datp.artifacts.poison_names import (
-    CP2_OUTPUT_ROOT,
-    Cp2ManifestFile,
-    Cp2RunFile,
+    CALIBRATION_POISONING_OUTPUT_ROOT,
+    ManifestFile,
+    RunFile,
 )
 from datp.attacks.poison_enums import (
     AttackerObjective,
@@ -36,8 +36,8 @@ from datp.attacks.poison_enums import (
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2CellId:
-    """Identity of one CP2 experiment cell.
+class CellId:
+    """Identity of one experiment cell.
 
     A cell = one (policy, objective, source, fraction, scope, training_seed,
     poisoning_seed) tuple under a fixed (scale, dataset).
@@ -63,10 +63,10 @@ class Cp2CellId:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2CellPaths:
-    """Resolved canonical paths for one CP2 experiment cell."""
+class CellPaths:
+    """Resolved canonical paths for one experiment cell."""
 
-    cell: Cp2CellId
+    cell: CellId
     run_dir: Path
     poisoned_scores: Path
     threshold_deltas: Path
@@ -78,8 +78,8 @@ class Cp2CellPaths:
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2Layout:
-    """Canonical artifact layout for CP2 runs.
+class PoisonLayout:
+    """Canonical artifact layout for runs.
 
     All path construction goes through this class. ``base_dir`` is the
     repository-level ``outputs/`` directory.
@@ -88,9 +88,9 @@ class Cp2Layout:
     base_dir: Path
 
     @property
-    def cp2_root(self) -> Path:
-        """Root for all CP2 outputs: <base_dir>/conference_calibration_poisoning/"""
-        return self.base_dir / CP2_OUTPUT_ROOT
+    def poison_output_root(self) -> Path:
+        """Root for all outputs: <base_dir>/conference_calibration_poisoning/"""
+        return self.base_dir / CALIBRATION_POISONING_OUTPUT_ROOT
 
     def _fraction_segment(self, fraction: float) -> str:
         return f"f_{fraction:.2f}"
@@ -104,10 +104,10 @@ class Cp2Layout:
     def _poisoning_seed_segment(self, seed: int) -> str:
         return f"poison_{seed}"
 
-    def run_dir(self, cell: Cp2CellId) -> Path:
-        """Return the canonical run directory for one CP2 experiment cell."""
+    def run_dir(self, cell: CellId) -> Path:
+        """Return the canonical run directory for one experiment cell."""
         return (
-            self.cp2_root
+            self.poison_output_root
             / cell.scale.value
             / cell.dataset
             / cell.policy.value
@@ -119,29 +119,29 @@ class Cp2Layout:
             / self._poisoning_seed_segment(cell.poisoning_seed)
         )
 
-    def cell_paths(self, cell: Cp2CellId) -> Cp2CellPaths:
-        """Return all canonical file paths for one CP2 experiment cell."""
+    def cell_paths(self, cell: CellId) -> CellPaths:
+        """Return all canonical file paths for one experiment cell."""
         rd = self.run_dir(cell)
-        return Cp2CellPaths(
+        return CellPaths(
             cell=cell,
             run_dir=rd,
-            poisoned_scores=rd / Cp2RunFile.POISONED_SCORES,
-            threshold_deltas=rd / Cp2RunFile.THRESHOLD_DELTAS,
-            cell_metrics=rd / Cp2RunFile.CELL_METRICS,
-            seed_record=rd / Cp2RunFile.SEED_RECORD,
-            provenance=rd / Cp2RunFile.PROVENANCE,
-            run_done=rd / Cp2RunFile.RUN_DONE,
-            run_in_progress=rd / Cp2RunFile.RUN_IN_PROGRESS,
+            poisoned_scores=rd / RunFile.POISONED_SCORES,
+            threshold_deltas=rd / RunFile.THRESHOLD_DELTAS,
+            cell_metrics=rd / RunFile.CELL_METRICS,
+            seed_record=rd / RunFile.SEED_RECORD,
+            provenance=rd / RunFile.PROVENANCE,
+            run_done=rd / RunFile.RUN_DONE,
+            run_in_progress=rd / RunFile.RUN_IN_PROGRESS,
         )
 
     def project_audit_report(self) -> Path:
-        return self.cp2_root / Cp2ManifestFile.PROJECT_AUDIT_REPORT
+        return self.poison_output_root / ManifestFile.PROJECT_AUDIT_REPORT
 
     def clean_score_artifacts_manifest(self) -> Path:
-        return self.cp2_root / Cp2ManifestFile.CLEAN_SCORE_ARTIFACTS
+        return self.poison_output_root / ManifestFile.CLEAN_SCORE_ARTIFACTS
 
-    def nbaiot_mvp_manifest(self) -> Path:
-        return self.cp2_root / Cp2ManifestFile.NBAIOT_MVP_MANIFEST
+    def nbaiot_bounded_sweep_manifest(self) -> Path:
+        return self.poison_output_root / ManifestFile.NBAIOT_BOUNDED_SWEEP_MANIFEST
 
     def paper_figure_manifest(self) -> Path:
-        return self.cp2_root / Cp2ManifestFile.PAPER_FIGURE_MANIFEST
+        return self.poison_output_root / ManifestFile.PAPER_FIGURE_MANIFEST

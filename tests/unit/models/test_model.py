@@ -109,7 +109,7 @@ class TestActivation:
     def test_unknown_activation_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown activation"):
             Autoencoder(
-                NBAIOT_INPUT_DIM, NBAIOT_HIDDEN, activation="swish_42", use_bn=False  # type: ignore[arg-type]
+                NBAIOT_INPUT_DIM, NBAIOT_HIDDEN, activation="swish_42", use_bn=False # type: ignore[arg-type]
             )
 
     def test_empty_hidden_dims_raises(self) -> None:

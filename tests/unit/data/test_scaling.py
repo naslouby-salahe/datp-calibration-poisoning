@@ -17,8 +17,8 @@ class TestFitScaler:
     def test_fitted_on_train_only(self) -> None:
         rng = np.random.default_rng(7)
         cols = [f"f{i}" for i in range(5)]
-        train_df = pd.DataFrame(rng.standard_normal((200, 5)) * 3 + 10, columns=cols)  # type: ignore[arg-type]
-        other_df = pd.DataFrame(rng.standard_normal((100, 5)) * 0.5 - 5, columns=cols)  # type: ignore[arg-type]
+        train_df = pd.DataFrame(rng.standard_normal((200, 5)) * 3 + 10, columns=cols) # type: ignore[arg-type]
+        other_df = pd.DataFrame(rng.standard_normal((100, 5)) * 0.5 - 5, columns=cols) # type: ignore[arg-type]
 
         scaler = fit_scaler(pl.from_pandas(train_df))
 
@@ -28,7 +28,7 @@ class TestFitScaler:
             scaler.mean_, train_df.values.mean(axis=0), atol=1e-10
         )
         np.testing.assert_allclose(
-            scaler.scale_, train_df.values.std(axis=0, ddof=0), atol=1e-10  # type: ignore[arg-type]
+            scaler.scale_, train_df.values.std(axis=0, ddof=0), atol=1e-10 # type: ignore[arg-type]
         )
 
         # Applying to train should give ~zero mean, ~unit std
@@ -55,7 +55,7 @@ class TestFitScaler:
 class TestApplyScaler:
     def test_apply_preserves_columns(self) -> None:
         cols = ["alpha", "beta", "gamma"]
-        df = pd.DataFrame(np.ones((10, 3)), columns=cols)  # type: ignore[arg-type]
+        df = pd.DataFrame(np.ones((10, 3)), columns=cols) # type: ignore[arg-type]
         scaler = fit_scaler(pl.from_pandas(df))
         result = apply_scaler(pl.from_pandas(df), scaler)
         assert list(result.columns) == cols
@@ -75,7 +75,7 @@ class TestSaveLoadScaler:
     def test_round_trip(self, tmp_path: Path) -> None:
         rng = np.random.default_rng(8)
         cols = [f"f{i}" for i in range(5)]
-        train_df = pd.DataFrame(rng.standard_normal((100, 5)), columns=cols)  # type: ignore[arg-type]
+        train_df = pd.DataFrame(rng.standard_normal((100, 5)), columns=cols) # type: ignore[arg-type]
 
         scaler = fit_scaler(pl.from_pandas(train_df))
         path = tmp_path / "scaler.pkl"
@@ -86,13 +86,13 @@ class TestSaveLoadScaler:
         assert loaded.scale_ is not None
         assert scaler.mean_ is not None
         assert scaler.scale_ is not None
-        np.testing.assert_allclose(loaded.mean_, scaler.mean_)  # type: ignore[arg-type]
-        np.testing.assert_allclose(loaded.scale_, scaler.scale_)  # type: ignore[arg-type]
+        np.testing.assert_allclose(loaded.mean_, scaler.mean_) # type: ignore[arg-type]
+        np.testing.assert_allclose(loaded.scale_, scaler.scale_) # type: ignore[arg-type]
 
     def test_save_creates_parent_dirs(self, tmp_path: Path) -> None:
         rng = np.random.default_rng(1)
         cols = ["a"]
-        df = pd.DataFrame(rng.standard_normal((10, 1)), columns=cols)  # type: ignore[arg-type]
+        df = pd.DataFrame(rng.standard_normal((10, 1)), columns=cols) # type: ignore[arg-type]
         scaler = fit_scaler(pl.from_pandas(df))
 
         nested = tmp_path / "deep" / "nested" / "scaler.pkl"

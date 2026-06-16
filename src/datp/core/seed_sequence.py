@@ -1,4 +1,4 @@
-"""CP2 deterministic seed derivation using numpy SeedSequence.
+"""Deterministic seed derivation using numpy SeedSequence.
 
 No integer seed addition. Co-victims differ by client_idx (independent streams
 by construction). Every derived child seed is reproducible from the parent entropy.
@@ -12,10 +12,10 @@ import numpy as np
 
 
 @dataclass(frozen=True, slots=True)
-class Cp2SeedRecord:
-    """Canonical record of SeedSequence inputs for one CP2 experiment cell.
+class SeedRecord:
+    """Canonical record of SeedSequence inputs for one experiment cell.
 
-    Embed this in every CP2 run manifest so any run can be reproduced exactly.
+    Embed this in every run manifest so any run can be reproduced exactly.
     """
 
     training_seed: int
@@ -34,11 +34,11 @@ class Cp2SeedRecord:
         )
 
 
-def _parent_sequence(record: Cp2SeedRecord) -> np.random.SeedSequence:
+def _parent_sequence(record: SeedRecord) -> np.random.SeedSequence:
     return np.random.SeedSequence(list(record.entropy))
 
 
-def make_cp2_rng(
+def make_seed_rng(
     *,
     training_seed: int,
     poisoning_seed: int,
@@ -46,14 +46,14 @@ def make_cp2_rng(
     scope_idx: int,
     child_index: int = 0,
 ) -> np.random.Generator:
-    """Return a reproducible NumPy Generator for one CP2 experiment cell.
+    """Return a reproducible NumPy Generator for one experiment cell.
 
     Uses SeedSequence([training_seed, poisoning_seed, client_idx, scope_idx])
     and spawns child generators. ``child_index`` selects which child stream.
 
-    Do NOT use integer seed addition (forbidden by CP2 protocol).
+    Do NOT use integer seed addition (forbidden by protocol).
     """
-    record = Cp2SeedRecord(
+    record = SeedRecord(
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
         client_idx=client_idx,
@@ -64,15 +64,15 @@ def make_cp2_rng(
     return np.random.default_rng(children[child_index])
 
 
-def derive_cp2_seed_record(
+def derive_seed_record(
     *,
     training_seed: int,
     poisoning_seed: int,
     client_idx: int,
     scope_idx: int,
-) -> Cp2SeedRecord:
-    """Build and return the typed seed record for a CP2 experiment cell."""
-    return Cp2SeedRecord(
+) -> SeedRecord:
+    """Build and return the typed seed record for a experiment cell."""
+    return SeedRecord(
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
         client_idx=client_idx,

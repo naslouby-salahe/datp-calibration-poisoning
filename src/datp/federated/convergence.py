@@ -23,7 +23,7 @@ class ConvergenceMonitor:
 
     Criterion:
         previous_window_mean = mean(losses[-(2*window) : -window])
-        current_window_mean  = mean(losses[-window:])
+        current_window_mean = mean(losses[-window:])
         relative_change = |current_window_mean - previous_window_mean| / |previous_window_mean|
 
     Convergence fires when relative_change < relative_threshold.

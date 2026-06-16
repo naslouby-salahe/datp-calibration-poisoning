@@ -138,7 +138,7 @@ class TestCapApplied:
         output_dir = tmp_path / "out"
         result = _prepare_ciciot(single_raw.parent.parent, output_dir)
 
-        client_id = Path(_SINGLE_CLIENT_FILE).stem  # "Merged01"
+        client_id = Path(_SINGLE_CLIENT_FILE).stem # "Merged01"
         info = result[client_id]
 
         total_output = (

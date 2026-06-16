@@ -95,6 +95,6 @@ class RunLifecycle:
         if exc_tb is not None:
             tb_lines = traceback.format_tb(exc_tb)
             lines.append("traceback:")
-            lines.extend(f"  {line.rstrip()}" for line in tb_lines)
+            lines.extend(f" {line.rstrip()}" for line in tb_lines)
 
         (self.run_dir / ArtifactFile.RUN_ABORTED).write_text("\n".join(lines) + "\n")

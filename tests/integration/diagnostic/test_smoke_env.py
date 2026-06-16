@@ -9,7 +9,7 @@ from datp.core.seeds import set_seeds
 
 _SMOKE_INPUT_DIM = 8
 _SMOKE_HIDDEN_DIM = 4
-_SMOKE_N_SAMPLES = 200  # per client
+_SMOKE_N_SAMPLES = 200 # per client
 _SMOKE_NUM_CLIENTS = 2
 _SMOKE_NUM_ROUNDS = 2
 _SMOKE_SEED = 42

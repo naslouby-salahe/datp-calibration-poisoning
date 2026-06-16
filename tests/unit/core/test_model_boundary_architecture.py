@@ -17,20 +17,20 @@ class TestCanonicalIdentityTypes:
         from datp.core.identity import TrainingCellId
 
         assert dataclasses.is_dataclass(TrainingCellId)
-        assert TrainingCellId.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        assert TrainingCellId.__dataclass_params__.frozen # type: ignore[attr-defined]
 
     def test_baseline_run_id_is_frozen_dataclass(self) -> None:
         from datp.core.identity import BaselineRunId
 
         assert dataclasses.is_dataclass(BaselineRunId)
-        assert BaselineRunId.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        assert BaselineRunId.__dataclass_params__.frozen # type: ignore[attr-defined]
 
     def test_score_cell_id_is_frozen_dataclass(self) -> None:
         """Score identity uses TrainingCellId (same type as training identity — scores are shared across B1-B4)."""
         from datp.core.identity import TrainingCellId
 
         assert dataclasses.is_dataclass(TrainingCellId)
-        assert TrainingCellId.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        assert TrainingCellId.__dataclass_params__.frozen # type: ignore[attr-defined]
 
     def test_experiment_key_absent(self) -> None:
         module = importlib.import_module("datp.core.identity")

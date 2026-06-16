@@ -71,7 +71,7 @@ class TestMetricValue:
         assert result == 1.0
 
     def test_unknown_type_returns_none(self) -> None:
-        assert _metric_value("not a metric") is None  # type: ignore[arg-type]
+        assert _metric_value("not a metric") is None # type: ignore[arg-type]
 
 
 class TestAELightningModule:

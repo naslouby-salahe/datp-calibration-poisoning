@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datp.attacks.poison_enums import (
-    CP2_DEFAULT_POLICIES,
-    CP2_MVP_FRACTIONS,
-    CP2_MVP_OBJECTIVES,
-    CP2_MVP_SOURCES,
+    DEFAULT_POLICIES,
+    BOUNDED_SWEEP_FRACTIONS,
+    BOUNDED_SWEEP_OBJECTIVES,
+    BOUNDED_SWEEP_SOURCES,
     AttackerObjective,
     AuditDisposition,
     CalibrationInjectionRule,
@@ -36,8 +36,8 @@ class TestThresholdPolicy:
             assert isinstance(policy, str)
 
     def test_default_policies_tuple(self) -> None:
-        assert set(CP2_DEFAULT_POLICIES) == set(ThresholdPolicy)
-        assert len(CP2_DEFAULT_POLICIES) == 3
+        assert set(DEFAULT_POLICIES) == set(ThresholdPolicy)
+        assert len(DEFAULT_POLICIES) == 3
 
 
 class TestAttackerObjective:
@@ -54,8 +54,8 @@ class TestAttackerObjective:
         for obj in AttackerObjective:
             assert isinstance(obj, str)
 
-    def test_mvp_objectives_tuple(self) -> None:
-        assert set(CP2_MVP_OBJECTIVES) == set(AttackerObjective)
+    def test_bounded_objectives_tuple(self) -> None:
+        assert set(BOUNDED_SWEEP_OBJECTIVES) == set(AttackerObjective)
 
 
 class TestPoisoningSourceStrategy:
@@ -74,12 +74,12 @@ class TestPoisoningSourceStrategy:
             in PoisoningSourceStrategy
         )
 
-    def test_mvp_sources_excludes_diagnostic(self) -> None:
-        for s in CP2_MVP_SOURCES:
+    def test_bounded_sources_excludes_diagnostic(self) -> None:
+        for s in BOUNDED_SWEEP_SOURCES:
             assert "diagnostic" not in s.value
 
-    def test_mvp_sources_contains_three_members(self) -> None:
-        assert len(CP2_MVP_SOURCES) == 3
+    def test_bounded_sources_contains_three_members(self) -> None:
+        assert len(BOUNDED_SWEEP_SOURCES) == 3
 
 
 class TestCalibrationInjectionRule:
@@ -136,8 +136,8 @@ class TestExperimentScale:
     def test_smoke_value(self) -> None:
         assert ExperimentScale.SMOKE == "smoke"
 
-    def test_mvp_value(self) -> None:
-        assert ExperimentScale.MVP == "mvp"
+    def test_bounded_value(self) -> None:
+        assert ExperimentScale.BOUNDED == "bounded"
 
     def test_full_value(self) -> None:
         assert ExperimentScale.FULL == "full"
@@ -165,13 +165,13 @@ class TestAuditDisposition:
 
 class TestMvpFractions:
     def test_fraction_grid(self) -> None:
-        assert CP2_MVP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
+        assert BOUNDED_SWEEP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
 
     def test_four_fractions(self) -> None:
-        assert len(CP2_MVP_FRACTIONS) == 4
+        assert len(BOUNDED_SWEEP_FRACTIONS) == 4
 
     def test_no_fraction_five_percent(self) -> None:
-        assert 0.05 not in CP2_MVP_FRACTIONS
+        assert 0.05 not in BOUNDED_SWEEP_FRACTIONS
 
     def test_zero_fraction_present(self) -> None:
-        assert 0.0 in CP2_MVP_FRACTIONS
+        assert 0.0 in BOUNDED_SWEEP_FRACTIONS

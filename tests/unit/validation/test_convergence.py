@@ -72,7 +72,7 @@ class TestConvergencePayload:
             curve_path=None,
         )
         with pytest.raises(Exception):
-            p.convergence_round = 10  # type: ignore[misc]
+            p.convergence_round = 10 # type: ignore[misc]
 
 
 class TestConvergencePayloadMissingCheckpoint:
@@ -166,4 +166,4 @@ class TestConvergencePayloadWithSummary:
 
         result = convergence_payload(checkpoint)
         assert result.convergence_status == ConvergenceStatus.BLOCKED_PENDING_RUN
-        assert result.curve_path is None  # curve_path only set when summary exists
+        assert result.curve_path is None # curve_path only set when summary exists

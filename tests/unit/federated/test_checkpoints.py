@@ -155,7 +155,7 @@ class TestConvergenceSnapshot:
             criterion_value=0.0,
         )
         with pytest.raises(Exception):
-            s.converged_round = 5  # type: ignore[misc]
+            s.converged_round = 5 # type: ignore[misc]
 
 
 class TestSaveParamsSnapshot:

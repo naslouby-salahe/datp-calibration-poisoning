@@ -1,4 +1,4 @@
-"""CP2-specific enums — canonical, single home for all attack/experiment protocol enums.
+"""Canonical enums — canonical, single home for all attack/experiment protocol enums.
 
 Do not duplicate in other modules; import from here.
 """
@@ -9,7 +9,7 @@ import enum
 
 
 class ThresholdPolicy(enum.StrEnum):
-    """CP2 default threshold policies.
+    """Default threshold policies.
 
     B3 (family threshold) is excluded by protocol — it is DATP substrate only.
     """
@@ -80,7 +80,7 @@ class ExperimentScale(enum.StrEnum):
     """Experiment execution scale gate."""
 
     SMOKE = "smoke"
-    MVP = "mvp"
+    BOUNDED = "bounded"
     FULL = "full"
     STRETCH = "stretch"
 
@@ -95,24 +95,24 @@ class AuditDisposition(enum.StrEnum):
     BLOCK_UNSAFE = "block_unsafe"
 
 
-# Locked MVP fraction grid — do not extend without a ticket.
-CP2_MVP_FRACTIONS: tuple[float, ...] = (0.0, 0.10, 0.20, 0.40)
+# Locked bounded fraction grid — do not extend without a ticket.
+BOUNDED_SWEEP_FRACTIONS: tuple[float, ...] = (0.0, 0.10, 0.20, 0.40)
 
-# Default CP2 threshold policies in iteration order.
-CP2_DEFAULT_POLICIES: tuple[ThresholdPolicy, ...] = (
+# Default threshold policies in iteration order.
+DEFAULT_POLICIES: tuple[ThresholdPolicy, ...] = (
     ThresholdPolicy.B1_GLOBAL,
     ThresholdPolicy.B2_PERSONALIZED,
     ThresholdPolicy.B4_CLUSTER,
 )
 
-# MVP objectives.
-CP2_MVP_OBJECTIVES: tuple[AttackerObjective, ...] = (
+# bounded objectives.
+BOUNDED_SWEEP_OBJECTIVES: tuple[AttackerObjective, ...] = (
     AttackerObjective.THRESHOLD_RAISE,
     AttackerObjective.THRESHOLD_LOWER,
 )
 
-# MVP source strategies.
-CP2_MVP_SOURCES: tuple[PoisoningSourceStrategy, ...] = (
+# bounded source strategies.
+BOUNDED_SWEEP_SOURCES: tuple[PoisoningSourceStrategy, ...] = (
     PoisoningSourceStrategy.RANDOM_BENIGN,
     PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
     PoisoningSourceStrategy.LOW_SCORE_BENIGN,

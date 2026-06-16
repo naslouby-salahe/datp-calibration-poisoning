@@ -19,7 +19,7 @@ from datp.data.datasets.nbaiot import prepare_nbaiot
 from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 
 _N_FEATURES = 10
-_N_BENIGN = 300  # Enough for all splits above n_min=100
+_N_BENIGN = 300 # Enough for all splits above n_min=100
 _N_ATTACK = 50
 _DEVICES = ["TestDev_A", "TestDev_B"]
 
@@ -32,13 +32,13 @@ def _make_synthetic_raw(base: Path) -> Path:
     for dev in _DEVICES:
         dev_dir = raw / dev
         dev_dir.mkdir(parents=True)
-        pd.DataFrame(rng.randn(_N_BENIGN, _N_FEATURES), columns=cols).to_csv(  # type: ignore
+        pd.DataFrame(rng.randn(_N_BENIGN, _N_FEATURES), columns=cols).to_csv( # type: ignore
             dev_dir / "benign_traffic.csv",
             index=False,
         )
         atk_dir = dev_dir / "gafgyt_attacks"
         atk_dir.mkdir()
-        pd.DataFrame(rng.randn(_N_ATTACK, _N_FEATURES), columns=cols).to_csv(  # type: ignore
+        pd.DataFrame(rng.randn(_N_ATTACK, _N_FEATURES), columns=cols).to_csv( # type: ignore
             atk_dir / "combo.csv",
             index=False,
         )
@@ -73,7 +73,7 @@ class TestPrepareLoadPathConsistency:
         assert sorted(client_data.keys()) == sorted(_DEVICES)
         for cid, splits in client_data.items():
             assert splits.train is not None
-            assert splits.val is not None  # cal → val
+            assert splits.val is not None # cal → val
 
     def test_no_extra_nesting(self, prepared_dir: Path) -> None:
         nested = prepared_dir / "nbaiot"

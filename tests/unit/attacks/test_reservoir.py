@@ -1,9 +1,8 @@
-"""Tests for victim-local reservoir selection (CP2-T026)."""
+"""Tests for victim-local reservoir selection ."""
 
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from datp.attacks.poison_enums import PoisoningSourceStrategy
 from datp.attacks.reservoir import (

@@ -20,6 +20,27 @@ You refactor safely while preserving DATP scientific behavior.
 
 ---
 
+## Production-naming discipline (paper-neutral code)
+
+Production code (`src/`, `tests/`, generated runtime artifact names) must be
+**domain-named, not paper-coded**. See `CLAUDE.md` §4.1.
+
+- Forbidden in production names: `CP2`, `cp2`, `MVP`, `mvp`, phase labels, and
+  ticket IDs (`CP2-T044`, `FB1`, …) in filenames, classes, functions, variables,
+  enum members, constants, CLI command names, and persisted artifact
+  filenames / JSON field values.
+- Use domain names: `calibration_poisoning`, `threshold_calibration`,
+  `bounded_sweep`, `single_victim_sweep`, `ExperimentStage`,
+  `BoundedSweepManifest`, `CALIBRATION_POISONING_OUTPUT_ROOT`. Scale members are
+  `BOUNDED`/`FULL`, not `MVP`.
+- Docstrings/comments are short and technical: no AI-assistant phrasing, no
+  ticket numbers, no phase narration, no restating the code.
+- Never preserve a paper-coded name via a wrapper, re-export, or alias. Rename
+  the symbol and update every import, test, and doc reference.
+- Ticket / phase / `CP2` labels live only in `docs/**` and tracking files.
+
+---
+
 ## Required Reading
 
 Before refactoring, read:

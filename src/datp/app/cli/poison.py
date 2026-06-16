@@ -1,9 +1,8 @@
-"""CP2 CLI subcommands — stage preview, dry-run, and smoke gate.
+"""calibration-poisoning CLI subcommands — stage preview, dry-run, and smoke gate.
 
 No experiment execution. Heavy stages require explicit gate authorization
-(each stage's own `gate` field — e.g. CP2-T043, CP2-T044, FB3, FB4, or
-CP2-T056/T057 for the final/full experiment and paper figures). All
-commands here are read-only previews; they never launch a run themselves.
+(each stage's own `gate` field). All commands here are read-only previews;
+they never launch a run themselves.
 """
 
 from __future__ import annotations
@@ -15,10 +14,10 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from datp.attacks.mvp_run import write_nbaiot_mvp_manifest
-from datp.config.stages import Cp2Stage, Cp2StageConfig, all_stage_configs, get_stage_config
+from datp.attacks.bounded_sweep_run import write_nbaiot_bounded_sweep_manifest
+from datp.config.stages import ExperimentStage, ExperimentStageConfig, all_stage_configs, get_stage_config
 
-app = typer.Typer(help="CP2 calibration-channel poisoning commands.")
+app = typer.Typer(help="Calibration-channel poisoning commands.")
 
 _stdout = Console()
 _stderr = Console(stderr=True)
@@ -29,7 +28,7 @@ _PHASE_B_NOTICE = (
 )
 
 
-def _stage_config_as_dict(cfg: Cp2StageConfig) -> dict[str, object]:
+def _stage_config_as_dict(cfg: ExperimentStageConfig) -> dict[str, object]:
     d = dataclasses.asdict(cfg)
     # Convert enum values to their string representations.
     d["stage"] = str(cfg.stage)
@@ -39,8 +38,8 @@ def _stage_config_as_dict(cfg: Cp2StageConfig) -> dict[str, object]:
 
 @app.command("preview")
 def preview(
-    stage: Cp2Stage = typer.Option(
-        Cp2Stage.NBAIOT_MVP, help="CP2 stage to preview"
+    stage: ExperimentStage = typer.Option(
+        ExperimentStage.NBAIOT_BOUNDED, help="stage to preview"
     ),
 ) -> None:
     """Print the stage configuration as JSON; does not execute any run."""
@@ -55,18 +54,18 @@ def preview(
 
 @app.command("dry-run")
 def dry_run(
-    stage: Cp2Stage = typer.Option(
-        Cp2Stage.NBAIOT_MVP, help="CP2 stage to enumerate"
+    stage: ExperimentStage = typer.Option(
+        ExperimentStage.NBAIOT_BOUNDED, help="stage to enumerate"
     ),
 ) -> None:
-    """Enumerate CP2 cells for the stage without executing any experiment."""
+    """Enumerate cells for the stage without executing any experiment."""
     cfg = get_stage_config(stage)
-    _stdout.print(f"[bold]CP2 dry-run[/bold]: stage={stage!r}")
-    _stdout.print(f"  scale     : {cfg.scale}")
-    _stdout.print(f"  dataset   : {cfg.dataset}")
-    _stdout.print(f"  allow_run : {cfg.allow_run}")
-    _stdout.print(f"  gate      : {cfg.gate or 'none'}")
-    _stdout.print(f"  description: {cfg.description}")
+    _stdout.print(f"[bold]dry-run[/bold]: stage={stage!r}")
+    _stdout.print(f" scale : {cfg.scale}")
+    _stdout.print(f" dataset : {cfg.dataset}")
+    _stdout.print(f" allow_run : {cfg.allow_run}")
+    _stdout.print(f" gate : {cfg.gate or 'none'}")
+    _stdout.print(f" description: {cfg.description}")
     if not cfg.allow_run:
         _stderr.print(f"[yellow]{_PHASE_B_NOTICE}[/yellow]")
         if cfg.gate:
@@ -77,44 +76,44 @@ def dry_run(
 
 @app.command("smoke")
 def smoke() -> None:
-    """Show the CP2 smoke stage config; no experiment is launched in Phase B."""
-    cfg = get_stage_config(Cp2Stage.NBAIOT_SMOKE)
-    _stdout.print(f"[bold]CP2 smoke stage[/bold]: {cfg.description}")
-    _stdout.print(f"  scale  : {cfg.scale}")
-    _stdout.print(f"  dataset: {cfg.dataset}")
+    """Show the smoke stage config; no experiment is launched."""
+    cfg = get_stage_config(ExperimentStage.NBAIOT_SMOKE)
+    _stdout.print(f"[bold]smoke stage[/bold]: {cfg.description}")
+    _stdout.print(f" scale : {cfg.scale}")
+    _stdout.print(f" dataset: {cfg.dataset}")
     _stderr.print(f"[yellow]{_PHASE_B_NOTICE}[/yellow]")
 
 
-@app.command("run-mvp")
-def run_mvp(
+@app.command("run-bounded-sweep")
+def run_bounded_sweep(
     base_dir: Path = typer.Option(..., help="Root output directory (contains real N-BaIoT score artifacts)"),
 ) -> None:
-    """Execute the locked bounded N-BaIoT MVP matrix and write its manifest.
+    """Execute the locked bounded N-BaIoT matrix and write its manifest.
 
-    This is the single CLI run path for ``Cp2Stage.NBAIOT_MVP``: it refuses
-    to run unless that stage's ``allow_run`` is True (CP2-T044 gate
-    satisfied), and it only ever produces ``nbaiot_mvp_manifest.json`` —
+    This is the single CLI run path for ``ExperimentStage.NBAIOT_BOUNDED``: it refuses
+    to run unless that stage's ``allow_run`` is True (bounded-run gate
+    satisfied), and it only ever produces ``nbaiot_bounded_sweep_manifest.json`` —
     nothing outside the locked 1620-cell matrix.
     """
-    cfg = get_stage_config(Cp2Stage.NBAIOT_MVP)
+    cfg = get_stage_config(ExperimentStage.NBAIOT_BOUNDED)
     if not cfg.allow_run:
         _stderr.print(
-            f"[red]Refusing to run:[/red] {Cp2Stage.NBAIOT_MVP!r} allow_run is "
+            f"[red]Refusing to run:[/red] {ExperimentStage.NBAIOT_BOUNDED!r} allow_run is "
             f"False (gate {cfg.gate!r} not satisfied)."
         )
         raise typer.Exit(code=1)
-    out_path = write_nbaiot_mvp_manifest(base_dir)
-    _stdout.print(f"[bold green]Wrote MVP manifest:[/bold green] {out_path}")
+    out_path = write_nbaiot_bounded_sweep_manifest(base_dir)
+    _stdout.print(f"[bold green]Wrote bounded-sweep manifest:[/bold green] {out_path}")
 
 
 @app.command("stages")
 def stages() -> None:
-    """List all CP2 stages with their gate and allow_run status."""
+    """List all stages with their gate and allow_run status."""
     all_cfgs = all_stage_configs()
     for cfg in all_cfgs:
         gate_label = f"gate={cfg.gate!r}" if cfg.gate else "no gate"
         run_label = "BLOCKED" if not cfg.allow_run else "RUNNABLE"
         _stdout.print(
-            f"  {str(cfg.stage):<22}  scale={str(cfg.scale) if cfg.scale else 'N/A':<8}"
-            f"  {run_label:<8}  {gate_label}"
+            f" {str(cfg.stage):<22} scale={str(cfg.scale) if cfg.scale else 'N/A':<8}"
+            f" {run_label:<8} {gate_label}"
         )

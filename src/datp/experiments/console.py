@@ -99,7 +99,7 @@ def print_banner(
     *,
     alpha: float | None = None,
 ) -> None:
-    lines = [f"Regime: [cyan]{regime.value.upper()}[/cyan]  Seed: [cyan]{seed}[/cyan]"]
+    lines = [f"Regime: [cyan]{regime.value.upper()}[/cyan] Seed: [cyan]{seed}[/cyan]"]
     if alpha is not None:
         lines.append(f"Alpha: [cyan]{alpha:g}[/cyan]")
     lines.append(f"Output: [dim]{output_dir}[/dim]")
@@ -114,7 +114,7 @@ def print_banner(
 def step_context(step: DiagnosticStep) -> Iterator[None]:
     label = _DIAGNOSTIC_STEP_LABELS[step]
     ordinal = list(DiagnosticStep).index(step) + 1
-    console.print(f"  [dim][{ordinal:>2}][/dim] [bold]{label}[/bold] ...", end="")
+    console.print(f" [dim][{ordinal:>2}][/dim] [bold]{label}[/bold] ...", end="")
     t0 = time.monotonic()
     try:
         yield
@@ -149,8 +149,8 @@ def print_summary(
     table = Table(title=title, border_style=_Style.GREEN)
     table.add_column(_Label.METRIC, style="bold")
     table.add_column(_Label.VALUE)
-    table.add_row(_Label.B1_CV_FPR, f"{b1_cv_fpr:.4f}  ({_Label.COVERAGE}: {eligible}/{total})")
-    table.add_row(_Label.B2_CV_FPR, f"{b2_cv_fpr:.4f}  ({_Label.COVERAGE}: {eligible}/{total})")
+    table.add_row(_Label.B1_CV_FPR, f"{b1_cv_fpr:.4f} ({_Label.COVERAGE}: {eligible}/{total})")
+    table.add_row(_Label.B2_CV_FPR, f"{b2_cv_fpr:.4f} ({_Label.COVERAGE}: {eligible}/{total})")
     table.add_row(_Label.DELTA_CV_FPR, f"{delta:.4f}")
     if contingency is not None:
         table.add_row(_Label.CONTINGENCY, contingency.value.upper())
@@ -193,7 +193,7 @@ def print_sweep_banner(
 ) -> None:
     regime_display = _Label.REGIME_ALL if regime is None else regime.upper()
     lines = [
-        f"Regime: [cyan]{regime_display}[/cyan]  Cells: [cyan]{cell_count}[/cyan]",
+        f"Regime: [cyan]{regime_display}[/cyan] Cells: [cyan]{cell_count}[/cyan]",
         f"Output: [dim]{base_dir}[/dim]",
     ]
     console.print(
@@ -215,8 +215,8 @@ def print_dry_run_summary(regime_counts: dict[Regime, int], total_cells: int) ->
 
 def print_step(step: SweepStep, detail: str) -> None:
     label = _SWEEP_STEP_LABELS[step]
-    detail_str = f"  [dim]{detail}[/dim]" if detail else ""
-    console.print(f"  [dim][{step.value}][/dim] [bold]{label}[/bold]{detail_str}")
+    detail_str = f" [dim]{detail}[/dim]" if detail else ""
+    console.print(f" [dim][{step.value}][/dim] [bold]{label}[/bold]{detail_str}")
 
 
 def print_group_header(
@@ -231,9 +231,9 @@ def print_group_header(
     progress = f"[{current}/{total}]"
     console.print(
         f"\n[bold yellow]{'─' * _DIVIDER_WIDTH}[/bold yellow]\n"
-        f"[bold yellow]  Group {progress}[/bold yellow]"
-        f"  regime={regime.upper()} seed={seed}{alpha_str}"
-        f"  [dim]({group_size} cells)[/dim]",
+        f"[bold yellow] Group {progress}[/bold yellow]"
+        f" regime={regime.upper()} seed={seed}{alpha_str}"
+        f" [dim]({group_size} cells)[/dim]",
     )
 
 
@@ -244,17 +244,17 @@ def print_baseline_result(
 ) -> None:
     symbol = _STATUS_SYMBOLS[status]
     elapsed_str = f"[dim]({elapsed_s:.1f}s)[/dim]" if elapsed_s > 0 else ""
-    console.print(f"    {symbol} [bold]{baseline.upper()}[/bold] {elapsed_str}")
+    console.print(f" {symbol} [bold]{baseline.upper()}[/bold] {elapsed_str}")
 
 
 def print_checkpoint_status(found: bool, ckpt_path: Path) -> None:
     if found:
         console.print(
-            f"    [green]{_Symbol.CHECK} {_Message.CHECKPOINT_FOUND}[/green]  [dim]{ckpt_path}[/dim]"
+            f" [green]{_Symbol.CHECK} {_Message.CHECKPOINT_FOUND}[/green] [dim]{ckpt_path}[/dim]"
         )
     else:
         console.print(
-            f"    [yellow]{_Symbol.CIRCLE} {_Message.CHECKPOINT_MISSING}[/yellow]  [dim]{ckpt_path}[/dim]"
+            f" [yellow]{_Symbol.CIRCLE} {_Message.CHECKPOINT_MISSING}[/yellow] [dim]{ckpt_path}[/dim]"
         )
 
 

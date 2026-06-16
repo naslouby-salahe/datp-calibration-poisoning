@@ -193,7 +193,7 @@ def test_build_table_row_multi_seed() -> None:
     assert row.eligible_count == 5
     assert row.pending_count == 1
     assert row.coverage_ratio == pytest.approx(5 / 6)
-    assert row.cv_fpr_std > 0  # multi-seed std nonzero
+    assert row.cv_fpr_std > 0 # multi-seed std nonzero
 
 
 def test_build_table_row_single_seed() -> None:

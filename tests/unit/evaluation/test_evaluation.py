@@ -126,16 +126,16 @@ def test_compute_client_metrics_perfect_separation():
 
 
 def test_threshold_rule_strictly_greater_than():
-    benign = np.array([1.5, 0.5])  # 1.5 == threshold: should be TN
-    attack = np.array([1.5, 2.0])  # 1.5 == threshold: should be FN; 2.0: TP
+    benign = np.array([1.5, 0.5]) # 1.5 == threshold: should be TN
+    attack = np.array([1.5, 2.0]) # 1.5 == threshold: should be FN; 2.0: TP
     ct = ClientThreshold(
         client_id="test", threshold=1.5, calibration_pending=False, strategy=Baseline.B1
     )
     result = compute_client_record("test", benign, attack, ct)
     # 1.5 > 1.5 is False → both 1.5 values are not anomalous
-    assert result.confusion.tn == 2  # both benign are TN
-    assert result.confusion.fn == 1  # benign-score attack is FN
-    assert result.confusion.tp == 1  # 2.0 > 1.5
+    assert result.confusion.tn == 2 # both benign are TN
+    assert result.confusion.fn == 1 # benign-score attack is FN
+    assert result.confusion.tp == 1 # 2.0 > 1.5
 
 
 def test_compute_client_metrics_all_false_positives():
@@ -302,8 +302,8 @@ def test_eval_incomplete_excluded_from_attack_metrics():
         incomplete_ids=["c3"],
     )
 
-    assert fm.fpr_eligible.shape[0] == 3  # FPR includes all 3 eligible
-    assert fm.tpr_eligible.shape[0] == 2  # attack metrics exclude c3
+    assert fm.fpr_eligible.shape[0] == 3 # FPR includes all 3 eligible
+    assert fm.tpr_eligible.shape[0] == 2 # attack metrics exclude c3
     assert fm.ba_eligible.shape[0] == 2
     assert fm.f1_eligible.shape[0] == 2
 
@@ -565,7 +565,7 @@ def test_single_cv_implementation():
         ["grep", "-rn", r"def cv(", "src/datp/"],
         capture_output=True,
         text=True,
-        cwd=Path(__file__).resolve().parents[3],  # repo root
+        cwd=Path(__file__).resolve().parents[3], # repo root
     )
     lines = [line for line in result.stdout.strip().splitlines() if line.strip()]
     assert len(lines) == 1, f"Expected 1 'def cv(' match, got {len(lines)}: {lines}"

@@ -9,12 +9,12 @@ from datp.config.models import (
 
 class TestInputDimMismatch:
     def test_matching_dims_pass(self) -> None:
-        _ = BASE_CONFIG  # dims match (input_dim == feature_count from YAML)
+        _ = BASE_CONFIG # dims match (input_dim == feature_count from YAML)
 
     def test_mismatched_dims_fail(self) -> None:
         with pytest.raises(ValidationError, match="model.input_dim"):
             bad = BASE_CONFIG.model_dump()
-            bad["model"]["input_dim"] = 99  # dataset.feature_count stays at 115
+            bad["model"]["input_dim"] = 99 # dataset.feature_count stays at 115
             type(BASE_CONFIG).model_validate(bad)
 
 
@@ -34,11 +34,11 @@ class TestUnknownKeys:
 
     def test_missing_required_key_fails(self) -> None:
         with pytest.raises(ValidationError):
-            ModelConfig(input_dim=None)  # type: ignore[call-arg]
+            ModelConfig(input_dim=None) # type: ignore[call-arg]
 
     def test_null_required_key_fails(self) -> None:
         with pytest.raises(ValidationError):
-            ModelConfig(input_dim=None)  # type: ignore[call-arg]
+            ModelConfig(input_dim=None) # type: ignore[call-arg]
 
 
 class TestOverrideNotStripped:
@@ -52,18 +52,18 @@ class TestOverrideNotStripped:
 
 class TestCrossSectionInvariants:
     def test_matching_n_min_pass(self) -> None:
-        _ = BASE_CONFIG  # n_min values match in YAML
+        _ = BASE_CONFIG # n_min values match in YAML
 
     def test_mismatched_n_min_fail(self) -> None:
         with pytest.raises(ValidationError, match="n_min"):
             bad = BASE_CONFIG.model_dump()
-            bad["dataset"]["n_min"] = 50  # threshold.n_min stays at 100
+            bad["dataset"]["n_min"] = 50 # threshold.n_min stays at 100
             type(BASE_CONFIG).model_validate(bad)
 
 
 class TestResourceBounds:
     def test_within_bounds_pass(self) -> None:
-        _ = BASE_CONFIG  # batch_size_train within safety_bounds from YAML
+        _ = BASE_CONFIG # batch_size_train within safety_bounds from YAML
 
     def test_exceeds_bounds_fail(self) -> None:
         with pytest.raises(ValidationError, match="exceeds"):
@@ -75,7 +75,7 @@ class TestResourceBounds:
 
 class TestMachineProfile:
     def test_valid_profile_pass(self) -> None:
-        _ = BASE_CONFIG  # valid YAML-defined profile
+        _ = BASE_CONFIG # valid YAML-defined profile
 
     def test_negative_batch_size_fail(self) -> None:
         with pytest.raises(ValidationError):

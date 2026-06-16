@@ -1,6 +1,6 @@
-"""CP2 run manifest schema.
+"""run manifest schema.
 
-Every CP2 experiment cell writes one manifest that records provenance (E=1,
+Every experiment cell writes one manifest that records provenance (E=1,
 split semantics, checkpoint round), reservoir mode, locked mu_flag_threshold,
 and the SeedSequence entropy so any run can be reproduced exactly.
 """
@@ -17,17 +17,17 @@ from datp.attacks.poison_enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.core.seed_sequence import Cp2SeedRecord
+from datp.core.seed_sequence import SeedRecord
 
 # Canonical split description — do not vary; this locks split semantics.
-CP2_SPLIT_SEMANTICS: str = "chronological_benign_only_60_1_20_1_18"
+SPLIT_SEMANTICS: str = "chronological_benign_only_60_1_20_1_18"
 
 # Canonical reservoir description for source-precedence rule 2.
-CP2_RESERVOIR_MODE: str = "victim_local_benign_cal_source_precedence_rule_2"
+RESERVOIR_MODE: str = "victim_local_benign_cal_source_precedence_rule_2"
 
 
-class Cp2ProvenanceRecord(BaseModel):
-    """Provenance fields recorded in every CP2 manifest.
+class ProvenanceRecord(BaseModel):
+    """Provenance fields recorded in every manifest.
 
     E=1 is enforced; E=5 is rejected at validation time.
     """
@@ -35,10 +35,10 @@ class Cp2ProvenanceRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     local_epochs: int
-    cp2_generated: bool = True
+    pipeline_generated: bool = True
     repository: str
     checkpoint_round: int | None = None
-    split_semantics: str = CP2_SPLIT_SEMANTICS
+    split_semantics: str = SPLIT_SEMANTICS
 
     @field_validator("local_epochs")
     @classmethod
@@ -50,8 +50,8 @@ class Cp2ProvenanceRecord(BaseModel):
         return v
 
 
-class Cp2SeedRecordModel(BaseModel):
-    """Pydantic-serializable mirror of Cp2SeedRecord for manifest embedding."""
+class SeedRecordModel(BaseModel):
+    """Pydantic-serializable mirror of SeedRecord for manifest embedding."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -62,7 +62,7 @@ class Cp2SeedRecordModel(BaseModel):
     entropy: tuple[int, int, int, int]
 
     @classmethod
-    def from_record(cls, record: Cp2SeedRecord) -> "Cp2SeedRecordModel":
+    def from_record(cls, record: SeedRecord) -> "SeedRecordModel":
         return cls(
             training_seed=record.training_seed,
             poisoning_seed=record.poisoning_seed,
@@ -71,8 +71,8 @@ class Cp2SeedRecordModel(BaseModel):
             entropy=record.entropy,
         )
 
-    def to_record(self) -> Cp2SeedRecord:
-        return Cp2SeedRecord(
+    def to_record(self) -> SeedRecord:
+        return SeedRecord(
             training_seed=self.training_seed,
             poisoning_seed=self.poisoning_seed,
             client_idx=self.client_idx,
@@ -80,8 +80,8 @@ class Cp2SeedRecordModel(BaseModel):
         )
 
 
-class Cp2RunManifest(BaseModel):
-    """Manifest for one CP2 experiment cell.
+class RunManifest(BaseModel):
+    """Manifest for one experiment cell.
 
     Written before any poisoned run begins. Records all parameters needed to
     reproduce the run and verify provenance.
@@ -107,18 +107,18 @@ class Cp2RunManifest(BaseModel):
     client_idx: int
     scope_idx: int
 
-    # Provenance — E=1 enforced, E=5 rejected inside Cp2ProvenanceRecord.
-    provenance: Cp2ProvenanceRecord
+    # Provenance — E=1 enforced, E=5 rejected inside ProvenanceRecord.
+    provenance: ProvenanceRecord
 
     # Reservoir mode — must be victim-local.
-    reservoir_mode: str = CP2_RESERVOIR_MODE
+    reservoir_mode: str = RESERVOIR_MODE
 
     # mu_flag_threshold — None until computed from clean artifacts; must be
     # locked (non-None) before any poisoned run reads results.
     mu_flag_threshold: float | None
 
     # Every derived child seed recorded for reproducibility.
-    seed_record: Cp2SeedRecordModel
+    seed_record: SeedRecordModel
 
     # ISO-8601 UTC timestamp.
     generated_at_utc: str

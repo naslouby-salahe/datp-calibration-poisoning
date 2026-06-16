@@ -29,7 +29,7 @@ class TestConvergenceTrigger:
 
         assert stop_round is not None
         assert stop_round >= 5
-        assert stop_round >= 2 * 4  # 2*window
+        assert stop_round >= 2 * 4 # 2*window
         assert monitor.converged_round == stop_round
 
     def test_gradual_convergence(self) -> None:
@@ -46,7 +46,7 @@ class TestConvergenceTrigger:
 
         assert stop_round is not None
         assert stop_round >= 10
-        assert stop_round >= 2 * 5  # 2*window
+        assert stop_round >= 2 * 5 # 2*window
 
     def test_window_mean_comparison_differs_from_first_last(self) -> None:
         """The old first-vs-last behavior would give different answers from window-mean."""
@@ -58,7 +58,7 @@ class TestConvergenceTrigger:
         )
         # Sequence where first==last in window but means differ:
         # previous window [1.0, 0.9, 0.8, 0.7] mean=0.85
-        # current window  [0.7, 0.8, 0.7, 0.7] mean=0.725
+        # current window [0.7, 0.8, 0.7, 0.7] mean=0.725
         # rel_change = |0.725 - 0.85| / 0.85 = 0.147 > 0.02 => no convergence
         # But old method: start=0.7 end=0.7 => rel_change=0 => would converge (wrong!)
         losses = [1.0, 0.9, 0.8, 0.7, 0.7, 0.8, 0.7, 0.7]
@@ -77,7 +77,7 @@ class TestConvergenceTrigger:
         # Both windows will have mean=0.5, so rel_change=0
         losses = [0.5] * 8
         stop_round = _feed(monitor, losses)
-        assert stop_round == 8  # fires at exactly 2*window
+        assert stop_round == 8 # fires at exactly 2*window
 
 
 class TestRoundsInitialGuard:
@@ -212,7 +212,7 @@ class TestFromConfig:
 
     def test_from_config_missing_key_raises(self) -> None:
         with pytest.raises(AttributeError):
-            ConvergenceMonitor.from_config({"federation": {}})  # type: ignore[arg-type]
+            ConvergenceMonitor.from_config({"federation": {}}) # type: ignore[arg-type]
 
 
 class TestBaseConfigDefaults:
@@ -512,7 +512,7 @@ class TestAggregateEvaluateGuards:
         )
         strategy = self._make_strategy(monitor)
 
-        loss, metrics = strategy.aggregate_evaluate(  # type: ignore[attr-defined]
+        loss, metrics = strategy.aggregate_evaluate( # type: ignore[attr-defined]
             server_round=1, results=[], failures=[]
         )
 
@@ -533,7 +533,7 @@ class TestAggregateEvaluateGuards:
         result.num_examples = 0
         result.loss = 0.5
 
-        loss, metrics = strategy.aggregate_evaluate(  # type: ignore[attr-defined]
+        loss, metrics = strategy.aggregate_evaluate( # type: ignore[attr-defined]
             server_round=1, results=[(proxy, result)], failures=[]
         )
 
@@ -558,7 +558,7 @@ class TestAggregateEvaluateGuards:
         res_b.num_examples = 300
         res_b.loss = 0.8
 
-        loss, metrics = strategy.aggregate_evaluate(  # type: ignore[attr-defined]
+        loss, metrics = strategy.aggregate_evaluate( # type: ignore[attr-defined]
             server_round=1, results=[(proxy_a, res_a), (proxy_b, res_b)], failures=[]
         )
 

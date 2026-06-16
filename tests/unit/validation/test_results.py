@@ -310,11 +310,11 @@ def test_binary_macro_f1_ignores_multiclass_attack_names() -> None:
     )
     rec = compute_client_record("c", benign, attack, ct)
     expected = f1_score(
-        [0, 0, 1, 1], [0, 0, 1, 0], average="macro", labels=[0, 1], zero_division=0  # type: ignore[call-overload]
-    )  # type: ignore[arg-type]
+        [0, 0, 1, 1], [0, 0, 1, 0], average="macro", labels=[0, 1], zero_division=0 # type: ignore[call-overload]
+    ) # type: ignore[arg-type]
     multiclass_wrong = f1_score(
-        [0, 0, 2, 3], [0, 0, 1, 0], average="macro", zero_division=0  # type: ignore[call-overload]
-    )  # type: ignore[arg-type]
+        [0, 0, 2, 3], [0, 0, 1, 0], average="macro", zero_division=0 # type: ignore[call-overload]
+    ) # type: ignore[arg-type]
     assert rec.metrics.macro_f1 == expected
     assert rec.metrics.macro_f1 != multiclass_wrong
 

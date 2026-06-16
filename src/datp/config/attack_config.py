@@ -1,6 +1,6 @@
-"""CP2 typed config schema — single source of truth for all CP2 scientific parameters.
+"""Typed config schema — single source of truth for all scientific parameters.
 
-All CP2 scientific values come from here. No module-level constants for CP2 parameters
+All scientific values come from here. No module-level constants for these parameters
 downstream. No shift_magnitude. No attack_rate. No untyped dicts.
 
 E=1 is enforced by validator; E=5 is explicitly rejected.
@@ -11,19 +11,19 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datp.artifacts.poison_names import (
-    CP2_ANALYSIS_SEEDS,
-    CP2_B4_K,
-    CP2_B4_MAX_ITER,
-    CP2_B4_N_INIT,
-    CP2_B4_RANDOM_STATE,
-    CP2_COMPROMISE_PATTERN_SEED,
-    CP2_N_MIN,
-    CP2_POISONING_SEEDS,
-    CP2_TAIL_MASS,
-    CP2_TRAINING_SEEDS,
+    ANALYSIS_SEEDS,
+    B4_K,
+    B4_MAX_ITER,
+    B4_N_INIT,
+    B4_RANDOM_STATE,
+    COMPROMISE_PATTERN_SEED,
+    N_MIN,
+    POISONING_SEEDS,
+    TAIL_MASS,
+    TRAINING_SEEDS,
 )
 from datp.attacks.poison_enums import (
-    CP2_MVP_FRACTIONS,
+    BOUNDED_SWEEP_FRACTIONS,
     AttackerObjective,
     CalibrationInjectionRule,
     ExperimentScale,
@@ -35,8 +35,8 @@ from datp.attacks.poison_enums import (
 )
 
 
-class Cp2SeedPools(BaseModel):
-    """Locked seed pools for CP2 runs.
+class SeedPools(BaseModel):
+    """Locked seed pools for runs.
 
     Each pool contains exactly 5 seeds. Index i of training + index i of
     poisoning + index i of analysis define one seed triplet.
@@ -45,14 +45,14 @@ class Cp2SeedPools(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    training: tuple[int, ...] = CP2_TRAINING_SEEDS
-    poisoning: tuple[int, ...] = CP2_POISONING_SEEDS
-    analysis: tuple[int, ...] = CP2_ANALYSIS_SEEDS
+    training: tuple[int, ...] = TRAINING_SEEDS
+    poisoning: tuple[int, ...] = POISONING_SEEDS
+    analysis: tuple[int, ...] = ANALYSIS_SEEDS
     split: int = 0
-    compromise_pattern: int = CP2_COMPROMISE_PATTERN_SEED
+    compromise_pattern: int = COMPROMISE_PATTERN_SEED
 
     @model_validator(mode="after")
-    def pools_same_length(self) -> "Cp2SeedPools":
+    def pools_same_length(self) -> "SeedPools":
         if len(self.training) != len(self.poisoning):
             raise ValueError(
                 "training and poisoning seed pools must have the same length"
@@ -66,7 +66,7 @@ class Cp2SeedPools(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def no_seed_overlap(self) -> "Cp2SeedPools":
+    def no_seed_overlap(self) -> "SeedPools":
         all_seeds = list(self.training) + list(self.poisoning) + list(self.analysis)
         if len(all_seeds) != len(set(all_seeds)):
             raise ValueError(
@@ -82,7 +82,7 @@ class Cp2SeedPools(BaseModel):
         return len(self.training)
 
 
-class Cp2B4Config(BaseModel):
+class B4ClusterConfig(BaseModel):
     """B4 clustering hyperparameters — locked for N-BaIoT (Regime A).
 
     Do not change without a scientific ticket.
@@ -90,10 +90,10 @@ class Cp2B4Config(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    k: int = Field(default=CP2_B4_K, gt=0)
-    n_init: int = Field(default=CP2_B4_N_INIT, gt=0)
-    max_iter: int = Field(default=CP2_B4_MAX_ITER, gt=0)
-    random_state: int = CP2_B4_RANDOM_STATE
+    k: int = Field(default=B4_K, gt=0)
+    n_init: int = Field(default=B4_N_INIT, gt=0)
+    max_iter: int = Field(default=B4_MAX_ITER, gt=0)
+    random_state: int = B4_RANDOM_STATE
 
     @field_validator("k")
     @classmethod
@@ -105,8 +105,8 @@ class Cp2B4Config(BaseModel):
         return v
 
 
-class Cp2Config(BaseModel):
-    """Typed CP2 experiment config — covers all scientific parameters.
+class CalibrationPoisoningConfig(BaseModel):
+    """Typed experiment config — covers all scientific parameters.
 
     Enforces E=1 (rejects E=5), REPLACE_FIXED_BUDGET injection rule,
     victim-local reservoirs, and the locked fraction/seed grids.
@@ -129,23 +129,23 @@ class Cp2Config(BaseModel):
     defense: PoisoningDefense = PoisoningDefense.NONE
     scale: ExperimentScale
 
-    # Fraction grid: MVP = {0, 0.10, 0.20, 0.40}; Full adds 0.05 (FB4-gated).
-    fractions: tuple[float, ...] = CP2_MVP_FRACTIONS
+    # Fraction grid: bounded sweep = {0, 0.10, 0.20, 0.40}; Full adds 0.05 (gated).
+    fractions: tuple[float, ...] = BOUNDED_SWEEP_FRACTIONS
 
     # Seed pools
-    seeds: Cp2SeedPools = Cp2SeedPools()
+    seeds: SeedPools = SeedPools()
 
     # Eligibility threshold (clients with n_cal < n_min are calibration-pending)
-    n_min: int = Field(default=CP2_N_MIN, gt=0)
+    n_min: int = Field(default=N_MIN, gt=0)
 
     # B4 hyperparameters
-    b4: Cp2B4Config = Cp2B4Config()
+    b4: B4ClusterConfig = B4ClusterConfig()
 
     # Reservoir: victim-local benign calibration scores; tail_mass fraction.
-    tail_mass: float = Field(default=CP2_TAIL_MASS, gt=0.0, le=1.0)
+    tail_mass: float = Field(default=TAIL_MASS, gt=0.0, le=1.0)
 
     # CV(FPR) instability flag: mu_flag_threshold = round(M_clean / 8, 2 s.f.).
-    # Must be computed from clean FB1 artifacts and locked BEFORE any poisoned run.
+    # Must be computed from clean baseline artifacts and locked BEFORE any poisoned run.
     mu_flag_threshold: float | None = None
 
     @field_validator("local_epochs")
@@ -154,7 +154,7 @@ class Cp2Config(BaseModel):
         if v != 1:
             raise ValueError(
                 f"local_epochs must be 1 (E=1 protocol lock); "
-                f"got {v} — E={v} is forbidden for CP2"
+                f"got {v} — E={v} is forbidden"
             )
         return v
 
@@ -180,13 +180,13 @@ class Cp2Config(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def mvp_requires_single_client(self) -> "Cp2Config":
+    def bounded_scale_requires_single_client(self) -> "CalibrationPoisoningConfig":
         if (
-            self.scale == ExperimentScale.MVP
+            self.scale == ExperimentScale.BOUNDED
             and self.target_scope != PoisoningTargetScope.SINGLE_CLIENT
         ):
             raise ValueError(
-                "MVP scale requires SINGLE_CLIENT target scope"
+                "BOUNDED scale requires SINGLE_CLIENT target scope"
             )
         return self
 

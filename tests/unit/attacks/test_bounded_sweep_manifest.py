@@ -1,30 +1,30 @@
-"""Unit tests for the bounded N-BaIoT MVP manifest schema (CP2-T045)."""
+"""Unit tests for the bounded N-BaIoT bounded sweep manifest schema ."""
 
 from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
 
-from datp.attacks.mvp_manifest import Cp2MvpManifest, Cp2MvpResultRow
+from datp.attacks.bounded_sweep_manifest import BoundedSweepManifest, BoundedSweepResultRow
 from datp.attacks.poison_enums import (
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.attacks.run_manifest import Cp2ProvenanceRecord, Cp2SeedRecordModel
-from datp.core.seed_sequence import derive_cp2_seed_record
+from datp.attacks.run_manifest import ProvenanceRecord, SeedRecordModel
+from datp.core.seed_sequence import derive_seed_record
 
 
-def _row(training_seed: int = 0, poisoning_seed: int = 100) -> Cp2MvpResultRow:
-    seed_record = Cp2SeedRecordModel.from_record(
-        derive_cp2_seed_record(
+def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResultRow:
+    seed_record = SeedRecordModel.from_record(
+        derive_seed_record(
             training_seed=training_seed,
             poisoning_seed=poisoning_seed,
             client_idx=0,
             scope_idx=0,
         )
     )
-    return Cp2MvpResultRow(
+    return BoundedSweepResultRow(
         policy=ThresholdPolicy.B1_GLOBAL,
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
         objective=None,
@@ -50,10 +50,10 @@ def _row(training_seed: int = 0, poisoning_seed: int = 100) -> Cp2MvpResultRow:
     )
 
 
-def _manifest(**overrides: object) -> Cp2MvpManifest:
+def _manifest(**overrides: object) -> BoundedSweepManifest:
     base: dict[str, object] = dict(
         generated_at_utc="2026-06-16T00:00:00+00:00",
-        provenance=Cp2ProvenanceRecord(
+        provenance=ProvenanceRecord(
             local_epochs=1, repository="datp-calibration-poisoning"
         ),
         policies=(ThresholdPolicy.B1_GLOBAL,),
@@ -66,12 +66,12 @@ def _manifest(**overrides: object) -> Cp2MvpManifest:
         results=(_row(),),
     )
     base.update(overrides)
-    return Cp2MvpManifest(**base)  # type: ignore[arg-type]
+    return BoundedSweepManifest(**base) # type: ignore[arg-type]
 
 
 def test_manifest_round_trips_through_json():
     manifest = _manifest()
-    restored = Cp2MvpManifest.model_validate_json(manifest.model_dump_json())
+    restored = BoundedSweepManifest.model_validate_json(manifest.model_dump_json())
     assert restored == manifest
 
 
@@ -93,4 +93,4 @@ def test_manifest_rejects_missing_mu_flag_entry():
 def test_manifest_is_frozen():
     manifest = _manifest()
     with pytest.raises(ValidationError):
-        manifest.n_cells = 99  # type: ignore[misc]
+        manifest.n_cells = 99 # type: ignore[misc]

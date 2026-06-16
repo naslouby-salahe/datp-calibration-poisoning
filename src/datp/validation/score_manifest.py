@@ -347,7 +347,7 @@ def _validate_score_file(
 ) -> tuple[str | None, str | None]:
     """Validate a single score Parquet file.
 
-    Returns (schema_error_label, empty_label).  Exactly one of the two may be
+    Returns (schema_error_label, empty_label). Exactly one of the two may be
     non-None; both None means the file passed all checks.
     """
     presence_err = _check_column_presence(parquet)

@@ -27,4 +27,4 @@ class TestValidateModelOnCuda:
         model = Autoencoder(
             input_dim=10, hidden_dims=[8, 4], activation=Activation.RELU, use_bn=False
         ).cuda()
-        validate_model_on_cuda(model)  # Should not raise
+        validate_model_on_cuda(model) # Should not raise

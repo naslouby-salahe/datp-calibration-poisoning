@@ -1,7 +1,7 @@
-"""Phase E bounded MVP cell runner (CP2-T044-authorized).
+"""Real-data bounded sweep cell runner.
 
-Orchestrates the real-data MVP matrix on ``REGIME_A_NBAIOT`` using the same
-tested primitives as the Phase D synthetic smoke harness
+Orchestrates the real-data bounded matrix on ``REGIME_A_NBAIOT`` using the same
+tested primitives as the synthetic smoke harness
 (``datp.attacks.cell_runner``). The key difference from the smoke harness:
 ``mu_flag_threshold`` is locked once per training seed from the *clean B1*
 eligible-client mean FPR and passed in explicitly, then reused unmodified
@@ -13,21 +13,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from datp.artifacts.poison_names import CP2_Q
+from datp.artifacts.poison_names import THRESHOLD_QUANTILE
 from datp.attacks.cell_runner import PolicyPair, inject_single_victim, recompute_pair
 from datp.attacks.metric_engine import (
-    Cp2AurocRecord,
-    Cp2MetricResult,
+    AurocRecord,
+    MetricResult,
     compute_auroc_records,
     compute_metrics,
     compute_mu_flag_threshold,
 )
 from datp.attacks.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
-from datp.attacks.score_containers import Cp2ScoreCollection
+from datp.attacks.score_containers import ScoreCollection
 
 
 def lock_mu_flag_threshold(
-    collection: Cp2ScoreCollection, *, q: float = CP2_Q
+    collection: ScoreCollection, *, q: float = THRESHOLD_QUANTILE
 ) -> float:
     """Lock ``mu_flag_threshold`` from the clean B1 eligible-client mean FPR.
 
@@ -48,7 +48,7 @@ def lock_mu_flag_threshold(
 
 
 @dataclass(frozen=True, slots=True)
-class MvpCellResult:
+class SweepCellResult:
     """Clean-vs-poisoned result for one (policy, source, fraction, victim, seed) cell."""
 
     policy: ThresholdPolicy
@@ -59,12 +59,12 @@ class MvpCellResult:
     poisoning_seed: int
     clean_pair: PolicyPair
     poisoned_pair: PolicyPair
-    clean_metrics: Cp2MetricResult
-    poisoned_metrics: Cp2MetricResult
+    clean_metrics: MetricResult
+    poisoned_metrics: MetricResult
 
 
-def run_mvp_cell(
-    collection: Cp2ScoreCollection,
+def run_sweep_cell(
+    collection: ScoreCollection,
     *,
     victim_id: str,
     policy: ThresholdPolicy,
@@ -74,11 +74,11 @@ def run_mvp_cell(
     poisoning_seed: int,
     mu_flag_threshold: float,
     scope_idx: int = 0,
-    q: float = CP2_Q,
+    q: float = THRESHOLD_QUANTILE,
     b4_seed: int = 0,
-    auroc_records: dict[str, Cp2AurocRecord] | None = None,
-) -> MvpCellResult:
-    """Run one MVP cell using a pre-locked ``mu_flag_threshold``.
+    auroc_records: dict[str, AurocRecord] | None = None,
+) -> SweepCellResult:
+    """Run one bounded cell using a pre-locked ``mu_flag_threshold``.
 
     The clean baseline pair is still recomputed per (training_seed, policy)
     here (cheap; correctness-first) — it defines this policy's own Δτ
@@ -87,7 +87,7 @@ def run_mvp_cell(
     collection (test scores are never touched); callers sweeping many cells
     for one training seed should precompute it once via
     ``compute_auroc_records`` and pass it here — otherwise it is recomputed
-    on every call, which is correct but wasteful at MVP scale.
+    on every call, which is correct but wasteful at BOUNDED scale.
     """
     if auroc_records is None:
         auroc_records = compute_auroc_records(collection)
@@ -124,7 +124,7 @@ def run_mvp_cell(
         collection, poisoned_pair, mu_flag_threshold, auroc_records=auroc_records
     )
 
-    return MvpCellResult(
+    return SweepCellResult(
         policy=policy,
         victim_id=victim_id,
         source=source,

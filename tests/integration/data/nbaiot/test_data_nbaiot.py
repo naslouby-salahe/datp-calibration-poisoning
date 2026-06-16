@@ -85,7 +85,7 @@ class TestSplitRatio:
             info = result[device_id]
 
             csv_path = RAW_DIR / device_id / "benign_traffic.csv"
-            n_benign = sum(1 for _ in open(csv_path)) - 1  # minus header
+            n_benign = sum(1 for _ in open(csv_path)) - 1 # minus header
 
             n_train_expected = math.floor(n_benign * SPLIT_RATIOS[Split.TRAIN])
             n_gap1 = math.floor(n_benign * SPLIT_RATIOS[GAP1_KEY])

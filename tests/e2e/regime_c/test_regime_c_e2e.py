@@ -35,7 +35,7 @@ pytestmark = [pytest.mark.e2e]
 _TINY_DATA_N_MIN = 3
 _SEED = 0
 _ALPHA = 1.0
-_N_CLIENTS = 3  # tiny client count
+_N_CLIENTS = 3 # tiny client count
 _TRAIN_FRAC = BASE_CONFIG.dataset.regime_c_train_fraction
 _CAL_FRAC = BASE_CONFIG.dataset.regime_c_cal_fraction
 

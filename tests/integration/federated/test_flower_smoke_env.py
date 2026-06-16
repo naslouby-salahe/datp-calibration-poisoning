@@ -9,7 +9,7 @@ from datp.core.seeds import set_seeds
 
 _SMOKE_INPUT_DIM = 8
 _SMOKE_HIDDEN_DIM = 4
-_SMOKE_N_SAMPLES = 200  # per client
+_SMOKE_N_SAMPLES = 200 # per client
 _SMOKE_NUM_CLIENTS = 2
 _SMOKE_NUM_ROUNDS = 2
 _SMOKE_SEED = 42
@@ -119,7 +119,7 @@ def test_two_client_flower_simulation() -> None:
         num_supernodes=_SMOKE_NUM_CLIENTS,
         client_app=ClientApp(client_fn=client_fn),
         server_app=ServerApp(server_fn=server_fn),
-        backend_config={"init_args": {"num_cpus": 2, "include_dashboard": False}},  # type: ignore[arg-type]
+        backend_config={"init_args": {"num_cpus": 2, "include_dashboard": False}}, # type: ignore[arg-type]
         exit_event=EventType.PYTHON_API_RUN_SIMULATION_LEAVE,
     )
 

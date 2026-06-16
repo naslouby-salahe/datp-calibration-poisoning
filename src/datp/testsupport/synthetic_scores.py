@@ -1,4 +1,4 @@
-"""Deterministic synthetic per-client score arrays for CP2 smoke testing.
+"""Deterministic synthetic per-client score arrays for smoke testing.
 
 CPU-only. No real data. Covers eligible, Calibration-Pending, and degenerate-tail
 cases. All generators are deterministic via SeedSequence.
@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.artifacts.poison_names import CP2_N_MIN
-from datp.core.seed_sequence import make_cp2_rng
+from datp.artifacts.poison_names import N_MIN
+from datp.core.seed_sequence import make_seed_rng
 from datp.scoring.schema import SCORE_COLUMN
 
 
@@ -35,7 +35,7 @@ class SyntheticClientScores:
 
     @property
     def is_eligible(self) -> bool:
-        return self.n_cal >= CP2_N_MIN
+        return self.n_cal >= N_MIN
 
     @property
     def score_column(self) -> str:
@@ -44,7 +44,7 @@ class SyntheticClientScores:
 
 @dataclass(frozen=True, slots=True)
 class SyntheticScoreSet:
-    """A collection of synthetic clients forming one CP2 scenario."""
+    """A collection of synthetic clients forming one scenario."""
 
     clients: tuple[SyntheticClientScores, ...]
 
@@ -96,7 +96,7 @@ def make_synthetic_client(
     (loc=cal_loc, scale=cal_scale). Attack test scores are drawn from a
     higher distribution (loc=attack_loc). All values are clipped to [0, inf).
     """
-    rng = make_cp2_rng(
+    rng = make_seed_rng(
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
         client_idx=client_idx,
@@ -125,10 +125,10 @@ def make_eligible_client(
     training_seed: int = 0,
     poisoning_seed: int = 100,
 ) -> SyntheticClientScores:
-    """Shorthand: eligible client with n_cal >= CP2_N_MIN."""
+    """Shorthand: eligible client with n_cal >= N_MIN."""
     return make_synthetic_client(
         client_id=client_id,
-        n_cal=CP2_N_MIN + 100,
+        n_cal=N_MIN + 100,
         client_idx=client_idx,
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
@@ -142,10 +142,10 @@ def make_pending_client(
     training_seed: int = 0,
     poisoning_seed: int = 100,
 ) -> SyntheticClientScores:
-    """Shorthand: Calibration-Pending client with n_cal < CP2_N_MIN."""
+    """Shorthand: Calibration-Pending client with n_cal < N_MIN."""
     return make_synthetic_client(
         client_id=client_id,
-        n_cal=CP2_N_MIN - 1,
+        n_cal=N_MIN - 1,
         client_idx=client_idx,
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
@@ -164,9 +164,9 @@ def make_degenerate_tail_client(
     All calibration scores are identical (constant), so any percentile-based tail
     will have fewer than 2 distinct values.
     """
-    n_cal = CP2_N_MIN + 50
+    n_cal = N_MIN + 50
     cal = np.full(n_cal, 0.05)
-    rng = make_cp2_rng(
+    rng = make_seed_rng(
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
         client_idx=client_idx,
@@ -191,7 +191,7 @@ def make_standard_score_set(
     training_seed: int = 0,
     poisoning_seed: int = 100,
 ) -> SyntheticScoreSet:
-    """Build a standard CP2 synthetic score set.
+    """Build a standard Synthetic score set.
 
     Default: 9 eligible + 1 pending client (matches N-BaIoT 9-device setup).
     """

@@ -122,7 +122,7 @@ def _run_experiment(seed: int | None, run_dir: Path) -> Path:
         num_supernodes=_SMOKE_NUM_CLIENTS,
         client_app=ClientApp(client_fn=client_fn),
         server_app=ServerApp(server_fn=server_fn),
-        backend_config={"init_args": {"num_cpus": 2, "include_dashboard": False}},  # type: ignore[arg-type]
+        backend_config={"init_args": {"num_cpus": 2, "include_dashboard": False}}, # type: ignore[arg-type]
         exit_event=EventType.PYTHON_API_RUN_SIMULATION_LEAVE,
     )
 
