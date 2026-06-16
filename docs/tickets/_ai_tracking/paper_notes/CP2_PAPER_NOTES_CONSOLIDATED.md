@@ -182,3 +182,215 @@ roadmap §5, §6, §7, §10, §12.
 - **Do-not-claim (Phase B):** Do not claim Phase C/D results until CP2-T056 runs.
 - **Evidence path:** `audits/CP2-T023_phase_b_drift_check.md`; 702 tests pass;
   pyright 0 errors.
+
+## CP2-T029 — Source Strategies
+
+### Claims enabled
+
+- **RANDOM_BENIGN as negative control:** RANDOM_BENIGN samples from the full victim
+  calibration pool with replacement. Because it draws from the same distribution,
+  expected threshold change is near-null. This is the negative control in the source
+  strategy comparison. Near-null criterion is an audit flag (`|Δτ| ≤ threshold`),
+  not an auto-kill; anomalies are flagged for review.
+- **HIGH_SCORE_BENIGN raises threshold:** Upper-tail reservoir injection increases
+  the quantile, shifting the threshold upward. Direction verified on synthetic data.
+- **LOW_SCORE_BENIGN lowers threshold:** Lower-tail reservoir injection decreases
+  the quantile, shifting the threshold downward. Direction verified on synthetic data.
+
+### Limitations / do-not-claim
+
+- **Do-not-claim:** `LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY` does not appear in
+  the MVP/full experiment matrix and must not be cited as evidence in gray-box claims.
+  It is gated behind `allow_diagnostic=True`.
+- **Do-not-claim:** Near-null for RANDOM is an expected property of the construction,
+  not a measured result. Record directional effects from real N-BaIoT runs (Phase E).
+
+### Reviewer risk
+
+- Reviewers may ask why RANDOM is included if it is a negative control. Answer:
+  it validates that threshold change is attributable to the tail bias, not to
+  cardinality change or random sampling noise.
+
+### Evidence path
+
+- `src/datp/attacks/source_strategies.py`
+- `tests/unit/attacks/test_source_strategies.py`
+- Directional effect tests pass on synthetic data; pyright 0 errors.
+
+## CP2-T031 — B4 Decomposition
+
+### Claims enabled
+
+- **Client-indexed Δτ decomposition:** Each victim's threshold change is decomposed as
+  `Δτ_total = Δτ_agg + Δτ_churn`. The aggregation component (Δτ_agg) captures within-cluster
+  threshold change with frozen clean cluster assignments. The churn component (Δτ_churn)
+  captures the residual: cluster reassignment and normalization-mediated spillover.
+  The identity holds exactly (verified per client in tests).
+- **Spillover framing:** B4 cluster spillover to co-cluster clients is a mechanism,
+  not an independence violation. Non-victim co-cluster clients' thresholds may change
+  via Δτ_agg (intra-cluster aggregation effect of the victim's poisoning).
+- **Raw cluster labels never compared:** All B4 deltas are client-indexed. Raw k-means
+  label IDs are not compared across clean and poisoned runs.
+
+### Limitations / do-not-claim
+
+- **Do-not-claim:** Δτ_churn magnitude on synthetic data is not a real-data result.
+  The decomposition is measurable and structurally valid; quantitative claims wait until
+  Phase E real N-BaIoT runs (Phase G: T056).
+- **Do-not-claim:** B4 does not necessarily lie between B1 and B2. This is a hypothesis,
+  not an assumption. Record empirical evidence in Phase E/G.
+
+### Reviewer risk
+
+- Reviewers may ask about scaler refitting mediation (S_pois vs S_clean). The churn
+  component bundles pure normalization-mediated shifts (S_pois ≠ S_clean) alongside
+  assignment churn. Optional sub-diagnostic (Roadmap §5) can isolate this if needed.
+- B4 decomposition is an aggregate diagnostic, not a statistical test.
+
+### Evidence path
+
+- `src/datp/attacks/b4_recompute.py`
+- `tests/unit/attacks/test_b4_recompute.py`
+- 11 tests pass including decomposition identity: Δτ_agg + Δτ_churn = Δτ_total ✓
+
+## CP2-T033 — Metric Engine
+
+### Claims enabled
+
+- **CV(FPR) no ε:** CV(FPR) = σ/µ with no epsilon in denominator. Returns nan when
+  µ=0 (undefined). This is the correct treatment per protocol. Record in methods §metrics.
+- **Coverage always reported:** Coverage ratio = n_eligible / n_total accompanies every
+  CV(FPR) value. Clients with n_cal < n_min are Calibration-Pending and excluded.
+- **mu_flag_threshold locked pre-poison:** `mu_flag_threshold = round(M_clean/8, 2 s.f.)`
+  is computed from clean artifacts only. This module accepts it as input; the caller
+  must lock it before running any poisoned condition.
+- **AUROC invariant:** AUROC is computed from test scores (unchanged by calibration
+  poisoning). Identical across clean and poisoned conditions by construction. This is
+  the AUROC-invariance honesty point: calibration-channel attack does not improve ranking.
+- **δ_τ,i = 0.1 × IQR(clean cal scores_i):** Per-client significance scale computed from
+  clean calibration IQR. `is_significant = |Δτ| > δ_τ,i`.
+
+### Limitations / do-not-claim
+
+- **Do-not-claim:** Metric values on synthetic data are not paper results. Record real
+  N-BaIoT values from Phase E/G (T056).
+- **Do-not-claim:** CV(FPR)=nan when mean_fpr=0 does not indicate a good result; it
+  indicates a degenerate condition (report coverage and flag).
+
+### Evidence path
+
+- `src/datp/attacks/metric_engine.py`
+- `tests/unit/attacks/test_metric_engine.py`: 20 tests pass
+- CV(FPR) no-ε confirmed: test_cv_fpr_no_epsilon verifies nan when mean=0.
+
+## CP2-T034 — ASR, Blast Radius, Spillover Diagnostics
+
+### Claims enabled
+
+- **Blast-radius contrast (B1 vs B2 vs B4):** B2 blast radius = 1 (victim-local) by
+  construction for single-victim attack. B1 blast radius = fleet-wide (all eligible
+  clients affected via tau_global shift). B4 blast radius = cluster-local. This contrast
+  is the policy-differentiation headline.
+- **Spillover as mechanism:** B4/B1 spillover to non-victims is logged as a mechanistic
+  effect of policy propagation, not as a violation of victim independence. B2 has zero
+  spillover by construction.
+- **ASR directional:** ASR counts clients with Δτ > δ_τ,i (THRESHOLD_RAISE) or Δτ < -δ_τ,i
+  (THRESHOLD_LOWER). Direction must match the attacker objective.
+
+### Limitations / do-not-claim
+
+- **Do-not-claim:** ASR/blast-radius/spillover on synthetic data are not paper results.
+  Record real N-BaIoT values from Phase E/G.
+- **Do-not-claim:** B4 blast radius does not necessarily lie between B1 and B2; it depends
+  on cluster composition.
+
+### Reviewer risk
+
+- Reviewers may confuse blast radius with independence. Clarify: blast radius is a
+  mechanistic description of how many clients' thresholds change, not a claim about
+  statistical dependence.
+
+### Evidence path
+
+- `src/datp/attacks/diagnostics.py`
+- `tests/unit/attacks/test_diagnostics.py`: 14 tests pass
+- B2 single-victim blast radius ≤ 1 verified; B1 blast ≥ B2 verified; B2 no spillover.
+
+---
+
+## CP2-T035 — Two-layer inference, manifest, run logging
+
+### Claims enabled
+
+- **Two-layer design is the primary statistical design:** Never treat 9 victims × 5 seeds
+  = 45 deltas as 45 independent samples. Layer 1 = per-victim paired seed deltas (Δτ_{v,s});
+  Layer 2 = seed-level aggregates δ_s = mean over feasible victims. Bootstrap CI is on the
+  **5 seed-level aggregates** (primary evidence). Sign test (≥4/5 sign consistency) is
+  supporting evidence only. Holm correction is descriptive only — never used to claim
+  significance alone.
+- **Manifest provenance:** Every CP2 cell run records E=1, reservoir mode, locked
+  mu_flag_threshold, and the full SeedSequence entropy tuple (training_seed, poisoning_seed,
+  client_idx, scope_idx) in a serialized manifest. Any claim of reproducibility is
+  backed by the manifest round-trip.
+
+### Limitations / do-not-claim
+
+- **Do-not-claim:** "5 seed aggregates gives N=5 bootstrap." The bootstrap resamples from
+  the 5 seed-level means — report this sample size explicitly in the methods section.
+- **Do-not-claim:** Holm p-values as evidence of significance. Paper must state "descriptive
+  only, not used for inference."
+- **Reduced power flag:** If fewer than 2 feasible victims remain for a cell,
+  `bootstrap_seed_aggregates` raises ValueError — record as a reduced-power limitation
+  in the results.
+
+### Reviewer risk
+
+- Reviewers versed in paired-comparison statistics may challenge the bootstrap approach
+  on N=5. Pre-empt by disclosing the sample size and citing the two-layer design explicitly
+  in the methods.
+
+### Figure/table affected
+
+- Methods section: "Statistical inference" subsection — must state two-layer design,
+  bootstrap on 5 aggregates, sign test supporting only, Holm descriptive.
+
+### Evidence path
+
+- `src/datp/attacks/inference.py`: two-layer inference (collect_paired_deltas,
+  compute_seed_aggregates, sign_test, holm_adjust, bootstrap_seed_aggregates, compute_inference)
+- `src/datp/attacks/run_logger.py`: manifest emission + run log (build_manifest,
+  emit_manifest, write_run_log_entry)
+- `tests/unit/attacks/test_inference.py`: 37 tests pass
+- `tests/unit/attacks/test_run_logger.py`: 17 tests pass; mu_flag_threshold=None emission
+  raises ManifestEmissionError; round-trip verified
+
+---
+
+## CP2-T037 — Phase C final drift check
+
+### Claim-discipline confirmation (all locks verified)
+
+- **Two-layer design is the primary statistical design** (restated from T035):
+  Methods section must explicitly state N=5 seed-level aggregates for bootstrap CI.
+- **Sign test is supporting evidence only** (≥4/5 sign consistency = "consistent",
+  not "significant").
+- **Holm correction is descriptive only** — paper must state this.
+- **AUROC is invariant** — calibration-channel attack does not alter test scores;
+  AUROC is recorded for completeness only, not as a metric of attack success.
+- **CV(FPR) without ε** — paper must state no epsilon stabilizer was used.
+
+### Do-not-claim list (refreshed)
+
+- Do NOT claim 45 independent replicates.
+- Do NOT claim Holm p-values are inferential.
+- Do NOT claim synthetic smoke results as paper results.
+- Do NOT claim experiments ran before Phase E.
+- Do NOT claim AUROC improvement/degradation.
+- Do NOT claim broad FL robustness.
+- Do NOT claim deployment or on-device results.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/audits/CP2-T037_phase_c_drift_check.md`
+- All 13 lock checks: PASS
+- 538 unit tests pass; pyright 0 errors; ruff 0 errors

@@ -132,7 +132,10 @@ def assert_fractions_in_locked_grid(
     Raises:
         Cp2GuardrailError: If any fraction is not in the allowed grid.
     """
-    allowed = _FULL_FRACTIONS if scale == ExperimentScale.FULL else frozenset(CP2_MVP_FRACTIONS)
+    if scale == ExperimentScale.FULL:
+        allowed = _FULL_FRACTIONS
+    else:
+        allowed = frozenset(CP2_MVP_FRACTIONS)
     for f in fractions:
         if not any(abs(f - a) < 1e-9 for a in allowed):
             raise Cp2GuardrailError(

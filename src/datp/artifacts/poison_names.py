@@ -38,6 +38,7 @@ CP2_OUTPUT_ROOT: str = "conference_calibration_poisoning"
 CP2_N_MIN: int = 100
 CP2_TAIL_MASS: float = 0.10
 CP2_MATERIALITY_FACTOR: float = 0.1
+CP2_Q: float = 0.95  # Calibration quantile for threshold derivation.
 
 # Locked B4 hyperparameters for N-BaIoT (Regime A).
 CP2_B4_K: int = 3

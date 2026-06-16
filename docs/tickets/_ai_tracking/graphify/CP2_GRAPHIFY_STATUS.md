@@ -88,3 +88,20 @@ skipped (>5000 nodes). No API key used.
 Each ticket either runs `graphify update .` (where code structure changed) or
 records a deferral with reason. Docs-only Phase 00 tickets (T000–T003, T005–T006)
 defer with reason; T004 (this file) is the discovery/workflow record.
+
+---
+
+## 7. CP2-T036 Graphify Run (2026-06-16)
+
+```
+graphify update .
+  AST extraction: 453/453 files (100%)
+  Rebuilt: 7381 nodes, 18465 edges, 458 communities
+  graph.json and GRAPH_REPORT.md updated in graphify-out
+```
+
+**Context:** End-of-Phase-C consolidation checkpoint. Phase C added 9 new modules
+(synthetic_scores, score_containers, reservoir, injector, source_strategies,
+threshold_recompute, b4_recompute, metric_engine, diagnostics, inference, run_logger)
+and removed 3 quarantined prototype modules. Node count grew from 6365 → 7381.
+HTML viz skipped (>5000 nodes). No API key used.

@@ -103,6 +103,16 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("data/catalog.py", "DatasetSpec", "expected_client_count"),
         # CalibrationPoisoningConfig: seed=0 is the canonical default for reproducibility
         ("attacks/poisoning_config.py", "CalibrationPoisoningConfig", "seed"),
+        # Cp2HolmResult.descriptive_only: CP2 protocol lock — Holm is ALWAYS descriptive
+        # only in CP2; True is the only valid value; False would be a protocol violation
+        ("attacks/inference.py", "Cp2HolmResult", "descriptive_only"),
+        # Cp2ScoreCollection.n_min: canonical CP2_N_MIN=100 lock (Calibration-Pending
+        # boundary); any deviation from 100 is a protocol violation
+        ("attacks/score_containers.py", "Cp2ScoreCollection", "n_min"),
+        # Cp2ScoreCollection._eligible_ids/_pending_ids: computed in __post_init__ from
+        # the clients dict; None is the uninitialized sentinel for the lazy-init pattern
+        ("attacks/score_containers.py", "Cp2ScoreCollection", "_eligible_ids"),
+        ("attacks/score_containers.py", "Cp2ScoreCollection", "_pending_ids"),
     }
 )
 
