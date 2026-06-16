@@ -2,11 +2,30 @@
 
 Authoritative list of all CP2 tickets. `R` = refactor checkpoint, `D` = scientific
 drift check. Graphify (`Gfy`) and paper-notes (`PN`) columns: `Y`/`N`/`C` (conditional).
-Statuses started as `not started` when the ticket program was created. Track
-current status in `_ai_tracking/progress/CP2_PROGRESS.md` and the individual
+Track current status in `_ai_tracking/progress/CP2_PROGRESS.md` and the individual
 ticket headers.
 
 > Do not trust this index or the progress file alone — inspect the repository.
+
+**Audit reconciliation (2026-06-16).** A full Phase 00–D code-backed re-audit
+confirmed the implementation matches the tracking log and corrected stale ticket
+headers (which still read `not started`). Verified status:
+> - **Phase 00 (T000–T006):** `done` — setup/audit deliverables present.
+> - **Phase A (T007–T015):** `done` — audit reports in `_ai_tracking/audits/`.
+>   **CP2-FB1:** `blocked` (TRIGGERED by T007: clean artifacts absent + `config.yaml`
+>   `local_epochs: 5`; execution needs E=1 fix + retraining authorization).
+>   **CP2-FB3:** conditional, **not triggered** (B4 reproducible).
+> - **Phase B (T016–T023):** `done` — enums/config/constants/manifest/seeds/guardrails
+>   implemented and tested.
+> - **Phase C (T024–T037):** `done` — injector, reservoir, sources, B1/B2/B4
+>   recompute, metrics, diagnostics, inference implemented and tested.
+>   **CP2-FB2:** conditional, **not triggered** (degenerate-tail handling preventively
+>   built into `reservoir.py`).
+> - **Phase D (T038–T041):** `done` — smoke harness + 15 invariants pass.
+>
+> Evidence: 1003 CP2 tests pass; `ruff`/`pyright` clean on the CP2 surface; no source
+> drift. **Phases E–G remain `not started`** (gated by FB1 authorization → MVP →
+> kill-trigger). See the audit reconciliation row in `CP2_PROGRESS.md`.
 
 ---
 

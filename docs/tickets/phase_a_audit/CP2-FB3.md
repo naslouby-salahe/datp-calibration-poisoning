@@ -3,7 +3,7 @@
 **Phase:** A — Read-only audit (fallback)
 **Type:** scientific-drift (conditional)
 **Priority:** high
-**Status:** not started (CONDITIONAL — do NOT activate without trigger)
+**Status:** not started (CONDITIONAL — NOT triggered; B4 reproducible per CP2-T011)
 **Dependencies:** CP2-T011
 **Blocks:** —
 **Expected test level:** unit, integration

@@ -3,7 +3,8 @@
 **Phase:** A — Read-only audit (fallback)
 **Type:** scientific-drift / implementation (conditional)
 **Priority:** critical
-**Status:** not started (CONDITIONAL — do NOT activate without trigger)
+**Status:** blocked — TRIGGERED 2026-06-16 (CP2-T007), execution blocked
+**Audited:** 2026-06-16 — trigger confirmed in `_ai_tracking/decisions/CP2_DECISION_LOG.md`; blocked on `config.yaml` E=1 fix + retraining authorization. CP2 enforces E=1 in attack_config/run_manifest/provenance_gate so no E=5 artifact is consumable.
 **Dependencies:** CP2-T007
 **Blocks:** —
 **Expected test level:** integration, e2e

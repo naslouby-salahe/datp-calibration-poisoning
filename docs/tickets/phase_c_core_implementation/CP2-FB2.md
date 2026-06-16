@@ -3,7 +3,7 @@
 **Phase:** C — Core implementation (fallback)
 **Type:** fallback / conditional
 **Priority:** conditional
-**Status:** not started (activate only on trigger)
+**Status:** not started (CONDITIONAL — NOT triggered; degenerate-tail handling preventively implemented as `INFEASIBLE_DEGENERATE_TAIL` in `src/datp/attacks/reservoir.py`)
 **Dependencies:** CP2-T026
 **Blocks:** —
 **Expected test level:** unit, static
