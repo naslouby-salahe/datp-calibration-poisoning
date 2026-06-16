@@ -2,19 +2,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from datp.attacks.calibration_poisoning import PoisoningObjective
+from datp.attacks.poison_enums import AttackerObjective
 from datp.core.enums import Baseline
 
 
 @dataclass(frozen=True, slots=True)
 class PoisoningEffect:
-    """Comparison of clean vs poisoned threshold for one baseline/client."""
+    """Comparison of clean vs poisoned threshold for one baseline/client.
+
+    QUARANTINED: relative_shift uses shift_magnitude framing (wrong protocol).
+    Replacement target: CP2-T033 (Δτ, Δτ_rel, δ_{τ,i} metric engine).
+    """
 
     baseline: Baseline
     client_id: str
     clean_threshold: float
     poisoned_threshold: float
-    objective: PoisoningObjective
+    objective: AttackerObjective
 
     @property
     def absolute_shift(self) -> float:
@@ -29,11 +33,15 @@ class PoisoningEffect:
 
 @dataclass(frozen=True, slots=True)
 class PoisoningExperimentResult:
-    """Aggregated poisoning experiment result across all clients and baselines."""
+    """Aggregated poisoning experiment result across all clients and baselines.
+
+    QUARANTINED: attack_rate/shift_magnitude fields violate CP2 protocol.
+    Replacement target: CP2-T027/T033.
+    """
 
     attack_rate: float
     shift_magnitude: float
-    objective: PoisoningObjective
+    objective: AttackerObjective
     effects: list[PoisoningEffect]
 
     def mean_absolute_shift(self, baseline: Baseline) -> float:

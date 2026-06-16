@@ -56,7 +56,34 @@ inspection, `ruff`, `pyright`, `pytest`. If a future `graphify update .` cannot 
 record the exact blocker here and switch to those fallbacks. Graphify being
 unavailable is **not** a project hard-stop.
 
-## 5. Per-ticket usage
+## 6. CP2-T016 Graphify Run (2026-06-16)
+
+```
+graphify update .
+  AST extraction: 6484 nodes, 15894 edges, 416 communities (rebuilt)
+```
+
+**Decision:** Overwrite succeeded (6484 > 6365). Graph reflects cp2_enums.py addition
+and quarantined-file enum retirement. HTML viz skipped (>5000 nodes).
+
+---
+
+## 5. CP2-T013 Graphify Run (2026-06-16)
+
+```
+graphify update .
+  AST extraction: 414/414 files (100%)
+  Rebuilt: 6365 nodes, 15697 edges, 413 communities
+  graph.json and GRAPH_REPORT.md updated in graphify-out
+```
+
+**Decision:** Overwrite succeeded (6365 > 6331; no chunk data lost). Graph now
+reflects current repo state for the upcoming Phase B protocol lock. HTML viz
+skipped (>5000 nodes). No API key used.
+
+---
+
+## 6. Per-ticket usage
 
 Each ticket either runs `graphify update .` (where code structure changed) or
 records a deferral with reason. Docs-only Phase 00 tickets (T000–T003, T005–T006)

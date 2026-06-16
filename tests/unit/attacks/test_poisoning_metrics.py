@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datp.attacks.calibration_poisoning import PoisoningObjective
+from datp.attacks.poison_enums import AttackerObjective
 from datp.attacks.poisoning_metrics import PoisoningEffect, PoisoningExperimentResult
 from datp.core.enums import Baseline
 
@@ -12,7 +12,7 @@ class TestPoisoningEffect:
             client_id="c1",
             clean_threshold=0.5,
             poisoned_threshold=0.8,
-            objective=PoisoningObjective.RAISE_THRESHOLD,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         assert abs(effect.absolute_shift - 0.3) < 1e-9
 
@@ -22,7 +22,7 @@ class TestPoisoningEffect:
             client_id="c1",
             clean_threshold=0.5,
             poisoned_threshold=0.3,
-            objective=PoisoningObjective.LOWER_THRESHOLD,
+            objective=AttackerObjective.THRESHOLD_LOWER,
         )
         assert abs(effect.absolute_shift - (-0.2)) < 1e-9
 
@@ -32,7 +32,7 @@ class TestPoisoningEffect:
             client_id="c1",
             clean_threshold=1.0,
             poisoned_threshold=1.5,
-            objective=PoisoningObjective.RAISE_THRESHOLD,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         assert abs(effect.relative_shift - 0.5) < 1e-9
 
@@ -42,7 +42,7 @@ class TestPoisoningEffect:
             client_id="c1",
             clean_threshold=0.0,
             poisoned_threshold=1.0,
-            objective=PoisoningObjective.RAISE_THRESHOLD,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         assert effect.relative_shift == float("inf")
 
@@ -52,7 +52,7 @@ class TestPoisoningExperimentResult:
         return PoisoningExperimentResult(
             attack_rate=0.1,
             shift_magnitude=1.0,
-            objective=PoisoningObjective.RAISE_THRESHOLD,
+            objective=AttackerObjective.THRESHOLD_RAISE,
             effects=effects,
         )
 
@@ -62,7 +62,7 @@ class TestPoisoningExperimentResult:
             client_id="c1",
             clean_threshold=0.5,
             poisoned_threshold=1.0,
-            objective=PoisoningObjective.RAISE_THRESHOLD,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         result = self._make_result([effect])
         assert abs(result.mean_absolute_shift(Baseline.B1) - 0.5) < 1e-9
@@ -76,12 +76,12 @@ class TestPoisoningExperimentResult:
             PoisoningEffect(
                 baseline=Baseline.B1, client_id="c1",
                 clean_threshold=1.0, poisoned_threshold=2.0,
-                objective=PoisoningObjective.RAISE_THRESHOLD,
+                objective=AttackerObjective.THRESHOLD_RAISE,
             ),
             PoisoningEffect(
                 baseline=Baseline.B2, client_id="c1",
                 clean_threshold=1.0, poisoned_threshold=3.0,
-                objective=PoisoningObjective.RAISE_THRESHOLD,
+                objective=AttackerObjective.THRESHOLD_RAISE,
             ),
         ]
         result = self._make_result(effects)

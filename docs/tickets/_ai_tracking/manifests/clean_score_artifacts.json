@@ -1,0 +1,52 @@
+{
+  "schema_version": "1",
+  "audit_date": "2026-06-16",
+  "ticket": "CP2-T007",
+  "verdict": "ARTIFACTS_MISSING",
+  "fb1_triggered": true,
+  "fb1_blocked_by": "local_epochs_config_is_5_not_1",
+  "artifacts_present": false,
+  "artifacts_e1_confirmed": false,
+  "artifacts_cp2_generated": false,
+  "artifacts_datp_split_semantics": false,
+  "artifacts_per_client_calibration": false,
+  "scoring_infrastructure_ready": true,
+  "e5_in_python_code": false,
+  "e5_in_yaml_config": true,
+  "yaml_config_path": "src/datp/conf/config.yaml",
+  "yaml_config_field": "federation.local_epochs",
+  "yaml_config_value": 5,
+  "required_value": 1,
+  "outputs_contents": ["console_logs/"],
+  "parquet_files_found": [],
+  "manifest_files_found": [],
+  "checkpoint_files_found": [],
+  "convergence_config": {
+    "rounds_initial": 40,
+    "rounds_max": 150,
+    "local_epochs": "FAIL_is_5_not_1",
+    "seeds": [0, 1, 2, 3, 4]
+  },
+  "scoring_infrastructure": {
+    "score_column": "reconstruction_error",
+    "score_manifest_module": "src/datp/validation/score_manifest.py",
+    "generation_module": "src/datp/scoring/generation.py",
+    "schema_module": "src/datp/scoring/schema.py",
+    "verification_checks": [
+      "manifest_present", "manifest_parseable", "manifest_fields_present",
+      "manifest_completion_status", "scoring_sentinel_present", "regime_match",
+      "seed_match", "dataset_match", "client_ids_match_partition",
+      "expected_vs_actual_clients", "expected_vs_actual_splits",
+      "split_directories_present", "per_client_split_files_present",
+      "parquet_schema_valid", "parquet_non_empty",
+      "checkpoint_hash_field_present", "checkpoint_file_present",
+      "checkpoint_hash_matches"
+    ]
+  },
+  "phase_b_actions_required": [
+    "Fix src/datp/conf/config.yaml: local_epochs 5 -> 1",
+    "Add FederationConfig validator rejecting local_epochs != 1 for CP2 (T017/T022)",
+    "After Phase B config fix: activate FB1 with authorization"
+  ],
+  "phase_a_confirmation_1": "PENDING_FB1"
+}

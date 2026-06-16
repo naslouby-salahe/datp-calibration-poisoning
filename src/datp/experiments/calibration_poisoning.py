@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import numpy as np
 
-from datp.attacks.calibration_poisoning import PoisoningObjective, poison_calibration_errors
+from datp.attacks.calibration_poisoning import poison_calibration_errors
 from datp.attacks.poisoning_config import CalibrationPoisoningConfig
 from datp.attacks.poisoning_metrics import PoisoningEffect, PoisoningExperimentResult
 from datp.config.models import ThresholdConfig
 from datp.core.enums import Baseline, Regime
-from datp.thresholding.thresholds import arithmetic_mean_threshold, derive_threshold, percentile_threshold
+from datp.thresholding.thresholds import (
+    arithmetic_mean_threshold,
+    derive_threshold,
+    percentile_threshold,
+)
 
 _POISONING_BASELINES = (Baseline.B1, Baseline.B2, Baseline.B4)
 
@@ -17,7 +21,11 @@ def _tau_global_from_errors(
     q: float,
 ) -> float:
     """Compute global B1 threshold as arithmetic mean of per-client percentiles."""
-    per_client = [percentile_threshold(errs, q) for errs in client_errors.values() if len(errs) > 0]
+    per_client = [
+        percentile_threshold(errs, q)
+        for errs in client_errors.values()
+        if len(errs) > 0
+    ]
     if not per_client:
         return 0.0
     return arithmetic_mean_threshold(per_client)
@@ -32,6 +40,9 @@ def run_poisoning_experiment(
     alpha: float | None = None,
 ) -> PoisoningExperimentResult:
     """Compare clean vs poisoned thresholds for B1, B2, and B4.
+
+    QUARANTINED: poisons all clients simultaneously; violates single-victim sweep
+    and REPLACE_FIXED_BUDGET protocol. Replacement target: CP2-T027/T029.
 
     Outputs are isolated under outputs/conference_calibration_poisoning/.
     This function is pure (no IO) and returns a result object.
@@ -78,8 +89,12 @@ def run_poisoning_experiment(
             alpha=alpha,
         )
 
-        clean_by_client = {ct.client_id: ct.threshold for ct in clean_result.client_thresholds}
-        poisoned_by_client = {ct.client_id: ct.threshold for ct in poisoned_result.client_thresholds}
+        clean_by_client = {
+            ct.client_id: ct.threshold for ct in clean_result.client_thresholds
+        }
+        poisoned_by_client = {
+            ct.client_id: ct.threshold for ct in poisoned_result.client_thresholds
+        }
 
         for client_id in clean_by_client:
             if client_id in poisoned_by_client:

@@ -3,7 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from datp.attacks.calibration_poisoning import PoisoningObjective, poison_calibration_errors
+from datp.attacks.calibration_poisoning import poison_calibration_errors
+from datp.attacks.poison_enums import AttackerObjective
 
 
 def _make_errors(n: int = 100, seed: int = 0) -> np.ndarray:
@@ -11,12 +12,12 @@ def _make_errors(n: int = 100, seed: int = 0) -> np.ndarray:
     return rng.uniform(0.0, 1.0, size=n).astype(np.float64)
 
 
-class TestPoisoningObjectives:
+class TestAttackerObjectives:
     def test_raise_threshold_increases_mean(self) -> None:
         errors = _make_errors()
         rng = np.random.default_rng(42)
         poisoned = poison_calibration_errors(
-            errors, attack_rate=0.2, objective=PoisoningObjective.RAISE_THRESHOLD,
+            errors, attack_rate=0.2, objective=AttackerObjective.THRESHOLD_RAISE,
             shift_magnitude=10.0, rng=rng,
         )
         assert poisoned.mean() > errors.mean()
@@ -25,7 +26,7 @@ class TestPoisoningObjectives:
         errors = _make_errors()
         rng = np.random.default_rng(42)
         poisoned = poison_calibration_errors(
-            errors, attack_rate=0.2, objective=PoisoningObjective.LOWER_THRESHOLD,
+            errors, attack_rate=0.2, objective=AttackerObjective.THRESHOLD_LOWER,
             shift_magnitude=0.5, rng=rng,
         )
         assert poisoned.mean() < errors.mean()
@@ -34,7 +35,7 @@ class TestPoisoningObjectives:
         errors = np.array([0.1, 0.2, 0.3])
         rng = np.random.default_rng(0)
         poisoned = poison_calibration_errors(
-            errors, attack_rate=1.0, objective=PoisoningObjective.LOWER_THRESHOLD,
+            errors, attack_rate=1.0, objective=AttackerObjective.THRESHOLD_LOWER,
             shift_magnitude=100.0, rng=rng,
         )
         assert (poisoned >= 0.0).all()
@@ -45,7 +46,7 @@ class TestPoisonedArrayProperties:
         errors = _make_errors(50)
         rng = np.random.default_rng(0)
         poisoned = poison_calibration_errors(
-            errors, attack_rate=0.1, objective=PoisoningObjective.RAISE_THRESHOLD,
+            errors, attack_rate=0.1, objective=AttackerObjective.THRESHOLD_RAISE,
             shift_magnitude=1.0, rng=rng,
         )
         assert poisoned.shape == errors.shape
@@ -55,7 +56,7 @@ class TestPoisonedArrayProperties:
         original = errors.copy()
         rng = np.random.default_rng(0)
         poison_calibration_errors(
-            errors, attack_rate=0.5, objective=PoisoningObjective.RAISE_THRESHOLD,
+            errors, attack_rate=0.5, objective=AttackerObjective.THRESHOLD_RAISE,
             shift_magnitude=5.0, rng=rng,
         )
         np.testing.assert_array_equal(errors, original)
@@ -64,7 +65,7 @@ class TestPoisonedArrayProperties:
         errors = _make_errors(50)
         rng = np.random.default_rng(0)
         poisoned = poison_calibration_errors(
-            errors, attack_rate=0.5, objective=PoisoningObjective.RAISE_THRESHOLD,
+            errors, attack_rate=0.5, objective=AttackerObjective.THRESHOLD_RAISE,
             shift_magnitude=0.0, rng=rng,
         )
         np.testing.assert_array_equal(poisoned, errors)
@@ -73,7 +74,7 @@ class TestPoisonedArrayProperties:
         errors = np.zeros(10, dtype=np.float64)
         rng = np.random.default_rng(0)
         poisoned = poison_calibration_errors(
-            errors, attack_rate=1.0, objective=PoisoningObjective.RAISE_THRESHOLD,
+            errors, attack_rate=1.0, objective=AttackerObjective.THRESHOLD_RAISE,
             shift_magnitude=1.0, rng=rng,
         )
         assert (poisoned == 1.0).all()
@@ -84,7 +85,7 @@ class TestPoisoningValidation:
         with pytest.raises(ValueError, match="attack_rate"):
             poison_calibration_errors(
                 np.zeros(10), attack_rate=0.0,
-                objective=PoisoningObjective.RAISE_THRESHOLD,
+                objective=AttackerObjective.THRESHOLD_RAISE,
                 shift_magnitude=1.0, rng=np.random.default_rng(0),
             )
 
@@ -92,6 +93,6 @@ class TestPoisoningValidation:
         with pytest.raises(ValueError, match="attack_rate"):
             poison_calibration_errors(
                 np.zeros(10), attack_rate=1.1,
-                objective=PoisoningObjective.RAISE_THRESHOLD,
+                objective=AttackerObjective.THRESHOLD_RAISE,
                 shift_magnitude=1.0, rng=np.random.default_rng(0),
             )

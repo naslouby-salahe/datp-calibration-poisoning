@@ -21,11 +21,13 @@ def _main_callback(ctx: typer.Context) -> None:
 from datp.app.cli.audit import app as audit_app  # noqa: E402
 from datp.app.cli.checkpoint_protocol import app as checkpoint_protocol_app  # noqa: E402
 from datp.app.cli.config import app as config_app  # noqa: E402
+from datp.app.cli.poison import app as cp2_app  # noqa: E402
 from datp.app.cli.report import app as report_app  # noqa: E402
 
 app.add_typer(audit_app, name="audit")
 app.add_typer(checkpoint_protocol_app, name="checkpoint-protocol")
 app.add_typer(config_app, name="config")
+app.add_typer(cp2_app, name="cp2")
 app.add_typer(report_app, name="report")
 
 from datp.app.cli.status import status  # noqa: E402
