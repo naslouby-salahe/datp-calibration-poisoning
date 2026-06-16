@@ -20,7 +20,7 @@ from datp.data.datasets.ciciot2023.spec import (
     LABEL_COLUMN,
     NUM_CLIENTS,
 )
-from datp.data.splits import SplitFilename
+from datp.data.splits import Split, filename_for_split
 
 _ATTACK_RESERVE_FRACTION = BASE_CONFIG.dataset.attack_reserve_fraction
 
@@ -222,10 +222,10 @@ class TestCapApplied:
         client_out = output_dir / "ciciot2023" / client_id
 
         for artifact in [
-            SplitFilename.TRAIN,
-            SplitFilename.CAL,
-            SplitFilename.TEST_BENIGN,
-            SplitFilename.TEST_ATTACK,
+            filename_for_split(Split.TRAIN),
+            filename_for_split(Split.CAL),
+            filename_for_split(Split.TEST_BENIGN),
+            filename_for_split(Split.TEST_ATTACK),
         ]:
             path = client_out / artifact
             assert path.exists(), f"Missing artifact: {path}"

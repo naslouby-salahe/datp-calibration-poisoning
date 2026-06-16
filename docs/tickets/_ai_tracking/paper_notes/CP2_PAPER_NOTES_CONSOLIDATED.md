@@ -394,3 +394,64 @@ roadmap §5, §6, §7, §10, §12.
 - `docs/tickets/_ai_tracking/audits/CP2-T037_phase_c_drift_check.md`
 - All 13 lock checks: PASS
 - 538 unit tests pass; pyright 0 errors; ruff 0 errors
+
+---
+
+## CP2-T041 — Phase D smoke-validation drift gate
+
+### Claim enabled
+
+- **Reproducibility / methods-section claim:** the full CP2 pipeline (reservoir →
+  REPLACE_FIXED_BUDGET injection → B1/B2/B4 recompute + B4 Δτ decomposition → metric
+  engine → two-layer inference → manifest) is validated end-to-end on synthetic score
+  arrays before any real data is touched. 11 prompt invariants + 4 distinct roadmap
+  invariants (15 total) are asserted and passing, CPU-only and deterministic.
+- The methods section may state that protocol invariants are machine-checked
+  (`tests/integration/attacks/test_cp2_smoke.py`) and that all randomness derives from
+  `numpy.random.SeedSequence([training_seed, poisoning_seed, client_id, scope_id])`.
+
+### Claim blocked / do-not-claim (refreshed)
+
+- **Do NOT report any synthetic smoke number as a result.** The smoke harness uses
+  fabricated score arrays; ASR/blast-radius/Δτ values from it are validation artifacts
+  only, never paper results. First real results come from Phase E.
+- Do NOT claim 45 independent replicates — bootstrap CI is on **5** seed-level
+  aggregates (invariant 8 enforces this).
+- Do NOT claim Holm p-values are inferential (descriptive only).
+- Do NOT claim AUROC improvement/degradation — invariant by construction (invariant
+  10); test scores are never altered by the calibration-channel attack.
+- Do NOT claim "B4 lies between B1 and B2" from smoke — the smoke only proves the B4
+  shift/decomposition is **computable and finite** and that B1 victim shift < B2 victim
+  shift (dilution); the B1<B4<B2 ordering is a Phase-E/F hypothesis, not an invariant.
+
+### Limitation to disclose
+
+- The smoke harness validates pipeline correctness, not scientific magnitude. The
+  near-null behaviour of RANDOM_BENIGN and the HIGH-raises/LOW-lowers direction are
+  qualitative invariants checked on synthetic distributions; effect sizes are
+  Phase-E/F empirical questions.
+
+### Figure / table affected
+
+- Reproducibility / methods subsection (no results figure). Underpins the
+  invariant-table the paper may include to document protocol fidelity.
+
+### Reviewer-risk relevance
+
+- Pre-empts "are your 9×5 victim-seed deltas treated as 45 independent samples?" —
+  invariant 8 demonstrates the two-layer aggregation in code.
+- Pre-empts "did the attack secretly change test scores / AUROC?" — invariant 10.
+- Pre-empts "is CV(FPR) ε-stabilized?" — invariant 11 shows µ=0 → `nan`, no ε.
+
+### Dependency note
+
+- `statsmodels` (descriptive Holm correction) was an undeclared dependency that broke
+  `inference.py` import; now installed (0.14.6) and declared in `pyproject.toml`. The
+  inferential core (bootstrap CI) depends only on scipy/numpy. See decision log.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/audits/CP2-T041_smoke_validation_drift_check.md`
+- `docs/tickets/_ai_tracking/audits/CP2-T040_smoke_test_consolidation.md`
+- `tests/integration/attacks/test_cp2_smoke.py` — 19 passed
+- 15 distinct invariants asserted and passing; pyright 0 errors; ruff clean

@@ -5,10 +5,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 import dataclasses
 
-from datp.baselines.common.data_loading import (
+from datp.federated.data_loading import (
     ALL_SPLITS,
     discover_client_dirs,
     load_client_data,
@@ -67,7 +68,9 @@ class TestPrepareLoadPathConsistency:
         assert found_names == sorted(_DEVICES)
 
     def test_load_client_data_succeeds(self, prepared_dir: Path) -> None:
-        client_data = load_client_data(prepared_dir, device="cpu", splits=ALL_SPLITS)
+        client_data = load_client_data(
+            prepared_dir, device=torch.device("cpu"), splits=ALL_SPLITS
+        )
         assert sorted(client_data.keys()) == sorted(_DEVICES)
         for cid, splits in client_data.items():
             assert splits.train is not None

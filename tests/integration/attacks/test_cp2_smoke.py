@@ -1,0 +1,563 @@
+"""CP2 synthetic smoke validation — end-to-end protocol invariants (Phase D).
+
+CPU-only, deterministic, no real data. Asserts the union of the smoke invariants
+from the Phase D tickets (CP2-T038/T039 §3) and the protocol-of-record
+``docs/DATP_CP_Roadmap.md`` §10 line 142. Each invariant is a behavior assertion
+over the real CP2 pipeline wired by ``datp.testsupport.cp2_smoke_harness``.
+
+Invariant map (see CP2_DECISION_LOG 2026-06-16 reconciliation entry):
+  Prompt 1  f=0 reproduces clean exactly, zero Δτ
+  Prompt 2  cardinality preserved after injection
+  Prompt 3  clean arrays never mutated in place
+  Prompt 4  HIGH raises / LOW lowers thresholds (direction)
+  Prompt 5  Calibration-Pending excluded from victims/CV(FPR), gets tau_global
+  Prompt 6  determinism (same seeds -> identical outputs)
+  Prompt 7  B4 Δτ_total = Δτ_agg + Δτ_churn
+  Prompt 8  two-layer stats: bootstrap on 5 seed aggregates, not 45
+  Prompt 9  manifest round-trips (child seeds, locks, reservoir mode, mu_flag)
+  Prompt 10 AUROC invariant (test scores unchanged)
+  Prompt 11 CV(FPR) reported with coverage, no ε
+  Roadmap   RANDOM_BENIGN -> near-null
+  Roadmap   B1 victim shift < B2 victim shift (same single-client attack)
+  Roadmap   B4 K stays fixed at 3 under clean AND poisoned cal
+  Roadmap   outputs in temp only
+"""
+
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from datp.artifacts.poison_names import (
+    CP2_B4_K,
+    CP2_OUTPUT_ROOT,
+    CP2_POISONING_SEEDS,
+)
+from datp.attacks.guardrails import assert_no_inplace_mutation
+from datp.attacks.b4_recompute import Cp2B4ThresholdPair
+from datp.attacks.inference import (
+    Cp2PairedDeltas,
+    Cp2SeedDelta,
+    collect_paired_deltas,
+    compute_inference,
+)
+from datp.attacks.metric_engine import compute_fleet_fpr
+from datp.attacks.poison_enums import (
+    AttackerObjective,
+    CalibrationInjectionRule,
+    ExperimentScale,
+    PoisoningSourceStrategy,
+    PoisoningTargetScope,
+    ThresholdPolicy,
+)
+from datp.attacks.run_logger import (
+    ManifestEmissionError,
+    build_manifest,
+    emit_manifest,
+    load_manifest,
+)
+from datp.attacks.run_manifest import CP2_RESERVOIR_MODE
+from datp.attacks.score_containers import build_score_collection
+from datp.attacks.source_strategies import near_null_criterion
+from datp.attacks.threshold_recompute import Cp2ThresholdPair
+from datp.testsupport.cp2_smoke_harness import (
+    b4_cluster_count,
+    collection_from_score_set,
+    inject_single_victim,
+    pending_threshold,
+    run_smoke_cell,
+    victim_seed_deltas,
+)
+from datp.testsupport.synthetic_scores import make_standard_score_set
+
+pytestmark = pytest.mark.integration
+
+_VICTIM = "eligible_0"
+_HIGH_FRACTION = 0.40
+_ALL_POLICIES = (
+    ThresholdPolicy.B1_GLOBAL,
+    ThresholdPolicy.B2_PERSONALIZED,
+    ThresholdPolicy.B4_CLUSTER,
+)
+
+
+@pytest.fixture
+def collection():
+    """Standard 9-eligible + 1-pending synthetic collection (deterministic)."""
+    return collection_from_score_set(
+        make_standard_score_set(n_eligible=9, n_pending=1)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Invariant 1 — f=0 reproduces clean exactly with zero Δτ
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("policy", _ALL_POLICIES)
+def test_invariant_1_f0_reproduces_clean_zero_delta(collection, policy):
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=policy,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=0.0,
+    )
+    # Poisoned cal is an exact copy of clean cal for the victim.
+    np.testing.assert_array_equal(
+        cell.outcome.poisoned_cal[_VICTIM], collection.clients[_VICTIM].cal
+    )
+    # Every per-victim Δτ is exactly zero.
+    for entry in cell.poisoned_metrics.delta_tau.values():
+        assert entry.delta_tau == 0.0
+    assert cell.outcome.injection.n_replaced == 0
+
+
+# ---------------------------------------------------------------------------
+# Invariant 2 — cardinality preserved after injection
+# ---------------------------------------------------------------------------
+
+def test_invariant_2_cardinality_preserved(collection):
+    n_before = collection.clients[_VICTIM].n_cal
+    outcome = inject_single_victim(
+        collection,
+        victim_id=_VICTIM,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+        training_seed=0,
+        poisoning_seed=100,
+    )
+    assert outcome.injection.n_total == n_before
+    assert outcome.poisoned_cal[_VICTIM].shape[0] == n_before
+    assert outcome.injection.n_replaced == max(1, round(_HIGH_FRACTION * n_before))
+    # Eligibility partition is invariant under replacement.
+    rebuilt: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    for cid, c in collection.clients.items():
+        cal = outcome.poisoned_cal[cid] if cid in outcome.poisoned_cal else c.cal
+        rebuilt[cid] = (cal, c.test_benign, c.test_attack)
+    poisoned_collection = build_score_collection(rebuilt)
+    assert poisoned_collection.eligible_ids == collection.eligible_ids
+
+
+# ---------------------------------------------------------------------------
+# Invariant 3 — clean arrays never mutated in place
+# ---------------------------------------------------------------------------
+
+def test_invariant_3_no_inplace_mutation(collection):
+    victim_clean = collection.clients[_VICTIM].cal
+    snapshot = victim_clean.copy()
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    # The victim's clean array object is unchanged after the full pipeline.
+    assert_no_inplace_mutation(snapshot, collection.clients[_VICTIM].cal)
+    # The poisoned array is a distinct object that actually differs.
+    assert cell.outcome.poisoned_cal[_VICTIM] is not victim_clean
+    assert not np.array_equal(cell.outcome.poisoned_cal[_VICTIM], snapshot)
+
+
+# ---------------------------------------------------------------------------
+# Invariant 4 — HIGH raises, LOW lowers (direction)
+# ---------------------------------------------------------------------------
+
+def test_invariant_4_high_raises_low_lowers_b2(collection):
+    high = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    low = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    assert high.poisoned_metrics.delta_tau[_VICTIM].delta_tau > 0.0
+    assert low.poisoned_metrics.delta_tau[_VICTIM].delta_tau < 0.0
+
+
+# ---------------------------------------------------------------------------
+# Invariant 5 — Calibration-Pending excluded; receives tau_global
+# ---------------------------------------------------------------------------
+
+def test_invariant_5_pending_excluded_and_gets_tau_global(collection):
+    pending_ids = collection.pending_ids
+    assert pending_ids, "fixture must include a Calibration-Pending client"
+    pending = pending_ids[0]
+
+    for policy in _ALL_POLICIES:
+        cell = run_smoke_cell(
+            collection,
+            victim_id=_VICTIM,
+            policy=policy,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+        )
+        pair = cell.poisoned_pair
+        # Pending client is not an eligible victim / not in per-client thresholds.
+        assert pending not in collection.eligible_ids
+        assert pending not in pair.thresholds_pois
+        assert pending not in pair.thresholds_clean
+        # Pending excluded from per-victim Δτ and from CV(FPR) eligibility count.
+        assert pending not in cell.poisoned_metrics.delta_tau
+        fleet = cell.poisoned_metrics.fleet_fpr
+        assert fleet.n_eligible == len(collection.eligible_ids)
+        assert fleet.n_total == len(collection.clients)
+        # Pending client's fallback threshold is the global threshold.
+        assert pending_threshold(pair) == pair.tau_global_pois
+
+
+# ---------------------------------------------------------------------------
+# Invariant 6 — determinism (same seeds -> identical outputs)
+# ---------------------------------------------------------------------------
+
+def test_invariant_6_determinism(collection):
+    out_a = inject_single_victim(
+        collection,
+        victim_id=_VICTIM,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+        training_seed=0,
+        poisoning_seed=100,
+    )
+    out_b = inject_single_victim(
+        collection,
+        victim_id=_VICTIM,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+        training_seed=0,
+        poisoning_seed=100,
+    )
+    np.testing.assert_array_equal(
+        out_a.poisoned_cal[_VICTIM], out_b.poisoned_cal[_VICTIM]
+    )
+    np.testing.assert_array_equal(
+        out_a.injection.positions_replaced, out_b.injection.positions_replaced
+    )
+
+    cell_a = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    cell_b = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    assert (
+        cell_a.poisoned_metrics.delta_tau[_VICTIM].delta_tau
+        == cell_b.poisoned_metrics.delta_tau[_VICTIM].delta_tau
+    )
+    assert (
+        cell_a.poisoned_metrics.fleet_fpr.cv_fpr
+        == cell_b.poisoned_metrics.fleet_fpr.cv_fpr
+        or (
+            math.isnan(cell_a.poisoned_metrics.fleet_fpr.cv_fpr)
+            and math.isnan(cell_b.poisoned_metrics.fleet_fpr.cv_fpr)
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Invariant 7 — B4 decomposition identity Δτ_total = Δτ_agg + Δτ_churn
+# ---------------------------------------------------------------------------
+
+def test_invariant_7_b4_decomposition_identity(collection):
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B4_CLUSTER,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    pair = cell.poisoned_pair
+    assert isinstance(pair, Cp2B4ThresholdPair)
+    assert pair.decomposition  # client-indexed, non-empty
+    for entry in pair.decomposition.values():
+        assert math.isfinite(entry.delta_tau_total)
+        assert math.isfinite(entry.delta_tau_agg)
+        assert math.isfinite(entry.delta_tau_churn)
+        assert entry.delta_tau_total == pytest.approx(
+            entry.delta_tau_agg + entry.delta_tau_churn, abs=1e-9
+        )
+
+
+# ---------------------------------------------------------------------------
+# Invariant 8 — two-layer stats: bootstrap on 5 seed aggregates, not 45
+# ---------------------------------------------------------------------------
+
+def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
+    eligible = collection.eligible_ids
+    deltas: dict[str, dict[int, Cp2SeedDelta]] = {}
+    for victim in eligible:
+        seed_deltas = victim_seed_deltas(
+            collection,
+            victim_id=victim,
+            policy=ThresholdPolicy.B2_PERSONALIZED,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            poisoning_seeds=CP2_POISONING_SEEDS,
+        )
+        deltas[victim] = collect_paired_deltas(
+            victim_id=victim, seed_deltas=seed_deltas
+        )
+    paired = Cp2PairedDeltas(deltas=deltas)
+
+    result = compute_inference(
+        paired,
+        poisoning_seeds=CP2_POISONING_SEEDS,
+        direction="raise",
+    )
+    # Layer 2: exactly 5 seed-level aggregates (one per poisoning seed).
+    assert len(result.seed_aggregates) == len(CP2_POISONING_SEEDS) == 5
+    # Bootstrap CI is computed on the 5 aggregates — NOT on 9*5 = 45 raw deltas.
+    assert result.bootstrap_ci.n_seeds == 5
+    assert len(eligible) * len(CP2_POISONING_SEEDS) == 45
+    assert result.n_feasible_victims == len(eligible)
+    # Supporting sign test also operates on the 5 aggregates.
+    assert result.sign_test.n_total == 5
+
+
+# ---------------------------------------------------------------------------
+# Invariant 9 — manifest round-trips with all locks
+# ---------------------------------------------------------------------------
+
+def test_invariant_9_manifest_round_trip(collection, tmp_path):
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    manifest = build_manifest(
+        dataset="REGIME_SMOKE_SYNTHETIC",
+        scale=ExperimentScale.SMOKE,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        objective=AttackerObjective.THRESHOLD_RAISE,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+        training_seed=0,
+        poisoning_seed=100,
+        client_idx=0,
+        scope_idx=0,
+        mu_flag_threshold=cell.mu_flag_threshold,
+        repository="datp-calibration-poisoning",
+    )
+    run_dir = tmp_path / "cell"
+    emit_manifest(manifest, run_dir)
+    loaded = load_manifest(run_dir)
+
+    assert loaded.reservoir_mode == CP2_RESERVOIR_MODE
+    assert loaded.mu_flag_threshold == cell.mu_flag_threshold
+    assert loaded.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
+    assert loaded.provenance.local_epochs == 1  # E=1 lock
+    # All child seeds round-trip via the recorded SeedSequence entropy.
+    assert loaded.seed_record.entropy == (0, 100, 0, 0)
+    assert loaded.seed_record.training_seed == 0
+    assert loaded.seed_record.poisoning_seed == 100
+    assert loaded.seed_record.client_idx == 0
+    assert loaded.seed_record.scope_idx == 0
+
+
+def test_invariant_9_manifest_requires_locked_mu_flag(tmp_path):
+    manifest = build_manifest(
+        dataset="REGIME_SMOKE_SYNTHETIC",
+        scale=ExperimentScale.SMOKE,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        objective=AttackerObjective.THRESHOLD_RAISE,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+        training_seed=0,
+        poisoning_seed=100,
+        client_idx=0,
+        scope_idx=0,
+        mu_flag_threshold=None,  # not locked
+        repository="datp-calibration-poisoning",
+    )
+    with pytest.raises(ManifestEmissionError):
+        emit_manifest(manifest, tmp_path / "cell")
+
+
+# ---------------------------------------------------------------------------
+# Invariant 10 — AUROC invariant (test scores never modified)
+# ---------------------------------------------------------------------------
+
+def test_invariant_10_auroc_invariant(collection):
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    clean = cell.clean_metrics.auroc_records
+    poisoned = cell.poisoned_metrics.auroc_records
+    assert clean.keys() == poisoned.keys()
+    for cid in clean:
+        assert clean[cid].auroc == poisoned[cid].auroc
+
+
+# ---------------------------------------------------------------------------
+# Invariant 11 — CV(FPR) reported with coverage; no ε in denominator
+# ---------------------------------------------------------------------------
+
+def test_invariant_11_cv_fpr_reported_with_coverage(collection):
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    fleet = cell.poisoned_metrics.fleet_fpr
+    # Coverage is always reported alongside CV(FPR).
+    expected_coverage = len(collection.eligible_ids) / len(collection.clients)
+    assert fleet.coverage_ratio == pytest.approx(expected_coverage)
+    assert 0.0 < fleet.coverage_ratio <= 1.0
+
+
+def test_invariant_11_cv_fpr_no_epsilon_returns_nan_when_mean_zero():
+    """When every eligible FPR is 0, CV(FPR)=σ/µ has µ=0 -> nan (no ε stabilizer)."""
+    # Build a collection whose benign test scores are all below any threshold.
+    rng = np.random.default_rng(0)
+    clients: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    for i in range(4):
+        cal = np.maximum(rng.normal(0.05, 0.02, size=200), 0.0)
+        test_benign = np.zeros(50, dtype=np.float64)  # FPR will be exactly 0
+        test_attack = np.full(50, 0.9, dtype=np.float64)
+        clients[f"eligible_{i}"] = (cal, test_benign, test_attack)
+    coll = build_score_collection(clients)
+
+    # Uniform thresholds well above the (zero) benign scores.
+    pair = Cp2ThresholdPair(
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        tau_global_clean=0.5,
+        tau_global_pois=0.5,
+        thresholds_clean=dict.fromkeys(coll.eligible_ids, 0.5),
+        thresholds_pois=dict.fromkeys(coll.eligible_ids, 0.5),
+    )
+    fleet = compute_fleet_fpr(coll, pair, mu_flag_threshold=None)
+    assert fleet.mean_fpr == 0.0
+    assert math.isnan(fleet.cv_fpr)  # NOT a finite ε-stabilized value, NOT 0
+
+
+# ---------------------------------------------------------------------------
+# Roadmap invariant — RANDOM_BENIGN is a near-null negative control
+# ---------------------------------------------------------------------------
+
+def test_roadmap_random_benign_near_null(collection):
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.RANDOM_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    entry = cell.poisoned_metrics.delta_tau[_VICTIM]
+    # Resampling from the full benign pool preserves the distribution: |Δτ| should
+    # stay within the per-client materiality scale (0.1 * IQR).
+    assert near_null_criterion(
+        delta_tau=entry.delta_tau,
+        delta_tau_null_threshold=entry.delta_tau_scale,
+    )
+    assert not entry.is_significant
+
+
+# ---------------------------------------------------------------------------
+# Roadmap invariant — B1 victim shift < B2 victim shift (same attack)
+# ---------------------------------------------------------------------------
+
+def test_roadmap_b1_shift_less_than_b2_shift(collection):
+    b1 = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B1_GLOBAL,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    b2 = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    b1_shift = abs(b1.poisoned_metrics.delta_tau[_VICTIM].delta_tau)
+    b2_shift = abs(b2.poisoned_metrics.delta_tau[_VICTIM].delta_tau)
+    # B1 averages the victim's shift over all eligible clients -> diluted.
+    assert b1_shift < b2_shift
+
+
+# ---------------------------------------------------------------------------
+# Roadmap invariant — B4 K stays fixed at 3 under clean AND poisoned cal
+# ---------------------------------------------------------------------------
+
+def test_roadmap_b4_k_fixed_at_three(collection):
+    clean_cal = collection.cal_dict()
+    assert b4_cluster_count(clean_cal) == CP2_B4_K == 3
+
+    outcome = inject_single_victim(
+        collection,
+        victim_id=_VICTIM,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+        training_seed=0,
+        poisoning_seed=100,
+    )
+    poisoned_cal = dict(clean_cal)
+    poisoned_cal[_VICTIM] = outcome.poisoned_cal[_VICTIM]
+    assert b4_cluster_count(poisoned_cal) == CP2_B4_K == 3
+
+
+# ---------------------------------------------------------------------------
+# Roadmap invariant — outputs written to temp only
+# ---------------------------------------------------------------------------
+
+def test_roadmap_outputs_in_temp_only(collection, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    manifest = build_manifest(
+        dataset="REGIME_SMOKE_SYNTHETIC",
+        scale=ExperimentScale.SMOKE,
+        policy=ThresholdPolicy.B2_PERSONALIZED,
+        objective=AttackerObjective.THRESHOLD_RAISE,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+        training_seed=0,
+        poisoning_seed=100,
+        client_idx=0,
+        scope_idx=0,
+        mu_flag_threshold=cell.mu_flag_threshold,
+        repository="datp-calibration-poisoning",
+    )
+    run_dir = tmp_path / "run"
+    emit_manifest(manifest, run_dir)
+
+    assert (run_dir / "cp2_run_manifest.json").exists()
+    # The real CP2 output root must never be created by a synthetic smoke run.
+    assert not (tmp_path / CP2_OUTPUT_ROOT).exists()
+    assert not Path(CP2_OUTPUT_ROOT).exists()

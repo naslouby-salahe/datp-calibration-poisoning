@@ -105,3 +105,19 @@ graphify update .
 threshold_recompute, b4_recompute, metric_engine, diagnostics, inference, run_logger)
 and removed 3 quarantined prototype modules. Node count grew from 6365 → 7381.
 HTML viz skipped (>5000 nodes). No API key used.
+
+---
+
+## 8. CP2-T038–T041 Graphify Run (2026-06-16, Phase D)
+
+```
+graphify update .
+  AST extraction: 457/457 files (100%)
+  Rebuilt: 7479 nodes, 18740 edges, 446 communities
+  graph.json and GRAPH_REPORT.md updated in graphify-out
+```
+
+**Context:** Phase D smoke validation. Added the synthetic smoke harness
+(`src/datp/testsupport/cp2_smoke_harness.py`) and the invariant suite
+(`tests/integration/attacks/test_cp2_smoke.py`). Node count 7381 → 7479. HTML viz
+skipped (>5000 nodes). No API key used.

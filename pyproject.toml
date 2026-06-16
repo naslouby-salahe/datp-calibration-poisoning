@@ -32,6 +32,7 @@ dependencies = [
     "rich",
     "scikit-learn",
     "scipy",
+    "statsmodels",
     "structlog",
     "torch",
     "typer>=0.9",
