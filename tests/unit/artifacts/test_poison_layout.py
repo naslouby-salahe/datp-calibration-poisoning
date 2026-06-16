@@ -28,6 +28,7 @@ from datp.attacks.poison_enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.data.catalog import DatasetID
 
 
 def _cell(
@@ -37,7 +38,7 @@ def _cell(
 ) -> CellId:
     return CellId(
         scale=ExperimentScale.BOUNDED,
-        dataset="nbaiot",
+        dataset=DatasetID.NBAIOT,
         policy=ThresholdPolicy.B1_GLOBAL,
         objective=AttackerObjective.THRESHOLD_RAISE,
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
@@ -162,7 +163,7 @@ class TestCellId:
         with pytest.raises(ValueError, match="outside"):
             CellId(
                 scale=ExperimentScale.BOUNDED,
-                dataset="nbaiot",
+                dataset=DatasetID.NBAIOT,
                 policy=ThresholdPolicy.B1_GLOBAL,
                 objective=AttackerObjective.THRESHOLD_RAISE,
                 source=PoisoningSourceStrategy.RANDOM_BENIGN,
@@ -172,19 +173,12 @@ class TestCellId:
                 poisoning_seed=100,
             )
 
-    def test_empty_dataset_raises(self) -> None:
-        with pytest.raises(ValueError, match="dataset"):
-            CellId(
-                scale=ExperimentScale.BOUNDED,
-                dataset="",
-                policy=ThresholdPolicy.B1_GLOBAL,
-                objective=AttackerObjective.THRESHOLD_RAISE,
-                source=PoisoningSourceStrategy.RANDOM_BENIGN,
-                fraction=0.10,
-                target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-                training_seed=0,
-                poisoning_seed=100,
-            )
+    def test_dataset_is_enum_typed(self) -> None:
+        assert _cell().dataset is DatasetID.NBAIOT
+
+    def test_invalid_dataset_string_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            DatasetID("not_a_dataset")
 
 
 class TestConstants:

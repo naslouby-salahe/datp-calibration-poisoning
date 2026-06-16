@@ -7,6 +7,7 @@ import numpy as np
 
 from datp.core.types import ThresholdResult
 from datp.core.enums import (
+    B4RegimeAMode,
     Baseline,
     Regime,
 )
@@ -131,7 +132,7 @@ def derive_threshold(
         mode = threshold_cfg.b4_regime_a_mode
         k_for_a = (
             0  # silhouette selection
-            if regime == Regime.A and mode == "silhouette"
+            if regime == Regime.A and mode == B4RegimeAMode.SILHOUETTE
             else threshold_cfg.b4_k_regime_a
         )
         return b4_mod.compute(

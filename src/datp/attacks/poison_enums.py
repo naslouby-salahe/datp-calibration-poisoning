@@ -86,7 +86,7 @@ class ExperimentScale(enum.StrEnum):
 
 
 class AuditDisposition(enum.StrEnum):
-    """Audit verdict for a code artifact during Phase-A review."""
+    """Audit verdict for a code artifact during code audit review."""
 
     KEEP_CORE = "keep_core"
     REFACTOR_CORE = "refactor_core"
@@ -95,7 +95,7 @@ class AuditDisposition(enum.StrEnum):
     BLOCK_UNSAFE = "block_unsafe"
 
 
-# Locked bounded fraction grid — do not extend without a ticket.
+# Locked bounded fraction grid — fixed by scientific protocol.
 BOUNDED_SWEEP_FRACTIONS: tuple[float, ...] = (0.0, 0.10, 0.20, 0.40)
 
 # Full-scope fraction grid — the bounded grid plus 0.05, refining the

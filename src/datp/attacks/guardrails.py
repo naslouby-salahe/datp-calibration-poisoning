@@ -142,7 +142,7 @@ def assert_fractions_in_locked_grid(
             raise GuardrailError(
                 f"Calibration-poisoning guardrail: fraction {f} is not in the locked grid "
                 f"{sorted(allowed)} for scale {scale!r}. "
-                "Do not introduce new fractions without a scientific ticket."
+                "Fractions are fixed by the locked scientific protocol grid."
             )
 
 

@@ -1,5 +1,5 @@
 {
-  "include": ["src/datp/baselines", "src/datp/evaluation"],
+  "include": ["src/datp/experiments/baselines", "src/datp/evaluation"],
   "typeCheckingMode": "standard",
   "reportPrivateImportUsage": "none",
   "reportUnsupportedDunderAll": "none"

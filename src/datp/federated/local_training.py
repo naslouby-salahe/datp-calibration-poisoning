@@ -102,7 +102,7 @@ def train_decoder_only(
     batch_size: int,
     lr: float,
 ) -> float:
-    """Phase 1 local training: train decoder with encoder frozen.
+    """Local decoder training with the encoder frozen.
 
     Returns the average reconstruction loss of the final epoch.
     """

@@ -88,7 +88,7 @@ test-e2e:  ## Run end-to-end tests (tiny real-data subsets)
 
 typecheck:  ## Run pyright type checking on src/
 	@command -v pyright >/dev/null 2>&1 || { echo "pyright not installed — run: pip install pyright"; exit 1; }
-	pyright src/datp/baselines/ src/datp/evaluation/
+	pyright src/datp/experiments/baselines/ src/datp/evaluation/
 
 lint:  ## Run ruff linter (if installed)
 	@command -v ruff >/dev/null 2>&1 || { echo "ruff not installed — run: pip install ruff"; exit 1; }

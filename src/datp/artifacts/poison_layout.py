@@ -33,6 +33,7 @@ from datp.attacks.poison_enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.data.catalog import DatasetID
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +45,7 @@ class CellId:
     """
 
     scale: ExperimentScale
-    dataset: str
+    dataset: DatasetID
     policy: ThresholdPolicy
     objective: AttackerObjective
     source: PoisoningSourceStrategy
@@ -58,8 +59,6 @@ class CellId:
             raise ValueError(
                 f"fraction {self.fraction} is outside [0.0, 1.0]"
             )
-        if not self.dataset:
-            raise ValueError("dataset must not be empty")
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +108,7 @@ class PoisonLayout:
         return (
             self.poison_output_root
             / cell.scale.value
-            / cell.dataset
+            / cell.dataset.value
             / cell.policy.value
             / cell.objective.value
             / cell.source.value

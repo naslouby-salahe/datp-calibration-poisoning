@@ -7,12 +7,12 @@ scientific parameters downstream.
 from __future__ import annotations
 
 import enum
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from datp.core.enums import (
     Activation,
+    B4RegimeAMode,
     Baseline,
     CheckpointArtifactPathMode,
     CheckpointConvergenceMode,
@@ -153,7 +153,7 @@ class ThresholdConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     n_min: int
     q: float
-    b4_regime_a_mode: Literal["fixed", "silhouette"]
+    b4_regime_a_mode: B4RegimeAMode
     b4_k_regime_a: int
     b4_k_candidates: list[int]
     b4_n_init: int
@@ -175,7 +175,7 @@ class StatisticsConfig(BaseModel):
     ci_level: float
     bootstrap_seed: int
     significance_alpha: float
-    # GO if CV(FPR)[B1, Regime A single-seed] > this value (Phase 3 preliminary diagnostic only).
+    # GO if CV(FPR)[B1, Regime A single-seed] > this value (preliminary single-seed diagnostic only).
     dispersion_threshold: float
 
 

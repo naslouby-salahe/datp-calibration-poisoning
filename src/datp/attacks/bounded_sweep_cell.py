@@ -33,9 +33,8 @@ def lock_mu_flag_threshold(
 
     Must be called once per training seed, before any poisoned run for that
     seed, and the returned value reused unmodified across every policy/cell
-    for that seed (CLAUDE.md: "mu_flag_threshold locked before poisoned
-    runs"; the lock is always B1-derived, regardless of which policy a given
-    cell evaluates).
+    for that seed. The lock is always B1-derived, regardless of which policy a
+    given cell evaluates.
     """
     clean_cal = {
         cid: collection.clients[cid].cal.copy() for cid in collection.eligible_ids

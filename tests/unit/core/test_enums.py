@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from datp.core.enums import (
     B4_FINGERPRINT_FEATURES,
     BASELINE_ROLE,
@@ -10,6 +12,7 @@ from datp.core.enums import (
     STATS_REPORTING_BASELINES,
     THRESHOLD_AGGREGATION_BY_BASELINE,
     B0NormalizationMode,
+    B4RegimeAMode,
     Baseline,
     BaselineRole,
     ClientStatus,
@@ -179,6 +182,21 @@ class TestB0NormalizationMode:
 
     def test_pooled_zscore_value(self) -> None:
         assert B0NormalizationMode.POOLED_ZSCORE == "pooled_zscore"
+
+
+class TestB4RegimeAMode:
+    def test_values(self) -> None:
+        assert B4RegimeAMode.FIXED == "fixed"
+        assert B4RegimeAMode.SILHOUETTE == "silhouette"
+        assert len(B4RegimeAMode) == 2
+
+    def test_parse_from_string(self) -> None:
+        assert B4RegimeAMode("fixed") is B4RegimeAMode.FIXED
+        assert B4RegimeAMode("silhouette") is B4RegimeAMode.SILHOUETTE
+
+    def test_invalid_value_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            B4RegimeAMode("invalid_mode")
 
 
 class TestControlledBaselines:

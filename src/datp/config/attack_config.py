@@ -86,7 +86,7 @@ class SeedPools(BaseModel):
 class B4ClusterConfig(BaseModel):
     """B4 clustering hyperparameters — locked for N-BaIoT (Regime A).
 
-    Do not change without a scientific ticket.
+    Locked per scientific protocol.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

@@ -1,6 +1,6 @@
 """B4 threshold recomputation and client-indexed Δτ decomposition.
 
-Protocol (from docs/DATP_CP_Roadmap.md §5):
+Protocol (scientific protocol §5):
 
 1. Clean B4 run → τ_i^{eff,clean}, clean cluster assignments A_clean.
 2. Agg component: hold A_clean fixed; recompute per-client τ_i from poisoned cal;

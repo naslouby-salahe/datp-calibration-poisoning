@@ -103,6 +103,17 @@ class B0NormalizationMode(enum.StrEnum):
     POOLED_ZSCORE = "pooled_zscore"
 
 
+class B4RegimeAMode(enum.StrEnum):
+    """B4 cluster-count selection mode for Regime A.
+
+    FIXED uses the configured ``b4_k_regime_a``; SILHOUETTE selects K via
+    silhouette score over the candidate Ks.
+    """
+
+    FIXED = "fixed"
+    SILHOUETTE = "silhouette"
+
+
 class BaselineRole(enum.StrEnum):
     CONTROLLED_THRESHOLD = "controlled_threshold"
     CENTRALIZED_REFERENCE = "centralized_reference"
@@ -129,7 +140,7 @@ SCORING_STAGES: tuple[ScoringStage, ...] = ScoringStage.all()
 
 
 class AbsorptionClass(enum.StrEnum):
-    """Absorption ratio classification per PRE_CODING_PLAN §6.4.
+    """Absorption ratio classification per scientific protocol.
 
     Ratio = Δ_personalized / Δ_FedAvg where each Δ = CV(FPR)[B1] − CV(FPR)[B2].
     """
@@ -218,7 +229,7 @@ CONTROLLED_BASELINES: tuple[Baseline, ...] = (
 )
 
 # B4 fingerprint feature order: locked per scientific contract.
-# Do not reorder without a scientific ticket.
+# Locked per scientific protocol — do not reorder.
 B4_FINGERPRINT_FEATURES: tuple[str, ...] = ("mean", "std", "skew", "p95")
 
 

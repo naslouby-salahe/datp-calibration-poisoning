@@ -19,7 +19,7 @@ import numpy as np
 from datp.attacks.poison_enums import AttackerObjective, PoisoningSourceStrategy
 from datp.attacks.reservoir import ReservoirResult, build_reservoir
 
-# bounded source strategies — do not modify without a ticket.
+# bounded source strategies — fixed by scientific protocol.
 _BOUNDED_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
     {
         PoisoningSourceStrategy.RANDOM_BENIGN,

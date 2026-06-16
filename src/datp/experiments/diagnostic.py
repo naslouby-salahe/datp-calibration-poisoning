@@ -324,7 +324,7 @@ def _make_contingency_decision(
         delta_cv_fpr=cv_b1 - cv_b2,
         dispersion_threshold=dispersion_threshold,
         rationale=(
-            f"Phase 3 preliminary check: CV(FPR)_B1 = {cv_b1:.4f} and "
+            f"Preliminary diagnostic check: CV(FPR)_B1 = {cv_b1:.4f} and "
             f"CV(FPR)_B2 = {cv_b2:.4f} indicate a measurable threshold-scope effect. "
             "The final primary endpoint is the Regime A B1-vs-B2 per-seed bootstrap CI on CV(FPR)."
         ),

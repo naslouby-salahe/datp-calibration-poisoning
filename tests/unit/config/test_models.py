@@ -27,7 +27,7 @@ from datp.config.models import (
     ThresholdConfig,
     TrackingConfig,
 )
-from datp.core.enums import Activation, Baseline
+from datp.core.enums import Activation, B4RegimeAMode, Baseline
 
 
 # ── SafetyBounds ──────────────────────────────────────────────────────────
@@ -265,14 +265,26 @@ class TestThresholdConfig:
         t = ThresholdConfig(
             n_min=100,
             q=0.95,
-            b4_regime_a_mode="fixed",
+            b4_regime_a_mode=B4RegimeAMode.FIXED,
             b4_k_regime_a=3,
             b4_k_candidates=[2, 3, 4, 5],
             b4_n_init=10,
             b4_random_state=42,
         )
-        assert t.q == 0.95
-        assert t.b4_regime_a_mode == "fixed"
+        assert abs(t.q - 0.95) < 1e-9
+        assert t.b4_regime_a_mode is B4RegimeAMode.FIXED
+
+    def test_string_mode_coerced_to_enum(self) -> None:
+        t = ThresholdConfig(
+            n_min=100,
+            q=0.95,
+            b4_regime_a_mode="fixed",  # type: ignore[arg-type]
+            b4_k_regime_a=3,
+            b4_k_candidates=[2, 3, 4, 5],
+            b4_n_init=10,
+            b4_random_state=42,
+        )
+        assert t.b4_regime_a_mode is B4RegimeAMode.FIXED
 
     def test_invalid_b4_mode_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -290,20 +302,20 @@ class TestThresholdConfig:
         t = ThresholdConfig(
             n_min=100,
             q=0.95,
-            b4_regime_a_mode="silhouette",
+            b4_regime_a_mode=B4RegimeAMode.SILHOUETTE,
             b4_k_regime_a=3,
             b4_k_candidates=[2, 3, 4, 5],
             b4_n_init=10,
             b4_random_state=42,
         )
-        assert t.b4_regime_a_mode == "silhouette"
+        assert t.b4_regime_a_mode is B4RegimeAMode.SILHOUETTE
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
             ThresholdConfig( # type: ignore[call-arg]
                 n_min=100,
                 q=0.95,
-                b4_regime_a_mode="fixed",
+                b4_regime_a_mode=B4RegimeAMode.FIXED,
                 b4_k_regime_a=3,
                 b4_k_candidates=[2, 3, 4, 5],
                 b4_n_init=10,
@@ -325,7 +337,7 @@ class TestExperimentConfig:
             absorption_partial=0.25,
         )
         assert e.seeds == [0, 1, 2]
-        assert e.absorption_strong_retention == 0.75
+        assert abs(e.absorption_strong_retention - 0.75) < 1e-9
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
@@ -376,7 +388,7 @@ class TestQualityGateConfig:
             ciciot_homogeneity_threshold=0.05,
             js_divergence_n_bins=32,
         )
-        assert qg.b0_sanity_min == 0.90
+        assert abs(qg.b0_sanity_min - 0.90) < 1e-9
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
@@ -467,7 +479,7 @@ class TestRuntimeConfig:
             lock_timeout_seconds=3600.0,
             ray_memory_threshold=0.90,
         )
-        assert r.lock_timeout_seconds == 3600.0
+        assert abs(r.lock_timeout_seconds - 3600.0) < 1e-9
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):

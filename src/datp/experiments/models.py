@@ -43,7 +43,7 @@ class SharedPipelineContext:
 
 
 class ContingencyRecord(BaseModel):
-    """Phase 3 preliminary diagnostic result; final primary endpoint is Regime A B1-vs-B2 CV(FPR) bootstrap CI."""
+    """Preliminary single-seed diagnostic result; final primary endpoint is Regime A B1-vs-B2 CV(FPR) bootstrap CI."""
 
     model_config = ConfigDict(frozen=True)
     decision: ContingencyDecision
