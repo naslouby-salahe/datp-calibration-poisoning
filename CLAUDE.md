@@ -43,7 +43,17 @@ Do not trust progress files alone. Inspect actual repository state. If a progres
 5. Work the ticket scope only. Do not add features outside scope.
 6. After completing work, update `CP2_PROGRESS.md` with evidence.
 7. Do not skip dependencies.
-8. Do not run final experiments before **CP2-T056**.
+8. Do not run final experiments before **CP2-T056**. "Final experiments" means
+   the Phase G final/full CP2 experiment run. The Phase E bounded MVP run
+   (`SINGLE_CLIENT`, default policies `{B1,B2,B4}` × objectives × sources ×
+   the locked MVP fraction grid `{0,0.10,0.20,0.40}`, `REGIME_A_NBAIOT`) is a
+   distinct, earlier gate: it is authorized by **CP2-T044** once its run plan
+   is locked and `mu_flag_threshold` is fixed from clean data, and running it
+   is not a violation of this rule. (CP2-T056 depends on CP2-T049, which
+   depends on the MVP results — CP2-T056 cannot be a prerequisite for the MVP
+   itself.) Anything beyond the CP2-T044-authorized bounded MVP — full scope
+   (fraction `0.05`), Phase F/G scaling, pairs/triples, defenses, additional
+   datasets — remains gated until CP2-T056 or its own fallback gate (FB3/FB4).
 9. Do not run final analysis before **CP2-T057**.
 10. Do not write the final paper package before **CP2-T058**.
 
@@ -229,7 +239,11 @@ Stop and write a decision record if:
 - Edge-IIoTset would be used.
 - CICIoT2023 stretch would run without the FB4 feasibility gate.
 - A claim would be made without traceable evidence.
-- An experiment would run before CP2-T056 authorization.
+- An experiment would run before CP2-T056 authorization — meaning the Phase G
+  final/full CP2 experiment, or any scope beyond the CP2-T044-authorized
+  bounded MVP (full-scope fraction `0.05`, Phase F/G scaling, pairs/triples,
+  defenses, additional datasets). The CP2-T044-authorized bounded MVP run
+  itself does not violate this rule (see §2.8).
 - A result would be fabricated or a `.tmp` placeholder treated as success.
 - `mu_flag_threshold` would be set after, not before, poisoned runs.
 - In-place mutation of clean arrays would occur.

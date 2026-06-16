@@ -455,3 +455,449 @@ roadmap §5, §6, §7, §10, §12.
 - `docs/tickets/_ai_tracking/audits/CP2-T040_smoke_test_consolidation.md`
 - `tests/integration/attacks/test_cp2_smoke.py` — 19 passed
 - 15 distinct invariants asserted and passing; pyright 0 errors; ruff clean
+
+---
+
+## CP2-T042 — Phase E entry gate: FB1 re-confirmed, no real-data MVP results exist
+
+### Claim blocked / do-not-claim
+
+- **No real N-BaIoT MVP results exist in this repository as of 2026-06-16.** Phase E
+  (CP2-T042–T049) could not proceed past the entry gate: no clean per-client N-BaIoT
+  calibration/test score artifacts exist, and the only in-repo training config is
+  `local_epochs: 5` (E=5), not the conference-faithful E=1. Do NOT cite any MVP
+  number, kill-trigger outcome, or continue/stop/pivot decision — none was produced.
+  CP2-T049 recorded no decision (would be unevidenced).
+- Do NOT imply Phase E ran and found a null/clean result — it did not run at all.
+  This is an artifact-availability blocker, not a scientific finding.
+
+### Limitation to disclose
+
+- The manuscript's empirical section depends on FB1 (one supervised federated
+  retrain at E=1) being authorized and executed. As of this note, FB1 is
+  **TRIGGERED, awaiting explicit human authorization** (heavy training + GPU
+  may be required; config-semantics change `local_epochs: 5 → 1`). Until resolved,
+  all Phase E–G results are absent, not merely unaudited.
+
+### Reviewer-risk relevance
+
+- Pre-empts "why are there no real-data results / why does Phase E close with no
+  numbers?" — the answer is a documented, evidenced provenance gate failure (E=5
+  config + missing artifacts), not a dropped or cherry-picked result.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/diagnostics/CP2-T042_nbaiot_load_dryrun.md`
+- `docs/tickets/_ai_tracking/run_logs/CP2_PHASE_E_ENTRY_GATE.md`
+- `docs/tickets/_ai_tracking/decisions/CP2_FALLBACK_REGISTER.md`
+- `docs/tickets/_ai_tracking/manifests/clean_score_artifacts.json` (`"verdict":
+  "ARTIFACTS_MISSING"`, `"e5_in_yaml_config": true`)
+- Decision log: `2026-06-16 | CP2-T042 | FB1 RE-CONFIRMED at Phase E gate`
+
+### SUPERSEDED (2026-06-16, same day)
+
+The blocker above is resolved. The user explicitly authorized FB1; `config.yaml`
+was fixed to `local_epochs: 1` and the one authorized E=1 retrain was executed
+(25/25 sweep cells). Real clean N-BaIoT score artifacts now exist for all 5
+training seeds and pass `verify_all_score_cells` (18/18 checks each). The
+"no real-data MVP results exist" claim-block above no longer holds as of this
+note; see CP2-T043 below for the first real-data results. Evidence:
+`docs/tickets/_ai_tracking/diagnostics/CP2-T042_nbaiot_load_dryrun.md` (rewritten,
+verdict PASS), decision log FB1 execution entries.
+
+---
+
+## CP2-T043 — One-seed real-data diagnostics: directionally correct, policy-differentiated blast radius
+
+### Claim enabled
+
+- On real N-BaIoT `training_seed=0` data, calibration-channel poisoning with
+  `HIGH_SCORE_BENIGN` raises τ and `LOW_SCORE_BENIGN` lowers τ, monotonically in
+  the injection fraction, across all three default policies (B1_GLOBAL,
+  B2_PERSONALIZED, B4_CLUSTER). `RANDOM_BENIGN` stays near-null and
+  non-monotonic by comparison. This is the first real-data confirmation of the
+  CP2 core mechanism (prior confirmation was synthetic-only, CP2-T038–T041).
+- Blast radius is policy-differentiated in the hypothesized qualitative order:
+  B2 (personalized, victim-only) = 11.1% (1/9) < B4 (cluster) = 88.9% (8/9) <
+  B1 (global) = 100% (9/9), at f=0.40, HIGH_SCORE_BENIGN, single seed.
+- AUROC invariance and cardinality preservation hold exactly (abs_tol=1e-12;
+  exact n_i match) across all 36 one-victim cells — confirms the
+  calibration-channel-only boundary held in the real-data pipeline, not just
+  in synthetic smoke tests.
+
+### Limitation to disclose
+
+- **Single seed, single poisoning-seed.** This is a feasibility/direction
+  diagnostic (CP2-T043 scope), not a statistical result — n=1 per cell, no
+  multi-seed aggregation, no bootstrap CI, no sign test. Do not cite these
+  specific Δτ or blast-radius numbers as the paper's reported effect sizes;
+  cite only "direction and feasibility confirmed pre-MVP" until CP2-T046/T047
+  multi-seed results exist.
+- **B4 blast-radius magnitude (88.9%) is higher than a naive cluster-size
+  heuristic (~33%, cluster_size/9) would predict.** The qualitative ordering
+  (B2 < B4 < B1) is correct and was the acceptance bar for this ticket, but
+  the close-to-B1 magnitude should not be over-interpreted from one seed/one
+  fraction. Flagged for re-examination once CP2-T046/T047 multi-seed B4
+  statistics exist — if the pattern holds across seeds, it is a real and
+  citable finding (cluster-churn propagation, `Δτ_total = Δτ_agg + Δτ_churn`,
+  can extend beyond the victim's literal cluster); if it does not replicate,
+  it was a single-seed artifact.
+
+### Figure/table affected
+
+- Candidate input to a future "blast radius by policy" figure/table (Phase G),
+  pending multi-seed confirmation. Not citable as a standalone figure yet.
+
+### Reviewer-risk relevance
+
+- Pre-empts "does B4 actually behave like an intermediate/clustered policy, or
+  does it just track B1?" — this note honestly discloses the single-seed
+  magnitude is closer to B1 than a naive heuristic predicts, rather than
+  silently rounding it to "as expected."
+- Pre-empts "did you only test synthetic data?" — this is the first
+  confirmation on real per-client N-BaIoT scores.
+
+### Do-not-claim reminder
+
+- Do not claim "B4 blast radius ≈ 89%" as a headline MVP number; it is a
+  single-seed diagnostic observation pending CP2-T046/T047 confirmation.
+- Do not claim statistical significance of any Δτ at this rung — no CI, no
+  sign test, n=1.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/diagnostics/CP2-T043_one_seed_diagnostics.md`
+- `src/datp/attacks/real_score_loader.py`, `mvp_runner.py`, `cell_runner.py`
+- `tests/integration/attacks/test_real_score_loader.py`,
+  `tests/unit/attacks/test_mvp_runner.py`
+
+## CP2-T046 — MVP manifest & result-sanity audit: full-scale (1620-cell) confirmation
+
+### Claim enabled
+
+- The full bounded-MVP matrix (9 victims × 3 policies × 3 sources × 4 fractions
+  × 5 training/poisoning-seed pairs = 1620 cells, all real N-BaIoT data) is
+  complete and schema-valid: every cell has a non-empty result, AUROC
+  invariance holds on **1620/1620** rows, and the `f=0.0` no-op invariant
+  (`delta_tau == 0.0` etc.) holds exactly on all 405 zero-fraction rows.
+  `mu_flag_threshold` was confirmed locked per-training-seed from clean B1
+  data before any poisoned cell ran, with values identical to the
+  independently-derived CP2-T044 stability-sweep values
+  (`{0: 0.005, 1: 0.0049, 2: 0.0056, 3: 0.0053, 4: 0.005}`).
+- Directional confirmation now holds at full scale, not just one seed:
+  `HIGH_SCORE_BENIGN` raises τ in 403/405 non-zero-fraction cells (mean
+  Δτ = +0.392), `LOW_SCORE_BENIGN` lowers τ in 403/405 (mean Δτ = −0.0662),
+  `RANDOM_BENIGN` is near-null (mean Δτ = −0.0003, pos/neg roughly balanced
+  200/190, 15 exact zeros). This resolves the CP2-T043 caveat that direction
+  was confirmed on n=1 only.
+- **The CP2-T043 flagged concern about B4 magnitude is resolved at full
+  scale, and the resolution changes the headline number.** CP2-T043's
+  single-seed observation was B4 blast radius (88.9%) sitting unexpectedly
+  close to B1 (100%). At full scale (mean blast_fraction across all non-zero
+  cells): B1_GLOBAL = 0.559, B4_CLUSTER = 0.447, B2_PERSONALIZED = 0.091. The
+  qualitative ordering B2 < B4 < B1 replicates, but B4 is now roughly
+  midway between the two boundary policies, not clustered near B1 — the
+  single-seed magnitude was **not** representative and must not be reused.
+- Four cells (0.25% of 1620), all `B4_CLUSTER`, show a directional sign
+  reversal relative to their source's expected direction. All four are
+  mechanistically explained by the locked `Δτ_total = Δτ_agg + Δτ_churn`
+  decomposition (CP2-T031): cluster-reassignment churn after poisoning can
+  act against the direct injection effect for a specific victim. This is a
+  measurability property of B4, not an injector or metric-engine defect, and
+  is not large enough (`|Δτ| <= 0.033`) to be evidence against the ≥4/5-seed
+  sign-consistency rule at the per-victim level (that evaluation belongs to
+  CP2-T047/T049).
+
+### Limitation to disclose
+
+- This audit is descriptive only — no significance testing, no
+  sign-consistency-rule application, no bootstrap CI, no claim-worthy
+  decision. `is_victim_significant` is computed per-cell (849/1620 = 52.4%)
+  but is not yet aggregated to the seed level or run through the locked
+  statistical plan (roadmap §9: 5 seed-level aggregates, percentile
+  bootstrap, sign test as supporting evidence only). Do not cite the 52.4%
+  figure, the per-policy mean blast_fraction figures, or the 403/405
+  directional-consistency counts as the paper's reported effect sizes until
+  CP2-T047 (kill triggers) and CP2-T049 (continue/stop/pivot) have run the
+  proper seed-level inference.
+- The 4 B4 sign-reversal cells are flagged, not resolved into a statistical
+  statement — whether they survive the ≥4/5-seed sign-consistency rule at
+  the per-victim level is CP2-T047/T049's job, not this audit's.
+
+### Figure/table affected
+
+- Now the primary candidate input to the Phase G "blast radius by policy"
+  figure/table, superseding the CP2-T043 single-seed placeholder — but still
+  pending CP2-T047/T049's statistical sign-off before being treated as
+  citable. The B1/B4/B2 = 0.559/0.447/0.091 triple is the full-scale
+  descriptive analog of CP2-T043's single-seed 100%/88.9%/11.1% triple.
+- Candidate input to a "B4 cluster-churn anomaly" footnote or appendix table
+  (4 flagged cells), if CP2-T047/T049 decide the anomaly is worth disclosing
+  in the main paper rather than just the audit trail.
+
+### Reviewer-risk relevance
+
+- Directly pre-empts "you only checked one seed" (CP2-T043's own flagged
+  risk) — this is now full-scale, all 5 locked training/poisoning seed
+  pairs, all 9 eligible victims.
+- Pre-empts "is B4 just B1 with a different label?" — the full-scale mean
+  blast_fraction shows real separation (0.447 vs 0.559), not the
+  near-coincidence the single-seed number suggested.
+- Pre-empts "did you cherry-pick clean cells?" — the audit explicitly
+  surfaced and explained the 4 anomalous cells rather than omitting them.
+
+### Do-not-claim reminder
+
+- Do not cite the single-seed CP2-T043 numbers (100%/88.9%/11.1%) anywhere
+  in the paper now that full-scale numbers exist and differ materially.
+- Do not claim "B4 blast radius = 44.7%" or any other figure from this audit
+  as a statistically validated result — these are unweighted means over all
+  non-zero-fraction cells, not the seed-level bootstrap aggregate the
+  roadmap's statistical plan requires (CP2-T047/T049 own that step).
+- Do not claim the 4 B4 sign-reversals are resolved or explained away as
+  "not real" — they are real, measured, and mechanistically attributed to
+  churn, but their statistical weight is still pending.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/audits/CP2-T046_mvp_manifest_result_sanity_audit.md`
+- `outputs/conference_calibration_poisoning/nbaiot_mvp_manifest.json`
+- `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` (CP2-T045 entry,
+  real-execution provenance)
+
+## CP2-T047 — Kill-trigger evaluation: no trigger fires; one evidentiary gap flagged
+
+### Claim enabled
+
+- None of the 7 pre-registered kill triggers (roadmap §16) fire on the
+  full-scale bounded-MVP evidence. In particular, kill-trigger (1) ("no
+  material threshold shift for B2 under HIGH/LOW even at f=0.40") is
+  strongly refuted: `B2_PERSONALIZED` shows monotone, fully sign-consistent,
+  materially significant `Δτ` at every fraction (`f=0.40`: `+0.914` raise /
+  `−0.167` lower; bootstrap CI excludes zero by a wide margin; 9/9 victims
+  sign-consistent; ASR materiality rate `1.000`).
+- Kill-trigger (3) ("B1/B2/B4 indistinguishable") is refuted with a clean
+  mechanistic cross-check, not just a numeric difference: `B1 ≈ B2/9`
+  (`0.1015 ≈ 0.9139/9`) because B1's `tau_global` is the mean of 9 per-client
+  thresholds and only one shifts; this is the first time the B1 dilution
+  mechanism has been verified arithmetically against real data, not just
+  asserted qualitatively.
+- This is the strongest evidence to date that the CP2 hypothesis is viable
+  and the paper's primary mechanism claim (raise/lower, policy-differentiated)
+  is supportable on real N-BaIoT data at full MVP scale.
+
+### Limitation to disclose
+
+- **Kill-trigger (2) (downstream-metric movement) is not fully closeable
+  with the current MVP artifacts and must not be claimed as resolved.** The
+  roadmap (§8, §12) requires a primary claim to show `Δτ` with correct sign
+  **linked to ≥1 downstream metric** (victim `ΔTPR` for raise;
+  `ΔCV(FPR)`/worst-client FPR for lower) — but the bounded-MVP manifest
+  schema (`Cp2MvpResultRow`) does not carry literal per-victim `ΔTPR`/`ΔBA`.
+  The closest available evidence is the `Δτ`-materiality (ASR) proxy
+  (`is_victim_significant`), which is strongly positive across all
+  directional cells — but this is evidence the threshold moved by a material
+  amount, not direct evidence the victim's detection rate measurably
+  changed. **Do not claim the roadmap §12 primary-endpoint rule is fully
+  satisfied** until a dedicated downstream-metric pass is run (a bounded,
+  low-risk follow-on that reuses already-tested `cell_runner.py` threshold
+  primitives against each victim's already-loaded `test_attack` scores — no
+  new scientific design, just an unbuilt computation).
+- **One RANDOM_BENIGN cell is not exactly null.** `B4_CLUSTER`/
+  `RANDOM_BENIGN`/`f=0.40` is the sole cell (of 9 RANDOM cells) where the
+  bootstrap CI on the seed-level aggregate excludes zero
+  (`[-0.0233, -0.0065]`). Mechanistically attributed to cluster-reassignment
+  churn variance under unbiased resampling at the largest fraction (the
+  locked `Δτ_total = Δτ_agg + Δτ_churn` decomposition, CP2-T031) — magnitude
+  is 6–13× smaller than the directional B4 effects at the same fraction, so
+  RANDOM remains a usable near-null control in relative terms, but this
+  specific cell should not be cited as "exactly null" without the caveat.
+
+### Figure/table affected
+
+- Strengthens the case for the candidate "blast radius by policy" and "Δτ
+  vs fraction per policy" figures (F3/F5, roadmap §11) — the B1≈B2/9
+  mechanistic identity is a strong candidate footnote/derivation for the
+  methods or discussion section.
+- The trigger-(2) gap affects T4 (main results table) and T5
+  (claims↔evidence table): T4/T5 should not list a downstream-metric column
+  as populated until the follow-on diagnostic exists.
+
+### Reviewer-risk relevance
+
+- Directly pre-empts "you only measured Δτ, not actual detection harm" —
+  this note proactively discloses that exact gap rather than letting a
+  reviewer find it, and proposes the fix is bounded and already
+  architecturally possible (test_attack scores are already loaded).
+- The B1≈B2/9 arithmetic identity pre-empts "is B1's small effect just
+  noise?" — it is not; it is the predicted, falsifiable consequence of B1's
+  definition.
+
+### Do-not-claim reminder
+
+- Do not claim the roadmap §12 five-part primary-endpoint decision gate is
+  fully satisfied — the downstream-metric leg is unverified, not satisfied.
+- Do not claim "RANDOM_BENIGN is exactly null in every cell" — one B4 cell
+  at the largest fraction has a non-null bootstrap CI; report this with its
+  mechanistic explanation if RANDOM near-nullness is cited in the paper.
+- Do not claim B1's small effect size as evidence against the attack's
+  severity without noting it is the global-mean-dilution mechanism, not a
+  weaker attack — B2's undiluted victim shift (`0.914`) is the more
+  conservative severity number for the "personalized policy is most
+  vulnerable" claim.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/audits/CP2-T047_kill_trigger_evaluation.md`
+- `outputs/conference_calibration_poisoning/nbaiot_mvp_manifest.json`
+- `src/datp/attacks/inference.py` (two-layer statistical machinery reused,
+  unchanged)
+
+## CP2-T048 — MVP drift check: no protocol-lock drift in the real-data run path
+
+### Claim enabled
+
+- The real-data bounded-MVP execution path (loader → injector → threshold
+  recompute → metric engine → manifest writer) preserves every applicable
+  roadmap §5–§12 lock: calibration-channel-only boundary (the code imports
+  nothing from `federated.protocols.fedavg` or model modules — the
+  isolation is structural, not just behaviorally observed via AUROC
+  invariance), E=1, SINGLE_CLIENT, default policies with B3 architecturally
+  absent, REPLACE_FIXED_BUDGET with victim-local reservoirs, the two-layer
+  statistical unit of analysis, `mu_flag_threshold` locked before any
+  poisoned cell by control-flow construction (not just by matching values),
+  and `REGIME_A_NBAIOT`-only (no code path can reach CICIoT2023 or
+  Edge-IIoTset from the bounded-MVP runner).
+- Seed-scheme integrity was re-verified at full scale (all 1620 rows, not a
+  spot check): `seed_record.entropy[1] == poisoning_seed` on every row — 0
+  mismatches, ruling out integer-seed-addition drift across the entire
+  artifact, not just a sample of it.
+
+### Limitation to disclose
+
+- This is a code-and-artifact drift check, not a new statistical result —
+  it adds confidence that CP2-T046/T047's evidence is protocol-clean, it
+  does not add new effect-size evidence.
+- An unrelated, pre-existing DATP-substrate test-collection issue was
+  observed (4 `tests/e2e/*` files fail to import `SplitFilename`) and
+  confirmed via `git log` to predate all CP2 work — explicitly not a CP2
+  drift and not actioned, but noted here so it isn't silently rediscovered
+  as a surprise later.
+
+### Figure/table affected
+
+- None directly — this strengthens the credibility of the evidence behind
+  F3–F6/T4/T5, it isn't itself a figure/table input.
+
+### Reviewer-risk relevance
+
+- Directly supports the "calibration channel is structurally distinct from
+  the training pipeline" defense (roadmap §14 row 1) with a code-level
+  claim (no import path to FL training/aggregation code), not only a
+  metric-level claim (AUROC invariance).
+
+### Do-not-claim reminder
+
+- Do not claim this drift check is a substitute for CP2-T046/T047's result
+  audits — it confirms protocol fidelity of the run path, not the
+  statistical validity of the findings.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/audits/CP2-T048_mvp_drift_check.md`
+- `outputs/conference_calibration_poisoning/nbaiot_mvp_manifest.json`
+- `src/datp/attacks/mvp_run.py`, `cell_runner.py` (control-flow inspection)
+
+---
+
+## CP2-T049 — MVP CONTINUE decision: LOWER narrative fully evidenced; RAISE downstream metric pending
+
+### Claim enabled
+
+**LOWER narrative primary endpoint satisfied (Δτ + ΔCV(FPR)):** the bounded
+MVP establishes that LOW_SCORE_BENIGN poisoning produces material, monotone,
+policy-differentiated ΔCV(FPR) movement: B2 disparity increases to a mean
+ΔCV = +0.069 at f=0.40 (9/9 victims, 5 seeds), B4 similarly (+0.090), B1
+homogenizes (−0.022) — a mechanistically interpretable policy contrast
+consistent with B1's global-averaging dilution vs B2/B4's per-client/cluster
+concentration. Combined with T047's Δτ evidence (B2 lower: −0.167 at f=0.40,
+CI excludes zero, 9/9 strict majority), this satisfies roadmap §8/§12's
+primary-endpoint requirement for the LOWER objective (material Δτ + movement
+in ΔCV(FPR)/worst-client FPR).
+
+**RAISE narrative Δτ leg well-established:** B2 raise: +0.914 at f=0.40, CI
+excludes zero, 9/9 strict majority; B1/B4 show smaller, sign-consistent
+raise effects. This evidence supports the raise narrative alongside the
+downstream measurement still pending (below).
+
+### Limitation to disclose
+
+**RAISE narrative downstream metric (victim ΔTPR) not yet computed:** no
+literal TPR, BA, or F1 score change per victim has been measured anywhere in
+the MVP pipeline (`Cp2MvpResultRow` schema carries no TPR/BA/F1 field). This
+is not a null finding — it is an unmeasured quantity. The raise claim cannot
+currently be stated as "Δτ linked to ≥1 downstream metric" per roadmap §12's
+exact wording until ΔTPR is computed and shows consistent movement.
+
+Must be closed in CP2-T057 (final analysis): compute victim ΔTPR using
+already-existing `tau_clean`/`tau_poisoned` values (from `Cp2ThresholdPair`)
+against each victim's `Cp2ClientScores.test_attack` scores — no new
+poisoning, no new seeds, no scope expansion needed. Table T4 and Figure F6
+("victim ΔTPR vs worst-client ΔFPR") explicitly require this.
+
+### Figure or table affected
+
+- **F3** (Δτ vs fraction): already supported by T046/T047 Δτ evidence for
+  all three objectives.
+- **F4** (ΔCV(FPR)/worst-client FPR vs fraction): LOWER narrative now
+  evidenced with real data from this ticket's aggregation (the formal,
+  committed version to appear in CP2-T057's reporting module).
+- **F6** (victim ΔTPR vs worst-client ΔFPR): RAISE-side half is blocked
+  until ΔTPR is computed; LOWER-side worst-client FPR is derivable from
+  existing `mean_fpr` fields.
+- **T4** (main results: clean vs poisoned, mechanism + one downstream metric):
+  LOWER row can be completed; RAISE row's "downstream metric" column is
+  pending ΔTPR.
+- **T5** (claims↔evidence): RAISE claim cannot be marked fully supported
+  until ΔTPR closes.
+
+### Reviewer-risk relevance
+
+**RQ-B (lower) is now doubly evidenced** — both Δτ and ΔCV(FPR) downstream
+movement. This is the stronger, cleaner result and should be foregrounded in
+the disparity narrative. B1's homogenizing effect (opposite sign) is a
+differentiated finding, not a failure — it directly supports the
+policy-comparison narrative (B1's global averaging absorbs the disparity
+that B2/B4 amplifies).
+
+**RQ-A (raise) has a strong Δτ leg but an incomplete primary-endpoint
+chain** — do not finalize the paper's claim posture for RAISE until CP2-T057
+closes the ΔTPR leg. The paper's reviewer defensibility for RAISE depends on
+the final ΔTPR values being consistent (or on explicitly disclosing that
+ΔTPR is reported as a secondary metric if the primary Δτ link is stated
+differently per §15's mixed wording).
+
+### Do-not-claim reminder
+
+- **Do not claim the RAISE narrative's primary endpoint is fully satisfied**
+  until CP2-T057 computes victim ΔTPR. Do not include RAISE in Table T4's
+  "one downstream metric" column until that column has real ΔTPR values.
+- **Do not claim the ΔCV(FPR) values here as final** — they were computed
+  via ad hoc read-only aggregation (not a committed reporting module); the
+  official, committed version must appear in CP2-T057 with a provenance
+  sidecar. The values above are for decision-gate evidence only.
+- **Do not claim §15 "if positive" wording** (the fully positive claim)
+  until both RAISE and LOWER are individually supported at the
+  primary-endpoint level. Use §15's "if mixed" wording until RAISE ΔTPR
+  is confirmed.
+- **Do not claim Phase F results** — fraction 0.05, multi-client, defense,
+  CICIoT2023 — until CP2-T056 executes and CP2-T055 drift-checks them.
+
+### Evidence path
+
+- `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` (CP2-T049 entry)
+- `docs/tickets/_ai_tracking/audits/CP2-T047_kill_trigger_evaluation.md`
+- `outputs/conference_calibration_poisoning/nbaiot_mvp_manifest.json`
+  (fields: `cv_fpr`, `mean_fpr`, `coverage_ratio`, `n_eligible`)
+- `src/datp/attacks/mvp_manifest.py` (`Cp2MvpResultRow` schema — confirms
+  no TPR/BA/F1 field)

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from datp.attacks.poison_enums import PoisoningSourceStrategy
+from datp.attacks.poison_enums import AttackerObjective, PoisoningSourceStrategy
 from datp.attacks.reservoir import ReservoirResult, build_reservoir
 
 # MVP source strategies — do not modify without a ticket.
@@ -64,6 +64,23 @@ def select_reservoir(
 
 class DiagnosticSourceError(ValueError):
     """Raised when a diagnostic source is used without allow_diagnostic=True."""
+
+
+def objective_for_source(
+    source: PoisoningSourceStrategy,
+) -> AttackerObjective | None:
+    """Directional objective implied by a source strategy, for ASR computation.
+
+    HIGH_SCORE_BENIGN pairs with THRESHOLD_RAISE; LOW_SCORE_BENIGN pairs with
+    THRESHOLD_LOWER. RANDOM_BENIGN is a non-directional control and has no
+    objective pairing (returns None). The objective is derived metadata, not
+    an independent sweep axis crossed with source.
+    """
+    if source == PoisoningSourceStrategy.HIGH_SCORE_BENIGN:
+        return AttackerObjective.THRESHOLD_RAISE
+    if source == PoisoningSourceStrategy.LOW_SCORE_BENIGN:
+        return AttackerObjective.THRESHOLD_LOWER
+    return None
 
 
 def near_null_criterion(

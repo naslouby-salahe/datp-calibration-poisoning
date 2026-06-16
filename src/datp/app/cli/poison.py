@@ -1,18 +1,21 @@
 """CP2 CLI subcommands — stage preview, dry-run, and smoke gate.
 
 No experiment execution. Heavy stages require explicit gate authorization
-and are blocked until CP2-T056. All commands are read-only previews in
-Phase B.
+(each stage's own `gate` field — e.g. CP2-T043, CP2-T044, FB3, FB4, or
+CP2-T056/T057 for the final/full experiment and paper figures). All
+commands here are read-only previews; they never launch a run themselves.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import json
+from pathlib import Path
 
 import typer
 from rich.console import Console
 
+from datp.attacks.mvp_run import write_nbaiot_mvp_manifest
 from datp.config.stages import Cp2Stage, Cp2StageConfig, all_stage_configs, get_stage_config
 
 app = typer.Typer(help="CP2 calibration-channel poisoning commands.")
@@ -21,8 +24,8 @@ _stdout = Console()
 _stderr = Console(stderr=True)
 
 _PHASE_B_NOTICE = (
-    "NOTE: Experiment execution is blocked until CP2-T056 authorization. "
-    "This command is preview/dry-run only."
+    "NOTE: Experiment execution is blocked until this stage's own gate "
+    "(see below) is authorized. This command is preview/dry-run only."
 )
 
 
@@ -43,7 +46,7 @@ def preview(
     """Print the stage configuration as JSON; does not execute any run."""
     cfg = get_stage_config(stage)
     _stdout.print_json(json.dumps(_stage_config_as_dict(cfg), indent=2))
-    if cfg.gate:
+    if cfg.gate and not cfg.allow_run:
         _stderr.print(
             f"[yellow]Gate required:[/yellow] {cfg.gate!r} must be resolved "
             "before this stage can run."
@@ -66,10 +69,10 @@ def dry_run(
     _stdout.print(f"  description: {cfg.description}")
     if not cfg.allow_run:
         _stderr.print(f"[yellow]{_PHASE_B_NOTICE}[/yellow]")
-    if cfg.gate:
-        _stderr.print(
-            f"[yellow]Gate[/yellow] {cfg.gate!r} must be resolved before execution."
-        )
+        if cfg.gate:
+            _stderr.print(
+                f"[yellow]Gate[/yellow] {cfg.gate!r} must be resolved before execution."
+            )
 
 
 @app.command("smoke")
@@ -80,6 +83,28 @@ def smoke() -> None:
     _stdout.print(f"  scale  : {cfg.scale}")
     _stdout.print(f"  dataset: {cfg.dataset}")
     _stderr.print(f"[yellow]{_PHASE_B_NOTICE}[/yellow]")
+
+
+@app.command("run-mvp")
+def run_mvp(
+    base_dir: Path = typer.Option(..., help="Root output directory (contains real N-BaIoT score artifacts)"),
+) -> None:
+    """Execute the locked bounded N-BaIoT MVP matrix and write its manifest.
+
+    This is the single CLI run path for ``Cp2Stage.NBAIOT_MVP``: it refuses
+    to run unless that stage's ``allow_run`` is True (CP2-T044 gate
+    satisfied), and it only ever produces ``nbaiot_mvp_manifest.json`` —
+    nothing outside the locked 1620-cell matrix.
+    """
+    cfg = get_stage_config(Cp2Stage.NBAIOT_MVP)
+    if not cfg.allow_run:
+        _stderr.print(
+            f"[red]Refusing to run:[/red] {Cp2Stage.NBAIOT_MVP!r} allow_run is "
+            f"False (gate {cfg.gate!r} not satisfied)."
+        )
+        raise typer.Exit(code=1)
+    out_path = write_nbaiot_mvp_manifest(base_dir)
+    _stdout.print(f"[bold green]Wrote MVP manifest:[/bold green] {out_path}")
 
 
 @app.command("stages")

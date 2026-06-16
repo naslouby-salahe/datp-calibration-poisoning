@@ -35,8 +35,12 @@ class Cp2StageConfig:
         scale: Experiment scale, or None for non-execution stages.
         dataset: Target dataset, or None for cross-dataset stages.
         allow_run: Whether this stage may trigger experiment execution.
-            Always False in Phase B; set to True only after CP2-T056
-            (for experiment stages) or CP2-T057 (for paper figures).
+            False until this stage's own ``gate`` ticket is actually
+            complete, then flipped to True for exactly that stage — not a
+            blanket Phase-B/CP2-T056 switch. NBAIOT_SMOKE (gate CP2-T043)
+            and NBAIOT_MVP (gate CP2-T044) are True because those tickets
+            are done; NBAIOT_FULL/CICIOT2023_STRETCH/PAPER_FIGURES remain
+            False because FB3/FB4/CP2-T057 are not yet satisfied.
         gate: Authorization gate required before allow_run is meaningful
             (e.g. "FB3", "FB4", "CP2-T056"). None means no additional gate.
         description: Human-readable summary for CLI output.
@@ -75,23 +79,33 @@ _STAGE_CONFIGS: dict[Cp2Stage, Cp2StageConfig] = {
         stage=Cp2Stage.NBAIOT_SMOKE,
         scale=ExperimentScale.SMOKE,
         dataset="nbaiot",
-        allow_run=False,
-        gate="CP2-T056",
+        allow_run=True,
+        gate="CP2-T043",
         description=(
-            "N-BaIoT smoke test (scale=SMOKE); validates pipeline end-to-end. "
-            "No paper-quality results. Blocked until CP2-T056 authorization."
+            "N-BaIoT real-data smoke diagnostics (scale=SMOKE; one-seed/"
+            "one-victim and one-seed/all-victims) validating pipeline "
+            "end-to-end on real clean scores. No paper-quality results. "
+            "Phase E gate — distinct from the Phase G CP2-T056 final "
+            "experiment. CP2-T043 complete (2026-06-16): directionally "
+            "correct, feasible, real-data diagnostics — allow_run=True."
         ),
     ),
     Cp2Stage.NBAIOT_MVP: Cp2StageConfig(
         stage=Cp2Stage.NBAIOT_MVP,
         scale=ExperimentScale.MVP,
         dataset="nbaiot",
-        allow_run=False,
-        gate="CP2-T056",
+        allow_run=True,
+        gate="CP2-T044",
         description=(
-            "N-BaIoT MVP run (scale=MVP, fractions={0,0.10,0.20,0.40}, "
+            "N-BaIoT bounded MVP run (scale=MVP, fractions={0,0.10,0.20,0.40}, "
             "5 seed pairs, policies B1/B2/B4). "
-            "Primary result set. Blocked until CP2-T056 authorization."
+            "Primary Phase E result set — gated by CP2-T044 (run plan locked "
+            "+ mu_flag_threshold fixed from clean data), not by CP2-T056: "
+            "CP2-T056 depends on CP2-T049, which depends on these MVP "
+            "results, so CP2-T056 cannot be a prerequisite for this stage. "
+            "CP2-T044 complete (2026-06-16): 1620-cell bounded matrix locked, "
+            "per-seed mu_flag_threshold locked, multi-seed stability "
+            "confirmed — allow_run=True, restricted to exactly this matrix."
         ),
     ),
     Cp2Stage.NBAIOT_FULL: Cp2StageConfig(

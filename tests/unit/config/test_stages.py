@@ -73,13 +73,20 @@ class TestGetStageConfig:
 
 
 class TestAllowRun:
-    def test_no_stage_allows_run_in_phase_b(self) -> None:
-        # All stages must have allow_run=False in Phase B.
+    def test_only_stages_with_a_completed_gate_allow_run(self) -> None:
+        # NBAIOT_SMOKE (gate CP2-T043) and NBAIOT_MVP (gate CP2-T044) are
+        # done, so those two stages allow_run=True. Every other stage's gate
+        # (FB3, FB4, CP2-T057) is not yet satisfied and must stay blocked.
+        # CP2-T056 final/full experiments are not gated by any stage here.
+        expected_runnable = {Cp2Stage.NBAIOT_SMOKE, Cp2Stage.NBAIOT_MVP}
         for cfg in all_stage_configs():
-            assert not cfg.allow_run, (
-                f"Stage {cfg.stage!r} has allow_run=True; "
-                "no stage should run experiments until CP2-T056"
-            )
+            if cfg.stage in expected_runnable:
+                assert cfg.allow_run, f"Stage {cfg.stage!r} should allow_run=True"
+            else:
+                assert not cfg.allow_run, (
+                    f"Stage {cfg.stage!r} has allow_run=True but its gate "
+                    "is not recorded as satisfied"
+                )
 
 
 class TestGateRequirements:

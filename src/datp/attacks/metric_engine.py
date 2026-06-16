@@ -277,15 +277,23 @@ def compute_metrics(
     collection: Cp2ScoreCollection,
     pair: Cp2ThresholdPair | Cp2B4ThresholdPair,
     mu_flag_threshold: float | None,
+    *,
+    auroc_records: dict[str, Cp2AurocRecord] | None = None,
 ) -> Cp2MetricResult:
     """Compute full CP2 metric result for one threshold pair.
 
     mu_flag_threshold must be pre-computed from clean artifacts and passed in.
+    auroc_records is invariant across every cell sharing the same collection
+    (test scores are never touched by calibration poisoning) — callers
+    sweeping many cells for one collection may precompute it once via
+    ``compute_auroc_records`` and pass it here to avoid redundant recompute.
+    When omitted, it is computed internally as before.
     Returns Cp2MetricResult with all CP2 metrics.
     """
     delta_tau = compute_delta_tau(collection, pair)
     fleet_fpr = compute_fleet_fpr(collection, pair, mu_flag_threshold)
-    auroc_records = compute_auroc_records(collection)
+    if auroc_records is None:
+        auroc_records = compute_auroc_records(collection)
 
     return Cp2MetricResult(
         policy=pair.policy,

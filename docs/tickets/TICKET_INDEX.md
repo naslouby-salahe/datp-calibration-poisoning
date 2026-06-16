@@ -24,8 +24,25 @@ headers (which still read `not started`). Verified status:
 > - **Phase D (T038–T041):** `done` — smoke harness + 15 invariants pass.
 >
 > Evidence: 1003 CP2 tests pass; `ruff`/`pyright` clean on the CP2 surface; no source
-> drift. **Phases E–G remain `not started`** (gated by FB1 authorization → MVP →
-> kill-trigger). See the audit reconciliation row in `CP2_PROGRESS.md`.
+> drift.
+>
+> **Phase E entry gate (2026-06-16): superseded — FB1 executed, Phase E complete.**
+> CP2-T042 originally found FB1 triggered (no real artifacts, `config.yaml`
+> `local_epochs: 5`); the user explicitly authorized the FB1 heavy retrain the same
+> day. `local_epochs` was fixed to `1` and one E=1 federated retrain executed
+> (`datp sweep --regime a ...`, 25/25 cells, ~70 min, GPU), producing real N-BaIoT
+> clean score artifacts for all 5 training seeds (FB1 status: **closed**). Phase E
+> then ran to completion: CP2-T043/T044 diagnostics, the CP2-T044-authorized bounded
+> MVP run (CP2-T045, real execution, 1620-cell `nbaiot_mvp_manifest.json`), CP2-T046
+> (manifest audit, PASS), CP2-T047 (kill-trigger evaluation, NO KILL TRIGGER FIRES),
+> CP2-T048 (drift check, PASS) — all `done`. CP2-T049 (continue/stop/pivot decision)
+> recorded **CONTINUE**; see `_ai_tracking/decisions/CP2_DECISION_LOG.md`
+> (`CP2-T049` entry) for full rationale and the one open evidentiary caveat (RAISE
+> victim ΔTPR not yet computed). **Phase F tickets are now open for implementation
+> work; actual Phase F/G experiment execution remains separately gated at CP2-T056**
+> per CLAUDE.md §2.8. See `_ai_tracking/diagnostics/CP2-T042_nbaiot_load_dryrun.md`,
+> `_ai_tracking/run_logs/CP2_PHASE_E_ENTRY_GATE.md`,
+> `_ai_tracking/decisions/CP2_FALLBACK_REGISTER.md`, and `CP2_PROGRESS.md`.
 
 ---
 
@@ -112,7 +129,7 @@ headers (which still read `not started`). Verified status:
 | CP2-T048 | phase_e_mvp/CP2-T048.md | scientific-drift | high | T046 | T049 | [D] MVP drift check | static | C | Y |
 | CP2-T049 | phase_e_mvp/CP2-T049.md | audit | critical | T047,T048 | T050,T056 | MVP continue/stop/pivot decision | static | C | Y |
 
-## Phase F — Optional full (`phase_f_full_optional/`) — CONDITIONAL on CP2-T049 pass
+## Phase F — Optional full (`phase_f_full_optional/`) — OPEN (CP2-T049: CONTINUE, 2026-06-16); execution still gated at CP2-T056
 
 | ID | File | Type | Pri | Deps | Blocks | Purpose | Tests | Gfy | PN |
 |---|---|---|---|---|---|---|---|---|---|

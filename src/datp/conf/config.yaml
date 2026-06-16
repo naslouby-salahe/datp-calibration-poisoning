@@ -38,7 +38,7 @@ federation:
     relative_threshold: 0.005
     window: 10
     round_timeout_s: 400.0
-  local_epochs: 5
+  local_epochs: 1
 
 threshold:
   n_min: 100

@@ -37,6 +37,7 @@ from datp.artifacts.poison_names import (
     CP2_POISONING_SEEDS,
 )
 from datp.attacks.guardrails import assert_no_inplace_mutation
+from datp.attacks.cell_runner import inject_single_victim, pending_threshold
 from datp.attacks.b4_recompute import Cp2B4ThresholdPair
 from datp.attacks.inference import (
     Cp2PairedDeltas,
@@ -66,8 +67,6 @@ from datp.attacks.threshold_recompute import Cp2ThresholdPair
 from datp.testsupport.cp2_smoke_harness import (
     b4_cluster_count,
     collection_from_score_set,
-    inject_single_victim,
-    pending_threshold,
     run_smoke_cell,
     victim_seed_deltas,
 )

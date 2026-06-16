@@ -37,10 +37,16 @@ class TestCp2DryRun:
         result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_mvp"])
         assert "nbaiot_mvp" in result.output
 
-    def test_dry_run_phase_b_notice_present(self) -> None:
-        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_mvp"])
+    def test_dry_run_blocked_stage_shows_notice(self) -> None:
+        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_full"])
         # CliRunner mixes stdout+stderr into result.output by default.
-        assert "blocked" in result.output.lower() or "CP2-T056" in result.output
+        assert "blocked" in result.output.lower()
+
+    def test_dry_run_nbaiot_mvp_no_longer_blocked(self) -> None:
+        # CP2-T044 is done; allow_run=True for this stage now, so the
+        # Phase-B blocked notice must not appear.
+        result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_mvp"])
+        assert "blocked" not in result.output.lower()
 
     def test_dry_run_gated_stage_mentions_gate(self) -> None:
         result = _runner.invoke(app, ["cp2", "dry-run", "--stage", "nbaiot_full"])
