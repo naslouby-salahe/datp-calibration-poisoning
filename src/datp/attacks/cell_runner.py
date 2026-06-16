@@ -11,6 +11,7 @@ arrays are never mutated in place.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -100,6 +101,77 @@ def inject_single_victim(
         poisoned_cal=poisoned_cal,
         reservoir=reservoir,
         injection=injection,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class MultiInjectionOutcome:
+    """Result of injecting several co-victims in one MULTI_CLIENT pass.
+
+    poisoned_cal holds every eligible client's calibration array: each named
+    co-victim's is poisoned via its own independent stream (keyed by the
+    victim's client index in the seed scheme); every other eligible client's
+    is an exact copy of its clean array.
+    """
+
+    victim_ids: tuple[str, ...]
+    poisoned_cal: dict[str, np.ndarray]
+    per_victim: dict[str, InjectionOutcome]
+
+
+def inject_multi_victim(
+    collection: ScoreCollection,
+    *,
+    victim_ids: Sequence[str],
+    source: PoisoningSourceStrategy,
+    fraction: float,
+    training_seed: int,
+    poisoning_seed: int,
+    scope_idx: int = 0,
+    tail_mass: float = TAIL_MASS,
+) -> MultiInjectionOutcome:
+    """Build the poisoned calibration dict for a multi-client (co-victim) attack.
+
+    Each co-victim is poisoned independently with a stream keyed by its own
+    client index (no shared or integer-added seeds), so a co-victim's poisoned
+    array is identical to what it would receive when attacked alone under the
+    same (training_seed, poisoning_seed, scope_idx). Non-victim eligible clients
+    keep an exact copy of their clean cal. Clean arrays are never mutated.
+    """
+    ordered = sorted(set(victim_ids))
+    if len(ordered) != len(victim_ids):
+        raise ValueError(f"victim_ids must be unique; got {list(victim_ids)!r}")
+    if len(ordered) < 2:
+        raise ValueError(
+            f"multi-client attack requires at least 2 co-victims; got {ordered!r}"
+        )
+
+    per_victim: dict[str, InjectionOutcome] = {
+        vid: inject_single_victim(
+            collection,
+            victim_id=vid,
+            source=source,
+            fraction=fraction,
+            training_seed=training_seed,
+            poisoning_seed=poisoning_seed,
+            scope_idx=scope_idx,
+            tail_mass=tail_mass,
+        )
+        for vid in ordered
+    }
+
+    victim_set = set(ordered)
+    poisoned_cal: dict[str, np.ndarray] = {}
+    for cid in collection.eligible_ids:
+        if cid in victim_set:
+            poisoned_cal[cid] = per_victim[cid].poisoned_cal[cid]
+        else:
+            poisoned_cal[cid] = collection.clients[cid].cal.copy()
+
+    return MultiInjectionOutcome(
+        victim_ids=tuple(ordered),
+        poisoned_cal=poisoned_cal,
+        per_victim=per_victim,
     )
 
 

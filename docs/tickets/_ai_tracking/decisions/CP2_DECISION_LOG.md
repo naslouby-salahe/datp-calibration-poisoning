@@ -498,3 +498,49 @@ same posture as T047's analysis script).
 **Next:** Phase F tickets (CP2-T050–T055) open for implementation; CP2-T056
 remains the actual execution gate. CP2-T057 inherits the binding condition
 above.
+
+## 2026-06-17 | CP2-T050–T055 + FB4 | Phase F full-scope IMPLEMENTATION-ONLY (execution stays gated at CP2-T056)
+
+**Gate audit (required):** CP2-T049 = **CONTINUE** confirmed verbatim
+(`CP2_DECISION_LOG.md` 2026-06-16 entry). Per that decision + CLAUDE.md §9,
+CONTINUE opens Phase-F ticket *statuses* for implementation but does **not**
+authorize any experiment run; Phase-F/G execution (fraction 0.05, pairs/triples,
+defense, CICIoT2023) remains gated at **CP2-T056**. The handed Phase-F agent
+prompt asked to "run" Phase-F experiments; running them now would be a §9
+hard-stop violation. **User decision: proceed implementation-only.**
+
+**Done (implementation + read-only audits; NO runs):**
+- **CP2-T050** — `FULL_SWEEP_FRACTIONS=(0,0.05,0.10,0.20,0.40)`;
+  `enumerate_full_sweep_matrix` (strict superset of bounded; diff = 0.05 cells);
+  guardrail full grid now sourced from the constant. All other locks intact.
+- **CP2-T051** — `compromise_patterns.py` (`select_pairs`, `select_triples`
+  default 20, `SeedSequence([400])`); `inject_multi_victim` with independent
+  per-co-victim streams keyed by client_idx (no integer addition; clean arrays
+  not mutated).
+- **CP2-T052** — trimmed-calibration defense (`defenses.py`); trim from config
+  (`trim_fraction`, primary 5% / appendix 10%); applied before percentile and B4
+  fingerprint via a defended collection feeding the existing pipeline. Honest:
+  partial/conditional mitigation, no robustness overclaim.
+- **CP2-T054** — CICIoT2023 feasibility: **INFEASIBLE-NOW (DEFERRED)** — raw CSVs
+  + code exist, but no processed features / E=1 scores / provenance; downstream
+  pipeline is a heavy run gated at CP2-T056. Pseudo-clients are file-level, not
+  devices. **FB4 NOT TRIGGERED** (no stretch data ⇒ no B4-K instability test
+  either; primary K=3 untouched).
+- **CP2-T055** — Full-scope drift check: **PASS**. No protocol-lock drift in the
+  implementation; greps clean; 601 unit tests pass; pyright/ruff clean.
+
+**Gated (cannot complete now):**
+- **CP2-T053** — defense regression/recovery audit requires CP2-T052's *real
+  run* (T053 §1); recorded GATED until CP2-T056.
+
+**Verification:** pyright 0 errors on changed source+tests; ruff clean
+(project default select) on changed files; `pytest tests/unit/attacks
+tests/unit/thresholding tests/unit/config` → 601 passed.
+
+**No locks loosened:** FULL/STRETCH stages keep `allow_run=False`; B4 K=3, E=1,
+REPLACE_FIXED_BUDGET, victim-local reservoirs, seed scheme, mu_flag pre-poison
+lock — all untouched. All work is uncommitted working tree.
+
+**Next:** Phase G / CP2-T056 (final experiment run) when explicitly authorized;
+it inherits the run-output drift re-check and (if CONTINUE-Full) the new
+full-scope/multi-client/defense matrices. CP2-T053 re-opens post-run.

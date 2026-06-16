@@ -901,3 +901,59 @@ differently per §15's mixed wording).
   (fields: `cv_fpr`, `mean_fpr`, `coverage_ratio`, `n_eligible`)
 - `src/datp/attacks/mvp_manifest.py` (`Cp2MvpResultRow` schema — confirms
   no TPR/BA/F1 field)
+
+---
+
+## CP2-T050–T055 + FB4 — Phase F full-scope IMPLEMENTATION (no runs) — 2026-06-17
+
+**Context:** CP2-T049 = CONTINUE opened Phase F. Under the implementation-only
+authorization (execution gated at CP2-T056), the full-scope code/config and the
+read-only feasibility/drift audits were completed; **no Phase-F experiment ran.**
+
+### Claims enabled (capability, not results)
+- The codebase can now enumerate the full-scope matrix (fraction grid
+  `{0,0.05,0.10,0.20,0.40}`), run multi-client (pairs + 20 triples) with
+  independent per-co-victim SeedSequence streams (`compromise_pattern_seed=400`),
+  and apply a trimmed-calibration defense (`t=5%` primary, `t=10%` appendix)
+  before the threshold percentile and B4 fingerprint. These are *methods*
+  available for the paper's full-scope/defense sections **once executed**.
+
+### Claims blocked / do-not-claim
+- **Do not report any Phase-F numbers** (0.05 dose-response, multi-client
+  compound/spillover, defense recovery/regression, CICIoT2023) — nothing has run.
+  Phase-F results require CP2-T056 execution + CP2-T053/T055 run-output audits.
+- **Defense — do not overclaim robustness.** Trimmed calibration is *partial,
+  conditional* mitigation: it removes injected tail contamination only when the
+  trim fraction covers it; in the realistic in-range-reservoir regime (sources
+  sample the victim's clean tail) symmetric trimming at q=0.95 can leave |Δτ|
+  barely changed or slightly worse, and it imposes a calibration-cardinality
+  (coverage/utility) cost. Frame as "partial mitigation with cost," report the
+  defense regardless of outcome, and disclose failure/over-trim cases.
+- **CICIoT2023 — INFEASIBLE-NOW.** No processed features / E=1 scores /
+  provenance exist; the stretch cannot run under current artifacts/gate. If ever
+  run, it is **external-validity only, never confirmatory**, with the mandatory
+  **pseudo-client caveat** (file-level `MERGED_FILE`, not physical devices).
+  N-BaIoT (physical devices) remains the sole primary regime. Edge-IIoTset
+  forbidden.
+
+### Limitations to disclose
+- Full-scope, multi-client, and defense results are pending execution; the paper
+  must not present Phase-F capability as Phase-F evidence.
+
+### Figures/tables affected (when executed)
+- Dose-response figure gains a low-budget point at f=0.05.
+- New (future) tables: multi-client compound/spillover; defense recovery vs
+  regression per policy. None populated yet.
+
+### Reviewer-risk relevance
+- A reviewer will probe defense overclaims and CICIoT2023 device framing — the
+  honest "partial mitigation / pseudo-client / external-validity" posture above
+  is the defensible wording.
+
+### Evidence path
+- `_ai_tracking/audits/CP2-T054_ciciot2023_feasibility_preaudit.md`
+- `_ai_tracking/audits/CP2-T055_full_scope_drift_check.md`
+- `_ai_tracking/audits/CP2-T053_defense_regression_audit_GATED.md`
+- `_ai_tracking/decisions/CP2_FALLBACK_REGISTER.md` (FB4 detail)
+- `src/datp/attacks/{compromise_patterns,defenses}.py`,
+  `src/datp/attacks/{poison_enums,bounded_sweep_matrix,cell_runner,guardrails}.py`

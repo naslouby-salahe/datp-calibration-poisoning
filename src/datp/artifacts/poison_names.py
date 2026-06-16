@@ -40,6 +40,12 @@ TAIL_MASS: float = 0.10
 MATERIALITY_FACTOR: float = 0.1
 THRESHOLD_QUANTILE: float = 0.95  # Calibration quantile for threshold derivation.
 
+# Trimmed-calibration defense: symmetric trim fraction removed from each tail
+# before the threshold quantile and before B4 fingerprinting. Primary t=5%;
+# t=10% is appendix-only.
+TRIM_FRACTION_PRIMARY: float = 0.05
+TRIM_FRACTION_APPENDIX: float = 0.10
+
 # Locked B4 hyperparameters for N-BaIoT (Regime A).
 B4_K: int = 3
 B4_N_INIT: int = 10

@@ -5,6 +5,7 @@ from datp.attacks.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
     BOUNDED_SWEEP_OBJECTIVES,
     BOUNDED_SWEEP_SOURCES,
+    FULL_SWEEP_FRACTIONS,
     AttackerObjective,
     AuditDisposition,
     CalibrationInjectionRule,
@@ -175,3 +176,14 @@ class TestMvpFractions:
 
     def test_zero_fraction_present(self) -> None:
         assert 0.0 in BOUNDED_SWEEP_FRACTIONS
+
+
+class TestFullSweepFractions:
+    def test_full_grid_adds_005(self) -> None:
+        assert FULL_SWEEP_FRACTIONS == (0.0, 0.05, 0.10, 0.20, 0.40)
+
+    def test_full_grid_is_bounded_plus_005(self) -> None:
+        assert set(BOUNDED_SWEEP_FRACTIONS) | {0.05} == set(FULL_SWEEP_FRACTIONS)
+
+    def test_full_grid_has_five_fractions(self) -> None:
+        assert len(FULL_SWEEP_FRACTIONS) == 5

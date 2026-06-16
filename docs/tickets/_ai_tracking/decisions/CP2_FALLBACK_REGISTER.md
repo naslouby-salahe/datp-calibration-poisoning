@@ -16,7 +16,7 @@ Status vocabulary: `not triggered`, `TRIGGERED — awaiting authorization`,
 | **FB1** | Clean score artifacts fail provenance (absent / not E=1) | **executed** | **granted 2026-06-16** (user authorized heavy retrain + E=1 config fix) | below |
 | FB2 | (Phase C conditional) | not triggered | — | `CP2-FB2.md` |
 | FB3 | (Phase A conditional) | not triggered | — | `CP2-FB3.md`; CP2-T011 audit ("FB3 NOT triggered") |
-| FB4 | CICIoT2023 stretch feasibility gate | not triggered | — | `CP2-FB4.md` (Phase F, conditional on T049 CONTINUE) |
+| FB4 | CICIoT2023 stretch feasibility gate / B4 K instability | **not triggered** (T054 verdict: INFEASIBLE-NOW) | — | `CP2-T054` feasibility report; below |
 
 ---
 
@@ -64,3 +64,25 @@ compute/GPU is unavailable, record a blocker per FB1 §12.
 all 5 training seeds and pass `verify_all_score_cells` (18/18 checks each, 9/9
 clients eligible). See decision log `2026-06-16 | FB1 | AUTHORIZED by human —
 executing E=1 retrain`. **FB1 status: closed.**
+
+---
+
+## FB4 — detail
+
+**Status:** not triggered. **Evaluated:** 2026-06-16, CP2-T054.
+
+**Both triggers checked, neither fires:**
+1. *CICIoT2023 stretch feasible* — **NO.** CP2-T054 verdict is INFEASIBLE-NOW
+   (DEFERRED): raw CSVs and code exist, but no processed features, no E=1 scores,
+   and no provenance/control origin exist; producing them is a heavy run gated at
+   CP2-T056 and not permitted under the current implementation-only
+   authorization. Eligibility and reservoir feasibility are therefore unknowable
+   now. See `_ai_tracking/audits/CP2-T054_ciciot2023_feasibility_preaudit.md`.
+2. *B4 `K=3` unstable on stretch data* — **NO.** There is no CICIoT2023 stretch
+   data on which K-instability could be shown; the N-BaIoT primary `K=3` lock is
+   untouched and was confirmed stable by CP2-T046 / CP2-T048 (no drift).
+
+**Effect:** CICIoT2023 stays excluded from primary/confirmatory claims (always
+was); Edge-IIoTset remains forbidden. FB4 may only be revisited if a future
+CONTINUE+CP2-T056 authorization funds a CICIoT2023 preprocess+train+score run
+whose artifacts then pass an E=1 provenance check (re-run CP2-T054 first).

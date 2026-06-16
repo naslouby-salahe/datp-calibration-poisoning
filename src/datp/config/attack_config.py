@@ -21,6 +21,7 @@ from datp.artifacts.poison_names import (
     POISONING_SEEDS,
     TAIL_MASS,
     TRAINING_SEEDS,
+    TRIM_FRACTION_PRIMARY,
 )
 from datp.attacks.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
@@ -127,6 +128,9 @@ class CalibrationPoisoningConfig(BaseModel):
     knowledge: PoisoningKnowledge
     target_scope: PoisoningTargetScope
     defense: PoisoningDefense = PoisoningDefense.NONE
+    # Trimmed-calibration symmetric trim fraction; used only when
+    # defense == TRIMMED_CALIBRATION. Primary t=5%; t=10% is appendix-only.
+    trim_fraction: float = Field(default=TRIM_FRACTION_PRIMARY, ge=0.0, lt=0.5)
     scale: ExperimentScale
 
     # Fraction grid: bounded sweep = {0, 0.10, 0.20, 0.40}; Full adds 0.05 (gated).

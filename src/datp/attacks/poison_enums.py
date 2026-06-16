@@ -98,6 +98,11 @@ class AuditDisposition(enum.StrEnum):
 # Locked bounded fraction grid — do not extend without a ticket.
 BOUNDED_SWEEP_FRACTIONS: tuple[float, ...] = (0.0, 0.10, 0.20, 0.40)
 
+# Full-scope fraction grid — the bounded grid plus 0.05, refining the
+# dose-response curve at low attack budgets. Authorized only under the
+# full-scope CONTINUE decision; execution remains separately gated.
+FULL_SWEEP_FRACTIONS: tuple[float, ...] = (0.0, 0.05, 0.10, 0.20, 0.40)
+
 # Default threshold policies in iteration order.
 DEFAULT_POLICIES: tuple[ThresholdPolicy, ...] = (
     ThresholdPolicy.B1_GLOBAL,

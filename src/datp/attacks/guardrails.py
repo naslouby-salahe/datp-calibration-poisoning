@@ -15,6 +15,7 @@ import numpy as np
 
 from datp.attacks.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
+    FULL_SWEEP_FRACTIONS,
     ExperimentScale,
     ThresholdPolicy,
 )
@@ -112,7 +113,7 @@ def assert_policy_not_b3(policy: ThresholdPolicy) -> None:
 # Fraction-grid guardrail
 # ---------------------------------------------------------------------------
 
-_FULL_FRACTIONS: frozenset[float] = frozenset(BOUNDED_SWEEP_FRACTIONS) | {0.05}
+_FULL_FRACTIONS: frozenset[float] = frozenset(FULL_SWEEP_FRACTIONS)
 
 
 def assert_fractions_in_locked_grid(
