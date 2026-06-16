@@ -101,8 +101,6 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("data/catalog.py", "DatasetSpec", "device_ids"),
         ("data/catalog.py", "DatasetSpec", "attack_family_dirs"),
         ("data/catalog.py", "DatasetSpec", "expected_client_count"),
-        # CalibrationPoisoningConfig: seed=0 is the canonical default for reproducibility
-        ("attacks/poisoning_config.py", "CalibrationPoisoningConfig", "seed"),
         # Cp2HolmResult.descriptive_only: CP2 protocol lock — Holm is ALWAYS descriptive
         # only in CP2; True is the only valid value; False would be a protocol violation
         ("attacks/inference.py", "Cp2HolmResult", "descriptive_only"),
