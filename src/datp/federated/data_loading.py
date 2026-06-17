@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import ctypes
 import gc
 from collections.abc import Sequence
@@ -24,8 +23,10 @@ _MODULE = "federated.data_loading"
 def release_freed_heap() -> None:
     """Return freed heap pages to OS via glibc malloc_trim; prevents RSS growth from malloc arena fragmentation during repeated large DataFrame allocations in Ray actors."""
     gc.collect()
-    with contextlib.suppress(OSError, AttributeError):
+    try:
         ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError) as exc:
+        logger.debug("malloc_trim unavailable; heap not compacted", reason=str(exc))
 
 
 # TRAINING_SPLITS avoids loading the massive test_attack artifacts (~3 GB for 9 N-BaIoT clients).
@@ -131,13 +132,13 @@ def load_client_data(
             Split.TRAIN,
             first_train_df_override=first_train_df if i == 0 else None,
         )
-        val_t = _load_or_empty(cdir, Split.CAL, first_train_df_override=None)
+        cal_t = _load_or_empty(cdir, Split.CAL, first_train_df_override=None)
         tb_t = _load_or_empty(cdir, Split.TEST_BENIGN, first_train_df_override=None)
         ta_t = _load_or_empty(cdir, Split.TEST_ATTACK, first_train_df_override=None)
 
         client_data[cid] = ClientData(
             train=train_t,
-            val=val_t,
+            cal=cal_t,
             test_benign=tb_t,
             test_attack=ta_t,
         )

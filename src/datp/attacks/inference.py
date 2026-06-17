@@ -24,7 +24,10 @@ from typing import Literal
 import numpy as np
 from statsmodels.stats.multitest import multipletests
 
+from datp.core.logging import get_logger
 from datp.statistics.bootstrap import BootstrapResult, bootstrap_ci
+
+logger = get_logger(__name__)
 
 # Locked inference parameters.
 _N_POISONING_SEEDS: int = 5
@@ -102,7 +105,14 @@ def compute_seed_aggregates(
             for victim_dict in paired.deltas.values()
             if s in victim_dict and victim_dict[s].feasible
         ]
-        result[s] = float(np.mean(feasible_deltas)) if feasible_deltas else float("nan")
+        if feasible_deltas:
+            result[s] = float(np.mean(feasible_deltas))
+        else:
+            logger.warning(
+                "no feasible victims for poisoning seed; seed aggregate is nan",
+                poisoning_seed=s,
+            )
+            result[s] = float("nan")
     return result
 
 

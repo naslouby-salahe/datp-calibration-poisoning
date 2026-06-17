@@ -153,23 +153,23 @@ class TestEvaluateBenign:
 
     def test_returns_positive_loss(self) -> None:
         model = _make_model()
-        val_data = torch.randn(8, 4)
-        loss = evaluate_benign(model, val_data)
+        cal_data = torch.randn(8, 4)
+        loss = evaluate_benign(model, cal_data)
         assert loss > 0.0
 
     def test_model_set_to_eval(self) -> None:
         model = _make_model()
         model.train()
-        val_data = torch.randn(8, 4)
-        evaluate_benign(model, val_data)
+        cal_data = torch.randn(8, 4)
+        evaluate_benign(model, cal_data)
         assert not model.training
 
     def test_perfect_reconstruction_gives_zero_loss(self) -> None:
         model = _make_model()
-        val_data = torch.zeros(4, 4)
+        cal_data = torch.zeros(4, 4)
         # Zero input with identity-like model won't give exactly zero,
         # but at least it should be non-negative.
-        loss = evaluate_benign(model, val_data)
+        loss = evaluate_benign(model, cal_data)
         assert loss >= 0.0
 
 

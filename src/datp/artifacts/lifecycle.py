@@ -18,13 +18,15 @@ def _get_logger() -> Any:
 
 
 def check_run_state(run_dir: Path) -> RunState:
-    """Absent or conflicting markers -> CORRUPT."""
+    """No markers -> UNSTARTED. Conflicting markers (>1) -> CORRUPT."""
     has_in_progress = (run_dir / ArtifactFile.RUN_IN_PROGRESS).exists()
     has_done = (run_dir / ArtifactFile.RUN_DONE).exists()
     has_aborted = (run_dir / ArtifactFile.RUN_ABORTED).exists()
 
     marker_count = sum([has_in_progress, has_done, has_aborted])
-    if marker_count != 1:
+    if marker_count == 0:
+        return RunState.UNSTARTED
+    if marker_count > 1:
         return RunState.CORRUPT
 
     if has_done:

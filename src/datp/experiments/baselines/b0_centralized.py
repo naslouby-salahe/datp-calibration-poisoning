@@ -206,6 +206,11 @@ def _run_b0_impl(
 
         global_scaler = None
         if normalization_mode == B0NormalizationMode.POOLED_ZSCORE:
+            logger.warning(
+                "POOLED_ZSCORE applies a second z-score scaler on top of already "
+                "per-client-scaled prepared data; metrics are not comparable to "
+                "PER_CLIENT_PREPARED baseline runs"
+            )
             global_scaler = fit_scaler(pooled_train)
             pooled_train = apply_scaler(pooled_train, global_scaler)
             pooled_cal = apply_scaler(pooled_cal, global_scaler)

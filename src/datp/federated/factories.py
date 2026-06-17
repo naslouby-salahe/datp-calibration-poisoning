@@ -67,7 +67,7 @@ def make_client_fn(
     """Build a Flower client_fn that maps partition-id to a DatpClient subclass.
 
     Args:
-        client_data: mapping of client_id -> ClientData (train/val tensors).
+        client_data: mapping of client_id -> ClientData (train/cal tensors).
         client_ids: ordered client IDs matching partition indices.
         cfg: experiment config.
         device: torch device for model and data.
@@ -110,7 +110,7 @@ def make_client_fn(
                 cid=client_id,
                 model=model,
                 train_data=train_t,
-                val_data=cal_t,
+                cal_data=cal_t,
                 cfg=cfg,
                 **_extra,
             ).to_client()
@@ -128,7 +128,7 @@ def make_client_fn(
             cid=client_id,
             model=model,
             train_data=splits.train.to(device, non_blocking=True),
-            val_data=splits.val.to(device, non_blocking=True),
+            cal_data=splits.cal.to(device, non_blocking=True),
             cfg=cfg,
             **_extra,
         ).to_client()

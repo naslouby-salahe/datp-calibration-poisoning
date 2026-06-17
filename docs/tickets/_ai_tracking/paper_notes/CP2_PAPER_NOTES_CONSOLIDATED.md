@@ -957,3 +957,130 @@ read-only feasibility/drift audits were completed; **no Phase-F experiment ran.*
 - `_ai_tracking/decisions/CP2_FALLBACK_REGISTER.md` (FB4 detail)
 - `src/datp/attacks/{compromise_patterns,defenses}.py`,
   `src/datp/attacks/{poison_enums,bounded_sweep_matrix,cell_runner,guardrails}.py`
+
+---
+
+## Scientific-audit fixes (code-review 2026-06-17)
+
+### Issue 1 — Threshold quantile on calibration data: oracle knowledge disclosure
+
+**Claim enabled:** none new; this is a disclosure requirement.
+
+**Limitation to disclose:** The quantile threshold τ is derived from each client's
+calibration split using `percentile_threshold(cal_errors, q=q)`. In the attack study,
+the attacker poisons the **same calibration split** that the threshold is learned from.
+This dual role (calibration source + poisoning surface) must be stated prominently in
+the threat model: *the attacker has oracle knowledge of the calibration distribution
+and replaces values drawn from the victim-local reservoir, which is also the calibration
+set.* This is **by design** for this attack study — it demonstrates the worst-case
+vulnerability when an adversary controls the calibration channel — but reviewers will
+probe it. Do not claim the result applies to defenders who can isolate threshold
+derivation from the poisoned channel.
+
+**Do-not-claim:** The attack is not applicable to architectures where the threshold
+derivation source is independent of the poisoning surface.
+
+**Evidence path:** `src/datp/thresholding/thresholds.py` (`percentile_threshold`),
+`src/datp/attacks/reservoir.py`, `src/datp/attacks/injector.py`.
+
+---
+
+### Issue 2 — B4 K-means: fixed K=3, no silhouette selection
+
+**Claim enabled:** B4 results are valid for K=3 with N-BaIoT 9-device clients.
+
+**Limitation to disclose:** K=3 is a pre-specified hyperparameter locked per the
+experimental protocol (CLAUDE.md §3.6). The `k_candidates=[k]` call in
+`b4_recompute.py` deliberately disables silhouette-based adaptive K selection to
+prevent silent cross-run deviation. The paper must report sensitivity of B4 results
+to K choice. If K=3 is suboptimal for any seed/regime, the B4 policy is at a
+disadvantage relative to an adaptive-K variant.
+
+**Figure/table affected:** B4 threshold and CV(FPR) tables; add a sensitivity
+appendix row varying K ∈ {2, 3, 4} on the clean (unpoisoned) baseline.
+
+**Reviewer-risk:** Reviewers will ask why K is fixed. Answer: reproducibility lock;
+the paper discloses and provides a sensitivity check.
+
+**Evidence path:** `src/datp/attacks/b4_recompute.py:_run_b4`,
+`src/datp/artifacts/poison_names.py` (B4_K=3 constant).
+
+---
+
+### Issue 10 — B2 communication overhead reported as zero
+
+**Claim enabled:** B2 is the lowest-overhead policy in threshold calibration.
+
+**Limitation to disclose:** `compute_threshold_comm(B2)` returns 0 bytes for
+both uplink and downlink. This reflects the model assumption that B2 computes
+thresholds locally from each client's own calibration scores with no server
+coordination. Any coordination signal (e.g., a trigger or global quantile
+broadcast) is outside scope and treated as zero. The paper must note this
+modelling choice and that the comparison is relative to the threshold-calibration
+phase only; FL training communication is shared and identical across B1–B4.
+
+**Do-not-claim:** B2's total communication cost is zero (training rounds dominate).
+
+**Evidence path:** `src/datp/federated/communication.py:compute_threshold_comm`.
+
+---
+
+### Issue 11 — Bootstrap CIs on attack metrics: infrastructure confirmed active
+
+**Claim enabled:** Bootstrap confidence intervals on seed-level Δτ aggregates are
+computed and are the **primary inferential tool**.
+
+**Note:** The bootstrap infrastructure in `statistics/bootstrap.py` IS used —
+`attacks/inference.py:bootstrap_seed_aggregates` calls `bootstrap_ci` on the 5
+seed-level aggregates per (policy, fraction, source, objective) cell, returning
+`BootstrapResult` with `ci_lower`, `ci_upper`, `excludes_zero`, and `mean_delta`.
+The paper should present these CIs (95% percentile bootstrap, n=10,000) as primary
+evidence of attack effectiveness, with the sign test and Holm-adjusted p-values as
+supporting/descriptive only (per the two-layer inference design).
+
+**Figure/table affected:** All attack-effectiveness tables should include the CI column.
+
+**Evidence path:** `src/datp/attacks/inference.py` (`compute_inference`,
+`bootstrap_seed_aggregates`), `src/datp/statistics/bootstrap.py`.
+
+---
+
+### Issue 13 — Sign-test ≥4/5 threshold: Type I error rate disclosure
+
+**Claim enabled:** Sign consistency (≥4/5 seeds in expected direction) is a
+supporting indicator of attack directionality.
+
+**Limitation to disclose:** The ≥4/5 consistency threshold used in `sign_test()`
+has a one-tailed Type I error rate of P(X≥4 | H₀: p=0.5, n=5) = C(5,4)×(0.5)⁵ +
+C(5,5)×(0.5)⁵ = 6/32 ≈ 18.75%. This is too liberal for a primary inferential claim.
+The code explicitly designates the sign test as **supporting evidence only** (not
+inferential), with the bootstrap CI as the primary tool. The paper must not use
+"≥4/5 sign consistency" language to claim significance — use it only to describe
+directional concordance. The Wilcoxon signed-rank infrastructure (`statistics/wilcoxon.py`)
+is available if a stronger non-parametric test is needed.
+
+**Do-not-claim:** Sign consistency alone establishes statistical significance.
+
+**Evidence path:** `src/datp/attacks/inference.py:sign_test`,
+`_SIGN_CONSISTENCY_THRESHOLD = 4`.
+
+---
+
+### Issue 15 — Regime C excluded from checkpoint selection protocol
+
+**Claim enabled:** none; this is a scope limitation.
+
+**Limitation to disclose:** The `checkpoint protocol summary` CLI command
+(`app/cli/checkpoint_protocol.py:_load_metrics`) loads only B1 and B2 metrics
+for Regime A when selecting the global primary checkpoint round. Regime C
+(Dirichlet non-IID) is excluded from this selection. If the optimal checkpoint
+round differs between Regime A and Regime C, using the Regime-A-selected round
+for Regime C evaluation introduces a bias. The paper must acknowledge that
+checkpoint selection was performed on Regime A and applied uniformly, and must
+report whether Regime C results are sensitive to checkpoint round choice.
+
+**Figure/table affected:** Regime C evaluation tables; add a note on checkpoint
+selection methodology in the experimental setup section.
+
+**Evidence path:** `src/datp/app/cli/checkpoint_protocol.py:_load_metrics` (line 165,
+`Baseline.B1, Baseline.B2` only, `Regime.A` layout).

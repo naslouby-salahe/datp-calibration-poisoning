@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from math import floor
 from pathlib import Path
 
 import numpy as np
@@ -102,8 +103,8 @@ def _stratified_split(
         rng.shuffle(dev_indices)
 
         n = len(dev_indices)
-        n_train = max(1, round(n * train_frac))
-        n_cal = max(0, round(n * cal_frac))
+        n_train = max(1, floor(n * train_frac))
+        n_cal = max(0, floor(n * cal_frac))
         if n_train + n_cal > n:
             n_cal = max(0, n - n_train)
 
