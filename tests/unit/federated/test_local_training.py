@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Proprietary
-"""Tests for datp.training.local — shared local training mechanics."""
+"""Tests for datp.federated.local_training — shared local training mechanics."""
 
 from __future__ import annotations
 

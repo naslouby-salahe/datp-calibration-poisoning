@@ -53,7 +53,7 @@ else
 
 PYTHON      := .venv/bin/python
 PYTEST      := $(PYTHON) -m pytest
-DATP        := $(PYTHON) -m datp.cli
+DATP        := $(PYTHON) -m datp.app.cli
 OUTPUTS_DIR := outputs
 
 # ---------------------------------------------------------------------------
@@ -106,9 +106,9 @@ gate-all: gates  ## Alias for gates
 	@:
 
 gate0:  ## Verify Gate 0 conditions (environment)
-	$(PYTEST) tests/unit/core/test_seeds.py tests/unit/training/fl/test_determinism.py \
+	$(PYTEST) tests/unit/core/test_seeds.py tests/unit/federated/test_determinism.py \
 		tests/unit/config/test_config_validation.py tests/unit/artifacts/test_artifacts.py \
-		tests/unit/training/fl/test_resources.py tests/integration/diagnostic/test_smoke_env.py \
+		tests/integration/diagnostic/test_smoke_env.py \
 		--tb=short -q
 	$(PYTHON) -c "import datp; datp.check_imports(); print('G0-1: PASS')"
 
@@ -118,24 +118,23 @@ gate1:  ## Verify Gate 1 conditions (data preparation)
 		tests/integration/data/regime_c/test_data_regime_c.py \
 		tests/integration/data/test_data_audit.py \
 		tests/unit/data/common/test_storage_format.py \
-		tests/unit/data/common/test_manifest.py \
+		tests/unit/data/test_manifest.py \
 		tests/unit/data/common/test_schema_audit.py \
 		--tb=short -q
 
 gate2:  ## Verify Gate 2 conditions (centralized/local baselines)
-	$(PYTEST) tests/unit/baselines/main/test_baseline_b0.py \
-		tests/unit/baselines/main/test_thresholds.py \
-		tests/unit/baselines/main/test_threshold_strategies.py \
+	$(PYTEST) tests/unit/thresholding/strategies/test_b0_centralized.py \
+		tests/unit/thresholding/test_thresholds.py \
+		tests/unit/thresholding/strategies/test_threshold_strategies.py \
 		tests/unit/statistics/test_statistics.py \
 		tests/unit/models/test_model.py \
 		--tb=short -q
 
-gate3-code:  ## Verify Gate 3 code-testable conditions (18/20)
-	$(PYTEST) tests/integration/training/test_fl_simulation.py \
-		tests/unit/training/fl/test_convergence.py \
-		tests/unit/baselines/main/test_threshold_strategies.py \
-		tests/integration/baselines/main/test_baseline_scope.py \
-		tests/integration/training/test_comm_overhead.py \
+gate3-code:  ## Verify Gate 3 code-testable conditions
+	$(PYTEST) tests/integration/federated/test_fl_simulation.py \
+		tests/unit/federated/test_convergence.py \
+		tests/unit/thresholding/strategies/test_threshold_strategies.py \
+		tests/integration/thresholding/test_baseline_scope.py \
 		tests/unit/models/test_cuda_placement.py \
 		tests/unit/artifacts/test_results_exist.py \
 		tests/unit/artifacts/test_paths.py \

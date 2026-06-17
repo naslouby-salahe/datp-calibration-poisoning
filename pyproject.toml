@@ -39,7 +39,7 @@ dependencies = [
 ]
 
 [project.scripts]
-datp = "datp.cli:cli_entry"
+datp = "datp.app.cli:cli_entry"
 
 [project.optional-dependencies]
 test = [
