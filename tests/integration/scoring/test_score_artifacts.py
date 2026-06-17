@@ -9,7 +9,7 @@ import torch
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
-from datp.core.identity import TrainingCellId
+from datp.checkpointing.enums import CheckpointProtocolMode
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import (
     ConvergenceConfig,
@@ -17,9 +17,10 @@ from datp.config.models import (
     FederationConfig,
 )
 from datp.core.device import resolve_device
-from datp.core.enums import CheckpointProtocolMode, Regime, ScoringStage
-from datp.data.splits import Split
+from datp.core.enums import Regime, ScoringStage
+from datp.core.identity import TrainingCellId
 from datp.core.seeds import set_seeds
+from datp.data.splits import Split
 from datp.federated.protocols.fedavg import run_fl_training
 from datp.federated.types import ClientData
 from datp.scoring.generation import validate_scoring_manifest

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from datp.artifacts.layout import ArtifactLayout
 from datp.app.cli.status import get_status
+from datp.artifacts.layout import ArtifactLayout
 from datp.core.enums import (
     Baseline,
     Regime,

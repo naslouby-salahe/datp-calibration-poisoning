@@ -5,8 +5,9 @@ from pathlib import Path
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import Baseline, PayloadKey, Regime
+from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.metric_enums import PayloadKey
 from datp.evaluation.artifact_validation import validate_metrics_payload
 
 

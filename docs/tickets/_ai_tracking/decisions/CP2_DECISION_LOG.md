@@ -544,3 +544,31 @@ lock — all untouched. All work is uncommitted working tree.
 **Next:** Phase G / CP2-T056 (final experiment run) when explicitly authorized;
 it inherits the run-output drift re-check and (if CONTINUE-Full) the new
 full-scope/multi-client/defense matrices. CP2-T053 re-opens post-run.
+
+---
+
+## Refactor pass (greenfield, 2026-06-17): CalibrationPoisoningConfig wiring deferred
+
+**Context:** Package-chunk refactor audit flagged `CalibrationPoisoningConfig`
+(`src/datp/config/attack_config.py`) as having zero production importers — only
+its own test suite. It encodes every single-condition scientific lock as
+Pydantic validators (E=1, REPLACE_FIXED_BUDGET, fraction grid, BOUNDED⇒
+SINGLE_CLIENT, B4 K=3).
+
+**Decision:** DEFER wiring it into the bounded sweep runner.
+`run_nbaiot_bounded_sweep` enumerates the per-cell matrix from the module-level
+locked constants (`DEFAULT_POLICIES`, `BOUNDED_SWEEP_SOURCES`,
+`BOUNDED_SWEEP_FRACTIONS`, seed pools) and assembles `BoundedSweepManifest`
+directly. The config model represents one condition with a fraction grid, while
+the runner iterates many (policy × objective × source × fraction) cells.
+Restructuring the runner to construct this model per cell is a non-trivial change
+with real regression risk and no behavioral benefit (the same locks are already
+enforced at injection/threshold time). Wiring is left to a dedicated future
+ticket.
+
+**Done now:** docstring updated to state the model is the canonical lock-validator
+home and that runner wiring is deferred; the awkward `attacks.poison_enums`
+import was removed when the protocol enums moved to `core/poison_enums.py`
+(refactor Chunk 6). Validators remain covered by `tests/unit/config/test_attack_config.py`.
+
+**No locks loosened.**

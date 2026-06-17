@@ -8,16 +8,25 @@ from __future__ import annotations
 
 import enum
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
-from datp.core.enums import (
-    Activation,
-    B4RegimeAMode,
-    Baseline,
+from datp.checkpointing.enums import (
     CheckpointArtifactPathMode,
     CheckpointConvergenceMode,
     CheckpointProtocolMode,
     PrimaryCheckpointSelectionRule,
+)
+from datp.core.enums import (
+    Activation,
+    B4RegimeAMode,
+    Baseline,
     Regime,
 )
 
@@ -133,7 +142,10 @@ class CheckpointProtocolConfig(BaseModel):
             raise ValueError("max_rounds cannot be lower than largest milestone")
         if self.primary_selection_regime != Regime.A:
             raise ValueError("checkpoint selection must use Regime A")
-        if self.primary_selection_rule != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A:
+        if (
+            self.primary_selection_rule
+            != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A
+        ):
             raise ValueError("unsupported primary checkpoint selection rule")
         if self.convergence_mode not in (
             CheckpointConvergenceMode.LOG_ONLY,
@@ -157,6 +169,7 @@ class ThresholdConfig(BaseModel):
     b4_k_regime_a: int
     b4_k_candidates: list[int]
     b4_n_init: int
+    b4_max_iter: int
     b4_random_state: int
 
 

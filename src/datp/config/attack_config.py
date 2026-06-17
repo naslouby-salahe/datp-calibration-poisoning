@@ -23,7 +23,7 @@ from datp.artifacts.poison_names import (
     TRAINING_SEEDS,
     TRIM_FRACTION_PRIMARY,
 )
-from datp.attacks.poison_enums import (
+from datp.core.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
     AttackerObjective,
     CalibrationInjectionRule,
@@ -111,6 +111,13 @@ class CalibrationPoisoningConfig(BaseModel):
 
     Enforces E=1 (rejects E=5), REPLACE_FIXED_BUDGET injection rule,
     victim-local reservoirs, and the locked fraction/seed grids.
+
+    Canonical home for the single-condition lock validators. The bounded sweep
+    runner currently enumerates the per-cell matrix from the module-level locked
+    constants directly rather than constructing this model per cell; wiring this
+    model into the runner as the per-cell construction path is deferred. The
+    validators here remain the authoritative encoding of the scientific locks and
+    are exercised by the config test suite.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

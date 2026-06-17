@@ -12,8 +12,8 @@ import pytest
 import torch.nn as nn
 
 from datp.artifacts.names import ArtifactFile
+from datp.checkpointing.enums import ConvergenceStatus, ConvergenceSummaryKey
 from datp.config.models import ConvergenceConfig
-from datp.core.enums import ConvergenceStatus, ConvergenceSummaryKey
 from datp.federated.checkpoints import (
     ConvergenceSnapshot,
     load_params_snapshot,

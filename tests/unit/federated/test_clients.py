@@ -10,10 +10,10 @@ import torch
 
 from datp.core.enums import Activation
 from datp.core.seeds import set_seeds
-from datp.modeling.autoencoder import Autoencoder
 from datp.federated.clients import DatpClient
 from datp.federated.parameters import get_parameters
 from datp.federated.types import ClientMetricKey
+from datp.modeling.autoencoder import Autoencoder
 
 
 def _make_ae(input_dim: int = 4, hidden_dims: list[int] | None = None) -> Autoencoder:

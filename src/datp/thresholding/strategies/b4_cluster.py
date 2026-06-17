@@ -11,18 +11,18 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+from datp.core.enums import B4_FINGERPRINT_FEATURES, Regime
+from datp.core.errors import fmt
+from datp.core.identity import BaselineRunId
+from datp.core.logging import get_logger
+from datp.core.regime import enforce_regime
+from datp.core.types import B4ClusterInfo, B4Metadata, ThresholdResult
 from datp.thresholding.eligibility import (
     build_threshold_result,
     compute_client_thresholds,
     identify_eligible,
 )
 from datp.thresholding.thresholds import arithmetic_mean_threshold
-from datp.core.types import B4ClusterInfo, B4Metadata, ThresholdResult
-from datp.core.enums import B4_FINGERPRINT_FEATURES, Regime
-from datp.core.identity import BaselineRunId
-from datp.core.errors import fmt
-from datp.core.logging import get_logger
-from datp.core.regime import enforce_regime
 
 logger = get_logger(__name__)
 
@@ -54,6 +54,7 @@ class _B4ComputationRequest:
     k_regime_a: int
     k_candidates: list[int]
     n_init: int
+    max_iter: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,13 +91,19 @@ def _silhouette_scores_by_k(
     k_candidates: list[int],
     random_state: int,
     n_init: int,
+    max_iter: int,
 ) -> dict[int, float]:
     # _validate_k_candidates already guarantees every k >= 2.
     scores: dict[int, float] = {}
     for k in k_candidates:
         if k >= x_scaled.shape[0]:
             continue
-        km = KMeans(n_clusters=k, random_state=random_state, n_init=int(n_init))  # type: ignore[arg-type]
+        km = KMeans(
+            n_clusters=k,
+            random_state=random_state,
+            n_init=int(n_init),  # type: ignore[arg-type]  # sklearn stubs restrict n_init to str; int is valid
+            max_iter=int(max_iter),
+        )
         labels = km.fit_predict(x_scaled)
         n_labels = len(set(labels))
         if n_labels < 2 or n_labels >= x_scaled.shape[0]:
@@ -197,14 +204,14 @@ def _select_b4_k(
     eligible_count: int,
     silhouette_scores: dict[int, float],
 ) -> tuple[int, float]:
-    # @enforce_regime on compute() guarantees regime ∈ {A, B, C, D}.
+    # @enforce_regime on compute() guarantees regime ∈ {A, B, C}.
     if regime == Regime.A:
         return _select_regime_a_k(
             k_regime_a=k_regime_a,
             eligible_count=eligible_count,
             silhouette_scores=silhouette_scores,
         )
-    # Regime B, C, or D: silhouette-based K selection.
+    # Regime B or C: silhouette-based K selection.
     k, silhouette = _select_best_k(silhouette_scores)
     logger.info("B4 selected K", k=k, silhouette=silhouette, regime=regime)
     return k, silhouette
@@ -238,8 +245,14 @@ def _fit_cluster_labels(
     k: int,
     random_state: int,
     n_init: int,
+    max_iter: int,
 ) -> np.ndarray:
-    km = KMeans(n_clusters=k, random_state=random_state, n_init=int(n_init))  # type: ignore[arg-type]
+    km = KMeans(
+        n_clusters=k,
+        random_state=random_state,
+        n_init=int(n_init),  # type: ignore[arg-type]  # sklearn stubs restrict n_init to str; int is valid
+        max_iter=int(max_iter),
+    )
     return km.fit_predict(fingerprint_scaled)
 
 
@@ -311,7 +324,9 @@ def _b4_metadata(
         k=metadata_input.k,
         cluster_info=metadata_input.cluster_info,
         silhouette=metadata_input.silhouette,
-        silhouette_scores={str(k): v for k, v in metadata_input.silhouette_scores.items()},
+        silhouette_scores={
+            str(k): v for k, v in metadata_input.silhouette_scores.items()
+        },
         fingerprints={
             cid: tuple(metadata_input.fingerprints[cid].tolist())
             for cid in eligible_ids
@@ -353,6 +368,7 @@ def _compute_b4_thresholds(request: _B4ComputationRequest) -> _B4ComputationResu
         k_candidates=valid_k_candidates,
         random_state=request.random_state,
         n_init=request.n_init,
+        max_iter=request.max_iter,
     )
     k, _ = _select_b4_k(
         regime=request.regime,
@@ -365,6 +381,7 @@ def _compute_b4_thresholds(request: _B4ComputationRequest) -> _B4ComputationResu
         k=k,
         random_state=request.random_state,
         n_init=request.n_init,
+        max_iter=request.max_iter,
     )
     final_silhouette = _final_silhouette(
         fingerprint_scaled,
@@ -412,12 +429,13 @@ def compute(
     k_regime_a: int,
     k_candidates: list[int],
     n_init: int,
+    max_iter: int,
     run: BaselineRunId,
     *,
     regime: Regime,  # noqa: ARG001 - consumed by @enforce_regime decorator
 ) -> ThresholdResult:
     # Regime A: K=k_regime_a fixed (or silhouette if k_regime_a=0);
-    # Regime B/C/D: K selected by silhouette.
+    # Regime B/C: K selected by silhouette.
     # Calibration-Pending clients receive tau_global unconditionally.
     eligible, pending = identify_eligible(client_errors, n_min=n_min)
 
@@ -441,6 +459,7 @@ def compute(
             k_regime_a=k_regime_a,
             k_candidates=k_candidates,
             n_init=n_init,
+            max_iter=max_iter,
         )
     )
 

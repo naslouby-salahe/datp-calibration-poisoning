@@ -29,7 +29,6 @@ from datp.config.models import (
 )
 from datp.core.enums import Activation, B4RegimeAMode, Baseline
 
-
 # ── SafetyBounds ──────────────────────────────────────────────────────────
 
 
@@ -40,11 +39,11 @@ class TestSafetyBounds:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            SafetyBounds(max_batch_size_train=512, bogus=1) # type: ignore[call-arg]
+            SafetyBounds(max_batch_size_train=512, bogus=1)  # type: ignore[call-arg]
 
     def test_missing_required(self) -> None:
         with pytest.raises(ValidationError):
-            SafetyBounds() # type: ignore[call-arg]
+            SafetyBounds()  # type: ignore[call-arg]
 
 
 # ── ConvergenceConfig ─────────────────────────────────────────────────────
@@ -64,18 +63,18 @@ class TestConvergenceConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            ConvergenceConfig( # type: ignore[call-arg]
+            ConvergenceConfig(  # type: ignore[call-arg]
                 rounds_initial=40,
                 rounds_max=150,
                 relative_threshold=0.005,
                 window=10,
                 round_timeout_s=400.0,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
     def test_missing_required(self) -> None:
         with pytest.raises(ValidationError):
-            ConvergenceConfig(rounds_initial=40) # type: ignore[call-arg]
+            ConvergenceConfig(rounds_initial=40)  # type: ignore[call-arg]
 
 
 # ── ModelConfig ───────────────────────────────────────────────────────────
@@ -97,7 +96,7 @@ class TestModelConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            ModelConfig( # type: ignore[call-arg]
+            ModelConfig(  # type: ignore[call-arg]
                 input_dim=115,
                 encoder_dims=[80, 40, 20],
                 lr=0.001,
@@ -105,12 +104,12 @@ class TestModelConfig:
                 patience=10,
                 activation=Activation.RELU,
                 use_bn=False,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
     def test_missing_required(self) -> None:
         with pytest.raises(ValidationError):
-            ModelConfig(input_dim=115) # type: ignore[call-arg]
+            ModelConfig(input_dim=115)  # type: ignore[call-arg]
 
 
 # ── DatasetConfig ─────────────────────────────────────────────────────────
@@ -133,7 +132,7 @@ class TestDatasetConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            DatasetConfig( # type: ignore[call-arg]
+            DatasetConfig(  # type: ignore[call-arg]
                 feature_count=115,
                 n_min=100,
                 cap=50000,
@@ -142,7 +141,7 @@ class TestDatasetConfig:
                 regime_c_cal_fraction=0.15,
                 attack_reserve_fraction=0.2,
                 nbaiot_balanced_test=False,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -211,7 +210,7 @@ class TestMachineConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            MachineConfig( # type: ignore[call-arg]
+            MachineConfig(  # type: ignore[call-arg]
                 batch_size_train=256,
                 scoring_batch_size=4096,
                 require_cuda=True,
@@ -221,7 +220,7 @@ class TestMachineConfig:
                 ray_object_store_mb=256,
                 cache_maxsize=16,
                 safety_bounds=SafetyBounds(max_batch_size_train=512),
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -244,7 +243,7 @@ class TestFederationConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            FederationConfig( # type: ignore[call-arg]
+            FederationConfig(  # type: ignore[call-arg]
                 convergence=ConvergenceConfig(
                     rounds_initial=40,
                     rounds_max=150,
@@ -253,7 +252,7 @@ class TestFederationConfig:
                     round_timeout_s=400.0,
                 ),
                 local_epochs=5,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -269,6 +268,7 @@ class TestThresholdConfig:
             b4_k_regime_a=3,
             b4_k_candidates=[2, 3, 4, 5],
             b4_n_init=10,
+            b4_max_iter=300,
             b4_random_state=42,
         )
         assert abs(t.q - 0.95) < 1e-9
@@ -282,6 +282,7 @@ class TestThresholdConfig:
             b4_k_regime_a=3,
             b4_k_candidates=[2, 3, 4, 5],
             b4_n_init=10,
+            b4_max_iter=300,
             b4_random_state=42,
         )
         assert t.b4_regime_a_mode is B4RegimeAMode.FIXED
@@ -291,10 +292,11 @@ class TestThresholdConfig:
             ThresholdConfig(
                 n_min=100,
                 q=0.95,
-                b4_regime_a_mode="invalid_mode", # type: ignore[arg-type]
+                b4_regime_a_mode="invalid_mode",  # type: ignore[arg-type]
                 b4_k_regime_a=3,
                 b4_k_candidates=[2, 3, 4, 5],
                 b4_n_init=10,
+                b4_max_iter=300,
                 b4_random_state=42,
             )
 
@@ -306,21 +308,23 @@ class TestThresholdConfig:
             b4_k_regime_a=3,
             b4_k_candidates=[2, 3, 4, 5],
             b4_n_init=10,
+            b4_max_iter=300,
             b4_random_state=42,
         )
         assert t.b4_regime_a_mode is B4RegimeAMode.SILHOUETTE
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            ThresholdConfig( # type: ignore[call-arg]
+            ThresholdConfig(  # type: ignore[call-arg]
                 n_min=100,
                 q=0.95,
                 b4_regime_a_mode=B4RegimeAMode.FIXED,
                 b4_k_regime_a=3,
                 b4_k_candidates=[2, 3, 4, 5],
                 b4_n_init=10,
+                b4_max_iter=300,
                 b4_random_state=42,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -341,13 +345,13 @@ class TestExperimentConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            ExperimentConfig( # type: ignore[call-arg]
+            ExperimentConfig(  # type: ignore[call-arg]
                 seeds=[0, 1, 2],
                 regime_c_alphas=[0.1, 0.5, 1.0],
                 regime_c_n_clients=20,
                 absorption_strong_retention=0.75,
                 absorption_partial=0.25,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -367,13 +371,13 @@ class TestStatisticsConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            StatisticsConfig( # type: ignore[call-arg]
+            StatisticsConfig(  # type: ignore[call-arg]
                 n_bootstrap=10000,
                 ci_level=0.95,
                 bootstrap_seed=42,
                 significance_alpha=0.05,
                 dispersion_threshold=0.10,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -392,12 +396,12 @@ class TestQualityGateConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            QualityGateConfig( # type: ignore[call-arg]
+            QualityGateConfig(  # type: ignore[call-arg]
                 b0_sanity_min=0.90,
                 b3_dispersion_threshold=0.25,
                 ciciot_homogeneity_threshold=0.05,
                 js_divergence_n_bins=32,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -431,17 +435,15 @@ class TestStyleConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            StyleConfig( # type: ignore[call-arg]
+            StyleConfig(  # type: ignore[call-arg]
                 dpi=300,
                 font_size=9,
                 figsize_single_col=(3.5, 2.5),
                 figsize_double_col=(7.16, 3.0),
                 baseline_colors={Baseline.B1: "#1f77b4"},
                 baseline_labels={Baseline.B1: "B1"},
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
-
-
 
 
 # ── LoggingConfig ─────────────────────────────────────────────────────────
@@ -460,13 +462,13 @@ class TestLoggingConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            LoggingConfig( # type: ignore[call-arg]
+            LoggingConfig(  # type: ignore[call-arg]
                 level="INFO",
                 json_format=False,
                 max_bytes=10485760,
                 backup_count=5,
                 training_progress_interval=10,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -483,10 +485,10 @@ class TestRuntimeConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            RuntimeConfig( # type: ignore[call-arg]
+            RuntimeConfig(  # type: ignore[call-arg]
                 lock_timeout_seconds=3600.0,
                 ray_memory_threshold=0.90,
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -503,10 +505,10 @@ class TestTrackingConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            TrackingConfig( # type: ignore[call-arg]
+            TrackingConfig(  # type: ignore[call-arg]
                 experiment_name="datp",
                 tracking_uri="sqlite:///mlruns.db",
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -532,7 +534,7 @@ class TestReportingConfig:
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            ReportingConfig( # type: ignore[call-arg]
+            ReportingConfig(  # type: ignore[call-arg]
                 figure2_max_points=5000,
                 figure2_rng_seed=42,
                 metric_tol=1e-9,
@@ -544,7 +546,7 @@ class TestReportingConfig:
                     baseline_colors={Baseline.B1: "#1f77b4"},
                     baseline_labels={Baseline.B1: "B1"},
                 ),
-                bogus=1, # type: ignore[call-arg]
+                bogus=1,  # type: ignore[call-arg]
             )
 
 
@@ -568,11 +570,11 @@ class TestDatpConfig:
 
         # frozen=True means __setattr__ raises on mutation attempt.
         with pytest.raises((TypeError, ValueError, ValidationError)):
-            BASE_CONFIG.model.input_dim = 999 # type: ignore[misc]
+            BASE_CONFIG.model.input_dim = 999  # type: ignore[misc]
 
     def test_missing_required_section_fails(self) -> None:
         with pytest.raises(ValidationError):
-            DatpConfig( # type: ignore[call-arg]
+            DatpConfig(  # type: ignore[call-arg]
                 model=ModelConfig(
                     input_dim=115,
                     encoder_dims=[80, 40, 20],

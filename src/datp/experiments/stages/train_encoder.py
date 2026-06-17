@@ -8,8 +8,8 @@ from filelock import FileLock, Timeout
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
 from datp.config.models import CheckpointProtocolConfig
-from datp.core.errors import fmt
 from datp.core.enums import DeviceType
+from datp.core.errors import fmt, fmt_missing
 from datp.core.logging import get_logger
 from datp.experiments.enums import SweepStep
 from datp.experiments.models import PipelineRequest
@@ -180,6 +180,13 @@ def _ensure_fl_checkpoint_locked(
     )
 
 
+def _require_milestones(request: PipelineRequest) -> tuple[int, ...]:
+    protocol = request.cfg.checkpoint_protocol
+    if protocol is None:
+        raise ValueError(fmt_missing(_MODULE, "configured checkpoint protocol"))
+    return protocol.milestones
+
+
 def _checkpoint_protocol_checkpoints_exist(
     request: PipelineRequest, layout: ArtifactLayout
 ) -> bool:
@@ -189,7 +196,7 @@ def _checkpoint_protocol_checkpoints_exist(
             layout.checkpoint_dir_for_round(key, checkpoint_round)
             / ArtifactFile.MODEL_CHECKPOINT
         ).exists()
-        for checkpoint_round in request.cfg.checkpoint_protocol.milestones
+        for checkpoint_round in _require_milestones(request)
     )
 
 
@@ -205,7 +212,7 @@ def _checkpoint_protocol_complete(
                 / ArtifactFile.MODEL_CHECKPOINT
             ).exists()
         )
-        for checkpoint_round in request.cfg.checkpoint_protocol.milestones
+        for checkpoint_round in _require_milestones(request)
     )
 
 
@@ -222,7 +229,7 @@ def _recover_checkpoint_protocol_scores(
     scoring_data = load_client_data(
         request.prepared_dir, device=torch.device(DeviceType.CPU), splits=ALL_SPLITS
     )
-    for checkpoint_round in request.cfg.checkpoint_protocol.milestones:
+    for checkpoint_round in _require_milestones(request):
         score_base = layout.score_cell_for_round(key, checkpoint_round).score_dir
         try:
             from datp.scoring.generation import validate_scoring_manifest

@@ -6,11 +6,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import torch
 import torch.nn as nn
-from typing import cast
-
 from flwr.client import Client, ClientApp
 from flwr.common import Context, Parameters, ndarrays_to_parameters
 from flwr.common.telemetry import EventType
@@ -21,18 +20,14 @@ from flwr.simulation.run_simulation import BackendConfig, _run_simulation
 from datp import configure_runtime_env
 from datp.artifacts.lifecycle import RunLifecycle
 from datp.artifacts.names import ArtifactDir, ArtifactFile
-from datp.federated.data_loading import (
-    ALL_SPLITS,
-    load_client_data,
-)
 from datp.config.models import CheckpointProtocolConfig, DatpConfig
+from datp.core.device import resolve_device
 from datp.core.enums import DeviceType, Regime
 from datp.core.errors import fmt
 from datp.core.logging import get_logger
 from datp.core.seeds import set_seeds
 from datp.core.tracking import log_artifact, log_metrics, log_params
 from datp.data.regimes.catalog import dataset_for_regime
-from datp.modeling.autoencoder import Autoencoder
 from datp.federated.catalog import TrainingClientCatalog
 from datp.federated.checkpoints import (
     ConvergenceSnapshot,
@@ -42,16 +37,20 @@ from datp.federated.checkpoints import (
 )
 from datp.federated.clients import DatpClient
 from datp.federated.convergence import ConvergenceMonitor
+from datp.federated.data_loading import (
+    ALL_SPLITS,
+    load_client_data,
+)
 from datp.federated.factories import build_model, make_client_fn
 from datp.federated.parameters import get_parameters, set_parameters
-from datp.core.device import resolve_device
 from datp.federated.runtime import (
     derive_client_resources,
     ensure_ray_memory_threshold,
 )
-from datp.scoring.generation import score_clients
 from datp.federated.strategies import DatpFedAvg
 from datp.federated.types import ClientData
+from datp.modeling.autoencoder import Autoencoder
+from datp.scoring.generation import score_clients
 
 logger = get_logger(__name__)
 

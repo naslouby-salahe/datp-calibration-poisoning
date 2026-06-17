@@ -5,12 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from datp.thresholding.eligibility import (
-    build_threshold_result,
-    compute_client_thresholds,
-    compute_tau_global,
-    identify_eligible,
-)
+from datp.core.enums import Baseline, Regime
+from datp.core.identity import BaselineRunId, TrainingCellId
 from datp.core.types import (
     B3FamilyInfo,
     B3Metadata,
@@ -19,8 +15,12 @@ from datp.core.types import (
     ClientThreshold,
     ThresholdResult,
 )
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.thresholding.eligibility import (
+    build_threshold_result,
+    compute_client_thresholds,
+    compute_tau_global,
+    identify_eligible,
+)
 
 
 def _run(baseline: Baseline = Baseline.B1) -> BaselineRunId:

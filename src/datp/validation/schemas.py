@@ -4,16 +4,16 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from datp.checkpointing.enums import ConvergenceStatus
 from datp.core.enums import (
     Baseline,
-    ConvergenceStatus,
-    MetricName,
     NormalizationScope,
     Regime,
     ScoringStage,
     ThresholdAggregationMethod,
     ThresholdSource,
 )
+from datp.core.metric_enums import MetricName
 from datp.data.catalog import ClientIdentity, DatasetID
 from datp.validation.constants import REGIME_C_SCOPE_NOTE
 from datp.validation.enums import (

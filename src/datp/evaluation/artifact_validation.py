@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from datp.core.enums import ConfusionKey, PayloadKey
+from datp.core.metric_enums import ConfusionKey, PayloadKey
 
 _REQUIRED_METRICS_KEYS: tuple[PayloadKey, ...] = (
     PayloadKey.SCHEMA_VERSION,

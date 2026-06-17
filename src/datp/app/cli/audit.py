@@ -21,8 +21,8 @@ def results(
     ),
 ) -> None:
     """Run the results audit and write audit artifacts."""
-    from datp.validation.constants import AUDIT_DIR
     from datp.config.compose import BASE_CONFIG
+    from datp.validation.constants import AUDIT_DIR
 
     resolved_audit_dir = (
         audit_dir if audit_dir is not None else (Path("artifacts") / AUDIT_DIR)

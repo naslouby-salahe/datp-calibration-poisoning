@@ -15,26 +15,26 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from datp.artifacts.io import write_json_atomic
 from datp.artifacts.names import ArtifactDir
+from datp.config.models import DatpConfig
+from datp.core.enums import Regime
+from datp.core.identity import TrainingCellId
 from datp.validation.constants import (
     CELL_VERDICT_JSON,
     CELL_VERDICTS_JSON,
 )
 from datp.validation.discovery import iter_score_cells
+from datp.validation.enums import AuditStatus, ReuseVerdict
 from datp.validation.metric_reproducer import (
     CellReproductionResult,
     reproduce_cell_metrics,
 )
+from datp.validation.schemas import ValidationCheck
 from datp.validation.score_manifest import (
     ScoreCellVerification,
     verify_score_cell,
 )
-from datp.validation.schemas import ValidationCheck
-from datp.artifacts.io import write_json_atomic
-from datp.config.models import DatpConfig
-from datp.validation.enums import AuditStatus, ReuseVerdict
-from datp.core.enums import Regime
-from datp.core.identity import TrainingCellId
 
 _REASON_ALL_PASS = "all checks passed"
 _MANIFEST_PREFIX = "manifest"

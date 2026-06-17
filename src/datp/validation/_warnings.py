@@ -6,7 +6,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from datp.core.enums import Baseline, Regime
-from datp.core.enums import MetricName
+from datp.core.metric_enums import MetricName
 from datp.validation.constants import (
     BLOCKED_RESUME_COMMAND,
     FLAT_CV_TPR_EPSILON,
@@ -24,7 +24,7 @@ from datp.validation.schemas import (
 )
 
 if TYPE_CHECKING:
-    from datp.validation.results import _CellPanel
+    from datp.validation._audit_types import _CellPanel
 
 
 def emit_worst_client_stability_warnings(

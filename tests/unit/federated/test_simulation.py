@@ -19,7 +19,6 @@ from datp.federated.simulation import (
 )
 from datp.federated.types import ClientData
 
-
 # ---------------------------------------------------------------------------
 # validate_regime
 # ---------------------------------------------------------------------------

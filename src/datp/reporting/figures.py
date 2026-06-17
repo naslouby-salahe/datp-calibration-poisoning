@@ -9,8 +9,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from datp.core.enums import Baseline
 from datp.config.models import StyleConfig
+from datp.core.enums import Baseline
 from datp.reporting.constants import (
     FIGURE1_STEM,
     FIGURE2_STEM,

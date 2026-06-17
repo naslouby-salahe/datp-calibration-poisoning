@@ -8,11 +8,13 @@ import numpy as np
 import pytest
 
 from datp.core.enums import ScoringStage
-from datp.scoring.loading import ScoreProvider, load_parquets_from_dir, read_score_column
+from datp.scoring.loading import (
+    ScoreProvider,
+    load_parquets_from_dir,
+    read_score_column,
+)
 from datp.scoring.schema import SCORE_COLUMN
-
 from tests.unit.conftest import _write_score_artifact
-
 
 # ── read_score_column ─────────────────────────────────────────────────────
 

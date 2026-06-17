@@ -4,19 +4,18 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from datp.core.types import MetricsProvenance, ThresholdResult
 from datp.core.enums import (
     BASELINE_THRESHOLD_SOURCE,
     THRESHOLD_AGGREGATION_BY_BASELINE,
     Baseline,
-    ConfusionKey,
-    MetricName,
     Regime,
     RunKind,
     ThresholdAggregationMethod,
     ThresholdSource,
 )
+from datp.core.metric_enums import ConfusionKey, MetricName
 from datp.core.provenance import git_commit, source_hash, utc_timestamp
+from datp.core.types import MetricsProvenance, ThresholdResult
 from datp.data.catalog import DatasetID
 from datp.evaluation.metrics import ClientEvaluationRecord, EvaluationResult
 

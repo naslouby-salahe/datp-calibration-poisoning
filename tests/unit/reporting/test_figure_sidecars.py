@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from datp.core.enums import EvidenceRole, FigureName, SeedScope, SidecarField
+from datp.checkpointing.enums import EvidenceRole
+from datp.core.enums import SeedScope
 from datp.reporting.build import _REPRESENTATIVE_SEED_FIGURES, _validate_figure_sidecars
 from datp.reporting.constants import NOT_CONFIRMATORY_WARNING
+from datp.reporting.enums import FigureName, SidecarField
 
 
 def _write_sidecar(figures_dir: Path, fig_name: str, data: dict) -> None:

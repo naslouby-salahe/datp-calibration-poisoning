@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from datp.attacks.poison_enums import (
+from datp.config.attack_config import (
+    B4ClusterConfig,
+    CalibrationPoisoningConfig,
+    SeedPools,
+)
+from datp.core.poison_enums import (
     AttackerObjective,
     CalibrationInjectionRule,
     ExperimentScale,
@@ -15,8 +20,6 @@ from datp.attacks.poison_enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.config.attack_config import B4ClusterConfig, CalibrationPoisoningConfig, SeedPools
-
 
 # ── SeedPools ──────────────────────────────────────────────────────────
 
@@ -56,12 +59,12 @@ class TestSeedPools:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            SeedPools(bogus=99) # type: ignore[call-arg]
+            SeedPools(bogus=99)  # type: ignore[call-arg]
 
     def test_frozen(self) -> None:
         pools = SeedPools()
         with pytest.raises(ValidationError):
-            pools.training = (9,) # type: ignore[misc]
+            pools.training = (9,)  # type: ignore[misc]
 
 
 # ── B4ClusterConfig ───────────────────────────────────────────────────────────
@@ -81,7 +84,7 @@ class TestB4ClusterConfig:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            B4ClusterConfig(bogus=1) # type: ignore[call-arg]
+            B4ClusterConfig(bogus=1)  # type: ignore[call-arg]
 
 
 # ── CalibrationPoisoningConfig ─────────────────────────────────────────────────────────────
@@ -97,7 +100,7 @@ def _valid_config(**overrides: object) -> CalibrationPoisoningConfig:
         "scale": ExperimentScale.BOUNDED,
     }
     defaults.update(overrides)
-    return CalibrationPoisoningConfig(**defaults) # type: ignore[arg-type]
+    return CalibrationPoisoningConfig(**defaults)  # type: ignore[arg-type]
 
 
 class TestConfigValid:
@@ -137,7 +140,7 @@ class TestConfigValid:
     def test_frozen(self) -> None:
         cfg = _valid_config()
         with pytest.raises(ValidationError):
-            cfg.local_epochs = 2 # type: ignore[misc]
+            cfg.local_epochs = 2  # type: ignore[misc]
 
 
 class TestConfigE1Enforcement:
@@ -185,7 +188,7 @@ class TestConfigInjectionRule:
         assert cfg.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
 
 
-class TestConfigMvpConstraint:
+class TestConfigBoundedScaleConstraint:
     def test_bounded_single_client_accepted(self) -> None:
         cfg = _valid_config(
             scale=ExperimentScale.BOUNDED,
@@ -194,7 +197,9 @@ class TestConfigMvpConstraint:
         assert cfg.scale == ExperimentScale.BOUNDED
 
     def test_bounded_multi_client_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="BOUNDED scale requires SINGLE_CLIENT"):
+        with pytest.raises(
+            ValidationError, match="BOUNDED scale requires SINGLE_CLIENT"
+        ):
             _valid_config(
                 scale=ExperimentScale.BOUNDED,
                 target_scope=PoisoningTargetScope.MULTI_CLIENT,

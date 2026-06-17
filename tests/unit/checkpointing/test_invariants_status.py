@@ -7,9 +7,10 @@ import pytest
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
+from datp.checkpointing.enums import CheckpointArtifactStatus
 from datp.checkpointing.invariants import validate_checkpoint_evaluation_invariants
 from datp.checkpointing.status import checkpoint_artifact_status
-from datp.core.enums import Baseline, CheckpointArtifactStatus, Regime
+from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
 from datp.core.provenance import hash_file
 from datp.core.types import MetricsProvenance

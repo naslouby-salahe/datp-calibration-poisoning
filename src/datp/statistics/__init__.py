@@ -9,7 +9,7 @@ from datp.statistics.divergence import (
     pairwise_js_summary,
 )
 from datp.statistics.effect_size import CliffsDeltaResult, cliffs_delta
-from datp.core.enums import BootstrapMethod, EffectMagnitude
+from datp.statistics.enums import BootstrapMethod, EffectMagnitude
 from datp.statistics.spearman import SpearmanResult, spearman_correlation
 from datp.statistics.wilcoxon import (
     BonferroniResult,

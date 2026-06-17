@@ -17,10 +17,9 @@ from typing import assert_never
 
 import numpy as np
 
-from datp.artifacts.poison_names import THRESHOLD_QUANTILE, TAIL_MASS
+from datp.artifacts.poison_names import TAIL_MASS, THRESHOLD_QUANTILE
 from datp.attacks.b4_recompute import B4ThresholdPair, compute_b4_pair
 from datp.attacks.injector import InjectionResult, inject_fixed_budget
-from datp.attacks.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.attacks.reservoir import ReservoirResult
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.source_strategies import select_reservoir
@@ -29,6 +28,7 @@ from datp.attacks.threshold_recompute import (
     compute_b1_pair,
     compute_b2_pair,
 )
+from datp.core.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.core.seed_sequence import make_seed_rng
 
 PolicyPair = ThresholdPair | B4ThresholdPair

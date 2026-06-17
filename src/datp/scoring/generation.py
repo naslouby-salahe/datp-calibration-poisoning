@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -13,7 +13,8 @@ import polars as pl
 import torch
 
 from datp.artifacts.io import write_json_atomic
-from datp.artifacts.names import PathToken, ArtifactFile
+from datp.artifacts.names import ArtifactFile, PathToken
+from datp.core.device import resolve_device
 from datp.core.enums import (
     SCORING_STAGES,
     Regime,
@@ -22,12 +23,15 @@ from datp.core.enums import (
 from datp.core.errors import fmt
 from datp.core.logging import get_logger
 from datp.core.provenance import git_commit, hash_file, utc_timestamp
-from datp.data.common.storage import write_artifact
-from datp.scoring.schema import SCORE_COLUMN, SCORING_MANIFEST_NOT_PROVIDED, SCORING_MANIFEST_SCHEMA_VERSION
-from datp.modeling.autoencoder import Autoencoder
-from datp.core.device import resolve_device
 from datp.data.catalog import DatasetID
+from datp.data.common.storage import write_artifact
 from datp.federated.types import ClientData
+from datp.modeling.autoencoder import Autoencoder
+from datp.scoring.schema import (
+    SCORE_COLUMN,
+    SCORING_MANIFEST_NOT_PROVIDED,
+    SCORING_MANIFEST_SCHEMA_VERSION,
+)
 
 if TYPE_CHECKING:
     from datp.config.models import DatpConfig

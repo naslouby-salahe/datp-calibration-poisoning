@@ -292,9 +292,10 @@ class TestScoreClients:
         import io
 
         import torch
+
         from datp.data.catalog import DatasetID
-        from datp.modeling.autoencoder import Autoencoder
         from datp.federated.types import ClientData
+        from datp.modeling.autoencoder import Autoencoder
         from datp.scoring.generation import score_clients, validate_scoring_manifest
 
         model = Autoencoder(

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from datp.attacks.poison_enums import ExperimentScale
 from datp.config.stages import (
     ExperimentStage,
     ExperimentStageConfig,
     all_stage_configs,
     get_stage_config,
 )
+from datp.core.poison_enums import ExperimentScale
+from datp.data.catalog import DatasetID
 
 
 class TestExperimentStage:
@@ -60,16 +61,17 @@ class TestGetStageConfig:
             ExperimentStage.NBAIOT_BOUNDED,
             ExperimentStage.NBAIOT_FULL,
         ):
-            assert get_stage_config(stage).dataset == "nbaiot"
+            assert get_stage_config(stage).dataset == DatasetID.NBAIOT
 
     def test_ciciot_stage_dataset_is_ciciot2023(self) -> None:
-        assert get_stage_config(ExperimentStage.CICIOT2023_STRETCH).dataset == "ciciot2023"
+        assert (
+            get_stage_config(ExperimentStage.CICIOT2023_STRETCH).dataset
+            == DatasetID.CICIOT2023
+        )
 
     def test_edge_iiotset_not_present(self) -> None:
         for cfg in all_stage_configs():
-            assert cfg.dataset != "edge_iiotset", (
-                "Edge-IIoTset is forbidden"
-            )
+            assert cfg.dataset != "edge_iiotset", "Edge-IIoTset is forbidden"
 
 
 class TestAllowRun:
@@ -78,7 +80,10 @@ class TestAllowRun:
         # so those two stages allow_run=True. Every other stage's gate
         # is not yet satisfied and must stay blocked.
         # final/full experiments are not gated by any stage here.
-        expected_runnable = {ExperimentStage.NBAIOT_SMOKE, ExperimentStage.NBAIOT_BOUNDED}
+        expected_runnable = {
+            ExperimentStage.NBAIOT_SMOKE,
+            ExperimentStage.NBAIOT_BOUNDED,
+        }
         for cfg in all_stage_configs():
             if cfg.stage in expected_runnable:
                 assert cfg.allow_run, f"Stage {cfg.stage!r} should allow_run=True"
@@ -121,4 +126,4 @@ class TestAllStageConfigs:
     def test_frozen_immutable(self) -> None:
         cfg = get_stage_config(ExperimentStage.NBAIOT_BOUNDED)
         with pytest.raises(Exception):
-            cfg.allow_run = True # type: ignore[misc]
+            cfg.allow_run = True  # type: ignore[misc]

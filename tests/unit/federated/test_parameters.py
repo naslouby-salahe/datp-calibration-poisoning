@@ -9,8 +9,8 @@ import torch
 import torch.nn as nn
 
 from datp.core.enums import Activation, DeviceType
-from datp.modeling.autoencoder import Autoencoder
 from datp.federated.parameters import get_parameters, set_parameters
+from datp.modeling.autoencoder import Autoencoder
 
 
 def _make_model() -> Autoencoder:

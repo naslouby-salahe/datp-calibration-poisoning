@@ -5,20 +5,20 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from datp.attacks.poison_enums import (
-    AttackerObjective,
-    CalibrationInjectionRule,
-    ExperimentScale,
-    PoisoningSourceStrategy,
-    PoisoningTargetScope,
-    ThresholdPolicy,
-)
 from datp.attacks.run_manifest import (
     RESERVOIR_MODE,
     SPLIT_SEMANTICS,
     ProvenanceRecord,
     RunManifest,
     SeedRecordModel,
+)
+from datp.core.poison_enums import (
+    AttackerObjective,
+    CalibrationInjectionRule,
+    ExperimentScale,
+    PoisoningSourceStrategy,
+    PoisoningTargetScope,
+    ThresholdPolicy,
 )
 from datp.core.seed_sequence import SeedRecord, derive_seed_record
 

@@ -4,10 +4,7 @@ import math
 
 import pytest
 
-from datp.core.enums import (
-    ConfusionKey,
-    MetricName,
-)
+from datp.core.metric_enums import ConfusionKey, MetricName
 from datp.reporting.build import _eligible_intersection_fprs, _evaluation_from_payload
 
 

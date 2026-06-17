@@ -8,11 +8,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from datp.experiments.baselines.b0_centralized import (
-    B0RunRequest,
-    run_b0 as _execute_b0,
-    run_b0_pooled_norm as _execute_b0_pooled_norm,
-)
 from datp.core.enums import (
     Activation,
     B0NormalizationMode,
@@ -23,6 +18,15 @@ from datp.core.enums import (
     ThresholdAggregationMethod,
 )
 from datp.data.splits import SPLIT_FILENAME, Split
+from datp.experiments.baselines.b0_centralized import (
+    B0RunRequest,
+)
+from datp.experiments.baselines.b0_centralized import (
+    run_b0 as _execute_b0,
+)
+from datp.experiments.baselines.b0_centralized import (
+    run_b0_pooled_norm as _execute_b0_pooled_norm,
+)
 
 
 def _make_synthetic_client(

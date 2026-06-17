@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from datp.attacks.poison_enums import (
+from datp.core.poison_enums import (
     AttackerObjective,
     CalibrationInjectionRule,
     ExperimentScale,

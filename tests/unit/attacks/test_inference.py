@@ -20,7 +20,6 @@ from datp.attacks.inference import (
 )
 from datp.statistics.bootstrap import BootstrapResult
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

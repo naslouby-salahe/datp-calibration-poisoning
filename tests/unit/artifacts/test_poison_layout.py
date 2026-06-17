@@ -12,15 +12,15 @@ from datp.artifacts.poison_names import (
     B4_MAX_ITER,
     B4_N_INIT,
     B4_RANDOM_STATE,
+    CALIBRATION_POISONING_OUTPUT_ROOT,
     COMPROMISE_PATTERN_SEED,
     MATERIALITY_FACTOR,
     N_MIN,
-    CALIBRATION_POISONING_OUTPUT_ROOT,
     TAIL_MASS,
     ManifestFile,
     RunFile,
 )
-from datp.attacks.poison_enums import (
+from datp.core.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
     AttackerObjective,
     ExperimentScale,

@@ -10,7 +10,8 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass
 
-from datp.attacks.poison_enums import ExperimentScale
+from datp.core.poison_enums import ExperimentScale
+from datp.data.catalog import DatasetID
 
 
 class ExperimentStage(enum.StrEnum):
@@ -44,7 +45,7 @@ class ExperimentStageConfig:
 
     stage: ExperimentStage
     scale: ExperimentScale | None
-    dataset: str | None
+    dataset: DatasetID | None
     allow_run: bool
     gate: str | None
     description: str
@@ -74,7 +75,7 @@ _STAGE_CONFIGS: dict[ExperimentStage, ExperimentStageConfig] = {
     ExperimentStage.NBAIOT_SMOKE: ExperimentStageConfig(
         stage=ExperimentStage.NBAIOT_SMOKE,
         scale=ExperimentScale.SMOKE,
-        dataset="nbaiot",
+        dataset=DatasetID.NBAIOT,
         allow_run=True,
         gate="smoke_diagnostics_signoff",
         description=(
@@ -86,7 +87,7 @@ _STAGE_CONFIGS: dict[ExperimentStage, ExperimentStageConfig] = {
     ExperimentStage.NBAIOT_BOUNDED: ExperimentStageConfig(
         stage=ExperimentStage.NBAIOT_BOUNDED,
         scale=ExperimentScale.BOUNDED,
-        dataset="nbaiot",
+        dataset=DatasetID.NBAIOT,
         allow_run=True,
         gate="bounded_run_lock",
         description=(
@@ -99,7 +100,7 @@ _STAGE_CONFIGS: dict[ExperimentStage, ExperimentStageConfig] = {
     ExperimentStage.NBAIOT_FULL: ExperimentStageConfig(
         stage=ExperimentStage.NBAIOT_FULL,
         scale=ExperimentScale.FULL,
-        dataset="nbaiot",
+        dataset=DatasetID.NBAIOT,
         allow_run=False,
         gate="full_scope_continue_decision",
         description=(
@@ -110,7 +111,7 @@ _STAGE_CONFIGS: dict[ExperimentStage, ExperimentStageConfig] = {
     ExperimentStage.CICIOT2023_STRETCH: ExperimentStageConfig(
         stage=ExperimentStage.CICIOT2023_STRETCH,
         scale=ExperimentScale.STRETCH,
-        dataset="ciciot2023",
+        dataset=DatasetID.CICIOT2023,
         allow_run=False,
         gate="ciciot_feasibility_decision",
         description=(

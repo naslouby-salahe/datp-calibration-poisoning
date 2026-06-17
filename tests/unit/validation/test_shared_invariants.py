@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from datp.core.enums import Baseline, Regime, ScoringStage
+from datp.validation.enums import AuditStatus
 from datp.validation.invariants import (
     InvariantHashes,
     InvariantKey,
     build_invariant_results,
 )
-from datp.validation.enums import AuditStatus
-from datp.core.enums import Baseline, Regime, ScoringStage
 
 _CELL_A = InvariantKey(Regime.A, 0, None)
 _CELL_B = InvariantKey(Regime.B, 0, None)

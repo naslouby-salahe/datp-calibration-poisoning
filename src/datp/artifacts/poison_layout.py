@@ -26,7 +26,7 @@ from datp.artifacts.poison_names import (
     ManifestFile,
     RunFile,
 )
-from datp.attacks.poison_enums import (
+from datp.core.poison_enums import (
     AttackerObjective,
     ExperimentScale,
     PoisoningSourceStrategy,

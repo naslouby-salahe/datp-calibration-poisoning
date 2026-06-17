@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import stats as sp_stats
 
-from datp.core.enums import BootstrapMethod
+from datp.statistics.enums import BootstrapMethod
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,7 +13,7 @@ from datp.attacks.run_manifest import (
     RunManifest,
     SeedRecordModel,
 )
-from datp.attacks.poison_enums import (
+from datp.core.poison_enums import (
     AttackerObjective,
     ExperimentScale,
     PoisoningSourceStrategy,
@@ -21,14 +21,13 @@ from datp.attacks.poison_enums import (
     ThresholdPolicy,
 )
 from datp.core.seed_sequence import derive_seed_record
+from datp.validation.enums import AuditStatus
 from datp.validation.provenance_gate import (
     ProvenanceCheckCode,
     ProvenanceError,
     assert_provenance_gate,
     check_provenance,
 )
-from datp.validation.enums import AuditStatus
-
 
 # ---------------------------------------------------------------------------
 # Helpers

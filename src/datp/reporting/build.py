@@ -14,27 +14,16 @@ import numpy as np
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile
+from datp.checkpointing.enums import EvidenceRole
 from datp.config.models import DatpConfig
 from datp.core.enums import (
-    AuditField,
-    Baseline,
-    BootstrapField,
-    ComparisonLabel,
-    ConfusionKey,
-    EvidenceRole,
-    FigureName,
-    HeterogeneityContextResult,
-    MetricName,
-    PayloadKey,
     REGIME_BASELINES,
+    STATS_REPORTING_BASELINES,
+    Baseline,
     Regime,
     RunKind,
     ScoringStage,
     SeedScope,
-    SidecarField,
-    STATS_REPORTING_BASELINES,
-    StatsField,
-    ValidationField,
 )
 from datp.core.identity import (
     AlphaLabel,
@@ -43,6 +32,14 @@ from datp.core.identity import (
     alpha_from_label,
     alpha_label,
 )
+from datp.core.metric_enums import (
+    AuditField,
+    ConfusionKey,
+    MetricName,
+    PayloadKey,
+    ValidationField,
+)
+from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID
 from datp.evaluation.artifact_validation import client_rows, validate_metrics_payload
 from datp.evaluation.metrics import (
@@ -52,8 +49,16 @@ from datp.evaluation.metrics import (
     build_evaluation_result,
     recompute_binary_metrics,
 )
-from datp.validation.enums import AuditStatus
-from datp.scoring.schema import SCORE_COLUMN
+from datp.reporting.constants import (
+    NOT_CONFIRMATORY_WARNING,
+    REPORTING_AUDIT_SCHEMA_VERSION,
+)
+from datp.reporting.enums import (
+    ComparisonLabel,
+    FigureName,
+    HeterogeneityContextResult,
+    SidecarField,
+)
 from datp.reporting.figures import (
     generate_figure1,
     generate_figure2,
@@ -61,15 +66,13 @@ from datp.reporting.figures import (
     generate_figure4,
 )
 from datp.reporting.tables import generate_table3, generate_table4
+from datp.scoring.loading import ScoreProvider
+from datp.scoring.schema import SCORE_COLUMN
 from datp.statistics.bootstrap import bootstrap_ci
 from datp.statistics.effect_size import cliffs_delta
+from datp.statistics.enums import BootstrapField, StatsField
 from datp.statistics.wilcoxon import bonferroni_correct, wilcoxon_test
-from datp.reporting.constants import (
-    NOT_CONFIRMATORY_WARNING,
-    REPORTING_AUDIT_SCHEMA_VERSION,
-)
-from datp.core.types import ClientThreshold
-from datp.scoring.loading import ScoreProvider
+from datp.validation.enums import AuditStatus
 
 _REPORTING_SOURCES: set[str] = set()
 

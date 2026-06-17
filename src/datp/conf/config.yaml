@@ -47,6 +47,7 @@ threshold:
   b4_k_regime_a: 3
   b4_k_candidates: [2, 3, 4, 5]
   b4_n_init: 10
+  b4_max_iter: 300
   b4_random_state: 42
 
 experiment:

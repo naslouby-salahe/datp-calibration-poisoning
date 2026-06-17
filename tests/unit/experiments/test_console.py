@@ -8,11 +8,11 @@ from unittest.mock import patch
 from datp.core.enums import Baseline, BaselineRunStatus, Regime
 from datp.experiments.console import (
     _DIAGNOSTIC_STEP_LABELS,
+    _STATUS_SYMBOLS,
+    _SWEEP_STEP_LABELS,
     _Label,
     _Message,
-    _STATUS_SYMBOLS,
     _Style,
-    _SWEEP_STEP_LABELS,
     _Symbol,
     _Title,
     console,
@@ -28,7 +28,6 @@ from datp.experiments.console import (
     step_context,
 )
 from datp.experiments.enums import ContingencyDecision, DiagnosticStep, SweepStep
-
 
 # ── label coverage ────────────────────────────────────────────────────────
 

@@ -14,8 +14,8 @@ import torch.nn as nn
 from flwr.common import NDArrays
 
 from datp.artifacts.names import ArtifactFile
+from datp.checkpointing.enums import ConvergenceStatus, ConvergenceSummaryKey
 from datp.config.models import ConvergenceConfig
-from datp.core.enums import ConvergenceStatus, ConvergenceSummaryKey
 from datp.core.logging import get_logger
 
 logger = get_logger(__name__)

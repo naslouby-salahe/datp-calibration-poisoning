@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+from datp.checkpointing.enums import PrimaryCheckpointSelectionRule
 from datp.checkpointing.summary import (
     select_global_primary_checkpoint,
     summaries_for_global_primary_checkpoint,
     summarize_checkpoint_metrics,
 )
-from datp.core.enums import PrimaryCheckpointSelectionRule, Regime
+from datp.core.enums import Regime
 from datp.testsupport.checkpoint_protocol import build_fake_checkpoint_metrics
 
 

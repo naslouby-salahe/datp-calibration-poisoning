@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
+from datp.checkpointing.enums import CheckpointConvergenceMode
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import CheckpointConvergenceMode
 from datp.federated.convergence import ConvergenceMonitor
 from datp.federated.strategies import DatpFedAvg
 

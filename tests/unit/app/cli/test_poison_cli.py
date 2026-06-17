@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
 from datp.app.cli import app
 from datp.config.stages import ExperimentStage
-
-from typer.testing import CliRunner
 
 _runner = CliRunner()
 

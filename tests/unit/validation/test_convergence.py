@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import ConvergenceStatus, ConvergenceSummaryKey
+from datp.checkpointing.enums import ConvergenceStatus, ConvergenceSummaryKey
 from datp.validation.convergence import ConvergencePayload, convergence_payload
 
 

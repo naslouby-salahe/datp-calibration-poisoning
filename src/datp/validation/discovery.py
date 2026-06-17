@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from datp.artifacts.names import (
-    PathToken,
     ArtifactDir,
     ArtifactFile,
+    PathToken,
 )
 from datp.core.enums import (
     Baseline,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from datp.core.enums import ConfusionKey, PayloadKey
+from datp.core.metric_enums import ConfusionKey, PayloadKey
 from datp.evaluation.artifact_validation import validate_metrics_payload
 
 

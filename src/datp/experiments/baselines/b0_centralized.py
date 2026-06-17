@@ -13,26 +13,6 @@ import torch
 
 from datp.artifacts.io import write_metrics_atomic
 from datp.artifacts.names import ArtifactFile
-from datp.federated.data_loading import (
-    df_to_tensor,
-    discover_client_dirs,
-    load_client_artifact,
-    release_freed_heap,
-)
-from datp.scoring.generation import compute_reconstruction_errors
-from datp.thresholding.thresholds import percentile_threshold
-from datp.modeling.centralized_training import train_ae
-from datp.core.types import (
-    B0Result,
-    ClientEvalResult,
-    ClientThreshold,
-    MetricsProvenance,
-)
-from datp.thresholding.metrics_serialization import (
-    METRIC_SCHEMA_VERSION,
-    METRICS_SCHEMA_VERSION,
-    THRESHOLD_SCHEMA_VERSION,
-)
 from datp.core.device import resolve_device
 from datp.core.enums import (
     BASELINE_THRESHOLD_SOURCE,
@@ -40,14 +20,13 @@ from datp.core.enums import (
     Activation,
     B0NormalizationMode,
     Baseline,
-    ConfusionKey,
-    MetricName,
     NormalizationScope,
     Regime,
     RunKind,
 )
 from datp.core.errors import fmt
 from datp.core.logging import get_logger
+from datp.core.metric_enums import ConfusionKey, MetricName
 from datp.core.provenance import (
     MISSING_MANIFEST_HASH,
     NOT_APPLICABLE_B0_DIRECT_EVAL,
@@ -59,16 +38,36 @@ from datp.core.provenance import (
 )
 from datp.core.seeds import set_seeds
 from datp.core.tracking import log_artifact, log_metrics, tracking_run
+from datp.core.types import (
+    B0Result,
+    ClientEvalResult,
+    ClientThreshold,
+    MetricsProvenance,
+)
+from datp.data.regimes.catalog import dataset_for_regime
 from datp.data.scaling import apply_scaler, fit_scaler
 from datp.data.splits import Split
-from datp.data.regimes.catalog import dataset_for_regime
 from datp.evaluation.metrics import (
     ClientEvaluationRecord,
     build_evaluation_result,
     compute_client_record,
 )
 from datp.evaluation.ranking import compute_binary_ranking_metrics
+from datp.federated.data_loading import (
+    df_to_tensor,
+    discover_client_dirs,
+    load_client_artifact,
+    release_freed_heap,
+)
 from datp.modeling.autoencoder import Autoencoder
+from datp.modeling.centralized_training import train_ae
+from datp.scoring.generation import compute_reconstruction_errors
+from datp.thresholding.metrics_serialization import (
+    METRIC_SCHEMA_VERSION,
+    METRICS_SCHEMA_VERSION,
+    THRESHOLD_SCHEMA_VERSION,
+)
+from datp.thresholding.thresholds import percentile_threshold
 
 logger = get_logger(__name__)
 

@@ -7,7 +7,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from datp.core.errors import fmt
-from datp.evaluation.metric_keys import SCORE_COLUMN
+from datp.scoring.schema import SCORE_COLUMN
 
 
 def validate_feature_artifact(

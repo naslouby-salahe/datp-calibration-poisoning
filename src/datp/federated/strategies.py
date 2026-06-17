@@ -18,8 +18,8 @@ from flwr.common import (
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg
 
+from datp.checkpointing.enums import CheckpointConvergenceMode
 from datp.config.models import CheckpointProtocolConfig, DatpConfig
-from datp.core.enums import CheckpointConvergenceMode
 from datp.core.logging import get_logger
 from datp.federated.checkpoints import save_params_snapshot
 from datp.federated.convergence import ConvergenceMonitor

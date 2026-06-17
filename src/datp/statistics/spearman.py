@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from scipy.stats import spearmanr as _scipy_spearmanr
 
-from datp.core.enums import MechanismWording
+from datp.reporting.enums import MechanismWording
 
 
 @dataclass(frozen=True, slots=True)

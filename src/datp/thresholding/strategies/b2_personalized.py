@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 
+from datp.core.identity import BaselineRunId
+from datp.core.types import ThresholdResult
 from datp.thresholding.eligibility import (
     build_threshold_result,
     compute_client_thresholds,
     identify_eligible,
 )
-from datp.core.types import ThresholdResult
-from datp.core.identity import BaselineRunId
 
 
 def compute(

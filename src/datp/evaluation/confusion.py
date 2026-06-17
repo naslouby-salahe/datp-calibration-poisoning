@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 from datp.artifacts.names import ArtifactDir
-from datp.core.enums import ConfusionKey, PayloadKey
+from datp.core.metric_enums import ConfusionKey, PayloadKey
 from datp.evaluation.metrics import EvaluationResult
 
 

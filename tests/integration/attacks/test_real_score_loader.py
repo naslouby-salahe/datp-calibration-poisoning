@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 import torch
 
+from datp.attacks.real_score_loader import load_real_score_collection
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import ConvergenceConfig, DatpConfig, FederationConfig
 from datp.core.device import resolve_device
 from datp.core.enums import Regime
 from datp.core.seeds import set_seeds
-from datp.attacks.real_score_loader import load_real_score_collection
 from datp.federated.protocols.fedavg import run_fl_training
 from datp.federated.types import ClientData
 

@@ -6,16 +6,15 @@ import pytest
 from pydantic import ValidationError
 
 from datp.artifacts.layout import ArtifactLayout
-from datp.config.models import CheckpointProtocolConfig
-from datp.core.enums import (
+from datp.checkpointing.enums import (
     CheckpointArtifactPathMode,
     CheckpointConvergenceMode,
     CheckpointProtocolMode,
     PrimaryCheckpointSelectionRule,
-    Regime,
 )
+from datp.config.models import CheckpointProtocolConfig
+from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
-from datp.core.enums import Baseline
 
 
 def _checkpoint_config(

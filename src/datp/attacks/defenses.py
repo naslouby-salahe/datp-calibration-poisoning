@@ -19,8 +19,8 @@ from typing import assert_never
 
 import numpy as np
 
-from datp.attacks.poison_enums import PoisoningDefense
 from datp.attacks.score_containers import ClientScores, ScoreCollection
+from datp.core.poison_enums import PoisoningDefense
 
 
 def trimmed_calibration(cal: np.ndarray, trim_fraction: float) -> np.ndarray:

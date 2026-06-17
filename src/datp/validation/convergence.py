@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import ConvergenceStatus, ConvergenceSummaryKey
+from datp.checkpointing.enums import ConvergenceStatus, ConvergenceSummaryKey
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

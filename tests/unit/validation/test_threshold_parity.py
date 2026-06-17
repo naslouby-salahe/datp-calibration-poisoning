@@ -5,12 +5,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from datp.validation.results import _threshold_result
-from datp.thresholding.thresholds import derive_threshold
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import DatpConfig
 from datp.core.enums import Baseline, Regime
 from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
+from datp.thresholding.thresholds import derive_threshold
+from datp.validation._audit_helpers import _threshold_result
 
 _REAL_DEVICES = list(DEVICE_FAMILY_MAP.keys()) # 9 real N-BaIoT device names
 

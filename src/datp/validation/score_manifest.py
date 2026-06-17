@@ -16,16 +16,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from pydantic import BaseModel, ConfigDict, Field
 
-from datp.artifacts.layout import ArtifactLayout
-from datp.artifacts.names import PathToken, ArtifactDir, ArtifactFile
-from datp.validation.constants import (
-    SCORE_CELL_VERIFICATION_INDEX_JSON,
-    SCORE_CELL_VERIFICATION_JSON,
-)
-from datp.validation.discovery import ScoreCellLocation, iter_score_cells, parse_score_cell_dir
 from datp.artifacts.io import write_json_atomic
-from datp.validation.enums import AuditStatus
-from datp.validation.schemas import ValidationCheck
+from datp.artifacts.layout import ArtifactLayout
+from datp.artifacts.names import ArtifactDir, ArtifactFile, PathToken
 from datp.core.enums import (
     SCORING_STAGES,
     Regime,
@@ -34,9 +27,19 @@ from datp.core.enums import (
 from datp.core.identity import TrainingCellId
 from datp.core.provenance import hash_file
 from datp.data.catalog import dataset_spec
-
 from datp.data.regimes.catalog import dataset_for_regime
 from datp.scoring.schema import SCORE_COLUMN, SCORING_MANIFEST_NOT_PROVIDED
+from datp.validation.constants import (
+    SCORE_CELL_VERIFICATION_INDEX_JSON,
+    SCORE_CELL_VERIFICATION_JSON,
+)
+from datp.validation.discovery import (
+    ScoreCellLocation,
+    iter_score_cells,
+    parse_score_cell_dir,
+)
+from datp.validation.enums import AuditStatus
+from datp.validation.schemas import ValidationCheck
 
 _REQUIRED_MANIFEST_FIELDS: tuple[str, ...] = (
     "dataset",

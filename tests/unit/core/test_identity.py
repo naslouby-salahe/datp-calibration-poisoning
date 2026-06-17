@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+
 import pytest
 
 from datp.artifacts.names import PathToken

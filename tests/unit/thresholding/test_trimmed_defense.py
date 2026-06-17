@@ -18,14 +18,13 @@ from datp.attacks.defenses import (
     build_defended_collection,
     trimmed_calibration,
 )
-from datp.attacks.poison_enums import (
+from datp.attacks.score_containers import build_score_collection
+from datp.core.poison_enums import (
     PoisoningDefense,
     PoisoningSourceStrategy,
     ThresholdPolicy,
 )
-from datp.attacks.score_containers import build_score_collection
 from datp.testsupport.synthetic_scores import make_standard_score_set
-
 
 # ---------------------------------------------------------------------------
 # Trim primitive

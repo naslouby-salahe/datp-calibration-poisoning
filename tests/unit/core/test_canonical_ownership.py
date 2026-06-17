@@ -6,18 +6,20 @@ preventing drift back to the pre-canonicalization state.
 
 from __future__ import annotations
 
+import datp.checkpointing.enums as checkpointing_enums
 import datp.core.enums as core_enums
+import datp.reporting.enums as reporting_enums
+from datp.checkpointing.enums import EvidenceRole
 from datp.core.enums import (
     CONTROLLED_BASELINES,
     ISOLATED_BASELINES,
     REGIME_BASELINES,
     STATS_REPORTING_BASELINES,
     Baseline,
-    EvidenceRole,
-    FigureName,
     Regime,
     SeedScope,
 )
+from datp.reporting.enums import FigureName
 
 
 class TestRegimeBaselinesOwnership:
@@ -74,14 +76,16 @@ class TestRegimeBaselinesOwnership:
 
 
 class TestEnumOwnership:
-    def test_evidence_role_defined_in_core(self) -> None:
-        assert hasattr(core_enums, "EvidenceRole")
+    def test_evidence_role_defined_in_checkpointing(self) -> None:
+        assert hasattr(checkpointing_enums, "EvidenceRole")
+        assert not hasattr(core_enums, "EvidenceRole")
 
     def test_seed_scope_defined_in_core(self) -> None:
         assert hasattr(core_enums, "SeedScope")
 
-    def test_figure_name_defined_in_core(self) -> None:
-        assert hasattr(core_enums, "FigureName")
+    def test_figure_name_defined_in_reporting(self) -> None:
+        assert hasattr(reporting_enums, "FigureName")
+        assert not hasattr(core_enums, "FigureName")
 
     def test_evidence_role_values(self) -> None:
         assert EvidenceRole.DESCRIPTIVE == "descriptive"

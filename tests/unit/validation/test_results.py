@@ -10,6 +10,22 @@ import pytest
 from sklearn.metrics import f1_score
 
 from datp.artifacts.names import ArtifactFile
+from datp.checkpointing.enums import ConvergenceStatus
+from datp.config.compose import BASE_CONFIG
+from datp.core.enums import (
+    Baseline,
+    NormalizationScope,
+    Regime,
+    ThresholdAggregationMethod,
+)
+from datp.core.metric_enums import MetricName
+from datp.core.provenance import hash_file, source_hash
+from datp.core.seeds import set_seeds
+from datp.core.types import ClientThreshold
+from datp.data.catalog import DatasetID
+from datp.data.common.storage import write_artifact
+from datp.evaluation.metrics import compute_client_record
+from datp.scoring.schema import SCORE_COLUMN
 from datp.validation.constants import (
     AUDIT_SUMMARY_MD,
     B4_CLUSTER_STABILITY_CSV,
@@ -21,28 +37,20 @@ from datp.validation.constants import (
     THRESHOLD_VALUES_CSV,
     WARNINGS_MD,
 )
-from datp.core.enums import ConvergenceStatus
 from datp.validation.enums import (
     AuditSeverity,
     WarningCode,
     WorstDirection,
 )
-from datp.validation.results import _CellPanel, _split_hash, run_results_audit
-from datp.config.compose import BASE_CONFIG
-from datp.data.catalog import DatasetID
-from datp.validation.schemas import RunManifestRecord, WarningRecord
-from datp.core.enums import (
-    Baseline,
-    NormalizationScope,
-    Regime,
-    ThresholdAggregationMethod,
+from datp.validation._audit_helpers import _split_hash
+from datp.validation._audit_types import _CellPanel
+from datp.validation.results import (
+    _METRICS_SOURCE_FILES,
+    _SCORING_SOURCE_FILES,
+    _THRESHOLD_SOURCE_FILES,
+    run_results_audit,
 )
-from datp.core.seeds import set_seeds
-from datp.data.common.storage import write_artifact
-from datp.scoring.schema import SCORE_COLUMN
-from datp.core.enums import MetricName
-from datp.evaluation.metrics import compute_client_record
-from datp.core.types import ClientThreshold
+from datp.validation.schemas import RunManifestRecord, WarningRecord
 
 CLIENTS = (
     "Danmini_Doorbell",
@@ -174,7 +182,9 @@ def _write_minimal_outputs(root: Path) -> None:
         (result_dir / ArtifactFile.METRICS).write_text(
             json.dumps(_metrics_payload(baseline)), encoding="utf-8"
         )
-        (result_dir / ArtifactFile.RESOLVED_CONFIG).write_text("seed: 0\n", encoding="utf-8")
+        (result_dir / ArtifactFile.RESOLVED_CONFIG).write_text(
+            "seed: 0\n", encoding="utf-8"
+        )
 
 
 def test_manifest_schema_validation() -> None:
@@ -310,11 +320,18 @@ def test_binary_macro_f1_ignores_multiclass_attack_names() -> None:
     )
     rec = compute_client_record("c", benign, attack, ct)
     expected = f1_score(
-        [0, 0, 1, 1], [0, 0, 1, 0], average="macro", labels=[0, 1], zero_division=0 # type: ignore[call-overload]
-    ) # type: ignore[arg-type]
+        [0, 0, 1, 1],
+        [0, 0, 1, 0],
+        average="macro",
+        labels=[0, 1],
+        zero_division=0,  # type: ignore[call-overload]
+    )  # type: ignore[arg-type]
     multiclass_wrong = f1_score(
-        [0, 0, 2, 3], [0, 0, 1, 0], average="macro", zero_division=0 # type: ignore[call-overload]
-    ) # type: ignore[arg-type]
+        [0, 0, 2, 3],
+        [0, 0, 1, 0],
+        average="macro",
+        zero_division=0,  # type: ignore[call-overload]
+    )  # type: ignore[arg-type]
     assert rec.metrics.macro_f1 == expected
     assert rec.metrics.macro_f1 != multiclass_wrong
 
@@ -397,7 +414,9 @@ def test_results_audit_generates_regime_c_alpha_csv(tmp_path: Path) -> None:
 
 
 def test_flat_cv_tpr_warning_emitted() -> None:
-    from datp.validation._warnings import emit_flat_cv_tpr_warnings as _emit_flat_cv_tpr_warnings
+    from datp.validation._warnings import (
+        emit_flat_cv_tpr_warnings as _emit_flat_cv_tpr_warnings,
+    )
 
     warnings_out: list[WarningRecord] = []
     cell_panel: dict[tuple[Regime, int, str | None, Baseline], _CellPanel] = {
@@ -411,7 +430,9 @@ def test_flat_cv_tpr_warning_emitted() -> None:
 
 
 def test_no_flat_cv_tpr_warning_when_different() -> None:
-    from datp.validation._warnings import emit_flat_cv_tpr_warnings as _emit_flat_cv_tpr_warnings
+    from datp.validation._warnings import (
+        emit_flat_cv_tpr_warnings as _emit_flat_cv_tpr_warnings,
+    )
 
     warnings_out: list[WarningRecord] = []
     cell_panel: dict[tuple[Regime, int, str | None, Baseline], _CellPanel] = {
@@ -425,7 +446,9 @@ def test_no_flat_cv_tpr_warning_when_different() -> None:
 
 
 def test_worst_client_stability_warning_when_always_same() -> None:
-    from datp.validation._warnings import emit_worst_client_stability_warnings as _emit_worst_client_stability_warnings
+    from datp.validation._warnings import (
+        emit_worst_client_stability_warnings as _emit_worst_client_stability_warnings,
+    )
     from datp.validation.schemas import WorstClientRecord
 
     worst_records = [
@@ -450,7 +473,9 @@ def test_worst_client_stability_warning_when_always_same() -> None:
 
 
 def test_worst_client_varies_info_when_different() -> None:
-    from datp.validation._warnings import emit_worst_client_stability_warnings as _emit_worst_client_stability_warnings
+    from datp.validation._warnings import (
+        emit_worst_client_stability_warnings as _emit_worst_client_stability_warnings,
+    )
     from datp.validation.schemas import WorstClientRecord
 
     worst_records = [
@@ -544,11 +569,11 @@ def test_results_audit_generates_metric_recomputation_csv(tmp_path: Path) -> Non
 
 
 def test_recomputation_fails_on_wrong_fpr() -> None:
-    from datp.validation.enums import DenominatorStatus
     from datp.validation._recomputation import (
         RecomputationParams,
         append_recomputation_records,
     )
+    from datp.validation.enums import DenominatorStatus
 
     records: list = []
     append_recomputation_records(
@@ -579,13 +604,12 @@ def test_recomputation_fails_on_wrong_fpr() -> None:
 
 
 def test_recomputation_excludes_attack_metrics_when_n_attack_zero() -> None:
-    from datp.validation.enums import DenominatorStatus
     from datp.validation._recomputation import (
         RecomputationParams,
         append_recomputation_records,
     )
-    from datp.core.enums import MetricName
-
+    from datp.validation.enums import DenominatorStatus
+    
     records: list = []
     append_recomputation_records(
         records,
@@ -617,13 +641,12 @@ def test_recomputation_excludes_attack_metrics_when_n_attack_zero() -> None:
 
 
 def test_recomputation_fails_on_denominator_mismatch() -> None:
-    from datp.validation.enums import DenominatorStatus
     from datp.validation._recomputation import (
         RecomputationParams,
         append_recomputation_records,
     )
-    from datp.core.enums import MetricName
-
+    from datp.validation.enums import DenominatorStatus
+    
     records: list = []
     # confusion matrix: fp=1, tn=8 → actual n_benign used internally = 9
     # stored row says n_benign=10 and fpr=0.1 (= 1/10), but recomputed = 1/9 ≈ 0.111
@@ -671,7 +694,9 @@ def test_naked_cv_fpr_emits_fail_warning(tmp_path: Path) -> None:
         payload = json.loads((result_dir / ArtifactFile.METRICS).read_text("utf-8"))
         del payload["mean_fpr"]
         del payload["std_fpr"]
-        (result_dir / ArtifactFile.METRICS).write_text(json.dumps(payload), encoding="utf-8")
+        (result_dir / ArtifactFile.METRICS).write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
         run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
     finally:
         if original is not None:
@@ -686,12 +711,20 @@ def test_naked_cv_fpr_emits_fail_warning(tmp_path: Path) -> None:
 # ── check_b2_utility_tradeoff ──────────────────────────────
 
 
-def test_check_b2_utility_tradeoff_warns_when_b2_improves_cv_fpr_but_worsens_utility() -> None:
-    from datp.validation._warnings import check_b2_utility_tradeoff as _check_b2_utility_tradeoff
+def test_check_b2_utility_tradeoff_warns_when_b2_improves_cv_fpr_but_worsens_utility() -> (
+    None
+):
+    from datp.validation._warnings import (
+        check_b2_utility_tradeoff as _check_b2_utility_tradeoff,
+    )
 
     warnings_out: list[WarningRecord] = []
-    b1 = _CellPanel(cv_fpr=0.3, macro_f1_mean=0.85, pr_auc_mean=0.90, auroc_mean=0.92, cv_tpr=0.80)
-    b2 = _CellPanel(cv_fpr=0.2, macro_f1_mean=0.80, pr_auc_mean=0.88, auroc_mean=0.91, cv_tpr=0.78)
+    b1 = _CellPanel(
+        cv_fpr=0.3, macro_f1_mean=0.85, pr_auc_mean=0.90, auroc_mean=0.92, cv_tpr=0.80
+    )
+    b2 = _CellPanel(
+        cv_fpr=0.2, macro_f1_mean=0.80, pr_auc_mean=0.88, auroc_mean=0.91, cv_tpr=0.78
+    )
     _check_b2_utility_tradeoff(Regime.A, 0, None, b1, b2, warnings_out)
     codes = [w.code for w in warnings_out]
     assert WarningCode.B2_UTILITY_TRADEOFF in codes
@@ -701,7 +734,9 @@ def test_check_b2_utility_tradeoff_warns_when_b2_improves_cv_fpr_but_worsens_uti
 
 
 def test_check_b2_utility_tradeoff_no_warning_when_cv_fpr_not_improved() -> None:
-    from datp.validation._warnings import check_b2_utility_tradeoff as _check_b2_utility_tradeoff
+    from datp.validation._warnings import (
+        check_b2_utility_tradeoff as _check_b2_utility_tradeoff,
+    )
 
     warnings_out: list[WarningRecord] = []
     b1 = _CellPanel(cv_fpr=0.2, macro_f1_mean=0.80)
@@ -711,7 +746,9 @@ def test_check_b2_utility_tradeoff_no_warning_when_cv_fpr_not_improved() -> None
 
 
 def test_check_b2_utility_tradeoff_no_warning_when_no_utility_worsened() -> None:
-    from datp.validation._warnings import check_b2_utility_tradeoff as _check_b2_utility_tradeoff
+    from datp.validation._warnings import (
+        check_b2_utility_tradeoff as _check_b2_utility_tradeoff,
+    )
 
     warnings_out: list[WarningRecord] = []
     b1 = _CellPanel(cv_fpr=0.3, macro_f1_mean=0.80, auroc_mean=0.90, cv_tpr=0.75)
@@ -724,9 +761,11 @@ def test_check_b2_utility_tradeoff_no_warning_when_no_utility_worsened() -> None
 
 
 def test_emit_ciciot_homogeneity_warning_homogeneous() -> None:
-    from datp.validation._warnings import emit_ciciot_homogeneity_warnings as _emit_ciciot_homogeneity_warnings
-    from datp.validation.schemas import CICIoTHomogeneityRecord
+    from datp.validation._warnings import (
+        emit_ciciot_homogeneity_warnings as _emit_ciciot_homogeneity_warnings,
+    )
     from datp.validation.enums import HomogeneityVerdict
+    from datp.validation.schemas import CICIoTHomogeneityRecord
 
     warnings_out: list[WarningRecord] = []
     records = [
@@ -752,9 +791,11 @@ def test_emit_ciciot_homogeneity_warning_homogeneous() -> None:
 
 
 def test_emit_ciciot_homogeneity_warning_heterogeneous() -> None:
-    from datp.validation._warnings import emit_ciciot_homogeneity_warnings as _emit_ciciot_homogeneity_warnings
-    from datp.validation.schemas import CICIoTHomogeneityRecord
+    from datp.validation._warnings import (
+        emit_ciciot_homogeneity_warnings as _emit_ciciot_homogeneity_warnings,
+    )
     from datp.validation.enums import HomogeneityVerdict
+    from datp.validation.schemas import CICIoTHomogeneityRecord
 
     warnings_out: list[WarningRecord] = []
     records = [
@@ -780,9 +821,11 @@ def test_emit_ciciot_homogeneity_warning_heterogeneous() -> None:
 
 
 def test_emit_ciciot_homogeneity_warning_incomplete() -> None:
-    from datp.validation._warnings import emit_ciciot_homogeneity_warnings as _emit_ciciot_homogeneity_warnings
-    from datp.validation.schemas import CICIoTHomogeneityRecord
+    from datp.validation._warnings import (
+        emit_ciciot_homogeneity_warnings as _emit_ciciot_homogeneity_warnings,
+    )
     from datp.validation.enums import HomogeneityVerdict
+    from datp.validation.schemas import CICIoTHomogeneityRecord
 
     warnings_out: list[WarningRecord] = []
     records = [
@@ -806,3 +849,30 @@ def test_emit_ciciot_homogeneity_warning_incomplete() -> None:
     _emit_ciciot_homogeneity_warnings(records, warnings_out, homogeneity_threshold=0.05)
     codes = [w.code for w in warnings_out]
     assert WarningCode.CICIOT_HOMOGENEITY_INCOMPLETE in codes
+
+
+class TestProvenanceSourcePaths:
+    """The source files hashed into provenance must exist; a stale path makes
+    hash_file return the constant 'MISSING' sentinel, silently breaking
+    traceability."""
+
+    def test_all_provenance_source_files_exist(self) -> None:
+        all_files = (
+            *_SCORING_SOURCE_FILES,
+            *_THRESHOLD_SOURCE_FILES,
+            *_METRICS_SOURCE_FILES,
+        )
+        missing = [str(p) for p in all_files if hash_file(p) == "MISSING"]
+        assert not missing, f"provenance source files not found: {missing}"
+
+    def test_provenance_hashes_are_not_missing_sentinel(self) -> None:
+        for group in (
+            _SCORING_SOURCE_FILES,
+            _THRESHOLD_SOURCE_FILES,
+            _METRICS_SOURCE_FILES,
+        ):
+            digest = source_hash(list(group))
+            # A list of all-MISSING files still hashes to a non-"MISSING" digest,
+            # so assert against the degenerate all-missing digest explicitly.
+            all_missing = source_hash([p.with_suffix(".does_not_exist") for p in group])
+            assert digest != all_missing

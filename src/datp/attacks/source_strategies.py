@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from datp.attacks.poison_enums import AttackerObjective, PoisoningSourceStrategy
 from datp.attacks.reservoir import ReservoirResult, build_reservoir
+from datp.core.poison_enums import AttackerObjective, PoisoningSourceStrategy
 
 # bounded source strategies — fixed by scientific protocol.
 _BOUNDED_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(

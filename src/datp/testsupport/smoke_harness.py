@@ -26,6 +26,7 @@ import numpy as np
 
 from datp.artifacts.poison_names import (
     B4_K,
+    B4_MAX_ITER,
     B4_N_INIT,
     B4_RANDOM_STATE,
     N_MIN,
@@ -43,10 +44,6 @@ from datp.attacks.metric_engine import (
     compute_metrics,
     compute_mu_flag_threshold,
 )
-from datp.attacks.poison_enums import (
-    PoisoningSourceStrategy,
-    ThresholdPolicy,
-)
 from datp.attacks.score_containers import (
     ScoreCollection,
     VictimSet,
@@ -55,6 +52,10 @@ from datp.attacks.score_containers import (
 )
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.poison_enums import (
+    PoisoningSourceStrategy,
+    ThresholdPolicy,
+)
 from datp.testsupport.synthetic_scores import SyntheticScoreSet
 from datp.thresholding.eligibility import compute_client_thresholds, compute_tau_global
 from datp.thresholding.strategies.b4_cluster import compute as b4_compute
@@ -72,11 +73,11 @@ __all__ = [
 # Building blocks
 # ---------------------------------------------------------------------------
 
+
 def collection_from_score_set(score_set: SyntheticScoreSet) -> ScoreCollection:
     """Build a ScoreCollection from a synthetic score set."""
     raw = {
-        c.client_id: (c.cal, c.test_benign, c.test_attack)
-        for c in score_set.clients
+        c.client_id: (c.cal, c.test_benign, c.test_attack) for c in score_set.clients
     }
     return build_score_collection(raw, n_min=N_MIN)
 
@@ -84,6 +85,7 @@ def collection_from_score_set(score_set: SyntheticScoreSet) -> ScoreCollection:
 # ---------------------------------------------------------------------------
 # One full cell: clean baseline + poisoned outcome
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class SmokeCellResult:
@@ -170,6 +172,7 @@ def run_smoke_cell(
 # Two-layer seed sweep (for the statistics invariant)
 # ---------------------------------------------------------------------------
 
+
 def victim_seed_deltas(
     collection: ScoreCollection,
     *,
@@ -208,6 +211,7 @@ def victim_seed_deltas(
 # B4 cluster-count probe (K must stay fixed at 3)
 # ---------------------------------------------------------------------------
 
+
 def b4_cluster_count(
     cal_dict: dict[str, np.ndarray],
     *,
@@ -216,6 +220,7 @@ def b4_cluster_count(
     seed: int = 0,
     k: int = B4_K,
     n_init: int = B4_N_INIT,
+    max_iter: int = B4_MAX_ITER,
     random_state: int = B4_RANDOM_STATE,
 ) -> int:
     """Run B4 on a calibration dict and return the realized cluster count K.
@@ -239,6 +244,7 @@ def b4_cluster_count(
         k_regime_a=k,
         k_candidates=[k],
         n_init=n_init,
+        max_iter=max_iter,
         run=run,
         regime=Regime.A,
     )

@@ -6,10 +6,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.core.enums import (
-    Baseline,
+from datp.checkpointing.enums import (
     CheckpointSelectionVerdict,
     PrimaryCheckpointSelectionRule,
+)
+from datp.core.enums import (
+    Baseline,
     Regime,
 )
 from datp.core.errors import fmt

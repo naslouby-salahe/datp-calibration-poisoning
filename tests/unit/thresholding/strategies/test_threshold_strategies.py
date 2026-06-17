@@ -3,20 +3,26 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from datp.core.enums import Baseline, Regime
+from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.types import ThresholdResult
 from datp.thresholding.eligibility import (
     compute_client_thresholds,
     identify_eligible,
 )
-from datp.core.types import ThresholdResult
 from datp.thresholding.strategies import (
     b1_global as b1,
+)
+from datp.thresholding.strategies import (
     b2_personalized as b2,
+)
+from datp.thresholding.strategies import (
     b3_family as b3,
+)
+from datp.thresholding.strategies import (
     b4_cluster as b4,
 )
 from datp.thresholding.strategies.b4_cluster import compute_fingerprints
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
 
 
 def _run(baseline: Baseline = Baseline.B1, regime: Regime = Regime.A) -> BaselineRunId:
@@ -36,7 +42,7 @@ def client_errors() -> dict[str, np.ndarray]:
         "client_a": _make_errors(200, seed=1),
         "client_b": _make_errors(150, seed=2),
         "client_c": _make_errors(300, seed=3),
-        "client_d": _make_errors(50, seed=4), # Cal-Pending
+        "client_d": _make_errors(50, seed=4),  # Cal-Pending
     }
 
 
@@ -269,6 +275,7 @@ class TestB4:
                 k_regime_a=3,
                 k_candidates=[2, 3, 4, 5],
                 n_init=10,
+                max_iter=300,
                 run=_run(Baseline.B4, regime=Regime.A),
                 regime=Regime.A,
             )
@@ -283,6 +290,7 @@ class TestB4:
             k_regime_a=3,
             k_candidates=[2, 3, 4, 5],
             n_init=10,
+            max_iter=300,
             run=_run(Baseline.B4, regime=Regime.A),
             regime=Regime.A,
         )
@@ -301,6 +309,7 @@ class TestB4:
             k_regime_a=0,
             k_candidates=[2, 3, 4, 5],
             n_init=10,
+            max_iter=300,
             run=_run(Baseline.B4, regime=Regime.A),
             regime=Regime.A,
         )
@@ -324,6 +333,7 @@ class TestB4:
                 k_regime_a=3,
                 k_candidates=[2, 3, 4, 5],
                 n_init=10,
+                max_iter=300,
                 run=_run(Baseline.B4, regime=Regime.B),
                 regime=Regime.B,
             )
@@ -345,6 +355,7 @@ class TestB4:
             k_regime_a=3,
             k_candidates=[2, 3, 4, 5],
             n_init=10,
+            max_iter=300,
             run=_run(Baseline.B4, regime=Regime.A),
             regime=Regime.A,
         )
@@ -366,6 +377,7 @@ class TestB4:
             k_regime_a=3,
             k_candidates=[2, 3, 4, 5],
             n_init=10,
+            max_iter=300,
             run=_run(Baseline.B4, regime=Regime.A),
             regime=Regime.A,
         )
@@ -388,8 +400,9 @@ class TestB4:
                 k_regime_a=3,
                 k_candidates=[2, 3, 4, 5],
                 n_init=10,
+                max_iter=300,
                 run=_run(Baseline.B4, regime=Regime.A),
-                regime="X", # type: ignore[arg-type]
+                regime="X",  # type: ignore[arg-type]
             )
 
     def test_return_type(self, large_errors: dict[str, np.ndarray]) -> None:
@@ -402,6 +415,7 @@ class TestB4:
             k_regime_a=3,
             k_candidates=[2, 3, 4, 5],
             n_init=10,
+            max_iter=300,
             run=_run(Baseline.B4, regime=Regime.A),
             regime=Regime.A,
         )
@@ -422,6 +436,7 @@ class TestB4:
             k_regime_a=3,
             k_candidates=[2, 3, 4, 5],
             n_init=10,
+            max_iter=300,
             run=_run(Baseline.B4, regime=Regime.A),
             regime=Regime.A,
         )
@@ -442,6 +457,7 @@ class TestB4:
             k_regime_a=3,
             k_candidates=[2, 3, 4, 5],
             n_init=10,
+            max_iter=300,
             run=_run(Baseline.B4, regime=Regime.A),
             regime=Regime.A,
         )

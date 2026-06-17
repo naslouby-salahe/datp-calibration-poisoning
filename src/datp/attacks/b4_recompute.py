@@ -24,14 +24,15 @@ import numpy as np
 
 from datp.artifacts.poison_names import (
     B4_K,
+    B4_MAX_ITER,
     B4_N_INIT,
     B4_RANDOM_STATE,
     N_MIN,
 )
-from datp.attacks.poison_enums import ThresholdPolicy
 from datp.attacks.score_containers import ScoreCollection
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.poison_enums import ThresholdPolicy
 from datp.core.types import B4Metadata
 from datp.thresholding.eligibility import compute_client_thresholds, compute_tau_global
 from datp.thresholding.strategies.b4_cluster import compute as b4_compute
@@ -70,6 +71,7 @@ def _run_b4(
     seed: int,
     k: int,
     n_init: int,
+    max_iter: int,
     random_state: int,
 ) -> tuple[dict[str, float], B4Metadata]:
     """Run B4 and return (eligible_client -> effective_threshold, metadata).
@@ -80,7 +82,6 @@ def _run_b4(
     run = BaselineRunId(cell=cell, baseline=Baseline.B4)
 
     # k_candidates=[k] so B4 never silently deviates to a different K.
-    # max_iter defaults to 300 in sklearn KMeans (matches protocol lock).
     result = b4_compute(
         cal_dict,
         n_min=n_min,
@@ -90,6 +91,7 @@ def _run_b4(
         k_regime_a=k,
         k_candidates=[k],
         n_init=n_init,
+        max_iter=max_iter,
         run=run,
         regime=Regime.A,
     )
@@ -133,8 +135,7 @@ def _agg_thresholds(
         ck: float(np.mean(taus)) for ck, taus in cluster_pois_taus.items()
     }
     return {
-        cid: tau_agg_per_cluster[client_to_clean_cluster[cid]]
-        for cid in eligible_ids
+        cid: tau_agg_per_cluster[client_to_clean_cluster[cid]] for cid in eligible_ids
     }
 
 
@@ -145,6 +146,7 @@ def compute_b4_pair(
     *,
     k: int = B4_K,
     n_init: int = B4_N_INIT,
+    max_iter: int = B4_MAX_ITER,
     random_state: int = B4_RANDOM_STATE,
     n_min: int = N_MIN,
     seed: int = 0,
@@ -171,7 +173,15 @@ def compute_b4_pair(
     )
     tau_global_clean = compute_tau_global(clean_per_client_taus)
     eff_clean, clean_meta = _run_b4(
-        clean_full_cal, q, tau_global_clean, n_min, seed, k, n_init, random_state,
+        clean_full_cal,
+        q,
+        tau_global_clean,
+        n_min,
+        seed,
+        k,
+        n_init,
+        max_iter,
+        random_state,
     )
 
     # Poisoned per-client taus (no re-clustering yet).
@@ -190,7 +200,15 @@ def compute_b4_pair(
 
     # Full poisoned B4 run (refit scaler, re-run k-means).
     eff_pois, _ = _run_b4(
-        pois_full_cal, q, tau_global_pois, n_min, seed, k, n_init, random_state,
+        pois_full_cal,
+        q,
+        tau_global_pois,
+        n_min,
+        seed,
+        k,
+        n_init,
+        max_iter,
+        random_state,
     )
 
     # Decomposition.

@@ -19,9 +19,9 @@ import numpy as np
 
 from datp.artifacts.poison_names import MATERIALITY_FACTOR
 from datp.attacks.b4_recompute import B4ThresholdPair
-from datp.attacks.poison_enums import ThresholdPolicy
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.threshold_recompute import ThresholdPair
+from datp.core.poison_enums import ThresholdPolicy
 from datp.evaluation.ranking import compute_binary_ranking_metrics
 from datp.statistics.cv import cv
 

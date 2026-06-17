@@ -8,9 +8,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from datp.config.models import DatpConfig
-from datp.core.enums import (
-    Baseline,
-)
+from datp.core.enums import Baseline
 from datp.core.identity import TrainingCellId
 from datp.experiments.enums import ContingencyDecision
 

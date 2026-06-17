@@ -21,8 +21,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.attacks.poison_enums import ThresholdPolicy
 from datp.attacks.score_containers import ScoreCollection
+from datp.core.poison_enums import ThresholdPolicy
 from datp.thresholding.eligibility import (
     compute_client_thresholds,
     compute_tau_global,

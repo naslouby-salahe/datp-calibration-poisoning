@@ -6,10 +6,11 @@ import subprocess
 import numpy as np
 import pytest
 
+from datp.reporting.enums import MechanismWording
 from datp.statistics import cv
 from datp.statistics.bootstrap import BootstrapResult, bca_ci, bootstrap_ci
-from datp.core.enums import BootstrapMethod, EffectMagnitude, MechanismWording
 from datp.statistics.effect_size import CliffsDeltaResult, cliffs_delta
+from datp.statistics.enums import BootstrapMethod, EffectMagnitude
 from datp.statistics.spearman import SpearmanResult, spearman_correlation
 from datp.statistics.wilcoxon import (
     BonferroniResult,

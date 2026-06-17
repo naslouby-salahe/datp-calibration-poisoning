@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from datp.core.enums import (
     B0NormalizationMode,
     Baseline,
+    DatasetID,
     NormalizationScope,
     Regime,
     RunKind,
@@ -16,7 +17,6 @@ from datp.core.enums import (
     ThresholdSource,
 )
 from datp.core.identity import BaselineRunId
-from datp.data.catalog import DatasetID
 
 
 class FrozenModel(BaseModel):

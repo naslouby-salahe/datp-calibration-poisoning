@@ -16,17 +16,36 @@ from pathlib import Path
 
 from datp.artifacts.poison_layout import PoisonLayout
 from datp.artifacts.poison_names import POISONING_SEEDS, TRAINING_SEEDS
+from datp.attacks.bounded_sweep_cell import (
+    SweepCellResult,
+    lock_mu_flag_threshold,
+    run_sweep_cell,
+)
+from datp.attacks.bounded_sweep_manifest import (
+    BoundedSweepManifest,
+    BoundedSweepResultRow,
+)
+from datp.attacks.bounded_sweep_matrix import (
+    BoundedSweepCellSpec,
+    enumerate_bounded_sweep_matrix,
+)
 from datp.attacks.diagnostics import compute_blast_radius, compute_spillover
 from datp.attacks.metric_engine import AurocRecord, compute_auroc_records
-from datp.attacks.bounded_sweep_manifest import BoundedSweepManifest, BoundedSweepResultRow
-from datp.attacks.bounded_sweep_matrix import BoundedSweepCellSpec, enumerate_bounded_sweep_matrix
-from datp.attacks.bounded_sweep_cell import SweepCellResult, lock_mu_flag_threshold, run_sweep_cell
-from datp.attacks.poison_enums import DEFAULT_POLICIES, BOUNDED_SWEEP_FRACTIONS, BOUNDED_SWEEP_SOURCES
 from datp.attacks.real_score_loader import load_real_score_collection
 from datp.attacks.run_manifest import ProvenanceRecord, SeedRecordModel
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.source_strategies import objective_for_source
 from datp.core.enums import Regime
+from datp.config.attack_config import CalibrationPoisoningConfig
+from datp.core.poison_enums import (
+    BOUNDED_SWEEP_FRACTIONS,
+    BOUNDED_SWEEP_SOURCES,
+    DEFAULT_POLICIES,
+    AttackerObjective,
+    ExperimentScale,
+    PoisoningKnowledge,
+    PoisoningTargetScope,
+)
 from datp.core.seed_sequence import derive_seed_record
 
 _REPOSITORY_NAME: str = "datp-calibration-poisoning"
@@ -105,6 +124,18 @@ def run_nbaiot_bounded_sweep(*, base_dir: Path) -> BoundedSweepManifest:
     poisoned cell, and reuses it unmodified across every cell for that seed.
     Does not write to disk; callers persist via ``write_nbaiot_bounded_sweep_manifest``.
     """
+    # Guard: validates all locked grid parameters against the scientific protocol
+    # via CalibrationPoisoningConfig validators. Any drift in locked constants
+    # (fractions out of [0,1], B4 k≠3, seed-pool mismatch, wrong injection rule)
+    # raises here before any score data is loaded.
+    CalibrationPoisoningConfig(
+        policy=DEFAULT_POLICIES[0],
+        objective=AttackerObjective.THRESHOLD_RAISE,
+        source=BOUNDED_SWEEP_SOURCES[0],
+        knowledge=PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
+        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+        scale=ExperimentScale.BOUNDED,
+    )
     collections: dict[int, ScoreCollection] = {}
     mu_flag_by_seed: dict[int, float] = {}
     auroc_by_seed: dict[int, dict[str, AurocRecord]] = {}

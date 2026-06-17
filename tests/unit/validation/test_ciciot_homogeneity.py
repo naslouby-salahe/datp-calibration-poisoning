@@ -3,9 +3,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from datp.config.compose import BASE_CONFIG
 from datp.validation.datasets import compute_ciciot_homogeneity
 from datp.validation.enums import HomogeneityVerdict
-from datp.config.compose import BASE_CONFIG
 
 
 def _uniform(low: float, high: float, n: int, seed: int) -> np.ndarray:

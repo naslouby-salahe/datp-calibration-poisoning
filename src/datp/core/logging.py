@@ -3,14 +3,15 @@ from __future__ import annotations
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from rich.console import Console
 from rich.logging import RichHandler
 
-from datp.artifacts.names import ArtifactFile
+from datp.core.enums import ArtifactFile
 
-from datp.config.models import LoggingConfig
+if TYPE_CHECKING:
+    from datp.config.models import LoggingConfig
 
 try:  # pragma: no cover - optional dependency in the current environment
     import structlog

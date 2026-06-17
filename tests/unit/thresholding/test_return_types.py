@@ -5,14 +5,14 @@ import typing
 
 
 def test_baseline_types_importable():
+    import typing
+
     from datp.core.types import (
         B0Result,
         BaselineResult,
         ClientEvalResult,
         ClientEvalResultWithAuroc,
     )
-
-    import typing
 
     for cls in (B0Result, BaselineResult, ClientEvalResult, ClientEvalResultWithAuroc):
         assert len(typing.get_type_hints(cls)) > 0, f"{cls.__name__} has no type hints"

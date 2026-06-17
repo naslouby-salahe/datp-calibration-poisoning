@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from datp.thresholding.thresholds import (
-    arithmetic_mean_threshold,
-    percentile_threshold,
-)
+from datp.core.errors import fmt
+from datp.core.identity import BaselineRunId
 from datp.core.types import (
     B3Metadata,
     B4Metadata,
@@ -13,8 +11,10 @@ from datp.core.types import (
     ThresholdMetadata,
     ThresholdResult,
 )
-from datp.core.errors import fmt
-from datp.core.identity import BaselineRunId
+from datp.thresholding.thresholds import (
+    arithmetic_mean_threshold,
+    percentile_threshold,
+)
 
 
 def identify_eligible(

@@ -1,20 +1,9 @@
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass
 from typing import Mapping
 
-
-class DatasetID(enum.StrEnum):
-    NBAIOT = "nbaiot"
-    CICIOT2023 = "ciciot2023"
-
-
-class ClientIdentity(enum.StrEnum):
-    DEVICE_DIRECTORY = "device_directory"
-    MERGED_FILE = "merged_file"
-    VICTIM_MAC = "victim_mac"
-    VIRTUAL_CLIENT = "virtual_client"
+from datp.core.enums import ClientIdentity, DatasetID
 
 
 @dataclass(frozen=True, slots=True)

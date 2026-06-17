@@ -9,7 +9,7 @@ from datp.statistics.constants import (
     CLIFFS_DELTA_NEGLIGIBLE,
     CLIFFS_DELTA_SMALL,
 )
-from datp.core.enums import EffectMagnitude
+from datp.statistics.enums import EffectMagnitude
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from datp.core.enums import PayloadKey
+from datp.core.metric_enums import PayloadKey
 
 
 def valid_metrics_dict(baseline: str = "b1", regime: str = "a", seed: int = 0) -> dict:

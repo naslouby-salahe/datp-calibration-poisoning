@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from datp.checkpointing.enums import EvidenceRole
 from datp.core.enums import (
     B4_FINGERPRINT_FEATURES,
     BASELINE_ROLE,
@@ -16,8 +17,6 @@ from datp.core.enums import (
     Baseline,
     BaselineRole,
     ClientStatus,
-    EvidenceRole,
-    FigureName,
     NormalizationScope,
     Regime,
     ScoringStage,
@@ -29,6 +28,7 @@ from datp.data.catalog import DatasetID
 from datp.data.regimes.catalog import REGIME_DATASET
 from datp.data.splits import Split
 from datp.experiments.enums import SweepStep
+from datp.reporting.enums import FigureName
 
 
 class TestBaselineEnum:

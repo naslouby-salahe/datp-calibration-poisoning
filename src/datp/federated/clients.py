@@ -9,13 +9,13 @@ import numpy as np
 import torch
 from flwr.client import NumPyClient
 
-from datp.modeling.autoencoder import Autoencoder
 from datp.federated.local_training import evaluate_benign, train_local
 from datp.federated.parameters import get_parameters, set_parameters
 from datp.federated.types import (
     ClientMetricKey,
     validate_tensor_input,
 )
+from datp.modeling.autoencoder import Autoencoder
 
 if TYPE_CHECKING:
     from datp.config.models import DatpConfig

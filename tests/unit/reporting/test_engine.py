@@ -4,7 +4,6 @@ import pytest
 
 from datp.reporting.engine import format_mean_std, render
 
-
 # ── format_mean_std ──────────────────────────────────────────────
 
 def test_format_mean_std_normal() -> None:

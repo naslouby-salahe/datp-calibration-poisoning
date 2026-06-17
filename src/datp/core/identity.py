@@ -6,9 +6,9 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from datp.artifacts.names import PathToken
 from datp.core.enums import (
     Baseline,
+    PathToken,
     Regime,
 )
 

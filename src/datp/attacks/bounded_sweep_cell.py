@@ -22,8 +22,8 @@ from datp.attacks.metric_engine import (
     compute_metrics,
     compute_mu_flag_threshold,
 )
-from datp.attacks.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.attacks.score_containers import ScoreCollection
+from datp.core.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 
 
 def lock_mu_flag_threshold(

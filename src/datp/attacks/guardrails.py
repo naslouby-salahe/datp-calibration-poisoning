@@ -13,7 +13,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from datp.attacks.poison_enums import (
+from datp.core.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
     FULL_SWEEP_FRACTIONS,
     ExperimentScale,

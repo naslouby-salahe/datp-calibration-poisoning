@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from datp.attacks.poison_enums import PoisoningSourceStrategy
 from datp.attacks.reservoir import ReservoirStatus
 from datp.attacks.source_strategies import (
     DiagnosticSourceError,
@@ -13,8 +12,8 @@ from datp.attacks.source_strategies import (
     near_null_criterion,
     select_reservoir,
 )
+from datp.core.poison_enums import PoisoningSourceStrategy
 from datp.testsupport.synthetic_scores import make_eligible_client
-
 
 _TAIL_MASS = 0.10
 
@@ -34,7 +33,7 @@ class TestIsDiagnosticSource:
         )
 
 
-class TestSelectReservoirMvp:
+class TestSelectReservoirBoundedSources:
     @pytest.mark.parametrize(
         "source",
         [
@@ -45,9 +44,7 @@ class TestSelectReservoirMvp:
     )
     def test_bounded_sources_succeed(self, source: PoisoningSourceStrategy) -> None:
         c = make_eligible_client()
-        res = select_reservoir(
-            source=source, clean_cal=c.cal, tail_mass=_TAIL_MASS
-        )
+        res = select_reservoir(source=source, clean_cal=c.cal, tail_mass=_TAIL_MASS)
         assert res.status == ReservoirStatus.FEASIBLE
         assert res.source == source
 
@@ -81,7 +78,10 @@ class TestDiagnosticGate:
             tail_mass=_TAIL_MASS,
             allow_diagnostic=True,
         )
-        assert res.source == PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+        assert (
+            res.source
+            == PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+        )
 
     def test_diagnostic_source_default_blocked(self) -> None:
         """Default allow_diagnostic=False blocks diagnostic source."""

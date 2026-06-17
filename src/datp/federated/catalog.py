@@ -6,9 +6,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from datp.artifacts.names import ArtifactFile
-from datp.federated.data_loading import discover_client_dirs
 from datp.core.errors import fmt
 from datp.data.splits import Split, filename_for_split
+from datp.federated.data_loading import discover_client_dirs
 from datp.federated.types import ClientData
 
 _MODULE = "federated.catalog"

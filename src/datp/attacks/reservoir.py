@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.attacks.poison_enums import PoisoningSourceStrategy
+from datp.core.poison_enums import PoisoningSourceStrategy
 
 
 class ReservoirStatus(enum.StrEnum):

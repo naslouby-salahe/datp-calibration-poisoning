@@ -26,7 +26,6 @@ from statsmodels.stats.multitest import multipletests
 
 from datp.statistics.bootstrap import BootstrapResult, bootstrap_ci
 
-
 # Locked inference parameters.
 _N_POISONING_SEEDS: int = 5
 _SIGN_CONSISTENCY_THRESHOLD: int = 4  # ≥4/5

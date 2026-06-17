@@ -15,14 +15,19 @@ import typer
 from rich.console import Console
 
 from datp.attacks.bounded_sweep_run import write_nbaiot_bounded_sweep_manifest
-from datp.config.stages import ExperimentStage, ExperimentStageConfig, all_stage_configs, get_stage_config
+from datp.config.stages import (
+    ExperimentStage,
+    ExperimentStageConfig,
+    all_stage_configs,
+    get_stage_config,
+)
 
 app = typer.Typer(help="Calibration-channel poisoning commands.")
 
 _stdout = Console()
 _stderr = Console(stderr=True)
 
-_PHASE_B_NOTICE = (
+_EXECUTION_GATE_NOTICE = (
     "NOTE: Experiment execution is blocked until this stage's own gate "
     "(see below) is authorized. This command is preview/dry-run only."
 )
@@ -33,6 +38,7 @@ def _stage_config_as_dict(cfg: ExperimentStageConfig) -> dict[str, object]:
     # Convert enum values to their string representations.
     d["stage"] = str(cfg.stage)
     d["scale"] = str(cfg.scale) if cfg.scale is not None else None
+    d["dataset"] = cfg.dataset.value if cfg.dataset is not None else None
     return d
 
 
@@ -62,12 +68,12 @@ def dry_run(
     cfg = get_stage_config(stage)
     _stdout.print(f"[bold]dry-run[/bold]: stage={stage!r}")
     _stdout.print(f" scale : {cfg.scale}")
-    _stdout.print(f" dataset : {cfg.dataset}")
+    _stdout.print(f" dataset : {cfg.dataset.value if cfg.dataset else 'none'}")
     _stdout.print(f" allow_run : {cfg.allow_run}")
     _stdout.print(f" gate : {cfg.gate or 'none'}")
     _stdout.print(f" description: {cfg.description}")
     if not cfg.allow_run:
-        _stderr.print(f"[yellow]{_PHASE_B_NOTICE}[/yellow]")
+        _stderr.print(f"[yellow]{_EXECUTION_GATE_NOTICE}[/yellow]")
         if cfg.gate:
             _stderr.print(
                 f"[yellow]Gate[/yellow] {cfg.gate!r} must be resolved before execution."
@@ -80,13 +86,15 @@ def smoke() -> None:
     cfg = get_stage_config(ExperimentStage.NBAIOT_SMOKE)
     _stdout.print(f"[bold]smoke stage[/bold]: {cfg.description}")
     _stdout.print(f" scale : {cfg.scale}")
-    _stdout.print(f" dataset: {cfg.dataset}")
-    _stderr.print(f"[yellow]{_PHASE_B_NOTICE}[/yellow]")
+    _stdout.print(f" dataset: {cfg.dataset.value if cfg.dataset else 'none'}")
+    _stderr.print(f"[yellow]{_EXECUTION_GATE_NOTICE}[/yellow]")
 
 
 @app.command("run-bounded-sweep")
 def run_bounded_sweep(
-    base_dir: Path = typer.Option(..., help="Root output directory (contains real N-BaIoT score artifacts)"),
+    base_dir: Path = typer.Option(
+        ..., help="Root output directory (contains real N-BaIoT score artifacts)"
+    ),
 ) -> None:
     """Execute the locked bounded N-BaIoT matrix and write its manifest.
 

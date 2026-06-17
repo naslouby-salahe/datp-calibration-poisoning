@@ -16,8 +16,26 @@ from typing import Any, Mapping
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile
+from datp.config.compose import compose_config
+from datp.config.models import DatpConfig
+from datp.core.enums import (
+    Baseline,
+    Regime,
+    ScoringStage,
+    controlled_baselines_for_regime,
+)
+from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.metric_enums import ConfusionKey, MetricName, PayloadKey
+from datp.core.types import ThresholdResult
+from datp.evaluation.metrics import (
+    EvaluationResult,
+    evaluate_baseline,
+)
+from datp.scoring.loading import ScoreProvider, load_parquets_from_dir
+from datp.thresholding.thresholds import derive_threshold
 from datp.validation.constants import (
     COVERAGE_RATIO_TOLERANCE,
     RECOMPUTED_METRICS_INDEX_JSON,
@@ -25,31 +43,8 @@ from datp.validation.constants import (
     SCALAR_METRIC_TOLERANCE,
 )
 from datp.validation.discovery import iter_score_cells, parse_score_cell_dir
-from datp.artifacts.io import write_json_atomic
-from datp.thresholding.thresholds import derive_threshold
-from datp.core.types import ThresholdResult
-from datp.config.compose import compose_config
-from datp.config.models import DatpConfig
 from datp.validation.enums import AuditStatus
 from datp.validation.schemas import ValidationCheck
-from datp.core.identity import BaselineRunId, TrainingCellId
-from datp.core.enums import (
-    Baseline,
-    ConfusionKey,
-    MetricName,
-    PayloadKey,
-    Regime,
-    controlled_baselines_for_regime,
-)
-
-from datp.evaluation.metrics import (
-    EvaluationResult,
-    evaluate_baseline,
-)
-from datp.analyses.io import load_cal_errors
-from datp.scoring.loading import ScoreProvider
-
-_MODULE = "validation.metric_reproducer"
 
 _SCALAR_METRIC_FIELDS: tuple[MetricName, ...] = (
     MetricName.CV_FPR,
@@ -277,7 +272,9 @@ def _confusion_check(
     return ValidationCheck(
         code=MetricCheckCode.PER_CLIENT_CONFUSION_EXACT,
         status=AuditStatus.PASS,
-        detail=_format_check_detail(field=f"{PayloadKey.PER_CLIENT}.{PayloadKey.CONFUSION_MATRIX}"),
+        detail=_format_check_detail(
+            field=f"{PayloadKey.PER_CLIENT}.{PayloadKey.CONFUSION_MATRIX}"
+        ),
     )
 
 
@@ -308,7 +305,8 @@ def _thresholds_check(
         code=MetricCheckCode.PER_CLIENT_THRESHOLDS_WITHIN_TOLERANCE,
         status=AuditStatus.PASS,
         detail=_format_check_detail(
-            field=f"{PayloadKey.PER_CLIENT}.{PayloadKey.THRESHOLD_VALUE}", tolerance=tolerance
+            field=f"{PayloadKey.PER_CLIENT}.{PayloadKey.THRESHOLD_VALUE}",
+            tolerance=tolerance,
         ),
     )
 
@@ -351,7 +349,9 @@ def _evaluate(
         alpha,
         score_provider=score_provider,
     )
-    client_thresholds = {ct.client_id: float(ct.threshold) for ct in threshold_result.client_thresholds}
+    client_thresholds = {
+        ct.client_id: float(ct.threshold) for ct in threshold_result.client_thresholds
+    }
     return evaluation, client_thresholds
 
 
@@ -615,7 +615,7 @@ def reproduce_cell_metrics(
     layout = ArtifactLayout(base_dir=base_dir, regime=regime)
     cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
     score_root = layout.score_cell(cell).score_dir
-    cal_errors = load_cal_errors(score_root)
+    cal_errors = load_parquets_from_dir(score_root / ScoringStage.CAL)
     score_provider = ScoreProvider(score_root)
 
     cfg = config or compose_config(
@@ -624,7 +624,9 @@ def reproduce_cell_metrics(
         seed=seed,
         alpha=alpha,
     )
-    tau_global_b1 = _compute_b1_tau_global(cal_errors, cfg, regime, seed=seed, alpha=alpha)
+    tau_global_b1 = _compute_b1_tau_global(
+        cal_errors, cfg, regime, seed=seed, alpha=alpha
+    )
 
     baseline_results: list[BaselineReproductionResult] = []
     missing_baselines: list[Baseline] = []
@@ -632,9 +634,7 @@ def reproduce_cell_metrics(
 
     for baseline in candidate_baselines:
         run = BaselineRunId(cell=cell, baseline=baseline)
-        metrics_path = (
-            layout.baseline_run(run).result_dir / ArtifactFile.METRICS
-        )
+        metrics_path = layout.baseline_run(run).result_dir / ArtifactFile.METRICS
         if not metrics_path.exists():
             missing_baselines.append(baseline)
             continue

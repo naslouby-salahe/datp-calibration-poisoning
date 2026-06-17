@@ -36,9 +36,9 @@ from datp.artifacts.poison_names import (
     CALIBRATION_POISONING_OUTPUT_ROOT,
     POISONING_SEEDS,
 )
-from datp.attacks.guardrails import assert_no_inplace_mutation
-from datp.attacks.cell_runner import inject_single_victim, pending_threshold
 from datp.attacks.b4_recompute import B4ThresholdPair
+from datp.attacks.cell_runner import inject_single_victim, pending_threshold
+from datp.attacks.guardrails import assert_no_inplace_mutation
 from datp.attacks.inference import (
     PairedDeltas,
     SeedDelta,
@@ -46,14 +46,6 @@ from datp.attacks.inference import (
     compute_inference,
 )
 from datp.attacks.metric_engine import compute_fleet_fpr
-from datp.attacks.poison_enums import (
-    AttackerObjective,
-    CalibrationInjectionRule,
-    ExperimentScale,
-    PoisoningSourceStrategy,
-    PoisoningTargetScope,
-    ThresholdPolicy,
-)
 from datp.attacks.run_logger import (
     ManifestEmissionError,
     build_manifest,
@@ -64,6 +56,14 @@ from datp.attacks.run_manifest import RESERVOIR_MODE
 from datp.attacks.score_containers import build_score_collection
 from datp.attacks.source_strategies import near_null_criterion
 from datp.attacks.threshold_recompute import ThresholdPair
+from datp.core.poison_enums import (
+    AttackerObjective,
+    CalibrationInjectionRule,
+    ExperimentScale,
+    PoisoningSourceStrategy,
+    PoisoningTargetScope,
+    ThresholdPolicy,
+)
 from datp.testsupport.smoke_harness import (
     b4_cluster_count,
     collection_from_score_set,

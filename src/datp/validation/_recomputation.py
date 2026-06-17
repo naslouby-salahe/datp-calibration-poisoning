@@ -6,7 +6,7 @@ import dataclasses
 import math
 
 from datp.core.enums import Baseline, Regime
-from datp.core.enums import MetricName
+from datp.core.metric_enums import MetricName
 from datp.evaluation.metrics import recompute_binary_metrics
 from datp.validation.enums import DenominatorStatus
 from datp.validation.schemas import MetricRecomputationRecord

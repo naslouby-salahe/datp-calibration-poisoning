@@ -6,11 +6,11 @@ import pyarrow.parquet as pq
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from datp.artifacts.markers import write_json_atomic
-from datp.audit.constants import DATA_AUDIT_DIR
 from datp.core.enums import Regime
 from datp.core.errors import fmt, fmt_missing
 from datp.core.logging import get_logger
 from datp.data.contracts import PartitionResult
+from datp.validation.constants import DATA_AUDIT_DIR
 
 logger = get_logger(__name__)
 
@@ -56,7 +56,12 @@ class PartitionAudit(BaseModel):
     def validate_summary(self) -> "PartitionAudit":
         if self.n_clients != len(self.clients):
             raise ValueError(
-                fmt(_AUDIT_MODULE, "n_clients mismatch", str(len(self.clients)), str(self.n_clients))
+                fmt(
+                    _AUDIT_MODULE,
+                    "n_clients mismatch",
+                    str(len(self.clients)),
+                    str(self.n_clients),
+                )
             )
         calibration_pending_count = sum(
             client.calibration_pending for client in self.clients.values()
@@ -125,7 +130,9 @@ def audit_partitions(
         if cal_pending:
             calibration_pending_count += 1
 
-        attack_classes = info.attack_classes if info.attack_classes else info.attack_categories
+        attack_classes = (
+            info.attack_classes if info.attack_classes else info.attack_categories
+        )
 
         eval_incomplete = info.evaluation_incomplete
         if eval_incomplete:
@@ -181,11 +188,18 @@ def run_schema_audit(
     """Validate that a data file has the expected number of feature columns."""
     file_path = Path(file_path)
     if not file_path.exists():
-        raise FileNotFoundError(fmt_missing(_AUDIT_MODULE, f"Schema audit target {file_path}"))
+        raise FileNotFoundError(
+            fmt_missing(_AUDIT_MODULE, f"Schema audit target {file_path}")
+        )
 
     if file_path.suffix.lower() != ".parquet":
         raise ValueError(
-            fmt(_AUDIT_MODULE, "Unsupported file format", ".parquet", file_path.suffix.lower())
+            fmt(
+                _AUDIT_MODULE,
+                "Unsupported file format",
+                ".parquet",
+                file_path.suffix.lower(),
+            )
         )
     actual_count = len(pq.read_schema(file_path).names)
 

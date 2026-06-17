@@ -9,9 +9,9 @@ from datp.attacks.b4_recompute import (
     compute_b4_pair,
 )
 from datp.attacks.injector import inject_fixed_budget
-from datp.attacks.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
+from datp.core.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import make_standard_score_set
 

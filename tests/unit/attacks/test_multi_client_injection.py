@@ -6,19 +6,19 @@ real multi-client matrix is gated; these tests use synthetic data only.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import pytest
 
-from collections.abc import Sequence
-
 from datp.attacks.cell_runner import (
-    MultiInjectionOutcome,
     InjectionOutcome,
+    MultiInjectionOutcome,
     inject_multi_victim,
     inject_single_victim,
 )
-from datp.attacks.poison_enums import PoisoningSourceStrategy
 from datp.attacks.score_containers import ScoreCollection, build_score_collection
+from datp.core.poison_enums import PoisoningSourceStrategy
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
 _SOURCE = PoisoningSourceStrategy.HIGH_SCORE_BENIGN

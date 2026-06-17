@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
-from pathlib import Path
-
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
-from datp.core.types import ClientThreshold
 from datp.core.enums import (
     Baseline,
     Regime,
 )
 from datp.core.errors import fmt
 from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID
 from datp.data.regimes.catalog import dataset_for_regime
 from datp.scoring.loading import ScoreProvider

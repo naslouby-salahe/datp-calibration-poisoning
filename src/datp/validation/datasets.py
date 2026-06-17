@@ -14,15 +14,9 @@ from datp.data.catalog import DatasetID
 from datp.validation.constants import NBAIOT_CONFOUND_SUMMARY
 
 if TYPE_CHECKING:
-    from datp.data.contracts import RegimeCManifestMetadata  # type: ignore[attr-defined]
-from datp.validation.enums import HomogeneityVerdict, OutcomeVariable, SeverityTrendStatus, SeverityVariable
-from datp.validation.schemas import (
-    B4ClusterStabilityRecord,
-    CICIoTProtocolAudit,
-    NBaIoTDeviceCounts,
-    RegimeCAlphaAuditRecord,
-    RegimeCSeverityTrendRecord,
-)
+    from datp.data.contracts import (
+        RegimeCManifestMetadata,  # type: ignore[attr-defined]
+    )
 from datp.core.enums import Regime
 from datp.core.errors import fmt
 from datp.core.identity import alpha_from_label, alpha_label
@@ -34,6 +28,19 @@ from datp.statistics.divergence import (
     JSSummary,
     pairwise_js_from_distributions,
     pairwise_js_summary,
+)
+from datp.validation.enums import (
+    HomogeneityVerdict,
+    OutcomeVariable,
+    SeverityTrendStatus,
+    SeverityVariable,
+)
+from datp.validation.schemas import (
+    B4ClusterStabilityRecord,
+    CICIoTProtocolAudit,
+    NBaIoTDeviceCounts,
+    RegimeCAlphaAuditRecord,
+    RegimeCSeverityTrendRecord,
 )
 
 _MODULE = "validation.datasets"
@@ -206,7 +213,9 @@ class _AlphaAuditMetrics:
 
 
 def _load_alpha_audit_data(prepared_dir: Path) -> RegimeCManifestMetadata | None:
-    from datp.data.contracts import RegimeCManifestMetadata  # type: ignore[attr-defined]
+    from datp.data.contracts import (
+        RegimeCManifestMetadata,  # type: ignore[attr-defined]
+    )
 
     manifest_path = prepared_dir / ArtifactFile.MANIFEST
     if not manifest_path.exists():

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from datp.core.types import ThresholdResult
 from datp.core.enums import (
     B4RegimeAMode,
     Baseline,
@@ -13,6 +12,7 @@ from datp.core.enums import (
 )
 from datp.core.errors import fmt
 from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.types import ThresholdResult
 
 if TYPE_CHECKING:
     from datp.config.models import ThresholdConfig
@@ -144,6 +144,7 @@ def derive_threshold(
             k_regime_a=k_for_a,
             k_candidates=threshold_cfg.b4_k_candidates,
             n_init=threshold_cfg.b4_n_init,
+            max_iter=threshold_cfg.b4_max_iter,
             run=run,
             regime=regime,
         )

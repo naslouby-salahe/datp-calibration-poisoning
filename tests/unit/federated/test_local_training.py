@@ -10,12 +10,12 @@ import torch
 
 from datp.core.enums import Activation
 from datp.core.seeds import set_seeds
-from datp.modeling.autoencoder import Autoencoder
 from datp.federated.local_training import (
     evaluate_benign,
     train_decoder_only,
     train_local,
 )
+from datp.modeling.autoencoder import Autoencoder
 
 
 def _make_model() -> Autoencoder:

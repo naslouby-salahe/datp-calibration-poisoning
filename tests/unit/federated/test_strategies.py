@@ -10,7 +10,7 @@ import numpy as np
 from flwr.common import Code, FitRes, Status, ndarrays_to_parameters
 
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import CheckpointConvergenceMode
+from datp.checkpointing.enums import CheckpointConvergenceMode
 from datp.federated.checkpoints import load_params_snapshot
 from datp.federated.convergence import ConvergenceMonitor
 from datp.federated.strategies import DatpFedAvg

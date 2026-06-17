@@ -6,17 +6,17 @@ from collections import defaultdict
 
 import numpy as np
 
+from datp.core.enums import Regime
+from datp.core.errors import fmt
+from datp.core.identity import BaselineRunId
+from datp.core.regime import enforce_regime
+from datp.core.types import B3FamilyInfo, B3Metadata, ThresholdResult
 from datp.thresholding.eligibility import (
     build_threshold_result,
     compute_client_thresholds,
     identify_eligible,
 )
 from datp.thresholding.thresholds import arithmetic_mean_threshold
-from datp.core.types import B3FamilyInfo, B3Metadata, ThresholdResult
-from datp.core.enums import Regime
-from datp.core.errors import fmt
-from datp.core.identity import BaselineRunId
-from datp.core.regime import enforce_regime
 
 _MODULE = "thresholding.b3_family"
 _MISSING_CLIENT_SAMPLE_SIZE = 5

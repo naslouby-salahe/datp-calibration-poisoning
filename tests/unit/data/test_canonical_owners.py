@@ -14,7 +14,13 @@ from datp.data.paths import (
     regime_c_prepared_dir,
 )
 from datp.data.regimes.catalog import REGIME_DATASET
-from datp.data.splits import Split, filename_for_split, is_scoring_split, iter_scoring_splits, split_path
+from datp.data.splits import (
+    Split,
+    filename_for_split,
+    is_scoring_split,
+    iter_scoring_splits,
+    split_path,
+)
 
 
 def test_dataset_id_values_are_canonical() -> None:

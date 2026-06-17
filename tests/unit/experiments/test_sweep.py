@@ -110,6 +110,7 @@ class TestSweepResult:
 class TestCheckpointProtocolCompletion:
     def test_shared_baseline_ignores_legacy_non_round_metrics(self, tmp_path: Path):
         import pytest
+
         from datp.artifacts.layout import ArtifactLayout
         from datp.config.compose import BASE_CONFIG
         from datp.core.identity import TrainingCellId
@@ -128,6 +129,7 @@ class TestCheckpointProtocolCompletion:
 
     def test_shared_baseline_done_requires_all_checkpoint_rounds(self, tmp_path: Path):
         import pytest
+
         from datp.artifacts.layout import ArtifactLayout
         from datp.config.compose import BASE_CONFIG
         from datp.core.identity import TrainingCellId

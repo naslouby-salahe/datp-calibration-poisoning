@@ -8,9 +8,7 @@ import pytest
 from datp.core.enums import Regime, ScoringStage
 from datp.scoring.cal_loading import load_main_cal_errors
 from datp.scoring.loading import load_parquets_from_dir
-
 from tests.unit.conftest import _write_score_artifact
-
 
 # ── load_parquets_from_dir ────────────────────────────────────────────────
 

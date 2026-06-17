@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datp.attacks.poison_enums import (
-    DEFAULT_POLICIES,
+from datp.core.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
     BOUNDED_SWEEP_OBJECTIVES,
     BOUNDED_SWEEP_SOURCES,
+    DEFAULT_POLICIES,
     FULL_SWEEP_FRACTIONS,
     AttackerObjective,
     AuditDisposition,
@@ -164,7 +164,7 @@ class TestAuditDisposition:
         assert len(AuditDisposition) == 5
 
 
-class TestMvpFractions:
+class TestBoundedSweepFractions:
     def test_fraction_grid(self) -> None:
         assert BOUNDED_SWEEP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
 

@@ -5,18 +5,18 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from datp.attacks.poison_enums import (
-    BOUNDED_SWEEP_FRACTIONS,
-    ExperimentScale,
-    ThresholdPolicy,
-)
 from datp.attacks.guardrails import (
     GuardrailError,
-    assert_fractions_in_locked_grid,
     assert_bounded_scale_requires_single_client,
+    assert_fractions_in_locked_grid,
     assert_no_inplace_mutation,
     assert_policy_not_b3,
     assert_reservoir_not_test_or_training,
+)
+from datp.core.poison_enums import (
+    BOUNDED_SWEEP_FRACTIONS,
+    ExperimentScale,
+    ThresholdPolicy,
 )
 
 
@@ -29,7 +29,7 @@ class TestNoInplaceMutation:
     def test_mutated_array_raises(self) -> None:
         original = np.array([1.0, 2.0, 3.0])
         original_copy = original.copy()
-        original[0] = 99.0 # simulated in-place mutation
+        original[0] = 99.0  # simulated in-place mutation
         with pytest.raises(GuardrailError, match="mutated in place"):
             assert_no_inplace_mutation(original_copy, original)
 
@@ -88,7 +88,9 @@ class TestPolicyNotB3:
 
 class TestFractionsInLockedGrid:
     def test_bounded_fractions_all_pass(self) -> None:
-        assert_fractions_in_locked_grid(BOUNDED_SWEEP_FRACTIONS, ExperimentScale.BOUNDED)
+        assert_fractions_in_locked_grid(
+            BOUNDED_SWEEP_FRACTIONS, ExperimentScale.BOUNDED
+        )
 
     def test_zero_fraction_passes(self) -> None:
         assert_fractions_in_locked_grid([0.0], ExperimentScale.BOUNDED)
@@ -108,7 +110,9 @@ class TestFractionsInLockedGrid:
         assert_fractions_in_locked_grid([0.05], ExperimentScale.FULL)
 
     def test_bounded_fractions_allowed_in_full_scale(self) -> None:
-        assert_fractions_in_locked_grid(list(BOUNDED_SWEEP_FRACTIONS), ExperimentScale.FULL)
+        assert_fractions_in_locked_grid(
+            list(BOUNDED_SWEEP_FRACTIONS), ExperimentScale.FULL
+        )
 
     def test_empty_fractions_pass(self) -> None:
         assert_fractions_in_locked_grid([], ExperimentScale.BOUNDED)
@@ -118,13 +122,17 @@ class TestFractionsInLockedGrid:
             assert_fractions_in_locked_grid([0.99], ExperimentScale.BOUNDED)
 
 
-class TestMvpRequiresSingleClient:
+class TestBoundedScaleRequiresSingleClient:
     def test_bounded_with_single_client_passes(self) -> None:
-        assert_bounded_scale_requires_single_client(ExperimentScale.BOUNDED, "single_client")
+        assert_bounded_scale_requires_single_client(
+            ExperimentScale.BOUNDED, "single_client"
+        )
 
     def test_bounded_with_multi_client_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
-            assert_bounded_scale_requires_single_client(ExperimentScale.BOUNDED, "multi_client")
+            assert_bounded_scale_requires_single_client(
+                ExperimentScale.BOUNDED, "multi_client"
+            )
 
     def test_bounded_with_all_clients_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
@@ -134,7 +142,11 @@ class TestMvpRequiresSingleClient:
 
     def test_full_scale_multi_client_passes(self) -> None:
         # Non-bounded scales are not gated by this guardrail.
-        assert_bounded_scale_requires_single_client(ExperimentScale.FULL, "multi_client")
+        assert_bounded_scale_requires_single_client(
+            ExperimentScale.FULL, "multi_client"
+        )
 
     def test_smoke_scale_multi_client_passes(self) -> None:
-        assert_bounded_scale_requires_single_client(ExperimentScale.SMOKE, "multi_client")
+        assert_bounded_scale_requires_single_client(
+            ExperimentScale.SMOKE, "multi_client"
+        )

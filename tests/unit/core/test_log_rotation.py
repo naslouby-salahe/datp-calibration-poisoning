@@ -9,8 +9,8 @@ from rich.logging import RichHandler
 
 from datp.config.models import LoggingConfig
 from datp.core.logging import (
-    _StdlibBoundLogger,
     _parse_level,
+    _StdlibBoundLogger,
     configure_logging,
     get_logger,
     reset_logging,

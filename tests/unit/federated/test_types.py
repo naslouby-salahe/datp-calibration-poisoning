@@ -9,11 +9,11 @@ import torch
 from datp.federated.types import (
     ClientData,
     validate_client_data,
+    validate_feature_dim,
     validate_tensor_2d,
     validate_tensor_finite,
-    validate_tensor_non_empty,
-    validate_feature_dim,
     validate_tensor_input,
+    validate_tensor_non_empty,
 )
 
 

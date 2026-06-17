@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 import numpy as np
@@ -7,16 +8,14 @@ import pandas as pd
 import pytest
 import torch
 
-import dataclasses
-
+from datp.core.enums import DeviceType
+from datp.data.datasets.nbaiot import prepare_nbaiot
+from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 from datp.federated.data_loading import (
     ALL_SPLITS,
     discover_client_dirs,
     load_client_data,
 )
-from datp.core.enums import DeviceType
-from datp.data.datasets.nbaiot import prepare_nbaiot
-from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 
 _N_FEATURES = 10
 _N_BENIGN = 300 # Enough for all splits above n_min=100

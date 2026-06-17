@@ -5,9 +5,9 @@ from pathlib import Path
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
+from datp.checkpointing.enums import CheckpointArtifactStatus
 from datp.core.enums import (
     Baseline,
-    CheckpointArtifactStatus,
     Regime,
     controlled_baselines_for_regime,
 )

@@ -14,10 +14,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from datp.artifacts.poison_names import POISONING_SEEDS, TRAINING_SEEDS
-from datp.attacks.poison_enums import (
-    DEFAULT_POLICIES,
+from datp.core.poison_enums import (
     BOUNDED_SWEEP_FRACTIONS,
     BOUNDED_SWEEP_SOURCES,
+    DEFAULT_POLICIES,
     FULL_SWEEP_FRACTIONS,
     PoisoningSourceStrategy,
     PoisoningTargetScope,

@@ -11,16 +11,16 @@ import torch
 from flwr.client import Client
 from flwr.common import Context
 
+from datp.config.models import DatpConfig
+from datp.core.errors import fmt
+from datp.core.seeds import set_seeds
+from datp.federated.clients import DatpClient
 from datp.federated.data_loading import (
     discover_client_dirs,
     load_single_client_training_data,
 )
-from datp.config.models import DatpConfig
-from datp.core.errors import fmt
-from datp.core.seeds import set_seeds
-from datp.modeling.autoencoder import Autoencoder
-from datp.federated.clients import DatpClient
 from datp.federated.types import ClientData
+from datp.modeling.autoencoder import Autoencoder
 
 _MODULE = "federated.factories"
 

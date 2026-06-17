@@ -10,6 +10,7 @@ import pytest
 from datp.config.compose import BASE_CONFIG
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID
 from datp.evaluation.metrics import (
     BinaryMetrics,
@@ -18,7 +19,6 @@ from datp.evaluation.metrics import (
     DispersionMetrics,
     EvaluationResult,
 )
-from datp.core.types import ClientThreshold
 from datp.reporting.tables import (
     MANDATORY_FOOTNOTE,
     ResultTable,

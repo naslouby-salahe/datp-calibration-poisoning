@@ -11,21 +11,21 @@ import pyarrow.parquet as pq
 import pytest
 
 from datp.artifacts.names import ArtifactFile
+from datp.core.enums import (
+    SCORING_STAGES,
+    Regime,
+)
+from datp.data.catalog import DatasetID
+from datp.data.common.storage import write_artifact
+from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
+from datp.scoring.schema import SCORE_COLUMN
 from datp.validation.discovery import iter_score_cells
+from datp.validation.enums import AuditStatus
 from datp.validation.score_manifest import (
     ScoreCheckCode,
     verify_all_score_cells,
     verify_score_cell,
 )
-from datp.validation.enums import AuditStatus
-from datp.core.enums import (
-    SCORING_STAGES,
-    Regime,
-)
-from datp.data.common.storage import write_artifact
-from datp.data.catalog import DatasetID
-from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
-from datp.scoring.schema import SCORE_COLUMN
 
 CLIENTS: tuple[str, ...] = NBAIOT_SPEC.device_ids
 PARTIAL_CLIENTS: tuple[str, ...] = NBAIOT_SPEC.device_ids[:3]

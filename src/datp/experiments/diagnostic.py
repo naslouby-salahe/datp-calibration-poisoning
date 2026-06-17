@@ -5,18 +5,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-
 from datp.artifacts.io import write_json_atomic, write_metrics_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.lifecycle import RunLifecycle
 from datp.artifacts.names import ArtifactFile
-from datp.thresholding.metrics_serialization import SweepMetrics, build_metrics_dict
-from datp.thresholding.thresholds import derive_threshold
+from datp.checkpointing.enums import CheckpointProtocolMode
 from datp.config.compose import compose_config, write_resolved_config
 from datp.config.models import DatpConfig
 from datp.core.enums import (
     Baseline,
-    CheckpointProtocolMode,
     Regime,
 )
 from datp.core.identity import TrainingCellId
@@ -30,6 +27,8 @@ from datp.experiments.enums import (
 )
 from datp.experiments.executor import SharedTrainingExecutor
 from datp.experiments.models import ContingencyRecord, PipelineRequest
+from datp.thresholding.metrics_serialization import SweepMetrics, build_metrics_dict
+from datp.thresholding.thresholds import derive_threshold
 
 logger = get_logger(__name__)
 
@@ -99,13 +98,14 @@ def run_diagnostic(request: DiagnosticRequest) -> None:
             seed=request.seed,
             alpha=request.alpha,
         )
-        cfg = cfg.model_copy(
-            update={
-                "checkpoint_protocol": cfg.checkpoint_protocol.model_copy(
-                    update={"mode": CheckpointProtocolMode.DISABLED}
-                )
-            }
-        )
+        if cfg.checkpoint_protocol is not None:
+            cfg = cfg.model_copy(
+                update={
+                    "checkpoint_protocol": cfg.checkpoint_protocol.model_copy(
+                        update={"mode": CheckpointProtocolMode.DISABLED}
+                    )
+                }
+            )
 
     write_resolved_config(cfg, request.run_dir)
 
