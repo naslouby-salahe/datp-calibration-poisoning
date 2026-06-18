@@ -153,13 +153,13 @@ def train_decoder_only(
     return last_loss
 
 
-def evaluate_benign(model: Autoencoder, cal_data: torch.Tensor) -> float:
-    """Benign-only calibration-set loss — never evaluated on attack data."""
-    if cal_data.numel() == 0:
+def evaluate_benign(model: Autoencoder, val_data: torch.Tensor) -> float:
+    """Benign-only validation loss — never evaluated on attack data."""
+    if val_data.numel() == 0:
         raise ValueError(
-            fmt(_MODULE, "calibration data must be non-empty", _EXPECTED_NON_EMPTY, "0")
+            fmt(_MODULE, "validation data must be non-empty", _EXPECTED_NON_EMPTY, "0")
         )
     model.eval()
     with torch.inference_mode():
-        x_hat = model(cal_data)
-        return torch.nn.functional.mse_loss(x_hat, cal_data).item()
+        x_hat = model(val_data)
+        return torch.nn.functional.mse_loss(x_hat, val_data).item()

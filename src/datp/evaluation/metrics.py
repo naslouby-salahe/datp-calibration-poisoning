@@ -13,7 +13,6 @@ from datp.core.enums import (
 )
 from datp.core.errors import fmt
 from datp.core.identity import BaselineRunId, TrainingCellId
-from datp.core.logging import get_logger
 from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID
 from datp.data.regimes.catalog import dataset_for_regime
@@ -21,7 +20,6 @@ from datp.scoring.loading import ScoreProvider
 from datp.statistics.cv import cv
 
 _MODULE = "evaluation.metrics"
-logger = get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,12 +258,6 @@ def _aggregate_dispersion(
 
     cv_fpr = cv(fpr_arr)
     mean_fpr = float(fpr_arr.mean()) if fpr_arr.size > 0 else math.nan
-    if math.isnan(cv_fpr) and fpr_arr.size >= 2:
-        logger.warning(
-            "cv_fpr is nan: mean_fpr near zero (well-calibrated degenerate case)",
-            mean_fpr=mean_fpr,
-            n_eligible=fpr_arr.size,
-        )
     std_fpr = float(fpr_arr.std(ddof=1)) if fpr_arr.size >= 2 else math.nan
     iqr_fpr = (
         float(np.percentile(fpr_arr, 75) - np.percentile(fpr_arr, 25))

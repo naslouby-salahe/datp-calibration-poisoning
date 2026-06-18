@@ -26,7 +26,7 @@ class ClientData:
     """All tensors are 2-D: (n_samples, input_dim)."""
 
     train: torch.Tensor
-    cal: torch.Tensor
+    val: torch.Tensor
     test_benign: torch.Tensor
     test_attack: torch.Tensor
 
@@ -86,7 +86,7 @@ def validate_client_data(
     client_data: ClientData, client_id: str, expected_dim: int | None = None
 ) -> None:
     """Validate all tensors in a ClientData instance."""
-    for name in ("train", "cal", "test_benign", "test_attack"):
+    for name in ("train", "val", "test_benign", "test_attack"):
         tensor = getattr(client_data, name)
         validate_tensor_2d(tensor, name, client_id)
         validate_tensor_non_empty(tensor, name, client_id)

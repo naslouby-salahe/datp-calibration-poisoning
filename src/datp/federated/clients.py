@@ -27,15 +27,15 @@ class DatpClient(NumPyClient):
         cid: str,
         model: Autoencoder,
         train_data: torch.Tensor,
-        cal_data: torch.Tensor,
+        val_data: torch.Tensor,
         cfg: DatpConfig,
     ) -> None:
         validate_tensor_input(train_data, "train_data", cid)
-        validate_tensor_input(cal_data, "cal_data", cid)
+        validate_tensor_input(val_data, "val_data", cid)
         self.cid = cid
         self.model = model
         self.train_data = train_data
-        self.cal_data = cal_data
+        self.val_data = val_data
 
         self._local_epochs: int = cfg.federation.local_epochs
         self._batch_size: int = cfg.machine.batch_size_train
@@ -73,5 +73,5 @@ class DatpClient(NumPyClient):
     ) -> tuple[float, int, dict[str, Any]]:
         """Benign-only validation — never evaluated on attack data."""
         set_parameters(self.model, parameters)
-        loss = evaluate_benign(self.model, self.cal_data)
-        return loss, len(self.cal_data), {ClientMetricKey.VAL_LOSS: loss}
+        loss = evaluate_benign(self.model, self.val_data)
+        return loss, len(self.val_data), {ClientMetricKey.VAL_LOSS: loss}

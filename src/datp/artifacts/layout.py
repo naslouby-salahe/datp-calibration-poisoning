@@ -21,8 +21,6 @@ def _seed_segment(seed: int, alpha: float | None) -> Path:
 
 
 def _round_segment(checkpoint_round: int) -> Path:
-    if not isinstance(checkpoint_round, int) or isinstance(checkpoint_round, bool):
-        raise TypeError(f"checkpoint_round must be int, got {type(checkpoint_round).__name__}")
     if checkpoint_round <= 0:
         raise ValueError("checkpoint_round must be positive")
     return Path(f"{PathToken.ROUND_PREFIX}{checkpoint_round}")

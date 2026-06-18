@@ -166,7 +166,7 @@ class TestLoadClientData:
         assert sorted(data.keys()) == ["c1", "c2"]
         for cd in data.values():
             assert cd.train.shape == (20, 4)
-            assert cd.cal.shape == (20, 4)
+            assert cd.val.shape == (20, 4)
             assert cd.test_benign.numel() == 0
             assert cd.test_attack.numel() == 0
 
@@ -179,7 +179,7 @@ class TestLoadClientData:
         )
         cd = data["c1"]
         assert cd.train.shape == (20, 4)
-        assert cd.cal.shape == (20, 4)
+        assert cd.val.shape == (20, 4)
         assert cd.test_benign.shape == (20, 4)
         assert cd.test_attack.shape == (20, 4)
 
@@ -193,7 +193,7 @@ class TestLoadClientData:
         )
         cd = data["c1"]
         assert cd.train.shape == (20, 4)
-        assert cd.cal.shape == (20, 4)
+        assert cd.val.shape == (20, 4)
         assert cd.test_benign.numel() == 0
 
     def test_empty_features_raises(self, tmp_path: Path) -> None:
@@ -215,4 +215,4 @@ class TestLoadClientData:
         )
         cd = data["c1"]
         assert cd.train.device.type == DeviceType.CPU
-        assert cd.cal.device.type == DeviceType.CPU
+        assert cd.val.device.type == DeviceType.CPU

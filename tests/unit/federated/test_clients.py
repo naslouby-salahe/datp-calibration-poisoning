@@ -42,7 +42,7 @@ class TestDatpClientConstruction:
             cid="c0",
             model=_make_ae(),
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(),
         )
         assert client.cid == "c0"
@@ -52,7 +52,7 @@ class TestDatpClientConstruction:
             cid="c0",
             model=_make_ae(),
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(local_epochs=3, lr=0.05, batch_size=16),
         )
         assert client._local_epochs == 3
@@ -71,18 +71,18 @@ class TestDatpClientShapeValidation:
                 cid="c0",
                 model=model,
                 train_data=torch.randn(16),
-                cal_data=torch.randn(8, 4),
+                val_data=torch.randn(8, 4),
                 cfg=_mock_cfg(),
             )
 
-    def test_rejects_3d_cal_data(self) -> None:
+    def test_rejects_3d_val_data(self) -> None:
         model = _make_ae()
-        with pytest.raises(ValueError, match="cal_data must be 2-D"):
+        with pytest.raises(ValueError, match="val_data must be 2-D"):
             DatpClient(
                 cid="c1",
                 model=model,
                 train_data=torch.randn(16, 4),
-                cal_data=torch.randn(8, 4, 2),
+                val_data=torch.randn(8, 4, 2),
                 cfg=_mock_cfg(),
             )
 
@@ -93,7 +93,7 @@ class TestDatpClientShapeValidation:
                 cid="c0",
                 model=model,
                 train_data=torch.empty(0, 4),
-                cal_data=torch.randn(8, 4),
+                val_data=torch.randn(8, 4),
                 cfg=_mock_cfg(),
             )
 
@@ -106,7 +106,7 @@ class TestDatpClientShapeValidation:
                 cid="c0",
                 model=model,
                 train_data=data,
-                cal_data=torch.randn(8, 4),
+                val_data=torch.randn(8, 4),
                 cfg=_mock_cfg(),
             )
 
@@ -117,7 +117,7 @@ class TestDatpClientShapeValidation:
                 cid="client_xyz",
                 model=model,
                 train_data=torch.randn(16),
-                cal_data=torch.randn(8, 4),
+                val_data=torch.randn(8, 4),
                 cfg=_mock_cfg(),
             )
 
@@ -132,7 +132,7 @@ class TestDatpClientGetParameters:
             cid="c0",
             model=model,
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(),
         )
         params = client.get_parameters({})
@@ -146,7 +146,7 @@ class TestDatpClientGetParameters:
             cid="c0",
             model=model,
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(),
         )
         direct = get_parameters(model)
@@ -165,7 +165,7 @@ class TestDatpClientFit:
             cid="c0",
             model=model,
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(local_epochs=2),
         )
         initial_params = get_parameters(model)
@@ -183,7 +183,7 @@ class TestDatpClientFit:
             cid="c0",
             model=model,
             train_data=torch.randn(32, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(local_epochs=3),
         )
         params_before = get_parameters(model)
@@ -203,7 +203,7 @@ class TestDatpClientFit:
             cid="c0",
             model=model,
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(local_epochs=1),
         )
         client.fit(get_parameters(model), {})
@@ -220,7 +220,7 @@ class TestDatpClientEvaluate:
             cid="c0",
             model=model,
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(),
         )
         loss, count, metrics = client.evaluate(get_parameters(model), {})
@@ -237,7 +237,7 @@ class TestDatpClientEvaluate:
             cid="c0",
             model=model,
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(),
         )
         client.evaluate(get_parameters(model), {})
@@ -249,7 +249,7 @@ class TestDatpClientEvaluate:
             cid="c0",
             model=model,
             train_data=torch.randn(16, 4),
-            cal_data=torch.randn(8, 4),
+            val_data=torch.randn(8, 4),
             cfg=_mock_cfg(),
         )
         params_before = get_parameters(model)
@@ -269,7 +269,7 @@ class TestDatpClientDeterminism:
         set_seeds(42)
         model_a = _make_ae()
         data = torch.randn(16, 4)
-        cal_data = torch.randn(8, 4)
+        val_data = torch.randn(8, 4)
 
         model_b = copy.deepcopy(model_a)
 
@@ -277,14 +277,14 @@ class TestDatpClientDeterminism:
             cid="c0",
             model=model_a,
             train_data=data,
-            cal_data=cal_data,
+            val_data=val_data,
             cfg=_mock_cfg(local_epochs=2),
         )
         client_b = DatpClient(
             cid="c0",
             model=model_b,
             train_data=data,
-            cal_data=cal_data,
+            val_data=val_data,
             cfg=_mock_cfg(local_epochs=2),
         )
 

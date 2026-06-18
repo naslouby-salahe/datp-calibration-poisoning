@@ -162,6 +162,8 @@ class ScoringStage(enum.StrEnum):
     @property
     def client_data_attr(self) -> str:
         """Attribute name on ``ClientData`` that holds this stage's tensor."""
+        if self == ScoringStage.CAL:
+            return "val"
         return self.value
 
     @classmethod

@@ -14,8 +14,8 @@ from datp.core.enums import Baseline
 
 
 class TestCheckRunState:
-    def test_empty_directory_is_unstarted(self, tmp_path: Path) -> None:
-        assert check_run_state(tmp_path) == RunState.UNSTARTED
+    def test_empty_directory_is_corrupt(self, tmp_path: Path) -> None:
+        assert check_run_state(tmp_path) == RunState.CORRUPT
 
     def test_in_progress_only(self, tmp_path: Path) -> None:
         (tmp_path / "IN_PROGRESS").touch()

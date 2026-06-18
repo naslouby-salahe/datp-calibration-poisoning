@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -34,10 +33,7 @@ def write_json_atomic(path: Path, data: Any) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     payload = serialize_json_payload(data)
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(json.dumps(payload, sort_keys=True, indent=2) + "\n")
-        f.flush()
-        os.fsync(f.fileno())
+    tmp.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n")
     tmp.replace(path)
     return path
 
