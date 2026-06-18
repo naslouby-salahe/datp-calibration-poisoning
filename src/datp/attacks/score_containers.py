@@ -64,6 +64,10 @@ class ScoreCollection:
     def all_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self.clients.keys()))
 
+    def client_index(self, client_id: str) -> int:
+        """Deterministic index of *client_id* in the sorted client list, used for SeedSequence."""
+        return self.all_ids.index(client_id)
+
     def cal_dict(self) -> dict[str, np.ndarray]:
         """Return {client_id: cal_scores} for all clients."""
         return {cid: c.cal for cid, c in self.clients.items()}

@@ -26,11 +26,11 @@ from datp.core.poison_enums import (
 
 
 @dataclass(frozen=True, slots=True)
-class BoundedSweepCellSpec:
-    """One bounded cell.
+class SweepCellSpec:
+    """One cell in the experiment matrix.
 
     Identity: (training_seed, poisoning_seed, victim_id, policy, source,
-    fraction). ``target_scope`` is always SINGLE_CLIENT for this matrix.
+    fraction). ``target_scope`` is always SINGLE_CLIENT for the bounded matrix.
     """
 
     training_seed: int
@@ -45,7 +45,7 @@ class BoundedSweepCellSpec:
 def _enumerate_single_victim_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
     fractions: Sequence[float],
-) -> tuple[BoundedSweepCellSpec, ...]:
+) -> tuple[SweepCellSpec, ...]:
     """Enumerate the single-victim matrix over a given fraction grid.
 
     ``victims_by_training_seed`` maps each training seed to its eligible
@@ -53,7 +53,7 @@ def _enumerate_single_victim_matrix(
     paired 1:1 by position in ``TRAINING_SEEDS``/``POISONING_SEEDS``).
     Raises ``KeyError`` if a locked training seed has no victim list.
     """
-    cells: list[BoundedSweepCellSpec] = []
+    cells: list[SweepCellSpec] = []
     for training_seed, poisoning_seed in zip(
         TRAINING_SEEDS, POISONING_SEEDS, strict=True
     ):
@@ -67,7 +67,7 @@ def _enumerate_single_victim_matrix(
                 for source in BOUNDED_SWEEP_SOURCES:
                     for fraction in fractions:
                         cells.append(
-                            BoundedSweepCellSpec(
+                            SweepCellSpec(
                                 training_seed=training_seed,
                                 poisoning_seed=poisoning_seed,
                                 victim_id=victim_id,
@@ -81,7 +81,7 @@ def _enumerate_single_victim_matrix(
 
 def enumerate_bounded_sweep_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
-) -> tuple[BoundedSweepCellSpec, ...]:
+) -> tuple[SweepCellSpec, ...]:
     """Enumerate the locked bounded matrix (fractions {0, 0.10, 0.20, 0.40})."""
     return _enumerate_single_victim_matrix(
         victims_by_training_seed, BOUNDED_SWEEP_FRACTIONS
@@ -90,7 +90,7 @@ def enumerate_bounded_sweep_matrix(
 
 def enumerate_full_sweep_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
-) -> tuple[BoundedSweepCellSpec, ...]:
+) -> tuple[SweepCellSpec, ...]:
     """Enumerate the full-scope matrix (fractions {0, 0.05, 0.10, 0.20, 0.40}).
 
     Identical to the bounded matrix except the fraction grid adds 0.05.

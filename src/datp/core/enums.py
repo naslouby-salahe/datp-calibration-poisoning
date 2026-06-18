@@ -289,7 +289,7 @@ class SeedScope(enum.StrEnum):
     """Which seeds a figure or result covers."""
 
     REPRESENTATIVE_SEED = "representative_seed"
-    ALL_SEED = "all_seed"
+    ALL_SEEDS = "all_seeds"
 
 
 # Baselines used for statistical comparisons per regime.

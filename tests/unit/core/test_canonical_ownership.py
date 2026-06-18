@@ -97,7 +97,7 @@ class TestEnumOwnership:
 
     def test_seed_scope_values(self) -> None:
         assert SeedScope.REPRESENTATIVE_SEED == "representative_seed"
-        assert SeedScope.ALL_SEED == "all_seed"
+        assert SeedScope.ALL_SEEDS == "all_seeds"
 
     def test_figure_name_values(self) -> None:
         assert FigureName.FIGURE_1 == "figure_1"

@@ -49,7 +49,7 @@ def test_wrong_seed_scope_fails(tmp_path: Path) -> None:
     figures_dir = tmp_path / "figures"
     for fig in _REPRESENTATIVE_SEED_FIGURES:
         sidecar = _valid_sidecar(fig)
-        sidecar["seed_scope"] = SeedScope.ALL_SEED.value
+        sidecar["seed_scope"] = SeedScope.ALL_SEEDS.value
         _write_sidecar(figures_dir, fig, sidecar)
     errors = _validate_figure_sidecars(figures_dir)
     assert any("seed_scope" in e for e in errors)

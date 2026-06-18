@@ -111,9 +111,9 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # the clients dict; None is the uninitialized sentinel for the lazy-init pattern
         ("attacks/score_containers.py", "ScoreCollection", "_eligible_ids"),
         ("attacks/score_containers.py", "ScoreCollection", "_pending_ids"),
-        # BoundedSweepCellSpec.target_scope: protocol lock — the bounded sweep
+        # SweepCellSpec.target_scope: protocol lock — the bounded sweep
         # matrix is always SINGLE_CLIENT; any other scope is out of scope here
-        ("attacks/bounded_sweep_matrix.py", "BoundedSweepCellSpec", "target_scope"),
+        ("attacks/bounded_sweep_matrix.py", "SweepCellSpec", "target_scope"),
     }
 )
 

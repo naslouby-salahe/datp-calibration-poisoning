@@ -26,7 +26,7 @@ from datp.attacks.bounded_sweep_manifest import (
     BoundedSweepResultRow,
 )
 from datp.attacks.bounded_sweep_matrix import (
-    BoundedSweepCellSpec,
+    SweepCellSpec,
     enumerate_bounded_sweep_matrix,
 )
 from datp.attacks.diagnostics import compute_blast_radius, compute_spillover
@@ -51,10 +51,6 @@ from datp.core.seed_sequence import derive_seed_record
 _REPOSITORY_NAME: str = "datp-calibration-poisoning"
 
 
-def _client_idx(collection: ScoreCollection, client_id: str) -> int:
-    return collection.all_ids.index(client_id)
-
-
 def _auroc_invariant(result: SweepCellResult) -> bool:
     clean = result.clean_metrics.auroc_records
     poisoned = result.poisoned_metrics.auroc_records
@@ -63,7 +59,7 @@ def _auroc_invariant(result: SweepCellResult) -> bool:
 
 def _row_for_cell(
     collection: ScoreCollection,
-    spec: BoundedSweepCellSpec,
+    spec: SweepCellSpec,
     *,
     mu_flag_threshold: float,
     auroc_records: dict[str, AurocRecord],
@@ -86,7 +82,7 @@ def _row_for_cell(
         derive_seed_record(
             training_seed=spec.training_seed,
             poisoning_seed=spec.poisoning_seed,
-            client_idx=_client_idx(collection, spec.victim_id),
+            client_idx=collection.client_index(spec.victim_id),
             scope_idx=0,
         )
     )

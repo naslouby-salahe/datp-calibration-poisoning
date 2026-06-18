@@ -301,7 +301,7 @@ class TestSeedScope:
         assert SeedScope.REPRESENTATIVE_SEED == "representative_seed"
 
     def test_all_seed_value(self) -> None:
-        assert SeedScope.ALL_SEED == "all_seed"
+        assert SeedScope.ALL_SEEDS == "all_seeds"
 
     def test_is_str_compatible(self) -> None:
         for scope in SeedScope:

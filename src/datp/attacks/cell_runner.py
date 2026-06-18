@@ -34,11 +34,6 @@ from datp.core.seed_sequence import make_seed_rng
 PolicyPair = ThresholdPair | B4ThresholdPair
 
 
-def _client_idx(collection: ScoreCollection, client_id: str) -> int:
-    """Deterministic per-client index for SeedSequence (position in sorted ids)."""
-    return collection.all_ids.index(client_id)
-
-
 @dataclass(frozen=True, slots=True)
 class InjectionOutcome:
     """Result of injecting one victim; carries the full poisoned cal dict.
@@ -78,7 +73,7 @@ def inject_single_victim(
     rng = make_seed_rng(
         training_seed=training_seed,
         poisoning_seed=poisoning_seed,
-        client_idx=_client_idx(collection, victim_id),
+        client_idx=collection.client_index(victim_id),
         scope_idx=scope_idx,
         child_index=0,
     )
