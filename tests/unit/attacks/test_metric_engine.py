@@ -138,6 +138,19 @@ class TestFleetFpr:
         fleet = compute_fleet_fpr(col, b1, None)
         assert not fleet.mu_flag_triggered
 
+    def test_companion_dispersion_populated(self) -> None:
+        """Companion dispersion (IQR, range) accompanies CV(FPR) and is non-negative."""
+        col = _make_collection()
+        pois_cal, _ = _inject_one_victim(col)
+        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        fleet = compute_fleet_fpr(col, b1, None)
+        assert math.isfinite(fleet.iqr_fpr)
+        assert fleet.iqr_fpr >= 0.0
+        assert math.isfinite(fleet.max_min_fpr_gap)
+        assert fleet.max_min_fpr_gap >= 0.0
+        assert math.isfinite(fleet.std_fpr)
+        assert fleet.std_fpr >= 0.0
+
     def test_worst_client_is_max_fpr(self) -> None:
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)

@@ -6,6 +6,7 @@ import numpy as np
 
 from datp.checkpointing.enums import CheckpointConvergenceMode
 from datp.config.compose import BASE_CONFIG
+from datp.core.enums import B4RegimeAMode
 from datp.federated.convergence import ConvergenceMonitor
 from datp.federated.strategies import DatpFedAvg
 
@@ -74,4 +75,13 @@ def test_checkpoint_save_schedule_and_b4_k_are_fixed() -> None:
     )
     assert BASE_CONFIG.checkpoint_protocol.max_rounds == 200
     assert BASE_CONFIG.checkpoint_protocol.convergence_mode == CheckpointConvergenceMode.LOG_ONLY
+    assert BASE_CONFIG.threshold.b4_k_regime_a == 3
+
+
+def test_canonical_regime_a_b4_is_fixed_k3() -> None:
+    # Canonical Regime A locks B4 to a fixed K=3. FIXED mode makes b4_k_regime_a
+    # authoritative; under SILHOUETTE the configured 3 would be ignored, so the
+    # mode assertion closes the K=3 lock at the config level. This guard is
+    # independent of the checkpoint-protocol block (which may be absent).
+    assert BASE_CONFIG.threshold.b4_regime_a_mode is B4RegimeAMode.FIXED
     assert BASE_CONFIG.threshold.b4_k_regime_a == 3

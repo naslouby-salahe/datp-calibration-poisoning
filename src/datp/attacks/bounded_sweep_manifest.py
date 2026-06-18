@@ -12,7 +12,9 @@ own. No change to that schema was made or is needed here.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, model_validator
+import math
+
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from datp.attacks.run_manifest import (
     RESERVOIR_MODE,
@@ -67,6 +69,16 @@ class BoundedSweepResultRow(BaseModel):
     n_blast_significant: int
     n_spillover: int
     n_non_victims: int
+
+    @field_validator("cv_fpr", "mean_fpr", mode="before")
+    @classmethod
+    def _undefined_null_to_nan(cls, value: object) -> object:
+        # CV(FPR) is undefined (NaN) when mean FPR is zero or fewer than two
+        # eligible clients contribute; mean FPR is undefined when no eligible
+        # client has a valid FPR. model_dump_json serializes NaN to JSON null,
+        # so reload must map null back to NaN. Undefined stays distinct from a
+        # genuine 0.0 — it is never silently coerced to zero.
+        return math.nan if value is None else value
 
 
 class BoundedSweepManifest(BaseModel):

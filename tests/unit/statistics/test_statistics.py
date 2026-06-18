@@ -46,6 +46,13 @@ class TestCV:
         arr = np.array([-1.0, 1.0])
         assert math.isnan(cv(arr, ddof=1))
 
+    def test_near_zero_positive_mean_is_finite(self) -> None:
+        """A tiny but non-zero mean yields a finite CV; no epsilon floor caps it."""
+        arr = np.array([0.0, 2e-12])
+        result = cv(arr, ddof=1)
+        assert math.isfinite(result)
+        assert result == pytest.approx(float(arr.std(ddof=1) / arr.mean()))
+
     def test_single_element_returns_nan(self) -> None:
         arr = np.array([42.0])
         assert math.isnan(cv(arr, ddof=1))

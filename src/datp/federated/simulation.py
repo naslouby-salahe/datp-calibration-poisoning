@@ -44,6 +44,7 @@ from datp.federated.data_loading import (
 from datp.federated.factories import build_model, make_client_fn
 from datp.federated.parameters import get_parameters, set_parameters
 from datp.federated.runtime import (
+    check_object_store_capacity,
     derive_client_resources,
     ensure_ray_memory_threshold,
 )
@@ -152,6 +153,12 @@ def _execute_flower_simulation(
         max_concurrent_override=cfg.machine.max_concurrent_override,
         require_cuda=cfg.machine.require_cuda,
         ray_num_gpus_per_client=cfg.machine.ray_num_gpus_per_client,
+    )
+    object_store_preflight = check_object_store_capacity(cfg.machine.ray_object_store_mb)
+    logger.info(
+        "ray object-store preflight",
+        object_store_mb=object_store_preflight["object_store_mb"],
+        available_ram_mb=object_store_preflight["available_ram_mb"],
     )
     object_store_bytes = cfg.machine.ray_object_store_mb * 1024 * 1024
     num_rounds = effective_rounds_max

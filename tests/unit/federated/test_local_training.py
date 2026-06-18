@@ -32,6 +32,20 @@ class TestTrainLocal:
         assert isinstance(loss, float)
         assert not torch.isnan(torch.tensor(loss))
 
+    def test_optimizer_uses_no_weight_decay(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Scope guard: local training uses no weight decay. Adding L2 regularization
+        # would be an unmotivated change to the optimization regime.
+        captured: dict[str, float] = {}
+        real_adam = torch.optim.Adam
+
+        def _capturing_adam(params: object, **kwargs: float) -> torch.optim.Adam:
+            captured["weight_decay"] = kwargs.get("weight_decay", -1.0)
+            return real_adam(params, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(torch.optim, "Adam", _capturing_adam)
+        train_local(_make_model(), torch.randn(16, 4), epochs=1, batch_size=8, lr=0.01)
+        assert captured["weight_decay"] == 0.0
+
     def test_multiple_epochs_reduce_loss(self) -> None:
         set_seeds(0)
         model = _make_model()

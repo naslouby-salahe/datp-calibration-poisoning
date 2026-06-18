@@ -112,6 +112,27 @@ class TestActivation:
             Autoencoder(NBAIOT_INPUT_DIM, [], activation=Activation.RELU, use_bn=False)
 
 
+class TestBatchNormScopeGuard:
+    def test_use_bn_false_has_no_batchnorm(self) -> None:
+        # Canonical federated setup runs without BatchNorm: averaging BN running
+        # stats across clients under FedAvg is ill-defined. Lock the BN-free path.
+        model = Autoencoder(
+            NBAIOT_INPUT_DIM, NBAIOT_HIDDEN, activation=Activation.RELU, use_bn=False
+        )
+        bn = [m for m in model.modules() if isinstance(m, torch.nn.BatchNorm1d)]
+        assert bn == []
+
+    def test_use_bn_true_inserts_batchnorm(self) -> None:
+        # The gate is genuine: use_bn=False is a deliberate choice, not a model
+        # that simply cannot express BatchNorm.
+        model = Autoencoder(
+            NBAIOT_INPUT_DIM, NBAIOT_HIDDEN, activation=Activation.RELU, use_bn=True
+        )
+        bn = [m for m in model.modules() if isinstance(m, torch.nn.BatchNorm1d)]
+        assert len(bn) > 0
+
+
+
 class TestLossDecreases:
     def test_loss_decreases(self) -> None:
         set_seeds(42)

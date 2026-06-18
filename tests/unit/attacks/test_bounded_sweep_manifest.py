@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 from pydantic import ValidationError
 
@@ -76,6 +78,18 @@ def test_manifest_round_trips_through_json():
     manifest = _manifest()
     restored = BoundedSweepManifest.model_validate_json(manifest.model_dump_json())
     assert restored == manifest
+
+
+def test_undefined_cv_serializes_as_null_and_round_trips_to_nan():
+    """Undefined CV(FPR) (NaN) serializes to JSON null, not 0.0, and reloads as NaN."""
+    row = _row()
+    undefined = row.model_copy(update={"cv_fpr": math.nan, "mean_fpr": 0.0})
+    payload = undefined.model_dump_json()
+    assert '"cv_fpr":null' in payload
+    restored = BoundedSweepResultRow.model_validate_json(payload)
+    assert math.isnan(restored.cv_fpr)
+    assert restored.cv_fpr != 0.0
+    assert restored.mean_fpr == 0.0
 
 
 def test_manifest_rejects_n_cells_mismatch():

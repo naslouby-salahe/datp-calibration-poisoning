@@ -12,9 +12,17 @@ from datp.core.errors import fmt
 
 _MODULE = "federated.runtime"
 _BYTES_PER_GIB = 1024**3
+_MIB_PER_GIB = 1024
 _KIB_PER_GIB = 1024**2
 _MEMINFO_PATH = Path("/proc/meminfo")
 _RAY_MEMORY_ENV_KEY = "RAY_memory_usage_threshold"
+
+
+class ObjectStorePreflight(TypedDict):
+    """Observed memory facts for the Ray plasma object-store feasibility check."""
+
+    object_store_mb: int
+    available_ram_mb: int
 
 
 class ClientResources(TypedDict):
@@ -89,6 +97,27 @@ def get_available_ram_gb() -> float:
             "neither available",
         )
     )
+
+
+def check_object_store_capacity(object_store_mb: int) -> ObjectStorePreflight:
+    """Validate the configured Ray object-store size against observed available RAM.
+
+    The configured value is never altered: this only fails early with an
+    actionable message when the requested plasma store cannot fit in available
+    RAM, instead of letting Ray init fail cryptically. Returns the observed
+    facts for observability logging.
+    """
+    available_ram_mb = int(get_available_ram_gb() * _MIB_PER_GIB)
+    if object_store_mb > available_ram_mb:
+        raise RuntimeError(
+            fmt(
+                _MODULE,
+                "Configured Ray object-store size exceeds available RAM",
+                f"<= {available_ram_mb} MiB available",
+                f"{object_store_mb} MiB requested",
+            )
+        )
+    return {"object_store_mb": object_store_mb, "available_ram_mb": available_ram_mb}
 
 
 def derive_client_resources(

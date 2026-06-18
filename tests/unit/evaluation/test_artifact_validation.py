@@ -190,3 +190,19 @@ class TestEligibilityValidation:
         )
         errors = validate_metrics_payload(payload, module="test")
         assert any("calibration_pending" in e for e in errors)
+
+    def test_non_first_client_missing_confusion_matrix_fails(self) -> None:
+        """Every client is validated, not only the first: a broken second client is caught."""
+        broken = _base_client("c2")
+        del broken[PayloadKey.CONFUSION_MATRIX]
+        payload = _valid_payload(
+            per_client=[_base_client("c1"), broken, _base_client("c3")],
+            eligible_ids=["c1", "c2", "c3"],
+            eligible_count=3,
+            client_count=3,
+        )
+        errors = validate_metrics_payload(payload, module="test")
+        assert any("c2" in e and "confusion_matrix" in e for e in errors)
+        assert not any("c1" in e for e in errors)
+        assert not any("c3" in e for e in errors)
+

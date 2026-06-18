@@ -572,6 +572,13 @@ class TestDatpConfig:
         with pytest.raises((TypeError, ValueError, ValidationError)):
             BASE_CONFIG.model.input_dim = 999  # type: ignore[misc]
 
+    def test_canonical_config_disables_batchnorm(self) -> None:
+        # BatchNorm is incompatible with FedAvg averaging of running stats; the
+        # canonical configuration must keep it off.
+        from datp.config.compose import BASE_CONFIG
+
+        assert BASE_CONFIG.model.use_bn is False
+
     def test_missing_required_section_fails(self) -> None:
         with pytest.raises(ValidationError):
             DatpConfig(  # type: ignore[call-arg]

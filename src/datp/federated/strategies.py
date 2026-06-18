@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,60 @@ def _get_rss_mb() -> float:
     except (OSError, ValueError):
         return _RSS_UNAVAILABLE
     return _RSS_UNAVAILABLE
+
+
+_UNIDENTIFIED_CLIENT = "<unidentified>"
+
+
+@dataclass(frozen=True, slots=True)
+class ParticipationFailureReport:
+    """Per-client diagnostics for a full-participation violation in one FL round."""
+
+    stage: str
+    server_round: int
+    successful_ids: tuple[str, ...]
+    failed_ids: tuple[str, ...]
+    reasons: tuple[str, ...]
+
+    @property
+    def message(self) -> str:
+        return (
+            f"FL round {self.server_round}: {len(self.failed_ids)} client(s) failed "
+            f"during {self.stage}; full participation required — aborting. "
+            f"successful={len(self.successful_ids)} {list(self.successful_ids)}; "
+            f"failed={len(self.failed_ids)} {list(self.failed_ids)}; "
+            f"reasons={list(self.reasons)}"
+        )
+
+
+def _build_participation_failure_report(
+    *,
+    stage: str,
+    server_round: int,
+    results: list[tuple[ClientProxy, Any]],
+    failures: list[tuple[ClientProxy, Any] | BaseException],
+) -> ParticipationFailureReport:
+    successful_ids = tuple(sorted(proxy.cid for proxy, _ in results))
+    failed_ids: list[str] = []
+    reasons: list[str] = []
+    for item in failures:
+        if isinstance(item, BaseException):
+            failed_ids.append(_UNIDENTIFIED_CLIENT)
+            reasons.append(f"{_UNIDENTIFIED_CLIENT}: {type(item).__name__}: {item}")
+            continue
+        proxy, res = item
+        cid = proxy.cid
+        failed_ids.append(cid)
+        status = getattr(res, "status", None)
+        reason = getattr(status, "message", None) or getattr(status, "code", None)
+        reasons.append(f"{cid}: {reason}" if reason else f"{cid}: returned failure status")
+    return ParticipationFailureReport(
+        stage=stage,
+        server_round=server_round,
+        successful_ids=successful_ids,
+        failed_ids=tuple(failed_ids),
+        reasons=tuple(reasons),
+    )
 
 
 class DatpFedAvg(FedAvg):
@@ -100,10 +155,22 @@ class DatpFedAvg(FedAvg):
         failures: list[tuple[ClientProxy, Any] | BaseException],
     ) -> tuple[Parameters | None, dict[str, Scalar]]:
         if failures:
-            raise RuntimeError(
-                f"FL round {server_round}: {len(failures)} client(s) failed during fit. "
-                f"Full participation required — aborting."
+            report = _build_participation_failure_report(
+                stage="fit",
+                server_round=server_round,
+                results=results,
+                failures=failures,
             )
+            logger.error(
+                "full participation violated",
+                round=server_round,
+                stage="fit",
+                successful=len(report.successful_ids),
+                failed=len(report.failed_ids),
+                failed_ids=list(report.failed_ids),
+                reasons=list(report.reasons),
+            )
+            raise RuntimeError(report.message)
         aggregated = super().aggregate_fit(server_round, results, failures)
         if aggregated is not None:
             params, _ = aggregated
@@ -152,10 +219,22 @@ class DatpFedAvg(FedAvg):
         failures: list[tuple[ClientProxy, Any] | BaseException],
     ) -> tuple[float | None, dict[str, Scalar]]:
         if failures:
-            raise RuntimeError(
-                f"FL round {server_round}: {len(failures)} client(s) failed during evaluate. "
-                f"Full participation required — aborting."
+            report = _build_participation_failure_report(
+                stage="evaluate",
+                server_round=server_round,
+                results=results,
+                failures=failures,
             )
+            logger.error(
+                "full participation violated",
+                round=server_round,
+                stage="evaluate",
+                successful=len(report.successful_ids),
+                failed=len(report.failed_ids),
+                failed_ids=list(report.failed_ids),
+                reasons=list(report.reasons),
+            )
+            raise RuntimeError(report.message)
         if not results:
             logger.warning("no evaluate results received", round=server_round)
             return None, {}

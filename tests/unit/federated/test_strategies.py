@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 from flwr.common import Code, FitRes, Status, ndarrays_to_parameters
 
 from datp.artifacts.names import ArtifactFile
@@ -150,3 +151,41 @@ class TestAggregateFitDiskWrite:
 
         assert (dirs[2] / ArtifactFile.PARAMS_SNAPSHOT).exists()
         assert (dirs[4] / ArtifactFile.PARAMS_SNAPSHOT).exists()
+
+
+class TestFullParticipationDiagnostics:
+    def test_aggregate_fit_reports_successful_and_failed_client_ids(self) -> None:
+        strategy = _make_strategy()
+        ok_proxy, ok_res = _make_fit_result(np.zeros((2, 2), dtype=np.float32))
+        ok_proxy.cid = "c0"
+        bad_proxy = MagicMock()
+        bad_proxy.cid = "c3"
+        bad_res = FitRes(
+            status=Status(code=Code.FIT_NOT_IMPLEMENTED, message="trainer crashed"),
+            parameters=ndarrays_to_parameters([np.zeros((2, 2), dtype=np.float32)]),
+            num_examples=0,
+            metrics={},
+        )
+
+        with pytest.raises(RuntimeError) as exc:
+            strategy.aggregate_fit(7, [(ok_proxy, ok_res)], [(bad_proxy, bad_res)])
+
+        message = str(exc.value)
+        assert "round 7" in message
+        assert "fit" in message
+        assert "full participation" in message.lower()
+        assert "c3" in message
+        assert "c0" in message
+        assert "trainer crashed" in message
+
+    def test_aggregate_evaluate_reports_exception_failures(self) -> None:
+        strategy = _make_strategy()
+
+        with pytest.raises(RuntimeError) as exc:
+            strategy.aggregate_evaluate(4, [], [RuntimeError("client process died")])
+
+        message = str(exc.value)
+        assert "evaluate" in message
+        assert "RuntimeError" in message
+        assert "client process died" in message
+

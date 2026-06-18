@@ -10,11 +10,36 @@ from datp.config.compose import BASE_CONFIG
 from datp.core.device import resolve_device
 from datp.core.enums import DeviceType
 from datp.federated.runtime import (
+    check_object_store_capacity,
     derive_client_resources,
     derive_max_concurrent,
     ensure_ray_memory_threshold,
     get_available_ram_gb,
 )
+
+
+class TestObjectStoreCapacity:
+    def test_fits_returns_observed_facts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "datp.federated.runtime.get_available_ram_gb", lambda: 8.0
+        )
+        result = check_object_store_capacity(1024)
+        assert result["object_store_mb"] == 1024
+        assert result["available_ram_mb"] == 8 * 1024
+
+    def test_exceeds_available_ram_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "datp.federated.runtime.get_available_ram_gb", lambda: 1.0
+        )
+        with pytest.raises(RuntimeError, match="exceeds available RAM"):
+            check_object_store_capacity(4096)
+
+    def test_equal_to_available_ram_passes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "datp.federated.runtime.get_available_ram_gb", lambda: 2.0
+        )
+        result = check_object_store_capacity(2 * 1024)
+        assert result["object_store_mb"] == 2 * 1024
 
 
 class TestRayMemoryThreshold:
