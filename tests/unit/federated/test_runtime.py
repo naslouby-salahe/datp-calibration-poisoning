@@ -10,6 +10,7 @@ from datp.config.compose import BASE_CONFIG
 from datp.core.device import resolve_device
 from datp.core.enums import DeviceType
 from datp.federated.runtime import (
+    RayClientResourceRequest,
     check_object_store_capacity,
     derive_client_resources,
     derive_max_concurrent,
@@ -123,11 +124,13 @@ class TestDeriveClientResources:
 
     def test_returns_typed_client_resources(self) -> None:
         result = derive_client_resources(
-            per_client_ram_gb=1.5,
-            reserve_ram_gb=3.5,
-            max_concurrent_override=None,
-            require_cuda=True,
-            ray_num_gpus_per_client=0.5,
+            RayClientResourceRequest(
+                per_client_ram_gb=1.5,
+                reserve_ram_gb=3.5,
+                max_concurrent_override=None,
+                require_cuda=True,
+                num_gpus_per_client=0.5,
+            )
         )
         assert isinstance(result, dict)
         assert result["num_gpus"] == 0.5
@@ -135,21 +138,25 @@ class TestDeriveClientResources:
 
     def test_num_gpus_zero_when_cpu_mode(self) -> None:
         result = derive_client_resources(
-            per_client_ram_gb=1.5,
-            reserve_ram_gb=3.5,
-            max_concurrent_override=None,
-            require_cuda=False,
-            ray_num_gpus_per_client=0.5,
+            RayClientResourceRequest(
+                per_client_ram_gb=1.5,
+                reserve_ram_gb=3.5,
+                max_concurrent_override=None,
+                require_cuda=False,
+                num_gpus_per_client=0.5,
+            )
         )
         assert result["num_gpus"] == 0.0
 
     def test_honours_max_concurrent_override(self) -> None:
         result = derive_client_resources(
-            per_client_ram_gb=1.5,
-            reserve_ram_gb=3.5,
-            max_concurrent_override=4,
-            require_cuda=False,
-            ray_num_gpus_per_client=0.0,
+            RayClientResourceRequest(
+                per_client_ram_gb=1.5,
+                reserve_ram_gb=3.5,
+                max_concurrent_override=4,
+                require_cuda=False,
+                num_gpus_per_client=0.0,
+            )
         )
         assert result["num_cpus"] == 2.0 # ceil(8 / 4)
 
@@ -159,11 +166,13 @@ class TestDeriveClientResources:
         monkeypatch.setattr("datp.core.device.torch.cuda.is_available", lambda: True)
         device = resolve_device(require_cuda=True)
         resources = derive_client_resources(
-            per_client_ram_gb=1.5,
-            reserve_ram_gb=3.5,
-            max_concurrent_override=None,
-            require_cuda=True,
-            ray_num_gpus_per_client=0.5,
+            RayClientResourceRequest(
+                per_client_ram_gb=1.5,
+                reserve_ram_gb=3.5,
+                max_concurrent_override=None,
+                require_cuda=True,
+                num_gpus_per_client=0.5,
+            )
         )
         assert device.type == DeviceType.CUDA
         assert resources["num_gpus"] > 0
@@ -174,11 +183,13 @@ class TestDeriveClientResources:
         monkeypatch.setattr("datp.core.device.torch.cuda.is_available", lambda: False)
         device = resolve_device(require_cuda=False)
         resources = derive_client_resources(
-            per_client_ram_gb=1.5,
-            reserve_ram_gb=3.5,
-            max_concurrent_override=None,
-            require_cuda=False,
-            ray_num_gpus_per_client=0.5,
+            RayClientResourceRequest(
+                per_client_ram_gb=1.5,
+                reserve_ram_gb=3.5,
+                max_concurrent_override=None,
+                require_cuda=False,
+                num_gpus_per_client=0.5,
+            )
         )
         assert device.type == DeviceType.CPU
         assert resources["num_gpus"] == 0.0

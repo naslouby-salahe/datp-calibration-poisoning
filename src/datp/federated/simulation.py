@@ -44,6 +44,7 @@ from datp.federated.data_loading import (
 from datp.federated.factories import build_model, make_client_fn
 from datp.federated.parameters import get_parameters, set_parameters
 from datp.federated.runtime import (
+    RayClientResourceRequest,
     check_object_store_capacity,
     derive_client_resources,
     ensure_ray_memory_threshold,
@@ -148,11 +149,13 @@ def _execute_flower_simulation(
     configure_runtime_env()
     ensure_ray_memory_threshold(cfg.runtime.ray_memory_threshold)
     client_resources = derive_client_resources(
-        per_client_ram_gb=cfg.machine.per_client_ram_gb,
-        reserve_ram_gb=cfg.machine.reserve_ram_gb,
-        max_concurrent_override=cfg.machine.max_concurrent_override,
-        require_cuda=cfg.machine.require_cuda,
-        ray_num_gpus_per_client=cfg.machine.ray_num_gpus_per_client,
+        RayClientResourceRequest(
+            per_client_ram_gb=cfg.machine.per_client_ram_gb,
+            reserve_ram_gb=cfg.machine.reserve_ram_gb,
+            max_concurrent_override=cfg.machine.max_concurrent_override,
+            require_cuda=cfg.machine.require_cuda,
+            num_gpus_per_client=cfg.machine.ray_num_gpus_per_client,
+        )
     )
     object_store_preflight = check_object_store_capacity(cfg.machine.ray_object_store_mb)
     logger.info(
@@ -474,7 +477,7 @@ def run_fl_simulation(
     log_params({
         "regime": str(regime),
         "seed": str(seed),
-            "rounds_max": str(effective_rounds_max),
+        "rounds_max": str(effective_rounds_max),
         "label": label,
     })
     log_metrics(

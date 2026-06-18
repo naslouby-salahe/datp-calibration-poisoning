@@ -1,8 +1,7 @@
-"""calibration-poisoning CLI subcommands — stage preview, dry-run, and smoke gate.
+"""Calibration-poisoning CLI commands.
 
-No experiment execution. Heavy stages require explicit gate authorization
-(each stage's own `gate` field). All commands here are read-only previews;
-they never launch a run themselves.
+Preview commands are read-only. Execution commands refuse to run unless the
+selected stage has its own gate authorized in the stage registry.
 """
 
 from __future__ import annotations

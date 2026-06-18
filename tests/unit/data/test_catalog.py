@@ -6,11 +6,14 @@ import pytest
 
 from datp.data.catalog import (
     CapPolicy,
+    CapStrategy,
     ClientIdentity,
     DatasetID,
     DatasetSpec,
     RawLayout,
     SplitPolicy,
+    SplitPolicyKind,
+    SplitPolicyRole,
     dataset_display_name,
     dataset_processed_slug,
     dataset_spec,
@@ -40,31 +43,51 @@ class TestClientIdentity:
             assert "_" in member.value or member.value.islower()
 
 
+class TestDatasetPolicyEnums:
+    def test_split_policy_kind_members(self) -> None:
+        assert set(SplitPolicyKind) == {
+            SplitPolicyKind.CHRONOLOGICAL_GAPPED,
+            SplitPolicyKind.STRATIFIED_RANDOM,
+        }
+
+    def test_split_policy_role_members(self) -> None:
+        assert set(SplitPolicyRole) == {
+            SplitPolicyRole.TRAIN,
+            SplitPolicyRole.GAP1,
+            SplitPolicyRole.CAL,
+            SplitPolicyRole.GAP2,
+            SplitPolicyRole.TEST_BENIGN,
+        }
+
+    def test_cap_strategy_members(self) -> None:
+        assert set(CapStrategy) == {CapStrategy.ATTACK_PRESERVING}
+
+
 class TestSplitPolicy:
     def test_construction(self) -> None:
         sp = SplitPolicy(
-            name="chronological",
+            name=SplitPolicyKind.CHRONOLOGICAL_GAPPED,
             calibration_benign_only=True,
             chronological=True,
             contiguous_gaps=False,
-            ratios={"train": 0.6, "cal": 0.2},
+            ratios={SplitPolicyRole.TRAIN: 0.6, SplitPolicyRole.CAL: 0.2},
         )
-        assert sp.name == "chronological"
+        assert sp.name == SplitPolicyKind.CHRONOLOGICAL_GAPPED
         assert sp.calibration_benign_only is True
         assert sp.chronological is True
         assert sp.contiguous_gaps is False
-        assert sp.ratios == {"train": 0.6, "cal": 0.2}
+        assert sp.ratios == {SplitPolicyRole.TRAIN: 0.6, SplitPolicyRole.CAL: 0.2}
 
     def test_frozen(self) -> None:
         sp = SplitPolicy(
-            name="test",
+            name=SplitPolicyKind.STRATIFIED_RANDOM,
             calibration_benign_only=False,
             chronological=False,
             contiguous_gaps=False,
             ratios={},
         )
         with pytest.raises(Exception):
-            sp.name = "other" # type: ignore[misc]
+            sp.name = "other"  # type: ignore[misc]
 
 
 class TestCapPolicy:
@@ -72,16 +95,20 @@ class TestCapPolicy:
         cp = CapPolicy(
             total=50000,
             attack_reserve=10000,
-            strategy="attack_preserving",
+            strategy=CapStrategy.ATTACK_PRESERVING,
         )
         assert cp.total == 50000
         assert cp.attack_reserve == 10000
-        assert cp.strategy == "attack_preserving"
+        assert cp.strategy == CapStrategy.ATTACK_PRESERVING
 
     def test_frozen(self) -> None:
-        cp = CapPolicy(total=100, attack_reserve=10, strategy="random")
+        cp = CapPolicy(
+            total=100,
+            attack_reserve=10,
+            strategy=CapStrategy.ATTACK_PRESERVING,
+        )
         with pytest.raises(Exception):
-            cp.total = 200 # type: ignore[misc]
+            cp.total = 200  # type: ignore[misc]
 
 
 def _make_spec(feature_count: int = 10) -> DatasetSpec:
@@ -96,11 +123,11 @@ def _make_spec(feature_count: int = 10) -> DatasetSpec:
         client_identity=ClientIdentity.DEVICE_DIRECTORY,
         raw_layout=RawLayout(root_slug="test_raw"),
         split_policy=SplitPolicy(
-            name="simple",
+            name=SplitPolicyKind.STRATIFIED_RANDOM,
             calibration_benign_only=True,
             chronological=False,
             contiguous_gaps=False,
-            ratios={"train": 0.7, "cal": 0.3},
+            ratios={SplitPolicyRole.TRAIN: 0.7, SplitPolicyRole.CAL: 0.3},
         ),
         cap_policy=None,
         family_map=None,
@@ -120,7 +147,7 @@ class TestDatasetSpec:
     def test_frozen(self) -> None:
         spec = _make_spec()
         with pytest.raises(Exception):
-            spec.feature_count = 99 # type: ignore[misc]
+            spec.feature_count = 99  # type: ignore[misc]
 
 
 class TestDatasetSpecHelper:
@@ -144,7 +171,7 @@ class TestDatasetSpecHelper:
 
     def test_raises_keyerror_for_invalid_id(self) -> None:
         with pytest.raises(KeyError):
-            dataset_spec("not_an_enum") # type: ignore[arg-type]
+            dataset_spec("not_an_enum")  # type: ignore[arg-type]
 
 
 class TestDatasetDisplayName:

@@ -6,9 +6,10 @@ from datp.data.catalog import (
     DatasetSpec,
     RawLayout,
     SplitPolicy,
+    SplitPolicyKind,
+    SplitPolicyRole,
 )
 
-DATASET_ID = "nbaiot"
 FEATURE_COUNT: int = 115
 
 CHRONOLOGICAL_SPLIT: bool = True
@@ -45,11 +46,11 @@ DEVICE_FAMILIES: frozenset[str] = frozenset(DEVICE_FAMILY_MAP.values())
 BENIGN_TRAFFIC_FILE = "benign_traffic.csv"
 ATTACK_FAMILY_DIRS: tuple[str, ...] = ("gafgyt_attacks", "mirai_attacks")
 
-SPLIT_RATIOS: dict[str, float] = {
-    "train": 0.60,
-    "gap1": 0.01,
-    "cal": 0.20,
-    "gap2": 0.01,
+SPLIT_RATIOS: dict[SplitPolicyRole, float] = {
+    SplitPolicyRole.TRAIN: 0.60,
+    SplitPolicyRole.GAP1: 0.01,
+    SplitPolicyRole.CAL: 0.20,
+    SplitPolicyRole.GAP2: 0.01,
 }
 
 BALANCED_TEST_DEFAULT: bool = False
@@ -65,7 +66,7 @@ NBAIOT_SPEC = DatasetSpec(
     client_identity=ClientIdentity.DEVICE_DIRECTORY,
     raw_layout=RawLayout(root_slug="N-BaIoT"),
     split_policy=SplitPolicy(
-        name="chronological_gapped",
+        name=SplitPolicyKind.CHRONOLOGICAL_GAPPED,
         calibration_benign_only=BENIGN_ONLY_CALIBRATION,
         chronological=CHRONOLOGICAL_SPLIT,
         contiguous_gaps=True,

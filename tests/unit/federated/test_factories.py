@@ -7,8 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import torch
-from flwr.common import Context
-from flwr.common.record import RecordDict
+from flwr.common import Context, RecordDict
 
 from datp.core.enums import Activation, DeviceType
 from datp.federated.factories import build_model, make_client_fn

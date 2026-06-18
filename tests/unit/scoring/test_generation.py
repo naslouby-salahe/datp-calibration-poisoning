@@ -15,7 +15,7 @@ from datp.core.identity import TrainingCellId
 from datp.core.seeds import set_seeds
 from datp.data.splits import Split
 from datp.scoring.generation import validate_scoring_manifest
-from datp.scoring.schema import SCORE_COLUMN
+from datp.scoring.schema import SCORE_COLUMN, ScoringManifestStatus
 
 _SEED = 0
 
@@ -58,7 +58,7 @@ def _write_valid_manifest(
             )
     manifest = {
         "schema_version": "1",
-        "completion_status": "complete",
+        "completion_status": ScoringManifestStatus.COMPLETE,
         "expected_client_ids": sorted(client_ids),
         "expected_splits": sorted(splits),
         "actual_client_ids": sorted(client_ids),
@@ -74,7 +74,7 @@ def test_validate_scoring_manifest_passes_with_valid_manifest(tmp_path: Path) ->
     sb = _score_base(tmp_path)
     _write_valid_manifest(sb, ["c0", "c1"], [Split.CAL.value, Split.TEST_BENIGN.value, Split.TEST_ATTACK.value])
     result = validate_scoring_manifest(sb)
-    assert result["completion_status"] == "complete"
+    assert result["completion_status"] == ScoringManifestStatus.COMPLETE
 
 
 def test_sentinel_alone_is_not_sufficient(tmp_path: Path) -> None:
@@ -337,7 +337,7 @@ class TestScoreClients:
             pf = score_base / stage.value / f"c0{PathToken.PARQUET_EXT}"
             assert pf.exists(), f"Missing {pf}"
         manifest = validate_scoring_manifest(score_base)
-        assert manifest["completion_status"] == "complete"
+        assert manifest["completion_status"] == ScoringManifestStatus.COMPLETE
         assert manifest["expected_client_ids"] == ["c0"]
 
     def test_score_clients_empty_client_data(self, tmp_path: Path) -> None:

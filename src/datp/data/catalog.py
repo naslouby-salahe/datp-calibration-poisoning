@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -11,20 +12,37 @@ class RawLayout:
     root_slug: str
 
 
+class SplitPolicyKind(enum.StrEnum):
+    CHRONOLOGICAL_GAPPED = "chronological_gapped"
+    STRATIFIED_RANDOM = "stratified_random"
+
+
+class SplitPolicyRole(enum.StrEnum):
+    TRAIN = "train"
+    GAP1 = "gap1"
+    CAL = "cal"
+    GAP2 = "gap2"
+    TEST_BENIGN = "test_benign"
+
+
+class CapStrategy(enum.StrEnum):
+    ATTACK_PRESERVING = "attack_preserving"
+
+
 @dataclass(frozen=True, slots=True)
 class SplitPolicy:
-    name: str
+    name: SplitPolicyKind
     calibration_benign_only: bool
     chronological: bool
     contiguous_gaps: bool
-    ratios: Mapping[str, float]
+    ratios: Mapping[SplitPolicyRole, float]
 
 
 @dataclass(frozen=True, slots=True)
 class CapPolicy:
     total: int
     attack_reserve: int
-    strategy: str
+    strategy: CapStrategy
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +72,7 @@ def _get_datasets() -> Mapping[DatasetID, DatasetSpec]:
     if _DATASETS is None:
         from datp.data.datasets.ciciot2023.spec import CICIOT2023_SPEC  # noqa: PLC0415
         from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC  # noqa: PLC0415
+
         _DATASETS = {
             DatasetID.NBAIOT: NBAIOT_SPEC,
             DatasetID.CICIOT2023: CICIOT2023_SPEC,

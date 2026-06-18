@@ -17,6 +17,7 @@ from datp.federated.simulation import (
     load_scoring_data,
     validate_regime,
 )
+from datp.federated.runtime import RayClientResourceRequest
 from datp.federated.types import ClientData
 
 # ---------------------------------------------------------------------------
@@ -273,10 +274,19 @@ class TestExecuteFlowerSimulation:
 
         monkeypatch.setattr(sim_mod, "configure_runtime_env", lambda: None)
         monkeypatch.setattr(sim_mod, "ensure_ray_memory_threshold", lambda _: None)
+
+        resource_requests: list[RayClientResourceRequest] = []
+
+        def fake_derive_client_resources(
+            request: RayClientResourceRequest,
+        ) -> dict[str, float]:
+            resource_requests.append(request)
+            return {"num_cpus": 1.0, "num_gpus": 0.0}
+
         monkeypatch.setattr(
             sim_mod,
             "derive_client_resources",
-            lambda **_kw: {"num_cpus": 1.0, "num_gpus": 0.0},
+            fake_derive_client_resources,
         )
 
         called: dict[str, object] = {}
@@ -296,6 +306,8 @@ class TestExecuteFlowerSimulation:
         )
 
         assert called.get("num_supernodes") == 7
+        assert len(resource_requests) == 1
+        assert resource_requests[0].per_client_ram_gb == BASE_CONFIG.machine.per_client_ram_gb
 
     def test_propagates_simulation_exception(
         self, monkeypatch: pytest.MonkeyPatch
@@ -308,8 +320,9 @@ class TestExecuteFlowerSimulation:
         monkeypatch.setattr(
             sim_mod,
             "derive_client_resources",
-            lambda **_kw: {"num_cpus": 1.0, "num_gpus": 0.0},
+            lambda _request: {"num_cpus": 1.0, "num_gpus": 0.0},
         )
+
         def boom(**_kw: object) -> None:
             raise RuntimeError("sim-boom")
 

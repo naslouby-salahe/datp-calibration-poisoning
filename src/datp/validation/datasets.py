@@ -128,7 +128,9 @@ def build_ciciot_protocol() -> CICIoTProtocolAudit:
             )
         )
 
-    feature_list = list(CICIOT2023_SPEC.feature_columns) if CICIOT2023_SPEC.feature_columns else []
+    feature_list = (
+        list(CICIOT2023_SPEC.feature_columns) if CICIOT2023_SPEC.feature_columns else []
+    )
     expected_count = CICIOT2023_SPEC.expected_client_count
     assert expected_count is not None, "CICIoT2023 spec must have expected_client_count"
     return CICIoTProtocolAudit(
@@ -147,7 +149,7 @@ def build_ciciot_protocol() -> CICIoTProtocolAudit:
         n_clients=expected_count,
         cap_total=cap_policy.total,
         cap_attack_reserve=cap_policy.attack_reserve,
-        cap_strategy=cap_policy.strategy,
+        cap_strategy=cap_policy.strategy.value,
     )
 
 

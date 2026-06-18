@@ -24,6 +24,7 @@ from datp.data.splits import Split
 from datp.federated.protocols.fedavg import run_fl_training
 from datp.federated.types import ClientData
 from datp.scoring.generation import validate_scoring_manifest
+from datp.scoring.schema import ScoringManifestStatus
 
 _N_FEATURES = 10
 _N_TRAIN = 200
@@ -116,7 +117,7 @@ def test_artifacts_written(tmp_path) -> None:
                 f"Missing score artifact: {expected} (client={cid}, stage={stage})"
             )
     manifest = validate_scoring_manifest(layout.score_cell(cell).score_dir)
-    assert manifest["completion_status"] == "complete"
+    assert manifest["completion_status"] == ScoringManifestStatus.COMPLETE
     assert manifest["expected_client_ids"] == client_ids
     assert len(cast(list, manifest["records"])) == len(client_ids) * len(_STAGES)
 

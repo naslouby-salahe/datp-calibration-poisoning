@@ -86,7 +86,7 @@ test-e2e:  ## Run end-to-end tests (tiny real-data subsets)
 # ═══════════════════════════════════════════════════════════════════════════
 .PHONY: typecheck lint
 
-typecheck:  ## Run pyright type checking on src/
+typecheck:  ## Run pyright type checking on baselines + evaluation
 	@command -v pyright >/dev/null 2>&1 || { echo "pyright not installed — run: pip install pyright"; exit 1; }
 	pyright src/datp/experiments/baselines/ src/datp/evaluation/
 
@@ -149,52 +149,13 @@ config-preview:  ## Preview resolved config for B1+Regime A (seed 0)
 	$(DATP) config preview --regime=a --baseline=b1 --seed=0
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Diagnostic run
-# ═══════════════════════════════════════════════════════════════════════════
-# Prerequisites: gate0–gate3-code PASS, data/raw/N-BaIoT/ populated.
-# Expected outputs: outputs/diagnostic/regime_a_seed0/{metrics,contingency}.json
-# Estimated runtime: 15–45 min GPU, 1–3 hours CPU-only
-.PHONY: diagnostics diagnostic-all diagnostic-regime-a
-
-diagnostics: diagnostic-regime-a diagnostic-regime-b diagnostic-regime-c  ## Run all diagnostic targets in order
-	@echo "=== DATP Diagnostics: all diagnostic targets complete ==="
-
-diagnostic-all: diagnostics  ## Alias for diagnostics
-	@:
-
-diagnostic-regime-a:  ## Regime A diagnostic run (REAL DATA; est. ~13 min)
-	@echo "=== DATP Diagnostic Run: N-BaIoT Regime A, seed 0 ==="
-	@echo "Prerequisites: gate0, gate1, gate2, gate3-code must PASS"
-	@echo "This will train FL on real N-BaIoT data (9 devices, 1 seed)."
-	@echo ""
-	$(DATP) diagnostic --raw-dir=data/raw/N-BaIoT --output-dir=outputs/diagnostic --seed=0
-
-.PHONY: diagnostic-regime-b
-diagnostic-regime-b:  ## Run CICIoT2023 diagnostic for Regime B, seed 0 (REAL DATA; est. ~35 min)
-	@echo "=== DATP Diagnostic Run: CICIoT2023 Regime B, seed 0 ==="
-	@echo "Prerequisites: gate0, gate1 must PASS; data/raw/CIC_IOT_Dataset2023/ populated."
-	@echo "This will train FL on real CICIoT2023 data."
-	@echo ""
-	$(DATP) diagnostic-b --raw-dir=data/raw/CIC_IOT_Dataset2023 --output-dir=outputs/diagnostic --seed=0
-
-.PHONY: diagnostic-regime-c
-diagnostic-regime-c:  ## Run Regime C diagnostic (Dirichlet α=1.0, seed 0, REAL DATA; est. ~13 min)
-	@echo "=== DATP Diagnostic Run: Regime C (Dirichlet α=1.0), seed 0 ==="
-	@echo "Prerequisites: gate0, gate1 must PASS; data/raw/N-BaIoT/ populated."
-	@echo "This will partition N-BaIoT via Dirichlet and train FL."
-	@echo ""
-	$(DATP) diagnostic-c --raw-dir=data/raw/N-BaIoT --output-dir=outputs/diagnostic --seed=0 --alpha=1.0
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # Main experiment runs — per regime
 # ═══════════════════════════════════════════════════════════════════════════
 .PHONY: run-regime-a run-regime-b run-regime-c run-main-matrix
 
 run-regime-a:  ## Run Regime A: N-BaIoT natural device split (25 cells; est. ~2 h)
 	@echo "=== DATP: Regime A (N-BaIoT, B0/B1/B2/B3/B4 × 5 seeds = 25 cells) ==="
-	@echo "Prerequisites: diagnostic-regime-a must complete successfully."
+	@echo "Prerequisites: gate0, gate1, gate2, and gate3-code must PASS."
 	$(DATP) sweep --regime=a --base-dir=$(OUTPUTS_DIR) --data-root=.
 
 run-regime-b:  ## Run Regime B: CICIoT2023 external validation/support (20 cells; est. ~8-10 h)
@@ -207,7 +168,7 @@ run-regime-c:  ## Run Regime C: N-BaIoT Dirichlet severity sweep (90 cells; est.
 
 run-main-matrix:  ## Run full 135-cell experiment matrix (REAL DATA + GPU; 24 to 72 hours on GPU, hardware-dependent)
 	@echo "WARNING: This launches the full 135-cell experiment matrix."
-	@echo "Prerequisites: diagnostic-regime-a must complete successfully."
+	@echo "Prerequisites: gate0, gate1, gate2, and gate3-code must PASS."
 	@echo "Estimated runtime: 24 to 72 hours on GPU, hardware-dependent."
 	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	$(DATP) sweep --base-dir=$(OUTPUTS_DIR) --data-root=.
@@ -215,7 +176,7 @@ run-main-matrix:  ## Run full 135-cell experiment matrix (REAL DATA + GPU; 24 to
 # ═══════════════════════════════════════════════════════════════════════════
 # Sweep utilities
 # ═══════════════════════════════════════════════════════════════════════════
-.PHONY: sweep-dry-run status audit-results
+.PHONY: sweep-dry-run status audit-results poison-stages poison-dry-run run-poison-bounded
 
 sweep-dry-run:  ## Validate sweep matrix without launching runs (est. <1 min)
 	$(DATP) sweep --dry-run --base-dir=$(OUTPUTS_DIR) --data-root=.
@@ -226,6 +187,15 @@ status:  ## Show experiment completion status (est. <1 min)
 audit-results:  ## Audit completed result artifacts and write artifacts/audit/ (est. <1 min)
 	@echo "=== DATP: Results audit ==="
 	$(DATP) audit results --base-dir=$(OUTPUTS_DIR) --data-root=.
+
+poison-stages:  ## List calibration-poisoning stages and gates
+	$(DATP) poison stages
+
+poison-dry-run:  ## Enumerate the bounded N-BaIoT poisoning stage without running
+	$(DATP) poison dry-run --stage nbaiot_bounded
+
+run-poison-bounded:  ## Run the authorized bounded N-BaIoT calibration-poisoning matrix
+	$(DATP) poison run-bounded-sweep --base-dir=$(OUTPUTS_DIR)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Reporting — figures, tables, statistics

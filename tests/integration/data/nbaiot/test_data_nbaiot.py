@@ -12,12 +12,13 @@ from datp.data.datasets.nbaiot import (
     prepare_nbaiot,
 )
 from datp.data.datasets.nbaiot.prepare import _compute_split_indices
+from datp.data.catalog import SplitPolicyRole
 from datp.data.splits import Split, filename_for_split
 
-# Buffer-gap keys in SPLIT_RATIOS / _compute_split_indices. Gaps are discarded
-# leakage buffers, not Split members, so they are referenced by their dict key.
-GAP1_KEY = "gap1"
-GAP2_KEY = "gap2"
+# Buffer gaps are policy roles, not materialized Split members. _compute_split_indices
+# still serializes keys as strings for manifests and audit payloads.
+GAP1_KEY = SplitPolicyRole.GAP1
+GAP2_KEY = SplitPolicyRole.GAP2
 
 RAW_DIR = Path("data/raw/N-BaIoT")
 N_EXPECTED_DEVICES = 9
@@ -85,11 +86,13 @@ class TestSplitRatio:
             info = result[device_id]
 
             csv_path = RAW_DIR / device_id / "benign_traffic.csv"
-            n_benign = sum(1 for _ in open(csv_path)) - 1 # minus header
+            n_benign = sum(1 for _ in open(csv_path)) - 1  # minus header
 
-            n_train_expected = math.floor(n_benign * SPLIT_RATIOS[Split.TRAIN])
+            n_train_expected = math.floor(
+                n_benign * SPLIT_RATIOS[SplitPolicyRole.TRAIN]
+            )
             n_gap1 = math.floor(n_benign * SPLIT_RATIOS[GAP1_KEY])
-            n_cal_expected = math.floor(n_benign * SPLIT_RATIOS[Split.CAL])
+            n_cal_expected = math.floor(n_benign * SPLIT_RATIOS[SplitPolicyRole.CAL])
             n_gap2 = math.floor(n_benign * SPLIT_RATIOS[GAP2_KEY])
             n_test_expected = (
                 n_benign - n_train_expected - n_gap1 - n_cal_expected - n_gap2
@@ -124,8 +127,11 @@ class TestGapContiguous:
             n_benign = sum(1 for _ in open(csv_path)) - 1
 
             splits = _compute_split_indices(n_benign)
-            train, gap1, cal = splits["train"], splits["gap1"], splits["cal"]
-            gap2, test = splits["gap2"], splits["test_benign"]
+            train = splits[SplitPolicyRole.TRAIN.value]
+            gap1 = splits[SplitPolicyRole.GAP1.value]
+            cal = splits[SplitPolicyRole.CAL.value]
+            gap2 = splits[SplitPolicyRole.GAP2.value]
+            test = splits[SplitPolicyRole.TEST_BENIGN.value]
 
             assert gap1[0] == train[1], (
                 f"{device_id}: gap1 start {gap1[0]} != train end {train[1]}"
@@ -147,8 +153,10 @@ class TestGapContiguous:
             n_benign = sum(1 for _ in open(csv_path)) - 1
 
             splits = _compute_split_indices(n_benign)
-            gap1_size = splits["gap1"][1] - splits["gap1"][0]
-            gap2_size = splits["gap2"][1] - splits["gap2"][0]
+            gap1 = splits[SplitPolicyRole.GAP1.value]
+            gap2 = splits[SplitPolicyRole.GAP2.value]
+            gap1_size = gap1[1] - gap1[0]
+            gap2_size = gap2[1] - gap2[0]
             assert gap1_size > 0, f"{device_id}: gap1 is empty (n={n_benign})"
             assert gap2_size > 0, f"{device_id}: gap2 is empty (n={n_benign})"
 
@@ -162,8 +170,14 @@ class TestNoLeak:
             n_benign = sum(1 for _ in open(csv_path)) - 1
 
             splits = _compute_split_indices(n_benign)
-            train_range = range(splits["train"][0], splits["train"][1])
-            test_range = range(splits["test_benign"][0], splits["test_benign"][1])
+            train_range = range(
+                splits[SplitPolicyRole.TRAIN.value][0],
+                splits[SplitPolicyRole.TRAIN.value][1],
+            )
+            test_range = range(
+                splits[SplitPolicyRole.TEST_BENIGN.value][0],
+                splits[SplitPolicyRole.TEST_BENIGN.value][1],
+            )
 
             # Ranges are disjoint if max(start) >= min(end)
             assert train_range.stop <= test_range.start, (
@@ -200,7 +214,7 @@ class TestCalibrationCounts:
         for device_id in DEVICE_DIRS:
             csv_path = RAW_DIR / device_id / "benign_traffic.csv"
             n_benign = sum(1 for _ in open(csv_path)) - 1
-            n_cal = math.floor(n_benign * SPLIT_RATIOS[Split.CAL])
+            n_cal = math.floor(n_benign * SPLIT_RATIOS[SplitPolicyRole.CAL])
             assert n_cal >= 100, (
                 f"{device_id}: cal split = {n_cal} rows "
                 f"(20% of {n_benign}) — below n_min=100"

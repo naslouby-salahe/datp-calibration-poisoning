@@ -31,6 +31,7 @@ from datp.scoring.schema import (
     SCORE_COLUMN,
     SCORING_MANIFEST_NOT_PROVIDED,
     SCORING_MANIFEST_SCHEMA_VERSION,
+    ScoringManifestStatus,
 )
 
 if TYPE_CHECKING:
@@ -103,7 +104,7 @@ def validate_scoring_manifest(score_base: Path) -> dict[str, object]:
         str(row["path"]) for row in records if not Path(str(row["path"])).exists()
     )
     completion_status = manifest["completion_status"]
-    if completion_status != "complete" or missing or missing_files:
+    if completion_status != ScoringManifestStatus.COMPLETE or missing or missing_files:
         raise ValueError(
             fmt(
                 _MODULE,
@@ -201,7 +202,7 @@ def _write_scoring_manifest_and_sentinel(
         "actual_client_ids": sorted({str(row["client_id"]) for row in records}),
         "actual_splits": sorted({str(row["split"]) for row in records}),
         "records": records,
-        "completion_status": "complete",
+        "completion_status": ScoringManifestStatus.COMPLETE,
         "generated_at_utc": utc_timestamp(),
     }
     write_json_atomic(score_base / ArtifactFile.SCORING_MANIFEST, manifest)

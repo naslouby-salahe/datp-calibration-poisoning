@@ -4,14 +4,16 @@ from pathlib import Path
 
 from datp.data.catalog import (
     CapPolicy,
+    CapStrategy,
     ClientIdentity,
     DatasetID,
     DatasetSpec,
     RawLayout,
     SplitPolicy,
+    SplitPolicyKind,
+    SplitPolicyRole,
 )
 
-DATASET_ID = "ciciot2023"
 LABEL_COLUMN: str = "Label"
 BENIGN_LABEL: str = "BENIGN"
 
@@ -93,29 +95,37 @@ _ATTACK_FAMILY_PREFIXES: tuple[tuple[str, str], ...] = (
     ("BRUTE_FORCE", "Brute-Force"),
 )
 
-_KNOWN_WEBATTACK_LABELS: frozenset[str] = frozenset({
-    "XSS",
-    "SQL_INJECTION",
-    "SQLINJECTION",
-    "COMMANDINJECTION",
-    "BACKDOOR_MALWARE",
-    "MITM",
-    "BROWSERHIJACKING",
-    "UPLOADING_ATTACK",
-})
+_KNOWN_WEBATTACK_LABELS: frozenset[str] = frozenset(
+    {
+        "XSS",
+        "SQL_INJECTION",
+        "SQLINJECTION",
+        "COMMANDINJECTION",
+        "BACKDOOR_MALWARE",
+        "MITM",
+        "BROWSERHIJACKING",
+        "UPLOADING_ATTACK",
+    }
+)
 
-_KNOWN_RECON_LABELS: frozenset[str] = frozenset({
-    "VULNERABILITYSCAN",
-})
+_KNOWN_RECON_LABELS: frozenset[str] = frozenset(
+    {
+        "VULNERABILITYSCAN",
+    }
+)
 
-_KNOWN_SPOOFING_LABELS: frozenset[str] = frozenset({
-    "DNS_SPOOFING",
-    "MITM_ARPSPOOFING",
-})
+_KNOWN_SPOOFING_LABELS: frozenset[str] = frozenset(
+    {
+        "DNS_SPOOFING",
+        "MITM_ARPSPOOFING",
+    }
+)
 
-_KNOWN_BRUTE_FORCE_LABELS: frozenset[str] = frozenset({
-    "DICTIONARYBRUTEFORCE",
-})
+_KNOWN_BRUTE_FORCE_LABELS: frozenset[str] = frozenset(
+    {
+        "DICTIONARYBRUTEFORCE",
+    }
+)
 
 
 def attack_family(label: str) -> str | None:
@@ -134,6 +144,7 @@ def attack_family(label: str) -> str | None:
         return "Brute-Force"
     return None
 
+
 CICIOT2023_SPEC = DatasetSpec(
     id=DatasetID.CICIOT2023,
     display_name="CICIoT2023",
@@ -145,16 +156,20 @@ CICIOT2023_SPEC = DatasetSpec(
     client_identity=ClientIdentity.MERGED_FILE,
     raw_layout=RawLayout(root_slug="CIC_IOT_Dataset2023"),
     split_policy=SplitPolicy(
-        name="stratified_random",
+        name=SplitPolicyKind.STRATIFIED_RANDOM,
         calibration_benign_only=True,
         chronological=False,
         contiguous_gaps=False,
-        ratios={"train": 0.70, "cal": CAL_FRACTION, "test_benign": 0.15},
+        ratios={
+            SplitPolicyRole.TRAIN: 0.70,
+            SplitPolicyRole.CAL: CAL_FRACTION,
+            SplitPolicyRole.TEST_BENIGN: 0.15,
+        },
     ),
     cap_policy=CapPolicy(
         total=CAP_TOTAL,
         attack_reserve=CAP_ATTACK_RESERVE,
-        strategy="attack_preserving",
+        strategy=CapStrategy.ATTACK_PRESERVING,
     ),
     expected_client_count=NUM_CLIENTS,
 )

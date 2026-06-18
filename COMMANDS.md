@@ -55,7 +55,7 @@ Validate partitions, manifests, calibration counts, and storage format. 1–2 mi
 
 ---
 
-## 4. Diagnostics
+## 4. Gates And Dry Runs
 
 ```bash
 make gate0
@@ -70,27 +70,12 @@ Centralized/local gate: B0, thresholds, statistics, model. 10–20 s.
 ```bash
 make gate3-code
 ```
-FL code gate: simulation, convergence, strategies. 2–3 min. Run diagnostic-regime-a before launching Regime A or the full matrix.
+FL code gate: simulation, convergence, strategies. 2–3 min.
 
 ```bash
 make gates
 ```
 Run gate0 → gate1 → gate2 → gate3-code in order.
-
-```bash
-make diagnostic-regime-a
-```
-Run N-BaIoT Regime A diagnostic. ~13 min. Needs N-BaIoT + gates pass.
-
-```bash
-make diagnostic-regime-b
-```
-FL on CICIoT2023 external validation/support check. Runtime is hardware-dependent. Requires CICIoT2023 and gate0/gate1 pass.
-
-```bash
-make diagnostic-regime-c
-```
-FL on Dirichlet-repartitioned N-BaIoT (α=1.0). ~13 min. Needs N-BaIoT + gate0/gate1 pass.
 
 ```bash
 make sweep-dry-run
@@ -125,7 +110,36 @@ B4 uses eligible-client clustering. Regime A follows the config-controlled `b4_r
 
 ---
 
-## 6. Audit / status
+## 6. Calibration Poisoning
+
+```bash
+make poison-stages
+```
+List all calibration-poisoning stages and their gates.
+
+```bash
+make poison-dry-run
+```
+Enumerate the bounded N-BaIoT poisoning stage without running it.
+
+```bash
+datp poison preview --stage nbaiot_bounded
+```
+Print the bounded stage configuration as JSON.
+
+```bash
+datp poison run-bounded-sweep --base-dir outputs
+```
+Run the authorized bounded N-BaIoT calibration-poisoning matrix against existing clean score artifacts and write the bounded-sweep manifest.
+
+```bash
+make run-poison-bounded
+```
+Make wrapper for the bounded poisoning run.
+
+---
+
+## 7. Audit / status
 
 ```bash
 make status
@@ -139,7 +153,7 @@ Audit completed results; write all artifacts under `artifacts/audit/`. < 1 min.
 
 ---
 
-## 7. Reporting
+## 8. Reporting
 
 Reporting reads `outputs/results/`. In a clean checkout, restore the tracked final metrics archive first:
 
@@ -165,11 +179,45 @@ make build-tables
 ```
 Tables 3–4 → `outputs/tables/`.
 
+```bash
+make docs
+```
+Build all reporting artifacts.
+
+```bash
+datp report validate --base-dir=outputs
+```
+Validate reporting inputs without building figures or tables.
+
 `results/statistics/sensitivity/` contains post hoc threshold-aggregation sensitivity analyses; these are not B1–B4 main baselines and do not change the controlled threshold-policy ladder.
 
 ---
 
-## 8. Cleanup
+## 9. Testing
+
+```bash
+make test-unit
+```
+Run unit tests only.
+
+```bash
+make test-integration
+```
+Run integration tests. Some integration tests require real raw datasets or runtime resources.
+
+```bash
+make test-e2e
+```
+Run end-to-end smoke tests.
+
+```bash
+make test
+```
+Run the full test suite.
+
+---
+
+## 10. Cleanup
 
 ```bash
 make clean-temp

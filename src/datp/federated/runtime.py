@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
@@ -30,6 +31,15 @@ class ClientResources(TypedDict):
 
     num_cpus: float
     num_gpus: float
+
+
+@dataclass(frozen=True, slots=True)
+class RayClientResourceRequest:
+    per_client_ram_gb: float
+    reserve_ram_gb: float
+    max_concurrent_override: int | None
+    require_cuda: bool
+    num_gpus_per_client: float
 
 
 def ensure_ray_memory_threshold(threshold: float) -> None:
@@ -120,27 +130,21 @@ def check_object_store_capacity(object_store_mb: int) -> ObjectStorePreflight:
     return {"object_store_mb": object_store_mb, "available_ram_mb": available_ram_mb}
 
 
-def derive_client_resources(
-    per_client_ram_gb: float,
-    reserve_ram_gb: float,
-    max_concurrent_override: int | None,
-    require_cuda: bool,
-    ray_num_gpus_per_client: float,
-) -> ClientResources:
+def derive_client_resources(request: RayClientResourceRequest) -> ClientResources:
     """Derive Ray actor resource spec from machine config.
 
     GPU allocation:
-      - When require_cuda is True: num_gpus = ray_num_gpus_per_client.
+      - When require_cuda is True: num_gpus = num_gpus_per_client.
       - When require_cuda is False: num_gpus = 0.0 and actors use CPU only.
     """
     available_ram_gb = get_available_ram_gb()
-    if max_concurrent_override is not None:
-        max_concurrent = max_concurrent_override
+    if request.max_concurrent_override is not None:
+        max_concurrent = request.max_concurrent_override
     else:
         max_concurrent = derive_max_concurrent(
             available_ram_gb,
-            per_client_ram_gb=per_client_ram_gb,
-            reserve_gb=reserve_ram_gb,
+            per_client_ram_gb=request.per_client_ram_gb,
+            reserve_gb=request.reserve_ram_gb,
         )
     cpu_count = os.cpu_count()
     if cpu_count is None:
@@ -155,7 +159,7 @@ def derive_client_resources(
     available_cpus = max(cpu_count, 1)
     num_cpus_per_actor = max(1, math.ceil(available_cpus / max_concurrent))
 
-    num_gpus = ray_num_gpus_per_client if require_cuda else 0.0
+    num_gpus = request.num_gpus_per_client if request.require_cuda else 0.0
     return {
         "num_cpus": float(num_cpus_per_actor),
         "num_gpus": num_gpus,
