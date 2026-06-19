@@ -36,6 +36,24 @@ from datp.core.seeds import SeedPair
 PolicyPair = ThresholdPairBase
 
 
+@dataclass(frozen=True, slots=True)
+class InjectionSpec:
+    """Bundled parameters for a single-victim or multi-victim injection.
+
+    Collapses the nine individual keyword arguments that
+    ``inject_single_victim`` and ``inject_multi_victim`` previously required
+    into one typed object.  ``seed_pair`` carries the paired training and
+    poisoning seeds; ``scope_idx`` and ``tail_mass`` use the repository
+    defaults.
+    """
+
+    source: PoisoningSourceStrategy
+    fraction: float
+    seed_pair: SeedPair
+    scope_idx: int = 0
+    tail_mass: float = TAIL_MASS
+
+
 @dataclass(frozen=True)
 class InjectionOutcome:
     """Result of injecting one victim; carries the full poisoned cal dict.
@@ -55,17 +73,30 @@ class InjectionOutcome:
         return {client.client_id: client.cal for client in self.poisoned_cal_set.clients}
 
 
+def _build_poisoned_clients(
+    collection: ScoreCollection,
+    *,
+    victim_cal_map: dict[str, np.ndarray],
+) -> list[tuple[str, np.ndarray]]:
+    """Return (client_id, calibration_array) for every eligible client.
+
+    Each victim's entry is taken from *victim_cal_map*; every other eligible
+    client receives an exact copy of its clean calibration array.
+    """
+    result: list[tuple[str, np.ndarray]] = []
+    for cid in collection.eligible_ids:
+        if cid in victim_cal_map:
+            result.append((cid, victim_cal_map[cid]))
+        else:
+            result.append((cid, collection.for_client(cid).cal.copy()))
+    return result
+
+
 def inject_single_victim(
     collection: ScoreCollection,
     *,
     victim_id: str,
-    source: PoisoningSourceStrategy,
-    fraction: float,
-    seed_pair: SeedPair | None = None,
-    training_seed: int | None = None,
-    poisoning_seed: int | None = None,
-    scope_idx: int = 0,
-    tail_mass: float = TAIL_MASS,
+    spec: InjectionSpec,
 ) -> InjectionOutcome:
     """Build the poisoned calibration dict for a single-client attack.
 
@@ -73,37 +104,27 @@ def inject_single_victim(
     victim's clean cal is never mutated in place (inject_fixed_budget copies
     internally).
     """
-    if seed_pair is None:
-        if training_seed is None or poisoning_seed is None:
-            raise TypeError("seed_pair or both legacy seed integers are required")
-        seed_pair = SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed)
     victim_clean = collection.for_client(victim_id).cal
     reservoir = _select_reservoir(
-        source=source, clean_cal=victim_clean, tail_mass=tail_mass
+        source=spec.source, clean_cal=victim_clean, tail_mass=spec.tail_mass
     )
     rng = make_seed_rng(
         SeedRecord(
-            pair=seed_pair,
+            pair=spec.seed_pair,
             client_idx=collection.client_index(victim_id),
-            scope_idx=scope_idx,
+            scope_idx=spec.scope_idx,
         ),
         child_index=0,
     )
     injection = inject_fixed_budget(
         clean_cal=victim_clean,
         reservoir=reservoir,
-        fraction=fraction,
+        fraction=spec.fraction,
         rng=rng,
     )
-
-    poisoned_clients = []
-    for cid in collection.eligible_ids:
-        if cid == victim_id:
-            cal = injection.poisoned_cal
-        else:
-            cal = collection.for_client(cid).cal.copy()
-        poisoned_clients.append((cid, cal))
-
+    poisoned_clients = _build_poisoned_clients(
+        collection, victim_cal_map={victim_id: injection.poisoned_cal}
+    )
     return InjectionOutcome(
         victim_id=victim_id,
         poisoned_cal_set=PoisonedCalibrationSet.from_mapping(dict(poisoned_clients)),
@@ -131,17 +152,23 @@ class MultiInjectionOutcome:
         return {client.client_id: client.cal for client in self.poisoned_cal_set.clients}
 
 
+def _validate_and_order_victim_ids(victim_ids: Sequence[str]) -> tuple[str, ...]:
+    """Deduplicate, sort, and validate a co-victim id sequence."""
+    ordered = tuple(sorted(set(victim_ids)))
+    if len(ordered) != len(victim_ids):
+        raise ValueError(f"victim_ids must be unique; got {list(victim_ids)!r}")
+    if len(ordered) < 2:
+        raise ValueError(
+            f"multi-client attack requires at least 2 co-victims; got {ordered!r}"
+        )
+    return ordered
+
+
 def inject_multi_victim(
     collection: ScoreCollection,
     *,
     victim_ids: Sequence[str],
-    source: PoisoningSourceStrategy,
-    fraction: float,
-    seed_pair: SeedPair | None = None,
-    training_seed: int | None = None,
-    poisoning_seed: int | None = None,
-    scope_idx: int = 0,
-    tail_mass: float = TAIL_MASS,
+    spec: InjectionSpec,
 ) -> MultiInjectionOutcome:
     """Build the poisoned calibration dict for a multi-client (co-victim) attack.
 
@@ -151,42 +178,20 @@ def inject_multi_victim(
     same (training_seed, poisoning_seed, scope_idx). Non-victim eligible clients
     keep an exact copy of their clean cal. Clean arrays are never mutated.
     """
-    if seed_pair is None:
-        if training_seed is None or poisoning_seed is None:
-            raise TypeError("seed_pair or both legacy seed integers are required")
-        seed_pair = SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed)
-    ordered = sorted(set(victim_ids))
-    if len(ordered) != len(victim_ids):
-        raise ValueError(f"victim_ids must be unique; got {list(victim_ids)!r}")
-    if len(ordered) < 2:
-        raise ValueError(
-            f"multi-client attack requires at least 2 co-victims; got {ordered!r}"
-        )
+    ordered = _validate_and_order_victim_ids(victim_ids)
 
     per_victim: dict[str, InjectionOutcome] = {
-        vid: inject_single_victim(
-            collection,
-            victim_id=vid,
-            source=source,
-            fraction=fraction,
-            seed_pair=seed_pair,
-            scope_idx=scope_idx,
-            tail_mass=tail_mass,
-        )
+        vid: inject_single_victim(collection, victim_id=vid, spec=spec)
         for vid in ordered
     }
 
-    victim_set = set(ordered)
-    poisoned_clients = []
-    for cid in collection.eligible_ids:
-        if cid in victim_set:
-            cal = per_victim[cid].poisoned_cal_set.for_client(cid).cal
-        else:
-            cal = collection.for_client(cid).cal.copy()
-        poisoned_clients.append((cid, cal))
+    victim_cal_map = {
+        vid: per_victim[vid].poisoned_cal_set.for_client(vid).cal for vid in ordered
+    }
+    poisoned_clients = _build_poisoned_clients(collection, victim_cal_map=victim_cal_map)
 
     return MultiInjectionOutcome(
-        victim_ids=tuple(ordered),
+        victim_ids=ordered,
         poisoned_cal_set=PoisonedCalibrationSet.from_mapping(dict(poisoned_clients)),
         per_victim=per_victim,
     )

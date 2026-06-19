@@ -37,7 +37,11 @@ from datp.artifacts.poison_names import (
 )
 from datp.attacks.constants import POISONING_SEEDS
 from datp.attacks.b4_recompute import B4ThresholdPair
-from datp.attacks.cell_runner import inject_single_victim, pending_threshold
+from datp.attacks.cell_runner import (
+    InjectionSpec,
+    inject_single_victim,
+    pending_threshold,
+)
 from datp.attacks.guardrails import assert_no_inplace_mutation
 from datp.attacks.inference import (
     PairedDeltas,
@@ -64,6 +68,7 @@ from datp.attacks.enums import (
     ThresholdPolicy,
 )
 from datp.core.enums import Baseline
+from datp.core.seeds import SeedPair
 from datp.experiments.enums import ExperimentScale
 from datp.testsupport.smoke_harness import (
     b4_cluster_count,
@@ -125,10 +130,11 @@ def test_invariant_2_cardinality_preserved(collection):
     outcome = inject_single_victim(
         collection,
         victim_id=_VICTIM,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-        training_seed=0,
-        poisoning_seed=100,
+        spec=InjectionSpec(
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+        ),
     )
     assert outcome.injection.n_total == n_before
     assert outcome.poisoned_cal[_VICTIM].shape[0] == n_before
@@ -225,18 +231,20 @@ def test_invariant_6_determinism(collection):
     out_a = inject_single_victim(
         collection,
         victim_id=_VICTIM,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-        training_seed=0,
-        poisoning_seed=100,
+        spec=InjectionSpec(
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+        ),
     )
     out_b = inject_single_victim(
         collection,
         victim_id=_VICTIM,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-        training_seed=0,
-        poisoning_seed=100,
+        spec=InjectionSpec(
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+        ),
     )
     np.testing.assert_array_equal(
         out_a.poisoned_cal[_VICTIM], out_b.poisoned_cal[_VICTIM]
@@ -523,10 +531,11 @@ def test_roadmap_b4_k_fixed_at_three(collection):
     outcome = inject_single_victim(
         collection,
         victim_id=_VICTIM,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-        training_seed=0,
-        poisoning_seed=100,
+        spec=InjectionSpec(
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+        ),
     )
     poisoned_cal = dict(clean_cal)
     poisoned_cal[_VICTIM] = outcome.poisoned_cal[_VICTIM]

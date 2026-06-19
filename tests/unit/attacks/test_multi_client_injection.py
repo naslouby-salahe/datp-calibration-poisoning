@@ -13,12 +13,14 @@ import pytest
 
 from datp.attacks.cell_runner import (
     InjectionOutcome,
+    InjectionSpec,
     MultiInjectionOutcome,
     inject_multi_victim,
     inject_single_victim,
 )
 from datp.attacks.score_containers import ScoreCollection, build_score_collection
 from datp.attacks.enums import PoisoningSourceStrategy
+from datp.core.seeds import SeedPair
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
 _SOURCE = PoisoningSourceStrategy.HIGH_SCORE_BENIGN
@@ -34,11 +36,12 @@ def _multi(col: ScoreCollection, victim_ids: Sequence[str]) -> MultiInjectionOut
     return inject_multi_victim(
         col,
         victim_ids=victim_ids,
-        source=_SOURCE,
-        fraction=0.40,
-        training_seed=0,
-        poisoning_seed=100,
-        scope_idx=0,
+        spec=InjectionSpec(
+            source=_SOURCE,
+            fraction=0.40,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+            scope_idx=0,
+        ),
     )
 
 
@@ -46,11 +49,12 @@ def _solo(col: ScoreCollection, victim_id: str) -> InjectionOutcome:
     return inject_single_victim(
         col,
         victim_id=victim_id,
-        source=_SOURCE,
-        fraction=0.40,
-        training_seed=0,
-        poisoning_seed=100,
-        scope_idx=0,
+        spec=InjectionSpec(
+            source=_SOURCE,
+            fraction=0.40,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+            scope_idx=0,
+        ),
     )
 
 

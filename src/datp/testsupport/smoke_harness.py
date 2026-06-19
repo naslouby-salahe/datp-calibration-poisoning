@@ -34,6 +34,7 @@ from datp.artifacts.poison_names import (
 from datp.attacks.constants import B4_RANDOM_STATE
 from datp.attacks.cell_runner import (
     InjectionOutcome,
+    InjectionSpec,
     PolicyPair,
     inject_single_victim,
     pending_threshold,
@@ -52,6 +53,7 @@ from datp.attacks.score_containers import (
 )
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.seeds import SeedPair
 from datp.attacks.enums import (
     PoisoningSourceStrategy,
     ThresholdPolicy,
@@ -125,11 +127,14 @@ def run_smoke_cell(
     clean_outcome = inject_single_victim(
         collection,
         victim_id=victim_id,
-        source=source,
-        fraction=0.0,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
-        scope_idx=scope_idx,
+        spec=InjectionSpec(
+            source=source,
+            fraction=0.0,
+            seed_pair=SeedPair(
+                training_seed=training_seed, poisoning_seed=poisoning_seed
+            ),
+            scope_idx=scope_idx,
+        ),
     )
     clean_pair = recompute_pair(
         collection, clean_outcome.poisoned_cal_set, policy, q=q, seed=b4_seed
@@ -143,11 +148,14 @@ def run_smoke_cell(
     outcome = inject_single_victim(
         collection,
         victim_id=victim_id,
-        source=source,
-        fraction=fraction,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
-        scope_idx=scope_idx,
+        spec=InjectionSpec(
+            source=source,
+            fraction=fraction,
+            seed_pair=SeedPair(
+                training_seed=training_seed, poisoning_seed=poisoning_seed
+            ),
+            scope_idx=scope_idx,
+        ),
     )
     poisoned_pair = recompute_pair(
         collection, outcome.poisoned_cal_set, policy, q=q, seed=b4_seed
@@ -195,11 +203,14 @@ def victim_seed_deltas(
         outcome = inject_single_victim(
             collection,
             victim_id=victim_id,
-            source=source,
-            fraction=fraction,
-            training_seed=training_seed,
-            poisoning_seed=ps,
-            scope_idx=scope_idx,
+            spec=InjectionSpec(
+                source=source,
+                fraction=fraction,
+                seed_pair=SeedPair(
+                    training_seed=training_seed, poisoning_seed=ps
+                ),
+                scope_idx=scope_idx,
+            ),
         )
         pair = recompute_pair(collection, outcome.poisoned_cal_set, policy, q=q)
         entry = compute_metrics(collection, pair, None).delta_tau[victim_id]

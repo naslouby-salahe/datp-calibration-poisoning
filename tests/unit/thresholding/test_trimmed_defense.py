@@ -12,7 +12,7 @@ import math
 import numpy as np
 import pytest
 
-from datp.attacks.cell_runner import inject_single_victim, recompute_pair
+from datp.attacks.cell_runner import InjectionSpec, inject_single_victim, recompute_pair
 from datp.attacks.defenses import (
     apply_defense,
     build_defended_collection,
@@ -24,6 +24,7 @@ from datp.attacks.enums import (
     PoisoningSourceStrategy,
     ThresholdPolicy,
 )
+from datp.core.seeds import SeedPair
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
 # ---------------------------------------------------------------------------
@@ -93,10 +94,11 @@ def test_apply_defense_none_is_identity():
     outcome = inject_single_victim(
         col,
         victim_id=victim,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=0.10,
-        training_seed=0,
-        poisoning_seed=100,
+        spec=InjectionSpec(
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=0.10,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+        ),
     )
     col2, pois2 = apply_defense(
         col, outcome.poisoned_cal, defense=PoisoningDefense.NONE, trim_fraction=0.05
@@ -186,10 +188,11 @@ def test_defense_runs_end_to_end_through_recompute_pipeline():
     outcome = inject_single_victim(
         col,
         victim_id=victim,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=0.20,
-        training_seed=0,
-        poisoning_seed=100,
+        spec=InjectionSpec(
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=0.20,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+        ),
     )
     work_col, work_pois = apply_defense(
         col,

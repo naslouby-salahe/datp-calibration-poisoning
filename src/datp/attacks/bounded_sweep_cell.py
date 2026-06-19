@@ -14,7 +14,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from datp.artifacts.poison_names import THRESHOLD_QUANTILE
-from datp.attacks.cell_runner import PolicyPair, inject_single_victim, recompute_pair
+from datp.attacks.cell_runner import (
+    InjectionSpec,
+    PolicyPair,
+    inject_single_victim,
+    recompute_pair,
+)
 from datp.attacks.bounded_sweep_matrix import SweepCellSpec
 from datp.attacks.metric_engine import (
     MetricResult,
@@ -132,10 +137,12 @@ def run_sweep_cell(
     clean_outcome = inject_single_victim(
         collection,
         victim_id=spec.victim_id,
-        source=spec.source,
-        fraction=0.0,
-        seed_pair=spec.seed_pair,
-        scope_idx=scope_idx,
+        spec=InjectionSpec(
+            source=spec.source,
+            fraction=0.0,
+            seed_pair=spec.seed_pair,
+            scope_idx=scope_idx,
+        ),
     )
     clean_pair = recompute_pair(
         collection, clean_outcome.poisoned_cal_set, spec.policy, q=q, seed=b4_seed
@@ -152,10 +159,12 @@ def run_sweep_cell(
     outcome = inject_single_victim(
         collection,
         victim_id=spec.victim_id,
-        source=spec.source,
-        fraction=spec.fraction,
-        seed_pair=spec.seed_pair,
-        scope_idx=scope_idx,
+        spec=InjectionSpec(
+            source=spec.source,
+            fraction=spec.fraction,
+            seed_pair=spec.seed_pair,
+            scope_idx=scope_idx,
+        ),
     )
     poisoned_pair = recompute_pair(
         collection, outcome.poisoned_cal_set, spec.policy, q=q, seed=b4_seed
