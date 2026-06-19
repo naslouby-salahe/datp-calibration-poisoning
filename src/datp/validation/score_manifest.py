@@ -302,6 +302,16 @@ def _check_split_directories(cell_dir: Path) -> ValidationCheck:
     )
 
 
+def _collect_missing_stage_files(
+    stage_dir: Path, stage_value: str, expected_client_ids: list[str]
+) -> list[str]:
+    return [
+        f"{stage_value}/{cid}.parquet"
+        for cid in expected_client_ids
+        if not (stage_dir / f"{cid}{PathToken.PARQUET_EXT}").is_file()
+    ]
+
+
 def _check_per_client_split_files(
     cell_dir: Path,
     expected_client_ids: list[str],
@@ -311,10 +321,9 @@ def _check_per_client_split_files(
         stage_dir = cell_dir / stage.value
         if not stage_dir.is_dir():
             continue
-        for client_id in expected_client_ids:
-            parquet = stage_dir / f"{client_id}{PathToken.PARQUET_EXT}"
-            if not parquet.is_file():
-                missing.append(f"{stage.value}/{client_id}.parquet")
+        missing.extend(
+            _collect_missing_stage_files(stage_dir, stage.value, expected_client_ids)
+        )
     if missing:
         return ValidationCheck(
             code=ScoreCheckCode.PER_CLIENT_SPLIT_FILES_PRESENT,
@@ -534,49 +543,20 @@ def verify_score_cell(
     return _verify_at_location(base_dir, resolved_data_root, location)
 
 
-def _verify_at_location(
+def _append_full_manifest_checks(
+    checks: list[ValidationCheck],
+    manifest: dict[str, Any],
+    location: "ScoreCellLocation",
+    cell_dir: Path,
     base_dir: Path,
     data_root: Path,
-    location: ScoreCellLocation,
-) -> ScoreCellVerification:
-    cell_dir = location.cell_dir
-    manifest_path = cell_dir / ArtifactFile.SCORING_MANIFEST
-    checks: list[ValidationCheck] = []
-
-    manifest, present, parseable = _read_manifest(manifest_path)
-    checks.append(present)
-    checks.append(parseable)
-    checks.append(_check_sentinel(cell_dir))
-    checks.append(_check_split_directories(cell_dir))
-
-    if manifest is None:
-        return ScoreCellVerification(
-            cell=location.cell,
-            expected_client_ids=[],
-            expected_splits=[],
-            checks=checks,
-            overall_status=_overall_status(checks),
-        )
-
-    fields_check = _check_required_fields(manifest)
-    checks.append(fields_check)
-    if fields_check.status != AuditStatus.PASS:
-        return ScoreCellVerification(
-            cell=location.cell,
-            expected_client_ids=list(map(str, manifest.get("expected_client_ids", []))),
-            expected_splits=list(map(str, manifest.get("expected_splits", []))),
-            checks=checks,
-            overall_status=_overall_status(checks),
-        )
-
+) -> tuple[list[str], list[str]]:
+    expected_client_ids = list(map(str, manifest["expected_client_ids"]))
+    expected_splits = list(map(str, manifest["expected_splits"]))
     checks.append(_check_completion_status(manifest))
     checks.append(_check_regime(manifest, location))
     checks.append(_check_seed(manifest, location))
     checks.append(_check_dataset(manifest, location))
-
-    expected_client_ids = list(map(str, manifest["expected_client_ids"]))
-    expected_splits = list(map(str, manifest["expected_splits"]))
-
     checks.append(
         _check_expected_vs_actual(
             ScoreCheckCode.EXPECTED_VS_ACTUAL_CLIENTS,
@@ -598,18 +578,57 @@ def _verify_at_location(
         )
     )
     checks.append(_check_per_client_split_files(cell_dir, expected_client_ids))
-
     schema_check, empty_check = _check_parquet_schema(cell_dir, expected_client_ids)
-    checks.append(schema_check)
-    checks.append(empty_check)
-
+    checks.extend([schema_check, empty_check])
     hash_field, file_check, match_check = _check_checkpoint(
         base_dir, data_root, location, manifest
     )
-    checks.append(hash_field)
-    checks.append(file_check)
-    checks.append(match_check)
+    checks.extend([hash_field, file_check, match_check])
+    return expected_client_ids, expected_splits
 
+
+def _verify_at_location(
+    base_dir: Path,
+    data_root: Path,
+    location: "ScoreCellLocation",
+) -> "ScoreCellVerification":
+    cell_dir = location.cell_dir
+    manifest_path = cell_dir / ArtifactFile.SCORING_MANIFEST
+    checks: list[ValidationCheck] = []
+
+    manifest, present, parseable = _read_manifest(manifest_path)
+    checks.extend(
+        [
+            present,
+            parseable,
+            _check_sentinel(cell_dir),
+            _check_split_directories(cell_dir),
+        ]
+    )
+
+    if manifest is None:
+        return ScoreCellVerification(
+            cell=location.cell,
+            expected_client_ids=[],
+            expected_splits=[],
+            checks=checks,
+            overall_status=_overall_status(checks),
+        )
+
+    fields_check = _check_required_fields(manifest)
+    checks.append(fields_check)
+    if fields_check.status != AuditStatus.PASS:
+        return ScoreCellVerification(
+            cell=location.cell,
+            expected_client_ids=list(map(str, manifest.get("expected_client_ids", []))),
+            expected_splits=list(map(str, manifest.get("expected_splits", []))),
+            checks=checks,
+            overall_status=_overall_status(checks),
+        )
+
+    expected_client_ids, expected_splits = _append_full_manifest_checks(
+        checks, manifest, location, cell_dir, base_dir, data_root
+    )
     return ScoreCellVerification(
         cell=location.cell,
         expected_client_ids=expected_client_ids,

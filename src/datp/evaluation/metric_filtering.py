@@ -21,6 +21,23 @@ class _FilteredMetrics:
     f1_eligible: np.ndarray
 
 
+def _collect_complete_metrics(
+    cr: ClientEvaluationRecord,
+    incomplete_set: set[str],
+    tpr_list: list[float],
+    ba_list: list[float],
+    f1_list: list[float],
+) -> None:
+    if cr.client_id in incomplete_set:
+        return
+    if not math.isnan(cr.metrics.tpr):
+        tpr_list.append(cr.metrics.tpr)
+    if not math.isnan(cr.metrics.balanced_accuracy):
+        ba_list.append(cr.metrics.balanced_accuracy)
+    if not math.isnan(cr.metrics.macro_f1):
+        f1_list.append(cr.metrics.macro_f1)
+
+
 def _filter_eligible_metrics(
     clients: Sequence[ClientEvaluationRecord],
     eligible_ids: Sequence[str],
@@ -38,13 +55,7 @@ def _filter_eligible_metrics(
         if cr.client_id not in eligible_set:
             continue
         fpr_list.append(cr.metrics.fpr)
-        if cr.client_id not in incomplete_set:
-            if not math.isnan(cr.metrics.tpr):
-                tpr_list.append(cr.metrics.tpr)
-            if not math.isnan(cr.metrics.balanced_accuracy):
-                ba_list.append(cr.metrics.balanced_accuracy)
-            if not math.isnan(cr.metrics.macro_f1):
-                f1_list.append(cr.metrics.macro_f1)
+        _collect_complete_metrics(cr, incomplete_set, tpr_list, ba_list, f1_list)
 
     return _FilteredMetrics(
         fpr_eligible=np.array(fpr_list, dtype=np.float64),

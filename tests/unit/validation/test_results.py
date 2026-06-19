@@ -678,7 +678,7 @@ def test_check_b2_utility_tradeoff_warns_when_b2_improves_cv_fpr_but_worsens_uti
     b2 = _CellPanel(
         cv_fpr=0.2, macro_f1_mean=0.80, pr_auc_mean=0.88, auroc_mean=0.91, cv_tpr=0.78
     )
-    _check_b2_utility_tradeoff(Regime.A, 0, None, b1, b2, warnings_out)
+    _check_b2_utility_tradeoff((Regime.A, 0, None), b1, b2, warnings_out)
     codes = [w.code for w in warnings_out]
     assert WarningCode.B2_UTILITY_TRADEOFF in codes
     msg = warnings_out[0].message
@@ -694,7 +694,7 @@ def test_check_b2_utility_tradeoff_no_warning_when_cv_fpr_not_improved() -> None
     warnings_out: list[WarningRecord] = []
     b1 = _CellPanel(cv_fpr=0.2, macro_f1_mean=0.80)
     b2 = _CellPanel(cv_fpr=0.3, macro_f1_mean=0.85)
-    _check_b2_utility_tradeoff(Regime.A, 0, None, b1, b2, warnings_out)
+    _check_b2_utility_tradeoff((Regime.A, 0, None), b1, b2, warnings_out)
     assert len(warnings_out) == 0
 
 
@@ -706,7 +706,7 @@ def test_check_b2_utility_tradeoff_no_warning_when_no_utility_worsened() -> None
     warnings_out: list[WarningRecord] = []
     b1 = _CellPanel(cv_fpr=0.3, macro_f1_mean=0.80, auroc_mean=0.90, cv_tpr=0.75)
     b2 = _CellPanel(cv_fpr=0.2, macro_f1_mean=0.85, auroc_mean=0.92, cv_tpr=0.80)
-    _check_b2_utility_tradeoff(Regime.A, 0, None, b1, b2, warnings_out)
+    _check_b2_utility_tradeoff((Regime.A, 0, None), b1, b2, warnings_out)
     assert len(warnings_out) == 0
 
 

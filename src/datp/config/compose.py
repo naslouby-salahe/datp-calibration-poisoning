@@ -68,34 +68,43 @@ class ComposeRequest(BaseModel):
         return self
 
 
+def _raise_enum_compose_error(
+    err: Any,
+    regime_input: "Regime | str",
+    baseline_input: "Baseline | str",
+    exc: "ValidationError",
+) -> None:
+    if "regime" in err["loc"]:
+        valid_regimes = sorted(r.value for r in Regime)
+        raise ComposeError(
+            fmt(
+                "config",
+                "Invalid regime",
+                f"one of {valid_regimes}",
+                repr(regime_input),
+            )
+        ) from exc
+    if "baseline" in err["loc"]:
+        valid_baselines = sorted(b.value for b in Baseline)
+        raise ComposeError(
+            fmt(
+                "config",
+                "Invalid baseline",
+                f"one of {valid_baselines}",
+                repr(baseline_input),
+            )
+        ) from exc
+
+
 def _raise_compose_error_from_validation(
-    exc: ValidationError,
-    regime_input: Regime | str,
-    baseline_input: Baseline | str,
-) -> NoReturn:
+    exc: "ValidationError",
+    regime_input: "Regime | str",
+    baseline_input: "Baseline | str",
+) -> "NoReturn":
     """Inspect Pydantic ValidationError and raise the appropriate ComposeError."""
     for err in exc.errors():
         if err["type"] == "enum":
-            if "regime" in err["loc"]:
-                valid_regimes = sorted(r.value for r in Regime)
-                raise ComposeError(
-                    fmt(
-                        "config",
-                        "Invalid regime",
-                        f"one of {valid_regimes}",
-                        repr(regime_input),
-                    )
-                ) from exc
-            if "baseline" in err["loc"]:
-                valid_baselines = sorted(b.value for b in Baseline)
-                raise ComposeError(
-                    fmt(
-                        "config",
-                        "Invalid baseline",
-                        f"one of {valid_baselines}",
-                        repr(baseline_input),
-                    )
-                ) from exc
+            _raise_enum_compose_error(err, regime_input, baseline_input, exc)
         if err["type"] == "value_error":
             raise ComposeError(err["msg"]) from exc
     raise ComposeError(str(exc)) from exc

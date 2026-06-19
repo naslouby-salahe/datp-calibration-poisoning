@@ -54,7 +54,7 @@ def generate_figure1(
     seed: int,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams[_FONT_SIZE_KEY] = style.font_size  # type: ignore[index]
 
     devices = sorted(per_device_fpr_b1.keys())
     fpr_b1 = [per_device_fpr_b1[d] for d in devices]
@@ -104,7 +104,7 @@ def generate_figure2(
     style: StyleConfig,
 ) -> Path:
     """x-axis is clipped at the 99th percentile across plotted devices."""
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams[_FONT_SIZE_KEY] = style.font_size  # type: ignore[index]
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
 
     all_vals = np.concatenate([cal_errors[d] for d in device_ids if d in cal_errors])
@@ -151,7 +151,7 @@ def generate_figure3(
     style: StyleConfig,
 ) -> Path:
     baselines = sorted(fpr_by_baseline.keys())
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams[_FONT_SIZE_KEY] = style.font_size  # type: ignore[index]
 
     fig, ax = plt.subplots(figsize=style.figsize_single_col)
 
@@ -188,7 +188,7 @@ def generate_figure4(
     style: StyleConfig,
 ) -> Path:
     baselines = sorted(cv_fpr_by_baseline.keys())
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams[_FONT_SIZE_KEY] = style.font_size  # type: ignore[index]
 
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
 

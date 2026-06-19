@@ -166,57 +166,44 @@ def _check_policy_not_b3(manifest: RunManifest) -> ValidationCheck:
     )
 
 
-def _check_cal_scores_present(score_root: Path | None) -> ValidationCheck:
-    """Check for at least one calibration score parquet.
-
-    Returns BLOCKED_PENDING_RUN when score_root is not provided.
-    Returns MISSING when the directory exists but contains no parquets.
-    """
+def _check_scores_present(
+    score_root: Path | None,
+    check_code: "ProvenanceCheckCode",
+    subdirectory: str,
+    label: str,
+) -> ValidationCheck:
     if score_root is None:
         return ValidationCheck(
-            code=ProvenanceCheckCode.CAL_SCORES_PRESENT,
+            code=check_code,
             status=AuditStatus.BLOCKED_PENDING_RUN,
-            detail="score_root not provided; calibration score check deferred",
+            detail=f"score_root not provided; {label} score check deferred",
         )
-    cal_dir = score_root / "calibration"
-    parquets = list(cal_dir.glob("*.parquet")) if cal_dir.is_dir() else []
+    score_dir = score_root / subdirectory
+    parquets = list(score_dir.glob("*.parquet")) if score_dir.is_dir() else []
     if not parquets:
         return ValidationCheck(
-            code=ProvenanceCheckCode.CAL_SCORES_PRESENT,
+            code=check_code,
             status=AuditStatus.MISSING,
-            detail=f"No calibration parquets found under {cal_dir}",
+            detail=f"No {label} parquets found under {score_dir}",
         )
     return ValidationCheck(
-        code=ProvenanceCheckCode.CAL_SCORES_PRESENT,
+        code=check_code,
         status=AuditStatus.PASS,
-        detail=f"{len(parquets)} calibration parquet(s) present",
+        detail=f"{len(parquets)} {label} parquet(s) present",
+    )
+
+
+def _check_cal_scores_present(score_root: Path | None) -> ValidationCheck:
+    """Check for at least one calibration score parquet."""
+    return _check_scores_present(
+        score_root, ProvenanceCheckCode.CAL_SCORES_PRESENT, "calibration", "calibration"
     )
 
 
 def _check_test_scores_present(score_root: Path | None) -> ValidationCheck:
-    """Check for at least one clean test score parquet.
-
-    Returns BLOCKED_PENDING_RUN when score_root is not provided.
-    Returns MISSING when the directory exists but contains no parquets.
-    """
-    if score_root is None:
-        return ValidationCheck(
-            code=ProvenanceCheckCode.TEST_SCORES_PRESENT,
-            status=AuditStatus.BLOCKED_PENDING_RUN,
-            detail="score_root not provided; test score check deferred",
-        )
-    test_dir = score_root / "test"
-    parquets = list(test_dir.glob("*.parquet")) if test_dir.is_dir() else []
-    if not parquets:
-        return ValidationCheck(
-            code=ProvenanceCheckCode.TEST_SCORES_PRESENT,
-            status=AuditStatus.MISSING,
-            detail=f"No test parquets found under {test_dir}",
-        )
-    return ValidationCheck(
-        code=ProvenanceCheckCode.TEST_SCORES_PRESENT,
-        status=AuditStatus.PASS,
-        detail=f"{len(parquets)} test parquet(s) present",
+    """Check for at least one clean test score parquet."""
+    return _check_scores_present(
+        score_root, ProvenanceCheckCode.TEST_SCORES_PRESENT, "test", "test"
     )
 
 

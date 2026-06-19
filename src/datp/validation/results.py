@@ -106,6 +106,85 @@ _METRICS_SOURCE_FILES = (
 )
 
 
+def _build_seed_delta_record(
+    regime: Regime,
+    seed: int,
+    alpha_text: str | None,
+    b1: "_CellPanel",
+    b2: "_CellPanel",
+    b4: "_CellPanel",
+) -> SeedDeltaRecord:
+    return SeedDeltaRecord(
+        regime=regime,
+        alpha=alpha_text,
+        seed=seed,
+        b1_cv_fpr=b1.cv_fpr,
+        b2_cv_fpr=b2.cv_fpr,
+        b4_cv_fpr=b4.cv_fpr,
+        b1_cv_tpr=b1.cv_tpr,
+        b2_cv_tpr=b2.cv_tpr,
+        b4_cv_tpr=b4.cv_tpr,
+        b1_macro_f1_mean=b1.macro_f1_mean,
+        b2_macro_f1_mean=b2.macro_f1_mean,
+        b4_macro_f1_mean=b4.macro_f1_mean,
+        b1_macro_f1_p10=b1.macro_f1_p10,
+        b2_macro_f1_p10=b2.macro_f1_p10,
+        b4_macro_f1_p10=b4.macro_f1_p10,
+        b1_auroc_mean=b1.auroc_mean,
+        b2_auroc_mean=b2.auroc_mean,
+        b4_auroc_mean=b4.auroc_mean,
+        b1_pr_auc_mean=b1.pr_auc_mean,
+        b2_pr_auc_mean=b2.pr_auc_mean,
+        b4_pr_auc_mean=b4.pr_auc_mean,
+        b1_mean_fpr=b1.mean_fpr,
+        b2_mean_fpr=b2.mean_fpr,
+        b4_mean_fpr=b4.mean_fpr,
+        b1_std_fpr=b1.std_fpr,
+        b2_std_fpr=b2.std_fpr,
+        b4_std_fpr=b4.std_fpr,
+        b1_iqr_fpr=b1.iqr_fpr,
+        b2_iqr_fpr=b2.iqr_fpr,
+        b4_iqr_fpr=b4.iqr_fpr,
+        b1_worst_client_fpr=b1.worst_client_fpr,
+        b2_worst_client_fpr=b2.worst_client_fpr,
+        b4_worst_client_fpr=b4.worst_client_fpr,
+        b1_worst_client_tpr=b1.worst_client_tpr,
+        b2_worst_client_tpr=b2.worst_client_tpr,
+        b4_worst_client_tpr=b4.worst_client_tpr,
+        b1_worst_client_macro_f1=b1.worst_client_macro_f1,
+        b2_worst_client_macro_f1=b2.worst_client_macro_f1,
+        b4_worst_client_macro_f1=b4.worst_client_macro_f1,
+        b1_worst_client_balanced_accuracy=b1.worst_client_balanced_accuracy,
+        b2_worst_client_balanced_accuracy=b2.worst_client_balanced_accuracy,
+        b4_worst_client_balanced_accuracy=b4.worst_client_balanced_accuracy,
+        delta_cv_fpr_b1_minus_b2=_safe_diff(b1.cv_fpr, b2.cv_fpr),
+        delta_cv_fpr_b1_minus_b4=_safe_diff(b1.cv_fpr, b4.cv_fpr),
+        delta_cv_tpr_b1_minus_b2=_safe_diff(b1.cv_tpr, b2.cv_tpr),
+        delta_cv_tpr_b1_minus_b4=_safe_diff(b1.cv_tpr, b4.cv_tpr),
+        delta_macro_f1_b1_minus_b2=_safe_diff(b1.macro_f1_mean, b2.macro_f1_mean),
+        delta_macro_f1_b1_minus_b4=_safe_diff(b1.macro_f1_mean, b4.macro_f1_mean),
+        delta_pr_auc_b1_minus_b2=_safe_diff(b1.pr_auc_mean, b2.pr_auc_mean),
+        delta_pr_auc_b1_minus_b4=_safe_diff(b1.pr_auc_mean, b4.pr_auc_mean),
+        delta_auroc_b1_minus_b2=_safe_diff(b1.auroc_mean, b2.auroc_mean),
+        delta_auroc_b1_minus_b4=_safe_diff(b1.auroc_mean, b4.auroc_mean),
+        b1_convergence_round=b1.convergence_round,
+        b2_convergence_round=b2.convergence_round,
+        b4_convergence_round=b4.convergence_round,
+        b1_tau_global=b1.tau_global,
+        b2_tau_global=b2.tau_global,
+        b4_tau_global=b4.tau_global,
+        coverage_ratio=str(
+            b1.coverage_ratio
+            or b2.coverage_ratio
+            or b4.coverage_ratio
+            or DEFAULT_COVERAGE_RATIO
+        ),
+        status=AuditStatus.PASS
+        if (b1.cv_fpr is not None and b2.cv_fpr is not None)
+        else AuditStatus.BLOCKED_PENDING_RUN,
+    )
+
+
 def _build_seed_deltas(
     cell_panel: dict[tuple[Regime, int, str | None, Baseline], _CellPanel],
     warnings: list[WarningRecord],
@@ -113,89 +192,11 @@ def _build_seed_deltas(
     # Side effect: emits B2_UTILITY_TRADEOFF warnings.
     out: list[SeedDeltaRecord] = []
     for regime, seed, alpha_text in sorted({(r, s, a) for r, s, a, _ in cell_panel}):
-        b1_key = (regime, seed, alpha_text, Baseline.B1)
-        b2_key = (regime, seed, alpha_text, Baseline.B2)
-        b4_key = (regime, seed, alpha_text, Baseline.B4)
-        b1 = cell_panel[b1_key] if b1_key in cell_panel else _CellPanel.empty()
-        b2 = cell_panel[b2_key] if b2_key in cell_panel else _CellPanel.empty()
-        b4 = cell_panel[b4_key] if b4_key in cell_panel else _CellPanel.empty()
-        out.append(
-            SeedDeltaRecord(
-                regime=regime,
-                alpha=alpha_text,
-                seed=seed,
-                b1_cv_fpr=b1.cv_fpr,
-                b2_cv_fpr=b2.cv_fpr,
-                b4_cv_fpr=b4.cv_fpr,
-                b1_cv_tpr=b1.cv_tpr,
-                b2_cv_tpr=b2.cv_tpr,
-                b4_cv_tpr=b4.cv_tpr,
-                b1_macro_f1_mean=b1.macro_f1_mean,
-                b2_macro_f1_mean=b2.macro_f1_mean,
-                b4_macro_f1_mean=b4.macro_f1_mean,
-                b1_macro_f1_p10=b1.macro_f1_p10,
-                b2_macro_f1_p10=b2.macro_f1_p10,
-                b4_macro_f1_p10=b4.macro_f1_p10,
-                b1_auroc_mean=b1.auroc_mean,
-                b2_auroc_mean=b2.auroc_mean,
-                b4_auroc_mean=b4.auroc_mean,
-                b1_pr_auc_mean=b1.pr_auc_mean,
-                b2_pr_auc_mean=b2.pr_auc_mean,
-                b4_pr_auc_mean=b4.pr_auc_mean,
-                b1_mean_fpr=b1.mean_fpr,
-                b2_mean_fpr=b2.mean_fpr,
-                b4_mean_fpr=b4.mean_fpr,
-                b1_std_fpr=b1.std_fpr,
-                b2_std_fpr=b2.std_fpr,
-                b4_std_fpr=b4.std_fpr,
-                b1_iqr_fpr=b1.iqr_fpr,
-                b2_iqr_fpr=b2.iqr_fpr,
-                b4_iqr_fpr=b4.iqr_fpr,
-                b1_worst_client_fpr=b1.worst_client_fpr,
-                b2_worst_client_fpr=b2.worst_client_fpr,
-                b4_worst_client_fpr=b4.worst_client_fpr,
-                b1_worst_client_tpr=b1.worst_client_tpr,
-                b2_worst_client_tpr=b2.worst_client_tpr,
-                b4_worst_client_tpr=b4.worst_client_tpr,
-                b1_worst_client_macro_f1=b1.worst_client_macro_f1,
-                b2_worst_client_macro_f1=b2.worst_client_macro_f1,
-                b4_worst_client_macro_f1=b4.worst_client_macro_f1,
-                b1_worst_client_balanced_accuracy=b1.worst_client_balanced_accuracy,
-                b2_worst_client_balanced_accuracy=b2.worst_client_balanced_accuracy,
-                b4_worst_client_balanced_accuracy=b4.worst_client_balanced_accuracy,
-                delta_cv_fpr_b1_minus_b2=_safe_diff(b1.cv_fpr, b2.cv_fpr),
-                delta_cv_fpr_b1_minus_b4=_safe_diff(b1.cv_fpr, b4.cv_fpr),
-                delta_cv_tpr_b1_minus_b2=_safe_diff(b1.cv_tpr, b2.cv_tpr),
-                delta_cv_tpr_b1_minus_b4=_safe_diff(b1.cv_tpr, b4.cv_tpr),
-                delta_macro_f1_b1_minus_b2=_safe_diff(
-                    b1.macro_f1_mean, b2.macro_f1_mean
-                ),
-                delta_macro_f1_b1_minus_b4=_safe_diff(
-                    b1.macro_f1_mean, b4.macro_f1_mean
-                ),
-                delta_pr_auc_b1_minus_b2=_safe_diff(b1.pr_auc_mean, b2.pr_auc_mean),
-                delta_pr_auc_b1_minus_b4=_safe_diff(b1.pr_auc_mean, b4.pr_auc_mean),
-                delta_auroc_b1_minus_b2=_safe_diff(b1.auroc_mean, b2.auroc_mean),
-                delta_auroc_b1_minus_b4=_safe_diff(b1.auroc_mean, b4.auroc_mean),
-                b1_convergence_round=b1.convergence_round,
-                b2_convergence_round=b2.convergence_round,
-                b4_convergence_round=b4.convergence_round,
-                b1_tau_global=b1.tau_global,
-                b2_tau_global=b2.tau_global,
-                b4_tau_global=b4.tau_global,
-                coverage_ratio=str(
-                    b1.coverage_ratio
-                    or b2.coverage_ratio
-                    or b4.coverage_ratio
-                    or DEFAULT_COVERAGE_RATIO
-                ),
-                status=AuditStatus.PASS
-                if (b1.cv_fpr is not None and b2.cv_fpr is not None)
-                else AuditStatus.BLOCKED_PENDING_RUN,
-            )
-        )
-
-        _check_b2_utility_tradeoff(regime, seed, alpha_text, b1, b2, warnings)
+        b1 = cell_panel.get((regime, seed, alpha_text, Baseline.B1), _CellPanel.empty())
+        b2 = cell_panel.get((regime, seed, alpha_text, Baseline.B2), _CellPanel.empty())
+        b4 = cell_panel.get((regime, seed, alpha_text, Baseline.B4), _CellPanel.empty())
+        out.append(_build_seed_delta_record(regime, seed, alpha_text, b1, b2, b4))
+        _check_b2_utility_tradeoff((regime, seed, alpha_text), b1, b2, warnings)
     return out
 
 
@@ -324,6 +325,43 @@ def _b4_stability_from_cluster_records(
     return stability
 
 
+def _collect_regime_c_alpha_records(
+    metric_paths: list[Path],
+    base_dir: Path,
+    data_root: Path | None,
+    acc: "_AuditAccumulator",
+) -> None:
+    seen: set[tuple[str, int]] = set()
+    for metrics_path in metric_paths:
+        run_id_obj = _parse_metric_path(base_dir, metrics_path)
+        if run_id_obj.regime != Regime.C or run_id_obj.alpha is None:
+            continue
+        alpha = run_id_obj.alpha
+        seed = run_id_obj.seed
+        if (str(alpha), seed) in seen:
+            continue
+        seen.add((str(alpha), seed))
+        _data_root_c = data_root if data_root is not None else base_dir
+        prepared = prepared_root_for_regime(
+            Regime.C, base_dir=_data_root_c, alpha=alpha, seed=seed
+        )
+        record = build_regime_c_alpha_audit(prepared, alpha, seed)
+        if record is not None:
+            acc.regime_c_alpha_records.append(record)
+        else:
+            acc.warnings.append(
+                WarningRecord(
+                    severity=AuditSeverity.BLOCKED_PENDING_RUN,
+                    code=WarningCode.REGIME_C_ALPHA_AUDIT_MISSING,
+                    message=(
+                        f"Regime C alpha={alpha_label(alpha)} seed={seed} prepared manifest is "
+                        "missing; JS divergence and device-mixture proportions cannot be audited."
+                    ),
+                    exact_command=BLOCKED_RESUME_COMMAND,
+                )
+            )
+
+
 def run_results_audit(
     base_dir: Path, audit_dir: Path, cfg: DatpConfig, data_root: Path | None = None
 ) -> dict[str, Path]:
@@ -363,34 +401,7 @@ def run_results_audit(
             data_root=data_root,
         )
 
-    _seen_regime_c: set[tuple[str, int]] = set()
-    for metrics_path in metric_paths:
-        run_id_obj = _parse_metric_path(base_dir, metrics_path)
-        regime = run_id_obj.regime
-        seed = run_id_obj.seed
-        alpha = run_id_obj.alpha
-        if regime != Regime.C or alpha is None or (str(alpha), seed) in _seen_regime_c:
-            continue
-        _seen_regime_c.add((str(alpha), seed))
-        _data_root_c = data_root if data_root is not None else base_dir
-        prepared = prepared_root_for_regime(
-            Regime.C, base_dir=_data_root_c, alpha=alpha, seed=seed
-        )
-        record = build_regime_c_alpha_audit(prepared, alpha, seed)
-        if record is not None:
-            acc.regime_c_alpha_records.append(record)
-        else:
-            acc.warnings.append(
-                WarningRecord(
-                    severity=AuditSeverity.BLOCKED_PENDING_RUN,
-                    code=WarningCode.REGIME_C_ALPHA_AUDIT_MISSING,
-                    message=(
-                        f"Regime C alpha={alpha_label(alpha)} seed={seed} prepared manifest is "
-                        "missing; JS divergence and device-mixture proportions cannot be audited."
-                    ),
-                    exact_command=BLOCKED_RESUME_COMMAND,
-                )
-            )
+    _collect_regime_c_alpha_records(metric_paths, base_dir, data_root, acc)
 
     acc.regime_c_alpha_records = _enrich_regime_c_records_with_cv(
         acc.regime_c_alpha_records, acc.cell_panel

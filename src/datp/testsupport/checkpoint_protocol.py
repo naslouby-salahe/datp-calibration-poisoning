@@ -119,7 +119,7 @@ def _fake_metric(
         worst_client_id="c1",
         worst_ba=worst_ba,
         p10_macro_f1=p10_macro_f1,
-        aggregate_metrics=aggregate,
+        aggregate_metrics=aggregate,  # type: ignore[arg-type]
         provenance=MetricsProvenance(
             config_identity="config",
             split_manifest_identity="split",

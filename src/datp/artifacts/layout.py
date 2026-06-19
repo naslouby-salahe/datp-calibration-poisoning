@@ -89,50 +89,52 @@ class ArtifactLayout:
             cell.seed, cell.alpha, checkpoint_round
         )
 
-    def score_cell(self, cell: TrainingCellId) -> ScoreCellPaths:
-        seg = _seed_segment(cell.seed, cell.alpha)
+    def _score_cell_paths(
+        self, cell: TrainingCellId, seg: Path, checkpoint_round: int | None = None
+    ) -> ScoreCellPaths:
         score_dir = self._score_root / seg
         return ScoreCellPaths(
             cell=cell,
             checkpoint_dir=self._checkpoint_root / seg,
             score_dir=score_dir,
             manifest_path=score_dir / ArtifactFile.SCORING_MANIFEST,
+            checkpoint_round=checkpoint_round,
         )
+
+    def _baseline_run_paths(
+        self, run: BaselineRunId, seg: Path, checkpoint_round: int | None = None
+    ) -> BaselineRunPaths:
+        result_dir = self._result_root / run.baseline.value / seg
+        return BaselineRunPaths(
+            run=run,
+            result_dir=result_dir,
+            metrics_path=result_dir / ArtifactFile.METRICS,
+            log_dir=self._log_root / run.baseline.value / seg,
+            checkpoint_round=checkpoint_round,
+        )
+
+    def score_cell(self, cell: TrainingCellId) -> ScoreCellPaths:
+        return self._score_cell_paths(cell, _seed_segment(cell.seed, cell.alpha))
 
     def score_cell_for_round(
         self, cell: TrainingCellId, checkpoint_round: int
     ) -> ScoreCellPaths:
-        seg = _round_aware_segment(cell.seed, cell.alpha, checkpoint_round)
-        score_dir = self._score_root / seg
-        return ScoreCellPaths(
-            cell=cell,
-            checkpoint_dir=self._checkpoint_root / seg,
-            score_dir=score_dir,
-            manifest_path=score_dir / ArtifactFile.SCORING_MANIFEST,
-            checkpoint_round=checkpoint_round,
+        return self._score_cell_paths(
+            cell,
+            _round_aware_segment(cell.seed, cell.alpha, checkpoint_round),
+            checkpoint_round,
         )
 
     def baseline_run(self, run: BaselineRunId) -> BaselineRunPaths:
-        seg = _seed_segment(run.seed, run.alpha)
-        result_dir = self._result_root / run.baseline.value / seg
-        return BaselineRunPaths(
-            run=run,
-            result_dir=result_dir,
-            metrics_path=result_dir / ArtifactFile.METRICS,
-            log_dir=self._log_root / run.baseline.value / seg,
-        )
+        return self._baseline_run_paths(run, _seed_segment(run.seed, run.alpha))
 
     def baseline_run_for_round(
         self, run: BaselineRunId, checkpoint_round: int
     ) -> BaselineRunPaths:
-        seg = _round_aware_segment(run.seed, run.alpha, checkpoint_round)
-        result_dir = self._result_root / run.baseline.value / seg
-        return BaselineRunPaths(
-            run=run,
-            result_dir=result_dir,
-            metrics_path=result_dir / ArtifactFile.METRICS,
-            log_dir=self._log_root / run.baseline.value / seg,
-            checkpoint_round=checkpoint_round,
+        return self._baseline_run_paths(
+            run,
+            _round_aware_segment(run.seed, run.alpha, checkpoint_round),
+            checkpoint_round,
         )
 
     def score_file(

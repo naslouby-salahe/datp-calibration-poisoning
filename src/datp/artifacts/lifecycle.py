@@ -53,6 +53,31 @@ class RunLifecycle:
         (self.run_dir / ArtifactFile.RUN_IN_PROGRESS).touch()
         return self
 
+    def _complete_run(self, in_progress_path: Path) -> None:
+        if in_progress_path.exists():
+            in_progress_path.unlink()
+        (self.run_dir / ArtifactFile.RUN_DONE).write_text(
+            "Run completed successfully.\n"
+        )
+
+    def _handle_abort(
+        self,
+        in_progress_path: Path,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        in_progress_path.unlink(missing_ok=True)
+        try:
+            self._write_aborted(exc_type, exc_val, exc_tb)
+        except Exception as inner:  # noqa: BLE001 - best-effort abort marker
+            with contextlib.suppress(Exception):
+                _get_logger().error(
+                    "artifacts.abort_marker_write_failed",
+                    run_dir=str(self.run_dir),
+                    error=str(inner),
+                )
+
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
@@ -61,24 +86,9 @@ class RunLifecycle:
     ) -> bool:
         in_progress_path = self.run_dir / ArtifactFile.RUN_IN_PROGRESS
         if exc_type is None:
-            if in_progress_path.exists():
-                in_progress_path.unlink()
-
-            (self.run_dir / ArtifactFile.RUN_DONE).write_text(
-                "Run completed successfully.\n"
-            )
+            self._complete_run(in_progress_path)
         else:
-            in_progress_path.unlink(missing_ok=True)
-            try:
-                self._write_aborted(exc_type, exc_val, exc_tb)
-            except Exception as inner:  # noqa: BLE001 - best-effort abort marker
-                with contextlib.suppress(Exception):
-                    _get_logger().error(
-                        "artifacts.abort_marker_write_failed",
-                        run_dir=str(self.run_dir),
-                        error=str(inner),
-                    )
-
+            self._handle_abort(in_progress_path, exc_type, exc_val, exc_tb)
         return False
 
     def _write_aborted(

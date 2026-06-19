@@ -66,6 +66,31 @@ class GlobalCheckpointSelection:
     summaries: tuple[CheckpointBaselineSummary, ...]
 
 
+def _build_baseline_summary(
+    regime: Regime,
+    baseline: Baseline,
+    checkpoint_round: int,
+    items: list[SweepMetrics],
+) -> CheckpointBaselineSummary:
+    return CheckpointBaselineSummary(
+        regime=regime,
+        baseline=baseline,
+        checkpoint_round=checkpoint_round,
+        seed_count=len(items),
+        mean_fpr=_mean(m.mean_fpr for m in items),
+        cv_fpr=_mean(m.cv_fpr for m in items),
+        worst_client_fpr=_max(m.worst_client_fpr for m in items),
+        mean_tpr=_mean(_mean_client_tpr(m) for m in items),
+        cv_tpr=_mean(m.cv_tpr for m in items),
+        worst_client_tpr=_min(_worst_client_tpr(m) for m in items),
+        macro_f1=_mean(_mean_client_macro_f1(m) for m in items),
+        p10_macro_f1=_mean(m.p10_macro_f1 for m in items),
+        worst_client_balanced_accuracy=_min(m.worst_ba for m in items),
+        coverage_ratio=_min(m.coverage_ratio for m in items),
+        collapse_cell_count=sum(_collapse_cell_count(m) for m in items),
+    )
+
+
 def summarize_checkpoint_metrics(
     metrics: tuple[SweepMetrics, ...],
 ) -> tuple[CheckpointBaselineSummary, ...]:
@@ -77,32 +102,29 @@ def summarize_checkpoint_metrics(
             )
         key = (item.regime, item.baseline, item.checkpoint_round)
         grouped.setdefault(key, []).append(item)
-    summaries: list[CheckpointBaselineSummary] = []
-    for (regime, baseline, checkpoint_round), items in sorted(grouped.items()):
-        summaries.append(
-            CheckpointBaselineSummary(
-                regime=regime,
-                baseline=baseline,
-                checkpoint_round=checkpoint_round,
-                seed_count=len(items),
-                mean_fpr=_mean(metric.mean_fpr for metric in items),
-                cv_fpr=_mean(metric.cv_fpr for metric in items),
-                worst_client_fpr=_max(metric.worst_client_fpr for metric in items),
-                mean_tpr=_mean(_mean_client_tpr(metric) for metric in items),
-                cv_tpr=_mean(metric.cv_tpr for metric in items),
-                worst_client_tpr=_min(_worst_client_tpr(metric) for metric in items),
-                macro_f1=_mean(_mean_client_macro_f1(metric) for metric in items),
-                p10_macro_f1=_mean(metric.p10_macro_f1 for metric in items),
-                worst_client_balanced_accuracy=_min(
-                    metric.worst_ba for metric in items
-                ),
-                coverage_ratio=_min(metric.coverage_ratio for metric in items),
-                collapse_cell_count=sum(
-                    _collapse_cell_count(metric) for metric in items
-                ),
-            )
-        )
-    return tuple(summaries)
+    return tuple(
+        _build_baseline_summary(regime, baseline, checkpoint_round, items)
+        for (regime, baseline, checkpoint_round), items in sorted(grouped.items())
+    )
+
+
+def _eligible_rounds(
+    comparisons: tuple[CheckpointRegimeAComparison, ...],
+    b2_by_round: dict[int, CheckpointBaselineSummary],
+) -> list[int]:
+    rounds: list[int] = []
+    for comparison in comparisons:
+        b2_summary = b2_by_round.get(comparison.checkpoint_round)
+        if b2_summary is None:
+            continue
+        if comparison.cv_fpr_bca95.mean_delta <= 0.0:
+            continue
+        if _mean(comparison.worst_client_fpr_deltas) <= 0.0:
+            continue
+        if b2_summary.coverage_ratio < 1.0:
+            continue
+        rounds.append(comparison.checkpoint_round)
+    return rounds
 
 
 def select_global_primary_checkpoint(
@@ -135,19 +157,8 @@ def select_global_primary_checkpoint(
         n_bootstrap=n_bootstrap,
         bootstrap_seed=bootstrap_seed,
     )
-    eligible_rounds: list[int] = []
-    for comparison in comparisons:
-        b2_summary = b2_by_round.get(comparison.checkpoint_round)
-        if b2_summary is None:
-            continue
-        if comparison.cv_fpr_bca95.mean_delta <= 0.0:
-            continue
-        if _mean(comparison.worst_client_fpr_deltas) <= 0.0:
-            continue
-        if b2_summary.coverage_ratio < 1.0:
-            continue
-        eligible_rounds.append(comparison.checkpoint_round)
-    if not eligible_rounds:
+    eligible = _eligible_rounds(comparisons, b2_by_round)
+    if not eligible:
         raise ValueError(
             fmt(
                 _MODULE,
@@ -157,11 +168,8 @@ def select_global_primary_checkpoint(
             )
         )
     selected = min(
-        eligible_rounds,
-        key=lambda round_count: (
-            -_lower_tail_tradeoff(b2_by_round[round_count]),
-            round_count,
-        ),
+        eligible,
+        key=lambda r: (-_lower_tail_tradeoff(b2_by_round[r]), r),
     )
     return GlobalCheckpointSelection(
         selected_round=selected,
@@ -182,6 +190,46 @@ def summaries_for_global_primary_checkpoint(
         summary
         for summary in summaries
         if summary.checkpoint_round == selection.selected_round
+    )
+
+
+def _build_round_comparison(
+    checkpoint_round: int,
+    b1: dict[int, SweepMetrics],
+    b2: dict[int, SweepMetrics],
+    n_bootstrap: int,
+    bootstrap_seed: int,
+) -> CheckpointRegimeAComparison:
+    seeds = tuple(sorted(set(b1) & set(b2)))
+    if len(seeds) < 3:
+        raise ValueError(
+            fmt(
+                _MODULE,
+                "BCa checkpoint selection needs at least 3 paired seeds",
+                ">=3",
+                str(len(seeds)),
+            )
+        )
+    cv_deltas = tuple(b1[seed].cv_fpr - b2[seed].cv_fpr for seed in seeds)
+    worst_deltas = tuple(
+        b1[seed].worst_client_fpr - b2[seed].worst_client_fpr for seed in seeds
+    )
+    b1_cv = np.array([b1[seed].cv_fpr for seed in seeds], dtype=np.float64)
+    b2_cv = np.array([b2[seed].cv_fpr for seed in seeds], dtype=np.float64)
+    return CheckpointRegimeAComparison(
+        checkpoint_round=checkpoint_round,
+        cv_fpr_deltas=cv_deltas,
+        worst_client_fpr_deltas=worst_deltas,
+        cv_fpr_bca95=bca_ci(
+            np.array(cv_deltas, dtype=np.float64),
+            n_bootstrap=n_bootstrap,
+            ci=0.95,
+            seed=bootstrap_seed,
+        ),
+        cv_fpr_sign_consistency=_positive_fraction(cv_deltas),
+        worst_fpr_sign_consistency=_positive_fraction(worst_deltas),
+        wilcoxon=wilcoxon_test(b1_cv, b2_cv),
+        cliffs_delta=cliffs_delta(b1_cv, b2_cv),
     )
 
 
@@ -207,37 +255,9 @@ def _regime_a_comparisons(
         b2 = baseline_map.get(Baseline.B2)
         if b1 is None or b2 is None:
             continue
-        seeds = tuple(sorted(set(b1) & set(b2)))
-        if len(seeds) < 3:
-            raise ValueError(
-                fmt(
-                    _MODULE,
-                    "BCa checkpoint selection needs at least 3 paired seeds",
-                    ">=3",
-                    str(len(seeds)),
-                )
-            )
-        cv_deltas = tuple(b1[seed].cv_fpr - b2[seed].cv_fpr for seed in seeds)
-        worst_deltas = tuple(
-            b1[seed].worst_client_fpr - b2[seed].worst_client_fpr for seed in seeds
-        )
-        b1_cv = np.array([b1[seed].cv_fpr for seed in seeds], dtype=np.float64)
-        b2_cv = np.array([b2[seed].cv_fpr for seed in seeds], dtype=np.float64)
         comparisons.append(
-            CheckpointRegimeAComparison(
-                checkpoint_round=checkpoint_round,
-                cv_fpr_deltas=cv_deltas,
-                worst_client_fpr_deltas=worst_deltas,
-                cv_fpr_bca95=bca_ci(
-                    np.array(cv_deltas, dtype=np.float64),
-                    n_bootstrap=n_bootstrap,
-                    ci=0.95,
-                    seed=bootstrap_seed,
-                ),
-                cv_fpr_sign_consistency=_positive_fraction(cv_deltas),
-                worst_fpr_sign_consistency=_positive_fraction(worst_deltas),
-                wilcoxon=wilcoxon_test(b1_cv, b2_cv),
-                cliffs_delta=cliffs_delta(b1_cv, b2_cv),
+            _build_round_comparison(
+                checkpoint_round, b1, b2, n_bootstrap, bootstrap_seed
             )
         )
     return tuple(comparisons)

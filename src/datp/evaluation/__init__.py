@@ -5,7 +5,7 @@ from __future__ import annotations
 # import from evaluation. Deferring actual imports to first attribute access
 # prevents circular-import failures at module-load time.
 
-__all__ = [
+__all__ = [  # pylint: disable=undefined-all-variable
     "BinaryMetrics",
     "BinaryRankingMetrics",
     "ClientEvaluationRecord",

@@ -97,7 +97,7 @@ def make_client_fn(
                 )
             )
 
-        def client_fn(context: Context) -> Client:
+        def _prepared_client_fn(context: Context) -> Client:
             idx = int(context.node_config["partition-id"])
             _seed_worker(seed, idx)
             client_id = client_ids[idx]
@@ -115,7 +115,7 @@ def make_client_fn(
                 **_extra,
             ).to_client()
 
-        return client_fn
+        return _prepared_client_fn
 
     def client_fn(context: Context) -> Client:
         idx = int(context.node_config["partition-id"])

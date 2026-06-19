@@ -97,10 +97,15 @@ class FederationConfig(BaseModel):
     local_epochs: int
 
 
-def _validate_checkpoint_milestones(
-    milestones: tuple[int, ...],
-    max_rounds: int,
-) -> None:
+def _is_bare_string_value(value: object, info: ValidationInfo) -> bool:
+    return (
+        isinstance(value, str)
+        and not isinstance(value, enum.Enum)
+        and not (info.context or {}).get("hydra_config")
+    )
+
+
+def _validate_milestone_ordering(milestones: tuple[int, ...]) -> None:
     if not milestones:
         raise ValueError("checkpoint milestones must not be empty")
     if len(set(milestones)) != len(milestones):
@@ -109,11 +114,15 @@ def _validate_checkpoint_milestones(
         raise ValueError("checkpoint milestones must be sorted ascending")
     if any(round_count <= 0 for round_count in milestones):
         raise ValueError("checkpoint milestones must be positive")
-    largest = max(milestones)
-    if largest > max_rounds:
+
+
+def _validate_checkpoint_milestones(
+    milestones: tuple[int, ...],
+    max_rounds: int,
+) -> None:
+    _validate_milestone_ordering(milestones)
+    if max(milestones) > max_rounds:
         raise ValueError("checkpoint milestone cannot exceed max_rounds")
-    if max_rounds < largest:
-        raise ValueError("max_rounds cannot be lower than largest milestone")
 
 
 def _validate_checkpoint_selection(
@@ -159,11 +168,7 @@ class CheckpointProtocolConfig(BaseModel):
     )
     @classmethod
     def reject_string_enum_values(cls, value: object, info: ValidationInfo) -> object:
-        if (
-            isinstance(value, str)
-            and not isinstance(value, enum.Enum)
-            and not (info.context or {}).get("hydra_config")
-        ):
+        if _is_bare_string_value(value, info):
             raise TypeError("checkpoint protocol enum fields require enum instances")
         return value
 

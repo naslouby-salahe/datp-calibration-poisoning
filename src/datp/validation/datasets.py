@@ -14,9 +14,7 @@ from datp.data.catalog import DatasetID
 from datp.validation.constants import NBAIOT_CONFOUND_SUMMARY
 
 if TYPE_CHECKING:
-    from datp.data.contracts import (
-        RegimeCManifestMetadata,  # type: ignore[attr-defined]
-    )
+    from datp.data.contracts import RegimeCManifestMetadata  # type: ignore[attr-defined]
 from datp.core.enums import Regime
 from datp.core.errors import fmt
 from datp.core.identity import alpha_from_label, alpha_label
@@ -215,9 +213,7 @@ class _AlphaAuditMetrics:
 
 
 def _load_alpha_audit_data(prepared_dir: Path) -> RegimeCManifestMetadata | None:
-    from datp.data.contracts import (
-        RegimeCManifestMetadata,  # type: ignore[attr-defined]
-    )
+    from datp.data.contracts import RegimeCManifestMetadata  # type: ignore[attr-defined]
 
     manifest_path = prepared_dir / ArtifactFile.MANIFEST
     if not manifest_path.exists():
@@ -462,7 +458,7 @@ def compute_b4_cluster_stability(
     regime: Regime,
     alpha: str | None,
 ) -> list[B4ClusterStabilityRecord]:
-    from sklearn.metrics import adjusted_rand_score  # noqa: PLC0415
+    from sklearn.metrics import adjusted_rand_score  # type: ignore[import-untyped]  # noqa: PLC0415
 
     seeds = sorted(cluster_assignments_by_seed.keys())
     records: list[B4ClusterStabilityRecord] = []
