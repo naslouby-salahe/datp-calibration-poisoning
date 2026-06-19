@@ -227,6 +227,16 @@ section. Read the relevant source files and reason about them.
 - `dict[str, Any]` used where a typed dataclass or TypedDict is clearly better
 - Missing return type annotations on public API functions
 - Missing parameter type annotations on public API functions
+- `Enum | str`, `Path | str`, `SomeDataclass | dict`, `SomeDataclass | str`
+  union types in non-boundary function signatures (forbidden in production code;
+  only the true external boundary — CLI parsing, Hydra YAML loading, JSON
+  deserialization — may accept raw strings and coerce them to typed values)
+- Backwards-compatibility helpers that accept weak types and coerce internally
+  (e.g. `path = Path(path)` after `path: Path | str`); remove both the union
+  and the coercion — callers must pass the correct type
+- Runtime validators that duplicate static type enforcement already caught by
+  pyright — prefer static typing over runtime guards where pyright is the
+  enforcement mechanism
 
 ### 3.7 — Hardcoding
 
