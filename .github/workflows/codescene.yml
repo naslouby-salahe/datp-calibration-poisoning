@@ -17,7 +17,18 @@ jobs:
           fetch-depth: 0
 
       - name: Install CodeScene CLI
-        run: curl -fsSL https://downloads.codescene.io/enterprise/cli/install-cs-tool.sh | sh
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL \
+            https://downloads.codescene.io/enterprise/cli/cs-linux-amd64-latest.zip \
+            -o /tmp/cs.zip
+          unzip -q /tmp/cs.zip -d /tmp/cs-cli
+          EXPECTED=$(awk '{print $1}' /tmp/cs-cli/cs.sha256)
+          ACTUAL=$(sha256sum /tmp/cs-cli/cs | awk '{print $1}')
+          [ "$EXPECTED" = "$ACTUAL" ] || { echo "SHA256 mismatch"; exit 1; }
+          mkdir -p "$HOME/.local/bin"
+          mv /tmp/cs-cli/cs "$HOME/.local/bin/cs"
+          chmod +x "$HOME/.local/bin/cs"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Delta analysis (push)
         if: github.event_name == 'push'
