@@ -81,26 +81,30 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
     }
     client_taus = compute_client_thresholds(client_errors, ["c1", "c2"], q=0.95)
     tau_global = compute_tau_global(client_taus)
-    b1_thresholds = derive_threshold(_DeriveInput(
-        baseline=Baseline.B1,
-        client_errors=client_errors,
-        n_min=1,
-        q=0.95,
-        tau_global=tau_global,
-        regime=Regime.A,
-        threshold_cfg=BASE_CONFIG.threshold,
-        seed=0,
-    ))
-    b2_thresholds = derive_threshold(_DeriveInput(
-        baseline=Baseline.B2,
-        client_errors=client_errors,
-        n_min=1,
-        q=0.95,
-        tau_global=tau_global,
-        regime=Regime.A,
-        threshold_cfg=BASE_CONFIG.threshold,
-        seed=0,
-    ))
+    b1_thresholds = derive_threshold(
+        _DeriveInput(
+            baseline=Baseline.B1,
+            client_errors=client_errors,
+            n_min=1,
+            q=0.95,
+            tau_global=tau_global,
+            regime=Regime.A,
+            threshold_cfg=BASE_CONFIG.threshold,
+            seed=0,
+        )
+    )
+    b2_thresholds = derive_threshold(
+        _DeriveInput(
+            baseline=Baseline.B2,
+            client_errors=client_errors,
+            n_min=1,
+            q=0.95,
+            tau_global=tau_global,
+            regime=Regime.A,
+            threshold_cfg=BASE_CONFIG.threshold,
+            seed=0,
+        )
+    )
 
     b1 = evaluate_baseline(
         b1_thresholds.client_thresholds,

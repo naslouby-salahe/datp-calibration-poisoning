@@ -69,7 +69,12 @@ def _get_required_field(
     value = payload.get(key)
     if not isinstance(value, expected_type):
         raise ValueError(
-            fmt(_MODULE, f"Score manifest lacks {key}", expected_type.__name__, repr(value))
+            fmt(
+                _MODULE,
+                f"Score manifest lacks {key}",
+                expected_type.__name__,
+                repr(value),
+            )
         )
     return cast(_T, value)
 
@@ -87,7 +92,9 @@ def _get_required_str_list(
 
 def load_score_manifest_identity(manifest_path: Path) -> ScoreManifestIdentity:
     payload = _read_json_object(manifest_path)
-    checkpoint_round = _get_required_field(payload, "checkpoint_round", int, manifest_path)
+    checkpoint_round = _get_required_field(
+        payload, "checkpoint_round", int, manifest_path
+    )
     checkpoint_identity = _get_required_field(
         payload, "model_checkpoint_hash", str, manifest_path
     )

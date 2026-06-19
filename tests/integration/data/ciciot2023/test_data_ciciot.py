@@ -141,7 +141,7 @@ class TestCapApplied:
         output_dir = tmp_path / "out"
         result = _prepare_ciciot(single_raw.parent.parent, output_dir)
 
-        client_id = Path(_SINGLE_CLIENT_FILE).stem # "Merged01"
+        client_id = Path(_SINGLE_CLIENT_FILE).stem  # "Merged01"
         info = result[client_id]
 
         total_output = (
@@ -182,7 +182,9 @@ class TestCapApplied:
 
         df = pl.from_pandas(pdf)
         capped = apply_ciciot_cap(
-            df, cap=50_000, label_column=LABEL_COLUMN,
+            df,
+            cap=50_000,
+            label_column=LABEL_COLUMN,
             benign_label=BENIGN_LABEL,
             attack_reserve_fraction=_ATTACK_RESERVE_FRACTION,
             seed=42,

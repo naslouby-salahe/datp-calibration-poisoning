@@ -148,6 +148,7 @@ def _synthetic_results_single_seed() -> dict[Baseline, list[EvaluationResult]]:
 
 # ── generate_table3 ──────────────────────────────────────────────
 
+
 def test_generate_table3_creates_files(tmp_path: Path) -> None:
     tex_path = generate_table3(_synthetic_results(), tmp_path, style=_STYLE)
     assert tex_path.exists()
@@ -177,6 +178,7 @@ def test_table_labels_p10_macro_f1_precisely(tmp_path: Path) -> None:
 
 # ── generate_table4 ──────────────────────────────────────────────
 
+
 def test_generate_table4_creates_files(tmp_path: Path) -> None:
     tex_path = generate_table4(_synthetic_results(), tmp_path, style=_STYLE)
     assert tex_path.exists()
@@ -187,6 +189,7 @@ def test_generate_table4_creates_files(tmp_path: Path) -> None:
 
 # ── _build_table_row ─────────────────────────────────────────────
 
+
 def test_build_table_row_multi_seed() -> None:
     results = [_make_eval_result(Baseline.B1, s) for s in range(3)]
     row = _build_table_row(Baseline.B1, results)
@@ -194,7 +197,7 @@ def test_build_table_row_multi_seed() -> None:
     assert row.eligible_count == 5
     assert row.pending_count == 1
     assert row.coverage_ratio == pytest.approx(5 / 6)
-    assert row.cv_fpr_std > 0 # multi-seed std nonzero
+    assert row.cv_fpr_std > 0  # multi-seed std nonzero
 
 
 def test_build_table_row_single_seed() -> None:
@@ -215,6 +218,7 @@ def test_build_table_row_eligible_count_mismatch_raises() -> None:
 
 # ── ResultTable.to_csv ───────────────────────────────────────────
 
+
 def test_result_table_to_csv(tmp_path: Path) -> None:
     results = [_make_eval_result(Baseline.B1, 0)]
     row = _build_table_row(Baseline.B1, results)
@@ -230,11 +234,9 @@ def test_result_table_to_csv(tmp_path: Path) -> None:
 
 # ── Non-finite coverage rejection ────────────────────────────────
 
+
 def test_build_table_row_nonfinite_coverage_raises() -> None:
     r1 = _make_eval_result(Baseline.B1, 0)
     object.__setattr__(r1, "coverage_ratio", float("nan"))
     with pytest.raises(ValueError, match="Coverage ratio missing"):
         _build_table_row(Baseline.B1, [r1])
-
-
-

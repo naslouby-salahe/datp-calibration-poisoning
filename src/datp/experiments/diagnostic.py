@@ -195,34 +195,38 @@ def _run_b1_b2_evaluation(
     q = cfg.threshold.q
 
     with step_context(DiagnosticStep.DERIVE_THRESHOLDS):
-        b1_result = derive_threshold(_DeriveInput(
-            baseline=Baseline.B1,
-            client_errors=ctx.client_errors,
-            n_min=n_min,
-            q=q,
-            tau_global=ctx.tau_global,
-            regime=regime,
-            threshold_cfg=cfg.threshold,
-            seed=seed,
-            alpha=alpha,
-        ))
+        b1_result = derive_threshold(
+            _DeriveInput(
+                baseline=Baseline.B1,
+                client_errors=ctx.client_errors,
+                n_min=n_min,
+                q=q,
+                tau_global=ctx.tau_global,
+                regime=regime,
+                threshold_cfg=cfg.threshold,
+                seed=seed,
+                alpha=alpha,
+            )
+        )
         tau_global = b1_result.tau_global
-        b2_result = derive_threshold(_DeriveInput(
-            baseline=Baseline.B2,
-            client_errors=ctx.client_errors,
-            n_min=n_min,
-            q=q,
-            tau_global=tau_global,
-            regime=regime,
-            threshold_cfg=cfg.threshold,
-            seed=seed,
-            alpha=alpha,
-        ))
+        b2_result = derive_threshold(
+            _DeriveInput(
+                baseline=Baseline.B2,
+                client_errors=ctx.client_errors,
+                n_min=n_min,
+                q=q,
+                tau_global=tau_global,
+                regime=regime,
+                threshold_cfg=cfg.threshold,
+                seed=seed,
+                alpha=alpha,
+            )
+        )
 
     with step_context(DiagnosticStep.EVALUATE):
-        score_root = ArtifactLayout(
-            base_dir=output_dir, regime=regime
-        ).score_cell(key).score_dir
+        score_root = (
+            ArtifactLayout(base_dir=output_dir, regime=regime).score_cell(key).score_dir
+        )
         b1_eval = evaluate_baseline(
             b1_result.client_thresholds,
             score_root,
@@ -241,30 +245,34 @@ def _run_b1_b2_evaluation(
         )
 
     inline = DIAGNOSTIC_INLINE
-    return b1_eval, b2_eval, DiagnosticMetrics(
-        regime=regime,
-        seed=seed,
-        alpha=alpha,
-        b1=build_metrics_dict(
-            b1_eval,
-            b1_result,
-            config_identity=inline.config,
-            split_manifest_identity=inline.split_manifest,
-            model_checkpoint_identity=inline.model_checkpoint,
-            score_artifact_identity=inline.score_artifact,
-            checkpoint_round=None,
+    return (
+        b1_eval,
+        b2_eval,
+        DiagnosticMetrics(
+            regime=regime,
+            seed=seed,
+            alpha=alpha,
+            b1=build_metrics_dict(
+                b1_eval,
+                b1_result,
+                config_identity=inline.config,
+                split_manifest_identity=inline.split_manifest,
+                model_checkpoint_identity=inline.model_checkpoint,
+                score_artifact_identity=inline.score_artifact,
+                checkpoint_round=None,
+            ),
+            b2=build_metrics_dict(
+                b2_eval,
+                b2_result,
+                config_identity=inline.config,
+                split_manifest_identity=inline.split_manifest,
+                model_checkpoint_identity=inline.model_checkpoint,
+                score_artifact_identity=inline.score_artifact,
+                checkpoint_round=None,
+            ),
+            delta_cv_fpr=b1_eval.cv_fpr - b2_eval.cv_fpr,
+            diagnostic_tag=diagnostic_tag,
         ),
-        b2=build_metrics_dict(
-            b2_eval,
-            b2_result,
-            config_identity=inline.config,
-            split_manifest_identity=inline.split_manifest,
-            model_checkpoint_identity=inline.model_checkpoint,
-            score_artifact_identity=inline.score_artifact,
-            checkpoint_round=None,
-        ),
-        delta_cv_fpr=b1_eval.cv_fpr - b2_eval.cv_fpr,
-        diagnostic_tag=diagnostic_tag,
     )
 
 

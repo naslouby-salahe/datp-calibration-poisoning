@@ -123,17 +123,19 @@ class ThresholdEvaluationExecutor:
 
         with RunLifecycle(res_dir, baseline=baseline, seed=ctx.key.seed):
             self._step(SweepStep.DERIVE_THRESHOLD, baseline)
-            threshold_result = derive_threshold(_DeriveInput(
-                baseline=baseline,
-                client_errors=ctx.client_errors,
-                n_min=cfg.threshold.n_min,
-                q=cfg.threshold.q,
-                tau_global=ctx.tau_global,
-                regime=ctx.key.regime,
-                threshold_cfg=cfg.threshold,
-                seed=ctx.key.seed,
-                alpha=ctx.key.alpha,
-            ))
+            threshold_result = derive_threshold(
+                _DeriveInput(
+                    baseline=baseline,
+                    client_errors=ctx.client_errors,
+                    n_min=cfg.threshold.n_min,
+                    q=cfg.threshold.q,
+                    tau_global=ctx.tau_global,
+                    regime=ctx.key.regime,
+                    threshold_cfg=cfg.threshold,
+                    seed=ctx.key.seed,
+                    alpha=ctx.key.alpha,
+                )
+            )
             logger.info(
                 "threshold derivation complete",
                 baseline=baseline,
@@ -193,7 +195,12 @@ class ThresholdEvaluationExecutor:
             return metrics
 
         raise RuntimeError(  # pragma: no cover — unreachable; RunLifecycle.__exit__ never suppresses
-            fmt("pipeline.executor", "unreachable: RunLifecycle always returns or raises", "", "")
+            fmt(
+                "pipeline.executor",
+                "unreachable: RunLifecycle always returns or raises",
+                "",
+                "",
+            )
         )
 
 

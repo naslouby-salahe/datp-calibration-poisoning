@@ -189,7 +189,9 @@ class TestLoadClientData:
         )
 
         data = load_client_data(
-            tmp_path, device=torch.device(DeviceType.CPU), splits=(Split.TRAIN, Split.CAL)
+            tmp_path,
+            device=torch.device(DeviceType.CPU),
+            splits=(Split.TRAIN, Split.CAL),
         )
         cd = data["c1"]
         assert cd.train.shape == (20, 4)

@@ -39,6 +39,7 @@ _DEFAULT_ANALYSIS_SEED: int = 300
 # Layer 1: per-victim seed deltas
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class SeedDelta:
     """One (victim, seed) delta in the two-layer structure."""
@@ -84,6 +85,7 @@ def collect_paired_deltas(
 # Layer 2: seed-level aggregates
 # ---------------------------------------------------------------------------
 
+
 def compute_seed_aggregates(
     paired: PairedDeltas,
     poisoning_seeds: tuple[int, ...],
@@ -110,6 +112,7 @@ def compute_seed_aggregates(
 # ---------------------------------------------------------------------------
 # Sign test (supporting evidence)
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class SignTestResult:
@@ -168,6 +171,7 @@ def sign_test(
 # Holm adjustment (descriptive only)
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class HolmResult:
     """Holm-adjusted p-values for seed-level aggregates.
@@ -212,6 +216,7 @@ def holm_adjust(
 # ---------------------------------------------------------------------------
 # Bootstrap CI (primary evidence)
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class BootstrapConfig:
@@ -260,9 +265,11 @@ def bootstrap_seed_aggregates(
 # Combined inference result
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class HolmConfig:
     """Holm adjustment parameters.  DESCRIPTIVE ONLY."""
+
     p_values: list[float]
     alpha: float = 0.05
 
@@ -289,6 +296,7 @@ class InferenceResult:
 @dataclass(frozen=True, slots=True)
 class InferenceInput:
     """Bundled inputs for full two-layer inference."""
+
     paired: PairedDeltas
     poisoning_seeds: tuple[int, ...]
     direction: Literal["raise", "lower"]
@@ -300,7 +308,9 @@ def compute_inference(inputs: InferenceInput) -> InferenceResult:
     """Compute full two-layer inference."""
     seed_aggregates = compute_seed_aggregates(inputs.paired, inputs.poisoning_seeds)
     boot = bootstrap_seed_aggregates(
-        seed_aggregates, poisoning_seeds=inputs.poisoning_seeds, config=inputs.bootstrap_config
+        seed_aggregates,
+        poisoning_seeds=inputs.poisoning_seeds,
+        config=inputs.bootstrap_config,
     )
     sign = sign_test(seed_aggregates, direction=inputs.direction)
 
@@ -309,7 +319,8 @@ def compute_inference(inputs: InferenceInput) -> InferenceResult:
         holm = holm_adjust(inputs.holm_config.p_values, alpha=inputs.holm_config.alpha)
 
     n_feasible = sum(
-        1 for victim_dict in inputs.paired.deltas.values()
+        1
+        for victim_dict in inputs.paired.deltas.values()
         if any(sd.feasible for sd in victim_dict.values())
     )
 

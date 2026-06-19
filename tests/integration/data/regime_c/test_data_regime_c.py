@@ -38,12 +38,12 @@ def _create_synthetic_nbaiot_raw(
         device_dir = raw_dir / device_id
         device_dir.mkdir(parents=True, exist_ok=True)
 
-        benign = pd.DataFrame(rng.standard_normal((n_benign, n_features)), columns=cols) # type: ignore
+        benign = pd.DataFrame(rng.standard_normal((n_benign, n_features)), columns=cols)  # type: ignore
         benign.to_csv(device_dir / "benign_traffic.csv", index=False)
 
         attack_dir = device_dir / "gafgyt_attacks"
         attack_dir.mkdir(parents=True, exist_ok=True)
-        attack = pd.DataFrame(rng.standard_normal((n_attack, n_features)), columns=cols) # type: ignore
+        attack = pd.DataFrame(rng.standard_normal((n_attack, n_features)), columns=cols)  # type: ignore
         attack.to_csv(attack_dir / "combo.csv", index=False)
 
 
@@ -70,7 +70,7 @@ class TestAllAlphaLevels:
                 alpha=alpha,
                 seed=SEED,
                 n_clients=N_CLIENTS,
-                n_min=10, # Low threshold for synthetic data
+                n_min=10,  # Low threshold for synthetic data
                 train_frac=TRAIN_FRAC,
                 cal_frac=CAL_FRAC,
             )
@@ -177,23 +177,13 @@ class TestJsDivergenceLogged:
         js_10 = js_values[10.0]
         js_inf = js_values[math.inf]
 
-        assert js_01 is not None, (
-            "js_divergence must not be None with multiple clients"
-        )
-        assert js_10 is not None, (
-            "js_divergence must not be None with multiple clients"
-        )
+        assert js_01 is not None, "js_divergence must not be None with multiple clients"
+        assert js_10 is not None, "js_divergence must not be None with multiple clients"
         assert js_inf is not None, (
             "js_divergence must not be None with multiple clients"
         )
-        assert js_01 > js_10, (
-            f"Expected JS(α=0.1)={js_01:.4f} > "
-            f"JS(α=10.0)={js_10:.4f}"
-        )
-        assert js_inf < js_01, (
-            f"Expected JS(IID)={js_inf:.4f} < "
-            f"JS(α=0.1)={js_01:.4f}"
-        )
+        assert js_01 > js_10, f"Expected JS(α=0.1)={js_01:.4f} > JS(α=10.0)={js_10:.4f}"
+        assert js_inf < js_01, f"Expected JS(IID)={js_inf:.4f} < JS(α=0.1)={js_01:.4f}"
 
 
 @pytest.mark.integration

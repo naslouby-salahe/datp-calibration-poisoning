@@ -101,8 +101,12 @@ def compute_threshold_comm(
         _b4_fingerprint_floats = len(B4_FINGERPRINT_FEATURES)
         return ThresholdComm(
             baseline=baseline,
-            server_uplink_payload_bytes=_b4_fingerprint_floats * _BYTES_PER_SCALAR * k_eligible,
-            server_downlink_payload_bytes=_B4_DOWNLINK_FLOATS_PER_CLIENT * _BYTES_PER_SCALAR * k_eligible,
+            server_uplink_payload_bytes=_b4_fingerprint_floats
+            * _BYTES_PER_SCALAR
+            * k_eligible,
+            server_downlink_payload_bytes=_B4_DOWNLINK_FLOATS_PER_CLIENT
+            * _BYTES_PER_SCALAR
+            * k_eligible,
         )
     raise ValueError(
         fmt(

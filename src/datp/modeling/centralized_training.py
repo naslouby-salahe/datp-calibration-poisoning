@@ -102,7 +102,12 @@ class _AELightningModule(pl.LightningModule):
         x = batch[0]
         loss = self.model.reconstruction_loss(x)
         self.log(
-            _KEY_VAL_LOSS, loss, on_step=False, on_epoch=True, prog_bar=False, logger=False
+            _KEY_VAL_LOSS,
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            logger=False,
         )
         return loss
 
@@ -112,7 +117,9 @@ class _AELightningModule(pl.LightningModule):
             _KEY_TRAIN_LOSS: _metric_value(
                 self.trainer.callback_metrics.get(_KEY_TRAIN_LOSS)
             ),
-            _KEY_VAL_LOSS: _metric_value(self.trainer.callback_metrics.get(_KEY_VAL_LOSS)),
+            _KEY_VAL_LOSS: _metric_value(
+                self.trainer.callback_metrics.get(_KEY_VAL_LOSS)
+            ),
         }
         if _should_log_epoch_progress(
             self.completed_epochs,

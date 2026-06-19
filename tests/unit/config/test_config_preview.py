@@ -229,7 +229,9 @@ class TestPreviewConfig:
             compose_config(regime="z", baseline=Baseline.B1, seed=0)
 
     def test_yaml_is_valid(self, tmp_path: Path) -> None:
-        dest = preview_config(regime=Regime.A, baseline=Baseline.B4, seed=7, output_dir=tmp_path)
+        dest = preview_config(
+            regime=Regime.A, baseline=Baseline.B4, seed=7, output_dir=tmp_path
+        )
         content = yaml.safe_load(dest.read_text())
         assert isinstance(content, dict)
         assert content["federation"]["convergence"]["rounds_max"] == 150

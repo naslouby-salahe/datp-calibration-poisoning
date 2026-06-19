@@ -251,7 +251,9 @@ def compute_b4_pair(
 
     # Clean B4 run.
     clean_per_client_taus = compute_client_thresholds(
-        CalibrationErrorSet.from_mapping({cid: clean_full_cal[cid] for cid in eligible_ids}),
+        CalibrationErrorSet.from_mapping(
+            {cid: clean_full_cal[cid] for cid in eligible_ids}
+        ),
         eligibility,
         q=q,
     )
@@ -270,7 +272,9 @@ def compute_b4_pair(
 
     # Poisoned per-client taus (no re-clustering yet).
     pois_per_client_taus = compute_client_thresholds(
-        CalibrationErrorSet.from_mapping({cid: pois_full_cal[cid] for cid in eligible_ids}),
+        CalibrationErrorSet.from_mapping(
+            {cid: pois_full_cal[cid] for cid in eligible_ids}
+        ),
         eligibility,
         q=q,
     )
@@ -303,7 +307,9 @@ def compute_b4_pair(
         policy=ThresholdPolicy.B4_CLUSTER,
         tau_global_clean=tau_global_clean,
         tau_global_pois=tau_global_pois,
-        thresholds_clean=ClientThresholdsCollection.from_mapping(eff_clean, Baseline.B4),
+        thresholds_clean=ClientThresholdsCollection.from_mapping(
+            eff_clean, Baseline.B4
+        ),
         thresholds_pois=ClientThresholdsCollection.from_mapping(eff_pois, Baseline.B4),
         decomposition=decomposition,
     )

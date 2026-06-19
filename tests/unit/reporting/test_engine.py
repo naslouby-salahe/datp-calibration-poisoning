@@ -6,6 +6,7 @@ from datp.reporting.engine import format_mean_std, render
 
 # ── format_mean_std ──────────────────────────────────────────────
 
+
 def test_format_mean_std_normal() -> None:
     result = format_mean_std(0.123, 0.045, bold=False)
     assert "\\textbf" not in result
@@ -49,6 +50,7 @@ def test_format_mean_std_inf_values_do_not_crash() -> None:
 
 
 # ── render ───────────────────────────────────────────────────────
+
 
 def test_render_table_main_template() -> None:
     """render must resolve the table_main.tex.j2 template and substitute values."""

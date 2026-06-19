@@ -64,7 +64,9 @@ class RunLifecycle:
             if in_progress_path.exists():
                 in_progress_path.unlink()
 
-            (self.run_dir / ArtifactFile.RUN_DONE).write_text("Run completed successfully.\n")
+            (self.run_dir / ArtifactFile.RUN_DONE).write_text(
+                "Run completed successfully.\n"
+            )
         else:
             in_progress_path.unlink(missing_ok=True)
             try:

@@ -16,7 +16,9 @@ from datp.federated.catalog import TrainingClientCatalog
 from datp.federated.types import ClientData
 
 
-def _write_client_dir(prepared_dir: Path, name: str, *, omit: str | None = None) -> None:
+def _write_client_dir(
+    prepared_dir: Path, name: str, *, omit: str | None = None
+) -> None:
     client_dir = prepared_dir / name
     client_dir.mkdir(parents=True)
     df = pl.DataFrame({"f0": [1.0], "f1": [2.0]})
@@ -84,16 +86,22 @@ class TestTrainingClientCatalog:
         ids.append("mutation")
         assert catalog.client_ids == ["x"]
 
-    def test_validate_prepared_splits_accepts_complete_client(self, tmp_path: Path) -> None:
+    def test_validate_prepared_splits_accepts_complete_client(
+        self, tmp_path: Path
+    ) -> None:
         prepared_dir = tmp_path / "prepared"
         _write_client_dir(prepared_dir, "client_0")
 
         catalog = TrainingClientCatalog(prepared_dir=prepared_dir)
         catalog.validate_prepared_splits()
 
-    def test_validate_prepared_splits_rejects_missing_test_attack(self, tmp_path: Path) -> None:
+    def test_validate_prepared_splits_rejects_missing_test_attack(
+        self, tmp_path: Path
+    ) -> None:
         prepared_dir = tmp_path / "prepared"
-        _write_client_dir(prepared_dir, "client_0", omit=filename_for_split(Split.TEST_ATTACK))
+        _write_client_dir(
+            prepared_dir, "client_0", omit=filename_for_split(Split.TEST_ATTACK)
+        )
 
         catalog = TrainingClientCatalog(prepared_dir=prepared_dir)
         with pytest.raises(FileNotFoundError, match=SPLIT_FILENAME[Split.TEST_ATTACK]):

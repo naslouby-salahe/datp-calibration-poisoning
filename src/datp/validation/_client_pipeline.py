@@ -145,10 +145,7 @@ def _b4_silhouette_scores_by_client(scores: Any) -> dict[str, float]:
     """Normalize B4 silhouette metadata for validation schema export."""
     if hasattr(scores, "items"):
         return {str(client_id): float(score) for client_id, score in scores.items()}
-    return {
-        score.client_id: float(score.score)
-        for score in scores
-    }
+    return {score.client_id: float(score.score) for score in scores}
 
 
 def _build_b4_cluster_records(

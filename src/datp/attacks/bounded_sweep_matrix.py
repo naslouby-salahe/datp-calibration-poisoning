@@ -71,9 +71,7 @@ def _enumerate_single_victim_matrix(
     ):
         victims = victims_by_training_seed.get(training_seed)
         if victims is None:
-            raise KeyError(
-                f"no victim list provided for training_seed={training_seed}"
-            )
+            raise KeyError(f"no victim list provided for training_seed={training_seed}")
         seed_pair = SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed)
         cells.extend(
             SweepCellSpec(

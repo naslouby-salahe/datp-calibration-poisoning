@@ -24,9 +24,7 @@ def _allocate_attack_counts(
     exact_counts = exact_counts.with_columns(
         **{
             _FLOOR_COLUMN: pl.col(_EXACT_COLUMN).floor().cast(pl.Int64),
-            _REMAINDER_COLUMN: (
-                pl.col(_EXACT_COLUMN) - pl.col(_EXACT_COLUMN).floor()
-            ),
+            _REMAINDER_COLUMN: (pl.col(_EXACT_COLUMN) - pl.col(_EXACT_COLUMN).floor()),
         }
     )
 
@@ -83,9 +81,7 @@ def apply_ciciot_cap(
     attack_df = df.filter(attack_mask)
 
     attack_budget = min(len(attack_df), int(cap * attack_reserve_fraction))
-    sampled_attack = _sample_attack_rows(
-        attack_df, attack_budget, label_column, seed
-    )
+    sampled_attack = _sample_attack_rows(attack_df, attack_budget, label_column, seed)
 
     benign_budget = cap - len(sampled_attack)
     if len(benign_df) <= benign_budget:

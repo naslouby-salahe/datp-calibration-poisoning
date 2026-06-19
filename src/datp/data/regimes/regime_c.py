@@ -54,7 +54,14 @@ def _load_benign_records(
         records[device_id] = df
 
     if feature_cols is None:
-        raise ValueError(fmt("data.regime_c", "No feature columns found", "non-empty feature columns", "None"))
+        raise ValueError(
+            fmt(
+                "data.regime_c",
+                "No feature columns found",
+                "non-empty feature columns",
+                "None",
+            )
+        )
     return records, feature_cols
 
 
@@ -146,24 +153,42 @@ def _build_client_partition(
         fractions = hist / total if total > 0 else np.ones(n_devices) / n_devices
     else:
         fractions = np.ones(n_devices) / n_devices
-    device_mixture_proportions = {device_names[i]: float(fractions[i]) for i in range(n_devices)}
+    device_mixture_proportions = {
+        device_names[i]: float(fractions[i]) for i in range(n_devices)
+    }
 
-    train_df, cal_df, test_benign_df = _stratified_split(benign_df, device_labs, rng, train_frac, cal_frac)
+    train_df, cal_df, test_benign_df = _stratified_split(
+        benign_df, device_labs, rng, train_frac, cal_frac
+    )
 
     cal_count = len(cal_df)
     calibration_pending = cal_count < n_min
     if calibration_pending:
         logger.warning(
             "client flagged as Calibration-Pending",
-            client=client_id, cal_count=cal_count, n_min=n_min,
+            client=client_id,
+            cal_count=cal_count,
+            n_min=n_min,
         )
 
     if len(train_df) > 0:
         scaler = fit_scaler(train_df)
         train_scaled = apply_scaler(train_df, scaler)
-        cal_scaled = apply_scaler(cal_df, scaler) if len(cal_df) > 0 else create_empty_feature_frame(feature_cols)
-        test_benign_scaled = apply_scaler(test_benign_df, scaler) if len(test_benign_df) > 0 else create_empty_feature_frame(feature_cols)
-        test_attack_scaled = apply_scaler(attack_df, scaler) if len(attack_df) > 0 else create_empty_feature_frame(feature_cols)
+        cal_scaled = (
+            apply_scaler(cal_df, scaler)
+            if len(cal_df) > 0
+            else create_empty_feature_frame(feature_cols)
+        )
+        test_benign_scaled = (
+            apply_scaler(test_benign_df, scaler)
+            if len(test_benign_df) > 0
+            else create_empty_feature_frame(feature_cols)
+        )
+        test_attack_scaled = (
+            apply_scaler(attack_df, scaler)
+            if len(attack_df) > 0
+            else create_empty_feature_frame(feature_cols)
+        )
     else:
         scaler = None
         train_scaled = create_empty_feature_frame(feature_cols)
@@ -195,8 +220,10 @@ def _build_client_partition(
     logger.info(
         "client prepared",
         client=client_id,
-        train=summary.train_count, cal=summary.cal_count,
-        test_benign=summary.test_benign_count, test_attack=summary.test_attack_count,
+        train=summary.train_count,
+        cal=summary.cal_count,
+        test_benign=summary.test_benign_count,
+        test_attack=summary.test_attack_count,
         pending=calibration_pending,
     )
     return summary
@@ -218,7 +245,9 @@ def _distribute_device_records(
         floor_counts[indices[:remaining]] += 1
 
     parts = []
-    shuffled_df = df.sample(fraction=1.0, seed=int(rng.integers(0, 1000000)), with_replacement=False)
+    shuffled_df = df.sample(
+        fraction=1.0, seed=int(rng.integers(0, 1000000)), with_replacement=False
+    )
 
     start = 0
     for count in floor_counts:
@@ -226,6 +255,7 @@ def _distribute_device_records(
         start += count
 
     return parts
+
 
 def _distribute_dataset_with_labels(
     dataset_by_device: dict[str, pl.DataFrame],
@@ -251,10 +281,14 @@ def _distribute_dataset_with_labels(
     merged_labels: list[np.ndarray] = []
     for c_idx in range(n_clients):
         merged_dfs.append(
-            pl.concat(client_dfs[c_idx]) if client_dfs[c_idx] else create_empty_feature_frame(feature_cols)
+            pl.concat(client_dfs[c_idx])
+            if client_dfs[c_idx]
+            else create_empty_feature_frame(feature_cols)
         )
         merged_labels.append(
-            np.concatenate(client_labels[c_idx]) if client_labels[c_idx] else np.array([], dtype=int)
+            np.concatenate(client_labels[c_idx])
+            if client_labels[c_idx]
+            else np.array([], dtype=int)
         )
 
     return merged_dfs, merged_labels
@@ -279,7 +313,9 @@ def _distribute_dataset(
             client_dfs[c_idx].append(parts[c_idx])
 
     return [
-        pl.concat(client_dfs[c_idx]) if client_dfs[c_idx] else create_empty_feature_frame(feature_cols)
+        pl.concat(client_dfs[c_idx])
+        if client_dfs[c_idx]
+        else create_empty_feature_frame(feature_cols)
         for c_idx in range(n_clients)
     ]
 
@@ -302,7 +338,9 @@ def partition_regime_c(
 
     logger.info(
         "Regime C partition",
-        alpha="IID" if is_iid else str(alpha), seed=seed, n_clients=n_clients,
+        alpha="IID" if is_iid else str(alpha),
+        seed=seed,
+        n_clients=n_clients,
     )
 
     benign_by_device, feature_cols = _load_benign_records(raw_nbaiot_dir)
@@ -352,7 +390,9 @@ def partition_regime_c(
     mixture_vectors = [
         np.array(
             [
-                s.device_mixture_proportions[d] if d in s.device_mixture_proportions else 0.0
+                s.device_mixture_proportions[d]
+                if d in s.device_mixture_proportions
+                else 0.0
                 for d in device_names
             ],
             dtype=np.float64,
@@ -364,7 +404,9 @@ def partition_regime_c(
 
     logger.info(
         "JS divergence computed",
-        alpha="IID" if is_iid else str(alpha), seed=seed, js_divergence=js_div,
+        alpha="IID" if is_iid else str(alpha),
+        seed=seed,
+        js_divergence=js_div,
     )
 
     js_path = run_dir / "js_divergence.json"

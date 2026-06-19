@@ -113,7 +113,7 @@ class TestAggregateFitDiskWrite:
         """Milestone without a corresponding disk_dir should not crash."""
         strategy = _make_strategy(
             milestones=(5,),
-            checkpoint_disk_dirs={}, # no dir mapped
+            checkpoint_disk_dirs={},  # no dir mapped
         )
         params = np.ones((2, 2), dtype=np.float32)
         proxy, fit_res = _make_fit_result(params)
@@ -188,4 +188,3 @@ class TestFullParticipationDiagnostics:
         assert "evaluate" in message
         assert "RuntimeError" in message
         assert "client process died" in message
-

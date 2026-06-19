@@ -51,7 +51,9 @@ class TestAuditWritesJson:
 class TestAuditSummaryCounts:
     def test_audit_summary_counts(self, tmp_path: Path) -> None:
         results = _make_partition_results(n_clients=4, cal_count=150)
-        audit = audit_partitions(results, regime=Regime.B, output_dir=tmp_path, n_min=100)
+        audit = audit_partitions(
+            results, regime=Regime.B, output_dir=tmp_path, n_min=100
+        )
 
         assert audit.summary.total_benign_train == sum(
             c.benign_train_count for c in audit.clients.values()
@@ -71,7 +73,9 @@ class TestAuditFlagsCalibrationPending:
     def test_audit_flags_calibration_pending(self, tmp_path: Path) -> None:
         results = _make_partition_results(n_clients=2, cal_count=50)
         # cal_count=50 and 51 — both below default n_min=100
-        audit = audit_partitions(results, regime=Regime.A, output_dir=tmp_path, n_min=100)
+        audit = audit_partitions(
+            results, regime=Regime.A, output_dir=tmp_path, n_min=100
+        )
 
         for client_info in audit.clients.values():
             assert client_info.calibration_pending is True
@@ -83,7 +87,9 @@ class TestAuditFlagsCalibrationPending:
 class TestAuditAllAboveNMin:
     def test_audit_all_above_n_min(self, tmp_path: Path) -> None:
         results = _make_partition_results(n_clients=3, cal_count=200)
-        audit = audit_partitions(results, regime=Regime.A, output_dir=tmp_path, n_min=100)
+        audit = audit_partitions(
+            results, regime=Regime.A, output_dir=tmp_path, n_min=100
+        )
 
         assert audit.summary.all_above_n_min is True
         assert audit.summary.calibration_pending_count == 0
@@ -92,7 +98,9 @@ class TestAuditAllAboveNMin:
 class TestAuditRequiredFields:
     def test_audit_includes_all_required_fields(self, tmp_path: Path) -> None:
         results = _make_partition_results(n_clients=2, cal_count=300)
-        audit = audit_partitions(results, regime=Regime.C, output_dir=tmp_path, n_min=100)
+        audit = audit_partitions(
+            results, regime=Regime.C, output_dir=tmp_path, n_min=100
+        )
 
         for client_id, client_info in audit.clients.items():
             missing = REQUIRED_CLIENT_FIELDS - {

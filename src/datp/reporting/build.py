@@ -144,7 +144,12 @@ def _client_records_from_payload(
         confusion = row[PayloadKey.CONFUSION_MATRIX]
         missing = [
             key
-            for key in (ConfusionKey.TP, ConfusionKey.FP, ConfusionKey.TN, ConfusionKey.FN)
+            for key in (
+                ConfusionKey.TP,
+                ConfusionKey.FP,
+                ConfusionKey.TN,
+                ConfusionKey.FN,
+            )
             if key not in confusion
         ]
         if missing:
@@ -180,7 +185,9 @@ def _client_records_from_payload(
                     calibration_pending=cal_pending,
                     strategy=Baseline(payload[PayloadKey.BASELINE]),
                 ),
-                evaluation_incomplete=bool(row.get(PayloadKey.EVALUATION_INCOMPLETE, False)),
+                evaluation_incomplete=bool(
+                    row.get(PayloadKey.EVALUATION_INCOMPLETE, False)
+                ),
             )
         )
     return tuple(records)
@@ -214,7 +221,9 @@ def _evaluation_from_payload(
     payload: dict[str, Any], metric_tol: float
 ) -> EvaluationResult:
     clients = _client_records_from_payload(payload)
-    eligible_ids = tuple(str(client_id) for client_id in payload[PayloadKey.ELIGIBLE_IDS])
+    eligible_ids = tuple(
+        str(client_id) for client_id in payload[PayloadKey.ELIGIBLE_IDS]
+    )
     pending_ids = tuple(str(client_id) for client_id in payload[PayloadKey.PENDING_IDS])
     incomplete_ids = tuple(
         str(client_id) for client_id in payload[PayloadKey.EVAL_INCOMPLETE_IDS]
@@ -229,18 +238,32 @@ def _evaluation_from_payload(
         pending_ids=pending_ids,
         incomplete_ids=incomplete_ids,
     )
-    _assert_metric_matches(payload, PayloadKey.COVERAGE_RATIO, result.coverage_ratio, metric_tol)
+    _assert_metric_matches(
+        payload, PayloadKey.COVERAGE_RATIO, result.coverage_ratio, metric_tol
+    )
     _assert_metric_matches(payload, MetricName.CV_FPR.value, result.cv_fpr, metric_tol)
-    _assert_metric_matches(payload, MetricName.MEAN_FPR.value, result.mean_fpr, metric_tol)
-    _assert_metric_matches(payload, MetricName.STD_FPR.value, result.std_fpr, metric_tol)
+    _assert_metric_matches(
+        payload, MetricName.MEAN_FPR.value, result.mean_fpr, metric_tol
+    )
+    _assert_metric_matches(
+        payload, MetricName.STD_FPR.value, result.std_fpr, metric_tol
+    )
     _assert_metric_matches(payload, MetricName.CV_TPR.value, result.cv_tpr, metric_tol)
-    _assert_metric_matches(payload, MetricName.IQR_FPR.value, result.iqr_fpr, metric_tol)
-    _assert_metric_matches(payload, MetricName.IQR_TPR.value, result.iqr_tpr, metric_tol)
+    _assert_metric_matches(
+        payload, MetricName.IQR_FPR.value, result.iqr_fpr, metric_tol
+    )
+    _assert_metric_matches(
+        payload, MetricName.IQR_TPR.value, result.iqr_tpr, metric_tol
+    )
     _assert_metric_matches(
         payload, MetricName.WORST_CLIENT_FPR.value, result.worst_client_fpr, metric_tol
     )
-    _assert_metric_matches(payload, MetricName.WORST_BA.value, result.worst_ba, metric_tol)
-    _assert_metric_matches(payload, MetricName.P10_MACRO_F1.value, result.p10_macro_f1, metric_tol)
+    _assert_metric_matches(
+        payload, MetricName.WORST_BA.value, result.worst_ba, metric_tol
+    )
+    _assert_metric_matches(
+        payload, MetricName.P10_MACRO_F1.value, result.p10_macro_f1, metric_tol
+    )
     if int(payload[PayloadKey.ELIGIBLE_COUNT]) != result.eligible_count:
         raise ValueError(
             f"[reporting] Eligibility count mismatch. Expected: {result.eligible_count}. Got: {payload[PayloadKey.ELIGIBLE_COUNT]}."
@@ -562,15 +585,17 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         )
         b1_b2 = _paired_deltas(results, Baseline.B1, Baseline.B2)
         b1_b4 = _paired_deltas(results, Baseline.B1, Baseline.B4)
-        b1_fpr, b2_fpr = _pooled_intersection_fprs(
-            results, Baseline.B1, Baseline.B2
-        )
+        b1_fpr, b2_fpr = _pooled_intersection_fprs(results, Baseline.B1, Baseline.B2)
         wilcoxon = wilcoxon_test(b1_fpr, b2_fpr)
         regime_c_p_values.append(wilcoxon.p_value)
         cliff = cliffs_delta(b1_fpr, b2_fpr)
         payload[StatsField.REGIME_C][alpha] = {
-            ComparisonLabel.B1_VS_B2.value: _bootstrap_payload(b1_b2, n_bootstrap, ci, bootstrap_seed),
-            ComparisonLabel.B1_VS_B4.value: _bootstrap_payload(b1_b4, n_bootstrap, ci, bootstrap_seed),
+            ComparisonLabel.B1_VS_B2.value: _bootstrap_payload(
+                b1_b2, n_bootstrap, ci, bootstrap_seed
+            ),
+            ComparisonLabel.B1_VS_B4.value: _bootstrap_payload(
+                b1_b4, n_bootstrap, ci, bootstrap_seed
+            ),
             StatsField.PAIRED_CLIENT_FPR_POLICY: "eligible-client intersection within each seed, pooled across seeds",
             StatsField.WILCOXON_B1_VS_B2: dataclasses.asdict(wilcoxon),
             StatsField.CLIFFS_DELTA_B1_VS_B2: dataclasses.asdict(cliff),
@@ -590,7 +615,9 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         metric_tol=metric_tol,
     )
 
-    json_path = write_json_atomic(analysis_dir / ArtifactFile.BOOTSTRAP_CIS_JSON, payload)
+    json_path = write_json_atomic(
+        analysis_dir / ArtifactFile.BOOTSTRAP_CIS_JSON, payload
+    )
     csv_path = analysis_dir / ArtifactFile.BOOTSTRAP_CIS_CSV
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -627,7 +654,10 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
                     ]
                 )
         for alpha, stats_by_comparison in payload[StatsField.REGIME_C].items():
-            for comparison in (ComparisonLabel.B1_VS_B2.value, ComparisonLabel.B1_VS_B4.value):
+            for comparison in (
+                ComparisonLabel.B1_VS_B2.value,
+                ComparisonLabel.B1_VS_B4.value,
+            ):
                 stats = stats_by_comparison[comparison]
                 writer.writerow(
                     [
@@ -769,45 +799,59 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         _write_figure_data(
             figures_dir,
             FigureName.FIGURE_2.value,
-            dict[str, Any]({
-                SidecarField.FIGURE: FigureName.FIGURE_2.value,
-                SidecarField.TITLE: "Calibration-error ECDF for three representative N-BaIoT clients with B1 client-averaged threshold — representative seed, descriptive only",
-                SidecarField.DATASET: DatasetID.NBAIOT.value,
-                SidecarField.REGIME: Regime.A.value,
-                SidecarField.SEED: rep_seed,
-                SidecarField.SEEDS: [rep_seed],
-                SidecarField.SOURCE_METRICS_FILES: [
-                    str(_result_path(base_dir, Regime.A, Baseline.B1, rep_seed))
-                ],
-                SidecarField.SOURCE_SCORE_MANIFESTS: [
-                    str(
-                        ArtifactLayout(base_dir=base_dir, regime=Regime.A)
-                        .score_cell(
-                            TrainingCellId(
-                                regime=Regime.A, seed=rep_seed, alpha=None
+            dict[str, Any](
+                {
+                    SidecarField.FIGURE: FigureName.FIGURE_2.value,
+                    SidecarField.TITLE: "Calibration-error ECDF for three representative N-BaIoT clients with B1 client-averaged threshold — representative seed, descriptive only",
+                    SidecarField.DATASET: DatasetID.NBAIOT.value,
+                    SidecarField.REGIME: Regime.A.value,
+                    SidecarField.SEED: rep_seed,
+                    SidecarField.SEEDS: [rep_seed],
+                    SidecarField.SOURCE_METRICS_FILES: [
+                        str(_result_path(base_dir, Regime.A, Baseline.B1, rep_seed))
+                    ],
+                    SidecarField.SOURCE_SCORE_MANIFESTS: [
+                        str(
+                            ArtifactLayout(base_dir=base_dir, regime=Regime.A)
+                            .score_cell(
+                                TrainingCellId(
+                                    regime=Regime.A, seed=rep_seed, alpha=None
+                                )
                             )
+                            .manifest_path
                         )
-                        .manifest_path
-                    )
-                ],
-                SidecarField.RUN_IDS: [f"{Regime.A.value}_b1_seed{rep_seed}"],
-                SidecarField.ALPHAS: [],
-                SidecarField.ELIGIBLE_COUNTS: {Baseline.B1.value: seed0_b1.eligible_count},
-                SidecarField.CLIENT_COUNTS: {Baseline.B1.value: seed0_b1.client_count},
-                SidecarField.COVERAGE_RATIOS: {Baseline.B1.value: seed0_b1.coverage_ratio},
-                SidecarField.METRIC_NAMES: [SCORE_COLUMN, PayloadKey.THRESHOLD_VALUE],
-                SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
-                SidecarField.SEED_SCOPE: SeedScope.REPRESENTATIVE_SEED.value,
-                SidecarField.NOT_CONFIRMATORY_WARNING: NOT_CONFIRMATORY_WARNING,
-                SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
-                SidecarField.BASELINES: [Baseline.B1.value],
-                SidecarField.BASELINE_ORDER: [Baseline.B1.value],
-                SidecarField.ELIGIBILITY_POLICY: f"selected eligible clients from B1 seed {rep_seed}",
-                SidecarField.AXIS_LABELS: {"x": "Reconstruction Error", "y": "Density"},
-                SidecarField.TAU_GLOBAL: tau_global,
-                SidecarField.CLIENT_IDS: representative,
-                SidecarField.MAX_POINTS_PER_CLIENT: figure2_max_points,
-            }),
+                    ],
+                    SidecarField.RUN_IDS: [f"{Regime.A.value}_b1_seed{rep_seed}"],
+                    SidecarField.ALPHAS: [],
+                    SidecarField.ELIGIBLE_COUNTS: {
+                        Baseline.B1.value: seed0_b1.eligible_count
+                    },
+                    SidecarField.CLIENT_COUNTS: {
+                        Baseline.B1.value: seed0_b1.client_count
+                    },
+                    SidecarField.COVERAGE_RATIOS: {
+                        Baseline.B1.value: seed0_b1.coverage_ratio
+                    },
+                    SidecarField.METRIC_NAMES: [
+                        SCORE_COLUMN,
+                        PayloadKey.THRESHOLD_VALUE,
+                    ],
+                    SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
+                    SidecarField.SEED_SCOPE: SeedScope.REPRESENTATIVE_SEED.value,
+                    SidecarField.NOT_CONFIRMATORY_WARNING: NOT_CONFIRMATORY_WARNING,
+                    SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
+                    SidecarField.BASELINES: [Baseline.B1.value],
+                    SidecarField.BASELINE_ORDER: [Baseline.B1.value],
+                    SidecarField.ELIGIBILITY_POLICY: f"selected eligible clients from B1 seed {rep_seed}",
+                    SidecarField.AXIS_LABELS: {
+                        "x": "Reconstruction Error",
+                        "y": "Density",
+                    },
+                    SidecarField.TAU_GLOBAL: tau_global,
+                    SidecarField.CLIENT_IDS: representative,
+                    SidecarField.MAX_POINTS_PER_CLIENT: figure2_max_points,
+                }
+            ),
         )
     )
     fig2_png = generate_figure2(
@@ -823,64 +867,77 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         _write_figure_data(
             figures_dir,
             FigureName.FIGURE_3.value,
-            dict[str, Any]({
-                SidecarField.FIGURE: FigureName.FIGURE_3.value,
-                SidecarField.TITLE: "Per-client FPR distribution, Regime A",
-                SidecarField.DATASET: DatasetID.NBAIOT.value,
-                SidecarField.REGIME: Regime.A.value,
-                SidecarField.SOURCE_METRICS_FILES: [
-                    str(_result_path(base_dir, Regime.A, Baseline(b), seed))
-                    for b in (Baseline.B1.value, Baseline.B2.value, Baseline.B4.value)
-                    for seed in seeds
-                ],
-                SidecarField.RUN_IDS: [
-                    f"{Regime.A.value}_{b}_seed{seed}"
-                    for b in (Baseline.B1.value, Baseline.B2.value, Baseline.B4.value)
-                    for seed in seeds
-                ],
-                SidecarField.SEEDS: list(seeds),
-                SidecarField.ALPHAS: [],
-                SidecarField.ELIGIBLE_COUNTS: {
-                    b.value: [r.eligible_count for r in regime_a[b]]
-                    for b in (Baseline.B1, Baseline.B2, Baseline.B4)
-                },
-                SidecarField.CLIENT_COUNTS: {
-                    b.value: [r.client_count for r in regime_a[b]]
-                    for b in (Baseline.B1, Baseline.B2, Baseline.B4)
-                },
-                SidecarField.COVERAGE_RATIOS: {
-                    b.value: [r.coverage_ratio for r in regime_a[b]]
-                    for b in (Baseline.B1, Baseline.B2, Baseline.B4)
-                },
-                SidecarField.METRIC_NAMES: [MetricName.FPR.value, "cv_fpr_delta_b1_b2"],
-                SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE_WITH_CONFIRMATORY_SIDECAR_DELTA.value,
-                SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
-                SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
-                SidecarField.BASELINES: [Baseline.B1.value, Baseline.B2.value, Baseline.B4.value],
-                SidecarField.PAIRED_SEED_CV_FPR_DELTA: [
-                    float(x)
-                    for x in _paired_deltas(
-                        regime_a, Baseline.B1, Baseline.B2
-                    )
-                ],
-                SidecarField.SEED_AGGREGATION_POLICY: "eligible-client FPR values pooled across configured seeds after intersection",
-                SidecarField.BASELINE_ORDER: [
-                    Baseline.B1.value,
-                    Baseline.B2.value,
-                    Baseline.B4.value,
-                ],
-                SidecarField.ELIGIBILITY_POLICY: "eligible-client intersection within each seed",
-                SidecarField.AXIS_LABELS: {"x": "Baseline", "y": "FPR"},
-                SidecarField.VALUES: {
-                    baseline: [[float(x) for x in arr] for arr in arrays]
-                    for baseline, arrays in fpr_by_baseline.items()
-                },
-            }),
+            dict[str, Any](
+                {
+                    SidecarField.FIGURE: FigureName.FIGURE_3.value,
+                    SidecarField.TITLE: "Per-client FPR distribution, Regime A",
+                    SidecarField.DATASET: DatasetID.NBAIOT.value,
+                    SidecarField.REGIME: Regime.A.value,
+                    SidecarField.SOURCE_METRICS_FILES: [
+                        str(_result_path(base_dir, Regime.A, Baseline(b), seed))
+                        for b in (
+                            Baseline.B1.value,
+                            Baseline.B2.value,
+                            Baseline.B4.value,
+                        )
+                        for seed in seeds
+                    ],
+                    SidecarField.RUN_IDS: [
+                        f"{Regime.A.value}_{b}_seed{seed}"
+                        for b in (
+                            Baseline.B1.value,
+                            Baseline.B2.value,
+                            Baseline.B4.value,
+                        )
+                        for seed in seeds
+                    ],
+                    SidecarField.SEEDS: list(seeds),
+                    SidecarField.ALPHAS: [],
+                    SidecarField.ELIGIBLE_COUNTS: {
+                        b.value: [r.eligible_count for r in regime_a[b]]
+                        for b in (Baseline.B1, Baseline.B2, Baseline.B4)
+                    },
+                    SidecarField.CLIENT_COUNTS: {
+                        b.value: [r.client_count for r in regime_a[b]]
+                        for b in (Baseline.B1, Baseline.B2, Baseline.B4)
+                    },
+                    SidecarField.COVERAGE_RATIOS: {
+                        b.value: [r.coverage_ratio for r in regime_a[b]]
+                        for b in (Baseline.B1, Baseline.B2, Baseline.B4)
+                    },
+                    SidecarField.METRIC_NAMES: [
+                        MetricName.FPR.value,
+                        "cv_fpr_delta_b1_b2",
+                    ],
+                    SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE_WITH_CONFIRMATORY_SIDECAR_DELTA.value,
+                    SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
+                    SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
+                    SidecarField.BASELINES: [
+                        Baseline.B1.value,
+                        Baseline.B2.value,
+                        Baseline.B4.value,
+                    ],
+                    SidecarField.PAIRED_SEED_CV_FPR_DELTA: [
+                        float(x)
+                        for x in _paired_deltas(regime_a, Baseline.B1, Baseline.B2)
+                    ],
+                    SidecarField.SEED_AGGREGATION_POLICY: "eligible-client FPR values pooled across configured seeds after intersection",
+                    SidecarField.BASELINE_ORDER: [
+                        Baseline.B1.value,
+                        Baseline.B2.value,
+                        Baseline.B4.value,
+                    ],
+                    SidecarField.ELIGIBILITY_POLICY: "eligible-client intersection within each seed",
+                    SidecarField.AXIS_LABELS: {"x": "Baseline", "y": "FPR"},
+                    SidecarField.VALUES: {
+                        baseline: [[float(x) for x in arr] for arr in arrays]
+                        for baseline, arrays in fpr_by_baseline.items()
+                    },
+                }
+            ),
         )
     )
-    fig3_png = generate_figure3(
-        fpr_by_baseline, figures_dir, style=style
-    )
+    fig3_png = generate_figure3(fpr_by_baseline, figures_dir, style=style)
     paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_3.value, fig3_png))
 
     cv_fpr_by_baseline: dict[Baseline, dict[str, list[float]]] = {}
@@ -903,63 +960,65 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         _write_figure_data(
             figures_dir,
             FigureName.FIGURE_4.value,
-            dict[str, Any]({
-                SidecarField.FIGURE: FigureName.FIGURE_4.value,
-                SidecarField.TITLE: "CV(FPR) vs Dirichlet alpha, Regime C",
-                SidecarField.DATASET: DatasetID.NBAIOT.value,
-                SidecarField.REGIME: Regime.C.value,
-                SidecarField.SOURCE_METRICS_FILES: [
-                    str(_result_path(base_dir, Regime.C, Baseline(b), seed, alpha))
-                    for b in regime_c_baselines
-                    for alpha in regime_c_alphas
-                    for seed in seeds
-                ],
-                SidecarField.RUN_IDS: [
-                    f"{Regime.C.value}_{b}_seed{seed}_alpha{alpha}"
-                    for b in regime_c_baselines
-                    for alpha in regime_c_alphas
-                    for seed in seeds
-                ],
-                SidecarField.SEEDS: list(seeds),
-                SidecarField.ALPHAS: list(regime_c_alphas),
-                SidecarField.ELIGIBLE_COUNTS: {
-                    b: {
-                        a: [r.eligible_count for r in regime_c_loaded[b][a]]
-                        for a in regime_c_alphas
-                    }
-                    for b in regime_c_baselines
-                },
-                SidecarField.CLIENT_COUNTS: {
-                    b: {
-                        a: [r.client_count for r in regime_c_loaded[b][a]]
-                        for a in regime_c_alphas
-                    }
-                    for b in regime_c_baselines
-                },
-                SidecarField.COVERAGE_RATIOS: {
-                    b: {
-                        a: [r.coverage_ratio for r in regime_c_loaded[b][a]]
-                        for a in regime_c_alphas
-                    }
-                    for b in regime_c_baselines
-                },
-                SidecarField.METRIC_NAMES: [MetricName.CV_FPR.value],
-                SidecarField.EVIDENCE_ROLE: EvidenceRole.SECONDARY.value,
-                SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
-                SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
-                SidecarField.BASELINES: list(regime_c_baselines),
-                SidecarField.SEED_AGGREGATION_POLICY: "mean with one-standard-deviation band across configured seeds",
-                SidecarField.BASELINE_ORDER: list(regime_c_baselines),
-                SidecarField.ELIGIBILITY_POLICY: "eligible clients only per result row",
-                SidecarField.AXIS_LABELS: {"x": "Dirichlet alpha", "y": "CV(FPR)"},
-                SidecarField.VALUES: {
-                    baseline: {
-                        str(alpha): [float(x) for x in values]
-                        for alpha, values in alpha_map.items()
-                    }
-                    for baseline, alpha_map in cv_fpr_by_baseline.items()
-                },
-            }),
+            dict[str, Any](
+                {
+                    SidecarField.FIGURE: FigureName.FIGURE_4.value,
+                    SidecarField.TITLE: "CV(FPR) vs Dirichlet alpha, Regime C",
+                    SidecarField.DATASET: DatasetID.NBAIOT.value,
+                    SidecarField.REGIME: Regime.C.value,
+                    SidecarField.SOURCE_METRICS_FILES: [
+                        str(_result_path(base_dir, Regime.C, Baseline(b), seed, alpha))
+                        for b in regime_c_baselines
+                        for alpha in regime_c_alphas
+                        for seed in seeds
+                    ],
+                    SidecarField.RUN_IDS: [
+                        f"{Regime.C.value}_{b}_seed{seed}_alpha{alpha}"
+                        for b in regime_c_baselines
+                        for alpha in regime_c_alphas
+                        for seed in seeds
+                    ],
+                    SidecarField.SEEDS: list(seeds),
+                    SidecarField.ALPHAS: list(regime_c_alphas),
+                    SidecarField.ELIGIBLE_COUNTS: {
+                        b: {
+                            a: [r.eligible_count for r in regime_c_loaded[b][a]]
+                            for a in regime_c_alphas
+                        }
+                        for b in regime_c_baselines
+                    },
+                    SidecarField.CLIENT_COUNTS: {
+                        b: {
+                            a: [r.client_count for r in regime_c_loaded[b][a]]
+                            for a in regime_c_alphas
+                        }
+                        for b in regime_c_baselines
+                    },
+                    SidecarField.COVERAGE_RATIOS: {
+                        b: {
+                            a: [r.coverage_ratio for r in regime_c_loaded[b][a]]
+                            for a in regime_c_alphas
+                        }
+                        for b in regime_c_baselines
+                    },
+                    SidecarField.METRIC_NAMES: [MetricName.CV_FPR.value],
+                    SidecarField.EVIDENCE_ROLE: EvidenceRole.SECONDARY.value,
+                    SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
+                    SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
+                    SidecarField.BASELINES: list(regime_c_baselines),
+                    SidecarField.SEED_AGGREGATION_POLICY: "mean with one-standard-deviation band across configured seeds",
+                    SidecarField.BASELINE_ORDER: list(regime_c_baselines),
+                    SidecarField.ELIGIBILITY_POLICY: "eligible clients only per result row",
+                    SidecarField.AXIS_LABELS: {"x": "Dirichlet alpha", "y": "CV(FPR)"},
+                    SidecarField.VALUES: {
+                        baseline: {
+                            str(alpha): [float(x) for x in values]
+                            for alpha, values in alpha_map.items()
+                        }
+                        for baseline, alpha_map in cv_fpr_by_baseline.items()
+                    },
+                }
+            ),
         )
     )
     fig4_png = generate_figure4(
@@ -1027,7 +1086,11 @@ def validate_results(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         {
             ValidationField.STATUS: AuditStatus.PASS.value,
             ValidationField.SOURCE: "canonical per-client confusion-count reconstruction",
-            ValidationField.VALIDATED_REGIMES: [Regime.A.value, Regime.B.value, Regime.C.value],
+            ValidationField.VALIDATED_REGIMES: [
+                Regime.A.value,
+                Regime.B.value,
+                Regime.C.value,
+            ],
             ValidationField.SEEDS: list(seeds),
             ValidationField.REGIME_C_ALPHAS: list(regime_c_alphas),
         },
@@ -1094,21 +1157,22 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
             AuditField.GENERATED_FIGURES: [
                 str(path)
                 for path in paths
-                if path.suffix in {".pdf", ".png", ".json"} and ArtifactDir.FIGURES in path.name
+                if path.suffix in {".pdf", ".png", ".json"}
+                and ArtifactDir.FIGURES in path.name
             ],
             AuditField.SOURCE_METRICS_FILES: sorted(_REPORTING_SOURCES),
             AuditField.SOURCE_SCORE_MANIFESTS: sorted(
                 str(
                     ArtifactLayout(base_dir=base_dir, regime=Regime.A)
-                    .score_cell(
-                        TrainingCellId(regime=Regime.A, seed=seed, alpha=None)
-                    )
+                    .score_cell(TrainingCellId(regime=Regime.A, seed=seed, alpha=None))
                     .manifest_path
                 )
                 for seed in cfg.experiment.seeds
             ),
             AuditField.SOURCE_RUN_IDS: sorted(_REPORTING_SOURCES),
-            AuditField.VALIDATION_RESULTS: AuditStatus.FAIL.value if failures else AuditStatus.PASS.value,
+            AuditField.VALIDATION_RESULTS: AuditStatus.FAIL.value
+            if failures
+            else AuditStatus.PASS.value,
             AuditField.RECOMPUTATION_CHECKS: "canonical confusion-matrix recomputation during load",
             AuditField.COVERAGE_CHECKS: "explicit eligible_ids/pending_ids/eval_incomplete_ids required",
             AuditField.MISSING_FIELD_CHECKS: "validate_metrics_payload",

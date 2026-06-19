@@ -22,4 +22,4 @@ class TestValidateModelOnCuda:
 
     def test_cuda_model_passes(self) -> None:
         model = make_cuda_validation_model().cuda()
-        validate_model_on_cuda(model) # Should not raise
+        validate_model_on_cuda(model)  # Should not raise

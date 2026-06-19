@@ -40,7 +40,7 @@ def _provenance(**overrides: object) -> ProvenanceRecord:
         "repository": "/repo/datp-calibration-poisoning",
     }
     defaults.update(overrides)
-    return ProvenanceRecord(**defaults) # type: ignore[arg-type]
+    return ProvenanceRecord(**defaults)  # type: ignore[arg-type]
 
 
 def _seed_model(
@@ -75,7 +75,7 @@ def _manifest(**overrides: object) -> RunManifest:
         "generated_at_utc": "2026-06-16T00:00:00Z",
     }
     defaults.update(overrides)
-    return RunManifest(**defaults) # type: ignore[arg-type]
+    return RunManifest(**defaults)  # type: ignore[arg-type]
 
 
 def _write_manifest(path: Path, manifest: RunManifest) -> None:
@@ -102,7 +102,9 @@ class TestManifestPresent:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p)
-        present = next(c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PRESENT)
+        present = next(
+            c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PRESENT
+        )
         assert present.status == AuditStatus.PASS
 
 
@@ -116,7 +118,9 @@ class TestManifestParseable:
         p = tmp_path / "manifest.json"
         p.write_text("NOT VALID JSON", encoding="utf-8")
         checks = check_provenance(p)
-        parseable = next(c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE)
+        parseable = next(
+            c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE
+        )
         assert parseable.status == AuditStatus.FAIL
 
     def test_e5_manifest_fails_parseable(self, tmp_path: Path) -> None:
@@ -127,7 +131,9 @@ class TestManifestParseable:
         p = tmp_path / "manifest.json"
         p.write_text(json.dumps(raw), encoding="utf-8")
         checks = check_provenance(p)
-        parseable = next(c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE)
+        parseable = next(
+            c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE
+        )
         assert parseable.status == AuditStatus.FAIL
         assert "E=" in parseable.detail or "Schema" in parseable.detail
 
@@ -138,7 +144,9 @@ class TestManifestParseable:
         p = tmp_path / "manifest.json"
         p.write_text(json.dumps(raw), encoding="utf-8")
         checks = check_provenance(p)
-        parseable = next(c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE)
+        parseable = next(
+            c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE
+        )
         assert parseable.status == AuditStatus.FAIL
 
 
@@ -166,7 +174,9 @@ class TestLocalEpochsE1:
         checks = check_provenance(p)
         codes = {c.code for c in checks}
         assert ProvenanceCheckCode.LOCAL_EPOCHS_E1 not in codes
-        parseable = next(c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE)
+        parseable = next(
+            c for c in checks if c.code == ProvenanceCheckCode.MANIFEST_PARSEABLE
+        )
         assert parseable.status == AuditStatus.FAIL
 
 
@@ -180,7 +190,9 @@ class TestGeneratedFlag:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p)
-        flag = next(c for c in checks if c.code == ProvenanceCheckCode.PIPELINE_GENERATED_FLAG)
+        flag = next(
+            c for c in checks if c.code == ProvenanceCheckCode.PIPELINE_GENERATED_FLAG
+        )
         assert flag.status == AuditStatus.PASS
 
     def test_false_returns_fail(self, tmp_path: Path) -> None:
@@ -190,7 +202,9 @@ class TestGeneratedFlag:
         p = tmp_path / "manifest.json"
         p.write_text(json.dumps(raw), encoding="utf-8")
         checks = check_provenance(p)
-        flag = next(c for c in checks if c.code == ProvenanceCheckCode.PIPELINE_GENERATED_FLAG)
+        flag = next(
+            c for c in checks if c.code == ProvenanceCheckCode.PIPELINE_GENERATED_FLAG
+        )
         assert flag.status == AuditStatus.FAIL
         assert "journal" in flag.detail
 
@@ -258,14 +272,18 @@ class TestArtifactPresenceNoRoot:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p, score_root=None)
-        cal = next(c for c in checks if c.code == ProvenanceCheckCode.CAL_SCORES_PRESENT)
+        cal = next(
+            c for c in checks if c.code == ProvenanceCheckCode.CAL_SCORES_PRESENT
+        )
         assert cal.status == AuditStatus.BLOCKED_PENDING_RUN
 
     def test_test_scores_blocked_when_no_root(self, tmp_path: Path) -> None:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p, score_root=None)
-        test = next(c for c in checks if c.code == ProvenanceCheckCode.TEST_SCORES_PRESENT)
+        test = next(
+            c for c in checks if c.code == ProvenanceCheckCode.TEST_SCORES_PRESENT
+        )
         assert test.status == AuditStatus.BLOCKED_PENDING_RUN
 
 
@@ -279,14 +297,18 @@ class TestArtifactPresenceWithRoot:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p, score_root=tmp_path / "scores")
-        cal = next(c for c in checks if c.code == ProvenanceCheckCode.CAL_SCORES_PRESENT)
+        cal = next(
+            c for c in checks if c.code == ProvenanceCheckCode.CAL_SCORES_PRESENT
+        )
         assert cal.status == AuditStatus.MISSING
 
     def test_test_scores_missing_when_dir_absent(self, tmp_path: Path) -> None:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p, score_root=tmp_path / "scores")
-        test = next(c for c in checks if c.code == ProvenanceCheckCode.TEST_SCORES_PRESENT)
+        test = next(
+            c for c in checks if c.code == ProvenanceCheckCode.TEST_SCORES_PRESENT
+        )
         assert test.status == AuditStatus.MISSING
 
     def test_cal_scores_pass_when_parquet_present(self, tmp_path: Path) -> None:
@@ -297,7 +319,9 @@ class TestArtifactPresenceWithRoot:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p, score_root=score_root)
-        cal = next(c for c in checks if c.code == ProvenanceCheckCode.CAL_SCORES_PRESENT)
+        cal = next(
+            c for c in checks if c.code == ProvenanceCheckCode.CAL_SCORES_PRESENT
+        )
         assert cal.status == AuditStatus.PASS
 
     def test_test_scores_pass_when_parquet_present(self, tmp_path: Path) -> None:
@@ -308,7 +332,9 @@ class TestArtifactPresenceWithRoot:
         p = tmp_path / "manifest.json"
         _write_manifest(p, _manifest())
         checks = check_provenance(p, score_root=score_root)
-        test = next(c for c in checks if c.code == ProvenanceCheckCode.TEST_SCORES_PRESENT)
+        test = next(
+            c for c in checks if c.code == ProvenanceCheckCode.TEST_SCORES_PRESENT
+        )
         assert test.status == AuditStatus.PASS
 
 

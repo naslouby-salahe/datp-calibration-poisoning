@@ -44,7 +44,9 @@ def _inject_one_victim(col, victim_idx: int = 0, fraction: float = 0.40):
     rng = make_seed_rng(
         training_seed=0, poisoning_seed=100, client_idx=victim_idx, scope_idx=0
     )
-    inj = inject_fixed_budget(clean_cal=cal, reservoir=reservoir, fraction=fraction, rng=rng)
+    inj = inject_fixed_budget(
+        clean_cal=cal, reservoir=reservoir, fraction=fraction, rng=rng
+    )
     pois_cal = {
         cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
         for cid in eligible_ids
@@ -56,14 +58,24 @@ class TestDeltaTau:
     def test_eligible_clients_covered(self) -> None:
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)
-        b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean)
+        b2 = compute_b2_pair(
+            col,
+            pois_cal,
+            THRESHOLD_QUANTILE,
+            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+        )
         dt = compute_delta_tau(col, b2)
         assert set(dt.keys()) == set(col.eligible_ids)
 
     def test_victim_has_nonzero_delta(self) -> None:
         col = _make_collection()
         pois_cal, victim_id = _inject_one_victim(col)
-        b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean)
+        b2 = compute_b2_pair(
+            col,
+            pois_cal,
+            THRESHOLD_QUANTILE,
+            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+        )
         dt = compute_delta_tau(col, b2)
         assert not math.isclose(dt[victim_id].delta_tau, 0.0, abs_tol=1e-10)
 
@@ -78,7 +90,12 @@ class TestDeltaTau:
     def test_delta_tau_rel_nonzero_for_nonzero_delta(self) -> None:
         col = _make_collection()
         pois_cal, victim_id = _inject_one_victim(col)
-        b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean)
+        b2 = compute_b2_pair(
+            col,
+            pois_cal,
+            THRESHOLD_QUANTILE,
+            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+        )
         dt = compute_delta_tau(col, b2)
         assert not math.isclose(dt[victim_id].delta_tau_rel, 0.0, abs_tol=1e-10)
 
@@ -123,6 +140,7 @@ class TestFleetFpr:
         b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
         # Set all poisoned thresholds very high to force FPR=0.
         from datp.attacks.threshold_recompute import ThresholdPair
+
         high_tau = 1e9
         high_pair = ThresholdPair(
             policy=ThresholdPolicy.B1_GLOBAL,
@@ -184,7 +202,7 @@ class TestAurocRecords:
         col = _make_collection()
         # Simulate different poisoning conditions — AUROC uses test scores only.
         r1 = compute_auroc_records(col)
-        r2 = compute_auroc_records(col) # same input → same output
+        r2 = compute_auroc_records(col)  # same input → same output
         for cid in col.eligible_ids:
             assert r1[cid].auroc is not None
             assert r2[cid].auroc is not None
@@ -213,15 +231,24 @@ class TestComputeMetrics:
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)
         b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        result = compute_metrics(MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None))
+        result = compute_metrics(
+            MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None)
+        )
         assert isinstance(result, MetricResult)
         assert result.policy == ThresholdPolicy.B1_GLOBAL
 
     def test_all_fields_populated(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean)
-        result = compute_metrics(MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=0.05))
+        b2 = compute_b2_pair(
+            col,
+            pois_cal,
+            THRESHOLD_QUANTILE,
+            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+        )
+        result = compute_metrics(
+            MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=0.05)
+        )
         assert set(result.delta_tau.keys()) == set(col.eligible_ids)
         assert set(result.auroc_records.keys()) == set(col.eligible_ids)
         assert result.mu_flag_threshold == pytest.approx(0.05)

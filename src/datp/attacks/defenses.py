@@ -19,7 +19,11 @@ from typing import assert_never
 
 import numpy as np
 
-from datp.attacks.score_containers import ClientScores, ClientScoresTuple, ScoreCollection
+from datp.attacks.score_containers import (
+    ClientScores,
+    ClientScoresTuple,
+    ScoreCollection,
+)
 from datp.attacks.enums import PoisoningDefense
 
 

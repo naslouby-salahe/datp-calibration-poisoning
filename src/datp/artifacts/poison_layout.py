@@ -65,9 +65,7 @@ class CellId:
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.fraction <= 1.0):
-            raise ValueError(
-                f"fraction {self.fraction} is outside [0.0, 1.0]"
-            )
+            raise ValueError(f"fraction {self.fraction} is outside [0.0, 1.0]")
 
 
 @dataclass(frozen=True, slots=True)

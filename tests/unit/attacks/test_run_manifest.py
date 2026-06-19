@@ -29,7 +29,7 @@ def _valid_provenance(**overrides: object) -> ProvenanceRecord:
         "repository": "/home/user/datp-calibration-poisoning",
     }
     defaults.update(overrides)
-    return ProvenanceRecord(**defaults) # type: ignore[arg-type]
+    return ProvenanceRecord(**defaults)  # type: ignore[arg-type]
 
 
 def _seed_record_model(
@@ -64,7 +64,7 @@ def _valid_manifest(**overrides: object) -> RunManifest:
         "generated_at_utc": "2026-06-16T00:00:00Z",
     }
     defaults.update(overrides)
-    return RunManifest(**defaults) # type: ignore[arg-type]
+    return RunManifest(**defaults)  # type: ignore[arg-type]
 
 
 class TestProvenanceRecord:
@@ -94,7 +94,7 @@ class TestProvenanceRecord:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            _valid_provenance(bogus=1) # type: ignore[call-arg]
+            _valid_provenance(bogus=1)  # type: ignore[call-arg]
 
 
 class TestSeedRecord:
@@ -142,8 +142,8 @@ class TestRunManifest:
     def test_frozen(self) -> None:
         m = _valid_manifest()
         with pytest.raises(ValidationError):
-            m.dataset = "other" # type: ignore[misc]
+            m.dataset = "other"  # type: ignore[misc]
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            _valid_manifest(bogus=1) # type: ignore[call-arg]
+            _valid_manifest(bogus=1)  # type: ignore[call-arg]

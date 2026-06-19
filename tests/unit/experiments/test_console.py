@@ -86,14 +86,23 @@ def test_print_summary_basic(tmp_path: Path) -> None:
 def test_print_summary_with_contingency(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
         print_summary(
-            Regime.A, 1, 0.1, 0.05, (8, 10), str(tmp_path / "out"), 12.3, contingency=ContingencyDecision.GO
+            Regime.A,
+            1,
+            0.1,
+            0.05,
+            (8, 10),
+            str(tmp_path / "out"),
+            12.3,
+            contingency=ContingencyDecision.GO,
         )
     assert mock_print.called
 
 
 def test_print_summary_with_alpha(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_summary(Regime.C, 1, 0.1, 0.05, (8, 10), str(tmp_path / "out"), 12.3, alpha=0.5)
+        print_summary(
+            Regime.C, 1, 0.1, 0.05, (8, 10), str(tmp_path / "out"), 12.3, alpha=0.5
+        )
     assert mock_print.called
 
 

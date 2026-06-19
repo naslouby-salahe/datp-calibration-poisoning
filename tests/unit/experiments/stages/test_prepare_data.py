@@ -46,9 +46,7 @@ def _patch_paths(monkeypatch, prepared_dir: Path, raw_dir: Path) -> None:
     """
     import datp.experiments.stages.prepare_data as mod
 
-    monkeypatch.setattr(
-        mod, "prepared_root_for_regime", lambda *a, **kw: prepared_dir
-    )
+    monkeypatch.setattr(mod, "prepared_root_for_regime", lambda *a, **kw: prepared_dir)
     monkeypatch.setattr(mod, "processed_root", lambda *a, **kw: prepared_dir)
     monkeypatch.setattr(mod, "raw_root", lambda *a, **kw: raw_dir)
 

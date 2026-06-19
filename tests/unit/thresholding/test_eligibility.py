@@ -45,7 +45,7 @@ def client_errors() -> dict[str, np.ndarray]:
         "client_a": _make_errors(200, seed=1),
         "client_b": _make_errors(150, seed=2),
         "client_c": _make_errors(300, seed=3),
-        "client_d": _make_errors(50, seed=4), # Calibration-Pending
+        "client_d": _make_errors(50, seed=4),  # Calibration-Pending
     }
 
 
@@ -221,12 +221,12 @@ class TestBuildThresholdResult:
             family_info=B3FamilyInfoTuple(
                 (
                     B3FamilyInfo(
-                    family_name="cameras",
-                    tau_family=0.25,
-                    eligible_count=2,
-                    members=("a", "b"),
-                    threshold_variance=0.01,
-                    singleton=False,
+                        family_name="cameras",
+                        tau_family=0.25,
+                        eligible_count=2,
+                        members=("a", "b"),
+                        threshold_variance=0.01,
+                        singleton=False,
                     ),
                 )
             )
@@ -248,10 +248,10 @@ class TestBuildThresholdResult:
             cluster_info=B4ClusterInfoTuple(
                 (
                     B4ClusterInfo(
-                    cluster_id="cluster_0", tau_cluster=0.3, members=("a",)
+                        cluster_id="cluster_0", tau_cluster=0.3, members=("a",)
                     ),
                     B4ClusterInfo(
-                    cluster_id="cluster_1", tau_cluster=0.7, members=("b",)
+                        cluster_id="cluster_1", tau_cluster=0.7, members=("b",)
                     ),
                 )
             ),

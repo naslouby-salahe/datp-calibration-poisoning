@@ -43,7 +43,7 @@ class TestTrainingCellId:
     def test_immutable(self) -> None:
         key = TrainingCellId(regime=Regime.A, seed=42, alpha=None)
         with pytest.raises((AttributeError, TypeError)):
-            key.regime = Regime.B # type: ignore[misc]
+            key.regime = Regime.B  # type: ignore[misc]
 
     def test_equality(self) -> None:
         k1 = TrainingCellId(regime=Regime.A, seed=1, alpha=0.3)
@@ -117,7 +117,7 @@ class TestBaselineRunId:
         cell = TrainingCellId(regime=Regime.A, seed=42, alpha=None)
         run = BaselineRunId(cell=cell, baseline=Baseline.B1)
         with pytest.raises((AttributeError, TypeError)):
-            run.baseline = Baseline.B2 # type: ignore[misc]
+            run.baseline = Baseline.B2  # type: ignore[misc]
 
     def test_hashable(self) -> None:
         cell = TrainingCellId(regime=Regime.A, seed=1, alpha=0.5)
@@ -185,7 +185,7 @@ class TestAlphaFromLabel:
         assert alpha_from_label(None) is None
 
     def test_iid_returns_inf(self) -> None:
-        assert math.isinf(alpha_from_label("iid")) # type: ignore[arg-type]
+        assert math.isinf(alpha_from_label("iid"))  # type: ignore[arg-type]
 
     def test_numeric_returns_float(self) -> None:
         assert alpha_from_label("0.5") == pytest.approx(0.5)
@@ -207,7 +207,7 @@ class TestParseAlphaDir:
         assert parse_alpha_dir("seed_42") is None
 
     def test_iid_returns_inf(self) -> None:
-        assert math.isinf(parse_alpha_dir(PathToken.ALPHA_IID)) # type: ignore[arg-type]
+        assert math.isinf(parse_alpha_dir(PathToken.ALPHA_IID))  # type: ignore[arg-type]
 
     def test_numeric_returns_float(self) -> None:
         assert parse_alpha_dir("alpha_0.5") == pytest.approx(0.5)
@@ -239,6 +239,7 @@ class TestMakeRunId:
 
     def test_unique_timestamps(self) -> None:
         import time
+
         id1 = make_run_id(Regime.A, seed=0)
         time.sleep(0.002)
         id2 = make_run_id(Regime.A, seed=0)

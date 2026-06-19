@@ -176,7 +176,10 @@ class TestWriteCsv:
         assert path.exists()
         df = pd.read_csv(path)
         assert list(df.columns) == ["name", "value"]
-        assert df.to_dict("records") == [{"name": "a", "value": 1}, {"name": "b", "value": 2}]
+        assert df.to_dict("records") == [
+            {"name": "a", "value": 1},
+            {"name": "b", "value": 2},
+        ]
 
     def test_atomic_rename_no_tmp_remains(self, tmp_path: Path) -> None:
         records = [_FakeRecord(name="x", value=99)]

@@ -41,7 +41,6 @@ class ScoreCellPaths:
     checkpoint_round: int | None = None
 
 
-
 @dataclass(frozen=True, slots=True)
 class BaselineRunPaths:
     """Resolved paths for a baseline evaluation run."""
@@ -136,13 +135,19 @@ class ArtifactLayout:
             checkpoint_round=checkpoint_round,
         )
 
-    def score_file(self, cell: TrainingCellId, stage: ScoringStage, client_id: str) -> Path:
+    def score_file(
+        self, cell: TrainingCellId, stage: ScoringStage, client_id: str
+    ) -> Path:
         """Return the canonical path for a client's score parquet file.
 
         Scores are shared across B1-B4 (no baseline dimension).
         Path: <score_dir>/<stage>/<client_id>.parquet
         """
-        return self.score_cell(cell).score_dir / stage / f"{client_id}{PathToken.PARQUET_EXT}"
+        return (
+            self.score_cell(cell).score_dir
+            / stage
+            / f"{client_id}{PathToken.PARQUET_EXT}"
+        )
 
     def score_file_for_round(
         self,

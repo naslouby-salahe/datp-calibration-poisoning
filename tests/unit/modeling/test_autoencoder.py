@@ -141,7 +141,6 @@ class TestBatchNormScopeGuard:
         assert len(bn) > 0
 
 
-
 class TestLossDecreases:
     def test_loss_decreases(self) -> None:
         set_seeds(42)

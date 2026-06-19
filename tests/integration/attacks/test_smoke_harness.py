@@ -94,14 +94,13 @@ _ALL_POLICIES = (
 @pytest.fixture
 def collection():
     """Standard 9-eligible + 1-pending synthetic collection (deterministic)."""
-    return collection_from_score_set(
-        make_standard_score_set(n_eligible=9, n_pending=1)
-    )
+    return collection_from_score_set(make_standard_score_set(n_eligible=9, n_pending=1))
 
 
 # ---------------------------------------------------------------------------
 # Invariant 1 — f=0 reproduces clean exactly with zero Δτ
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("policy", _ALL_POLICIES)
 def test_invariant_1_f0_reproduces_clean_zero_delta(collection, policy):
@@ -125,6 +124,7 @@ def test_invariant_1_f0_reproduces_clean_zero_delta(collection, policy):
 # ---------------------------------------------------------------------------
 # Invariant 2 — cardinality preserved after injection
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_2_cardinality_preserved(collection):
     n_before = collection.clients[_VICTIM].n_cal
@@ -153,6 +153,7 @@ def test_invariant_2_cardinality_preserved(collection):
 # Invariant 3 — clean arrays never mutated in place
 # ---------------------------------------------------------------------------
 
+
 def test_invariant_3_no_inplace_mutation(collection):
     victim_clean = collection.clients[_VICTIM].cal
     snapshot = victim_clean.copy()
@@ -173,6 +174,7 @@ def test_invariant_3_no_inplace_mutation(collection):
 # ---------------------------------------------------------------------------
 # Invariant 4 — HIGH raises, LOW lowers (direction)
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_4_high_raises_low_lowers_b2(collection):
     high = run_smoke_cell(
@@ -196,6 +198,7 @@ def test_invariant_4_high_raises_low_lowers_b2(collection):
 # ---------------------------------------------------------------------------
 # Invariant 5 — Calibration-Pending excluded; receives tau_global
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_5_pending_excluded_and_gets_tau_global(collection):
     pending_ids = collection.pending_ids
@@ -227,6 +230,7 @@ def test_invariant_5_pending_excluded_and_gets_tau_global(collection):
 # ---------------------------------------------------------------------------
 # Invariant 6 — determinism (same seeds -> identical outputs)
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_6_determinism(collection):
     out_a = inject_single_victim(
@@ -268,9 +272,7 @@ def test_invariant_6_determinism(collection):
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
-    assert cell_a.poisoned_metrics.delta_tau[
-        _VICTIM
-    ].delta_tau == pytest.approx(
+    assert cell_a.poisoned_metrics.delta_tau[_VICTIM].delta_tau == pytest.approx(
         cell_b.poisoned_metrics.delta_tau[_VICTIM].delta_tau
     )
     cv_fpr_a = cell_a.poisoned_metrics.fleet_fpr.cv_fpr
@@ -284,6 +286,7 @@ def test_invariant_6_determinism(collection):
 # Invariant 7 — B4 decomposition identity Δτ_total = Δτ_agg + Δτ_churn
 # ---------------------------------------------------------------------------
 
+
 def test_invariant_7_b4_decomposition_identity(collection):
     cell = run_smoke_cell(
         collection,
@@ -294,7 +297,7 @@ def test_invariant_7_b4_decomposition_identity(collection):
     )
     pair = cell.poisoned_pair
     assert isinstance(pair, B4ThresholdPair)
-    assert pair.decomposition # client-indexed, non-empty
+    assert pair.decomposition  # client-indexed, non-empty
     for entry in pair.decomposition.values():
         assert math.isfinite(entry.delta_tau_total)
         assert math.isfinite(entry.delta_tau_agg)
@@ -307,6 +310,7 @@ def test_invariant_7_b4_decomposition_identity(collection):
 # ---------------------------------------------------------------------------
 # Invariant 8 — two-layer stats: bootstrap on 5 seed aggregates, not 45
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
     eligible = collection.eligible_ids
@@ -325,11 +329,13 @@ def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
         )
     paired = PairedDeltas(deltas=deltas)
 
-    result = compute_inference(InferenceInput(
-        paired=paired,
-        poisoning_seeds=POISONING_SEEDS,
-        direction="raise",
-    ))
+    result = compute_inference(
+        InferenceInput(
+            paired=paired,
+            poisoning_seeds=POISONING_SEEDS,
+            direction="raise",
+        )
+    )
     # Layer 2: exactly 5 seed-level aggregates (one per poisoning seed).
     assert len(result.seed_aggregates) == len(POISONING_SEEDS) == 5
     # Bootstrap CI is computed on the 5 aggregates — NOT on 9*5 = 45 raw deltas.
@@ -343,6 +349,7 @@ def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
 # ---------------------------------------------------------------------------
 # Invariant 9 — manifest round-trips with all locks
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_9_manifest_round_trip(collection, tmp_path):
     cell = run_smoke_cell(
@@ -374,7 +381,7 @@ def test_invariant_9_manifest_round_trip(collection, tmp_path):
     assert loaded.reservoir_mode == RESERVOIR_MODE
     assert loaded.mu_flag_threshold == pytest.approx(cell.mu_flag_threshold)
     assert loaded.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
-    assert loaded.provenance.local_epochs == 1 # E=1 lock
+    assert loaded.provenance.local_epochs == 1  # E=1 lock
     # All child seeds round-trip via the recorded SeedSequence entropy.
     assert loaded.seed_record.entropy == (0, 100, 0, 0)
     assert loaded.seed_record.training_seed == 0
@@ -396,7 +403,7 @@ def test_invariant_9_manifest_requires_locked_mu_flag(tmp_path):
         poisoning_seed=100,
         client_idx=0,
         scope_idx=0,
-        mu_flag_threshold=None, # not locked
+        mu_flag_threshold=None,  # not locked
         repository="datp-calibration-poisoning",
     )
     with pytest.raises(ManifestEmissionError):
@@ -406,6 +413,7 @@ def test_invariant_9_manifest_requires_locked_mu_flag(tmp_path):
 # ---------------------------------------------------------------------------
 # Invariant 10 — AUROC invariant (test scores never modified)
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_10_auroc_invariant(collection):
     cell = run_smoke_cell(
@@ -427,6 +435,7 @@ def test_invariant_10_auroc_invariant(collection):
 # ---------------------------------------------------------------------------
 # Invariant 11 — CV(FPR) reported with coverage; no ε in denominator
 # ---------------------------------------------------------------------------
+
 
 def test_invariant_11_cv_fpr_reported_with_coverage(collection):
     cell = run_smoke_cell(
@@ -450,7 +459,7 @@ def test_invariant_11_cv_fpr_no_epsilon_returns_nan_when_mean_zero():
     clients: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
     for i in range(4):
         cal = np.maximum(rng.normal(0.05, 0.02, size=200), 0.0)
-        test_benign = np.zeros(50, dtype=np.float64) # FPR will be exactly 0
+        test_benign = np.zeros(50, dtype=np.float64)  # FPR will be exactly 0
         test_attack = np.full(50, 0.9, dtype=np.float64)
         clients[f"eligible_{i}"] = (cal, test_benign, test_attack)
     coll = build_score_collection(clients)
@@ -471,12 +480,13 @@ def test_invariant_11_cv_fpr_no_epsilon_returns_nan_when_mean_zero():
     )
     fleet = compute_fleet_fpr(coll, pair, mu_flag_threshold=None)
     assert fleet.mean_fpr == pytest.approx(0.0)
-    assert math.isnan(fleet.cv_fpr) # NOT a finite ε-stabilized value, NOT 0
+    assert math.isnan(fleet.cv_fpr)  # NOT a finite ε-stabilized value, NOT 0
 
 
 # ---------------------------------------------------------------------------
 # Roadmap invariant — RANDOM_BENIGN is a near-null negative control
 # ---------------------------------------------------------------------------
+
 
 def test_roadmap_random_benign_near_null(collection):
     cell = run_smoke_cell(
@@ -499,6 +509,7 @@ def test_roadmap_random_benign_near_null(collection):
 # ---------------------------------------------------------------------------
 # Roadmap invariant — B1 victim shift < B2 victim shift (same attack)
 # ---------------------------------------------------------------------------
+
 
 def test_roadmap_b1_shift_less_than_b2_shift(collection):
     b1 = run_smoke_cell(
@@ -525,6 +536,7 @@ def test_roadmap_b1_shift_less_than_b2_shift(collection):
 # Roadmap invariant — B4 K stays fixed at 3 under clean AND poisoned cal
 # ---------------------------------------------------------------------------
 
+
 def test_roadmap_b4_k_fixed_at_three(collection):
     clean_cal = collection.cal_dict()
     assert b4_cluster_count(clean_cal) == B4_K == 3
@@ -546,6 +558,7 @@ def test_roadmap_b4_k_fixed_at_three(collection):
 # ---------------------------------------------------------------------------
 # Roadmap invariant — outputs written to temp only
 # ---------------------------------------------------------------------------
+
 
 def test_roadmap_outputs_in_temp_only(collection, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)

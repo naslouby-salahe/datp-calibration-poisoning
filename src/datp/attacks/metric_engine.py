@@ -42,6 +42,7 @@ _IQR_P75: float = 75.0
 # Per-victim Δτ entry
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class DeltaTauEntry:
     """Per-victim threshold shift for one policy."""
@@ -59,6 +60,7 @@ class DeltaTauEntry:
 # ---------------------------------------------------------------------------
 # Fleet FPR dispersion metrics
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class FleetFprMetrics:
@@ -86,6 +88,7 @@ class FleetFprMetrics:
 # Full metric result for one (policy, poisoning-condition) pair
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class MetricResult:
     """Full metric output for one threshold-pair evaluation.
@@ -107,9 +110,8 @@ class MetricResult:
 # Helper: compute per-client FPR under a threshold dict
 # ---------------------------------------------------------------------------
 
-def _client_fpr(
-    test_benign: np.ndarray, threshold: float
-) -> float:
+
+def _client_fpr(test_benign: np.ndarray, threshold: float) -> float:
     """FPR = fraction of benign test samples with score > threshold."""
     if test_benign.size == 0:
         return math.nan
@@ -119,6 +121,7 @@ def _client_fpr(
 # ---------------------------------------------------------------------------
 # Δτ computation
 # ---------------------------------------------------------------------------
+
 
 def compute_delta_tau(
     collection: ScoreCollection,
@@ -157,6 +160,7 @@ def compute_delta_tau(
 # CV(FPR) + coverage + guards
 # ---------------------------------------------------------------------------
 
+
 def compute_fleet_fpr(
     collection: ScoreCollection,
     pair: ThresholdPairBase,
@@ -192,9 +196,7 @@ def compute_fleet_fpr(
         if n_valid > 0
         else math.nan
     )
-    max_min_gap = (
-        float(fpr_arr.max() - fpr_arr.min()) if n_valid > 0 else math.nan
-    )
+    max_min_gap = float(fpr_arr.max() - fpr_arr.min()) if n_valid > 0 else math.nan
 
     coverage = collection.coverage_ratio
     n_total = len(collection.clients)
@@ -225,6 +227,7 @@ def compute_fleet_fpr(
 # AUROC records (test scores only — invariant by construction)
 # ---------------------------------------------------------------------------
 
+
 def compute_auroc_records(
     collection: ScoreCollection,
 ) -> AurocSet:
@@ -245,6 +248,7 @@ def compute_auroc_records(
 # Convenience: mu_flag_threshold lock
 # ---------------------------------------------------------------------------
 
+
 def compute_mu_flag_threshold(mean_clean_fpr: float) -> float:
     """mu_flag_threshold = round(M_clean / 8, 2 significant figures).
 
@@ -264,6 +268,7 @@ def compute_mu_flag_threshold(mean_clean_fpr: float) -> float:
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
 
 def compute_metrics(inputs: MetricEngineInput) -> MetricResult:
     """Compute full metric result for one threshold pair.

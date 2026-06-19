@@ -123,7 +123,11 @@ class TestCheckpointProtocolCompletion:
             cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None),
             baseline=Baseline.B1,
         )
-        legacy_dir = ArtifactLayout(base_dir=tmp_path, regime=Regime.A).baseline_run(run).result_dir
+        legacy_dir = (
+            ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
+            .baseline_run(run)
+            .result_dir
+        )
         legacy_dir.mkdir(parents=True, exist_ok=True)
         (legacy_dir / "metrics.json").write_text(valid_metrics_json("b1", "a", 0))
 
@@ -173,7 +177,11 @@ class TestRunSweep:
             cell=TrainingCellId(regime=regime, seed=seed, alpha=None),
             baseline=baseline,
         )
-        rp = ArtifactLayout(base_dir=tmp_path, regime=regime).baseline_run(run).result_dir
+        rp = (
+            ArtifactLayout(base_dir=tmp_path, regime=regime)
+            .baseline_run(run)
+            .result_dir
+        )
         rp.mkdir(parents=True, exist_ok=True)
         (rp / "metrics.json").write_text(valid_metrics_json("b1", "a", 0))
 

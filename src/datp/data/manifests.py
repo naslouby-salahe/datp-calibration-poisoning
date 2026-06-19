@@ -31,7 +31,12 @@ class ManifestMetadata(BaseModel):
     def check_client_count(self) -> "ManifestMetadata":
         if self.n_devices is None and self.n_clients is None:
             raise ValueError(
-                fmt(MANIFEST_MODULE, "metadata missing client count", "n_devices or n_clients", "None")
+                fmt(
+                    MANIFEST_MODULE,
+                    "metadata missing client count",
+                    "n_devices or n_clients",
+                    "None",
+                )
             )
         return self
 
@@ -47,7 +52,12 @@ class PartitionManifest(BaseModel):
     def validate_hashes(self) -> "PartitionManifest":
         if not self.file_hashes:
             raise ValueError(
-                fmt(MANIFEST_MODULE, "file_hashes is empty", "at least 1 hash", "0 entries")
+                fmt(
+                    MANIFEST_MODULE,
+                    "file_hashes is empty",
+                    "at least 1 hash",
+                    "0 entries",
+                )
             )
         return self
 
@@ -78,7 +88,9 @@ class PartitionManifest(BaseModel):
         for rel_path_str, expected_hash in self.file_hashes.items():
             fpath = raw_base_dir / rel_path_str
             if not fpath.exists():
-                raise RuntimeError(fmt_missing(MANIFEST_MODULE, f"Raw file {rel_path_str}"))
+                raise RuntimeError(
+                    fmt_missing(MANIFEST_MODULE, f"Raw file {rel_path_str}")
+                )
             actual_hash = hash_file(fpath)
             if actual_hash != expected_hash:
                 raise RuntimeError(
@@ -89,7 +101,9 @@ class PartitionManifest(BaseModel):
                         actual_hash,
                     )
                 )
-        logger.info("partition manifest hash verification passed", n_files=len(self.file_hashes))
+        logger.info(
+            "partition manifest hash verification passed", n_files=len(self.file_hashes)
+        )
 
 
 def create_manifest(
@@ -105,7 +119,9 @@ def create_manifest(
         dataset=dataset,
         created=utc_timestamp(),
         file_hashes=file_hashes,
-        metadata=metadata if isinstance(metadata, ManifestMetadata) else ManifestMetadata.model_validate(metadata),
+        metadata=metadata
+        if isinstance(metadata, ManifestMetadata)
+        else ManifestMetadata.model_validate(metadata),
     )
     manifest.write(manifest_path)
     return manifest

@@ -131,7 +131,10 @@ class TestDeterminism:
         for cid in col.eligible_ids:
             assert p1.thresholds_clean[cid] == p2.thresholds_clean[cid]
             assert p1.thresholds_pois[cid] == p2.thresholds_pois[cid]
-            assert p1.decomposition[cid].delta_tau_total == p2.decomposition[cid].delta_tau_total
+            assert (
+                p1.decomposition[cid].delta_tau_total
+                == p2.decomposition[cid].delta_tau_total
+            )
 
 
 class TestNoClientLabelComparison:

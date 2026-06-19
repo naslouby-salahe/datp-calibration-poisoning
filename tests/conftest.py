@@ -47,7 +47,7 @@ def _ray_teardown_after_each_test():
     try:
         import datp.core.tracking as _tracking
 
-        _tracking._TRACKING_ENABLED = False # noqa: SLF001
+        _tracking._TRACKING_ENABLED = False  # noqa: SLF001
     except Exception:
         pass
     _release_heap()

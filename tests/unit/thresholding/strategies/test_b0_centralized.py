@@ -46,17 +46,22 @@ def _make_synthetic_client(
     cols = [f"f{i}" for i in range(n_features)]
 
     def _benign(n: int) -> pd.DataFrame:
-        return pd.DataFrame(rng.normal(0.0, 0.1, size=(n, n_features)), columns=cols) # type: ignore[call-arg]
+        return pd.DataFrame(rng.normal(0.0, 0.1, size=(n, n_features)), columns=cols)  # type: ignore[call-arg]
 
     def _attack(n: int) -> pd.DataFrame:
         return pd.DataFrame(
-            rng.normal(attack_shift, 0.1, size=(n, n_features)), columns=cols # type: ignore[call-arg]
+            rng.normal(attack_shift, 0.1, size=(n, n_features)),
+            columns=cols,  # type: ignore[call-arg]
         )
 
     _benign(n_train).to_parquet(client_dir / SPLIT_FILENAME[Split.TRAIN], index=False)
     _benign(n_cal).to_parquet(client_dir / SPLIT_FILENAME[Split.CAL], index=False)
-    _benign(n_test_benign).to_parquet(client_dir / SPLIT_FILENAME[Split.TEST_BENIGN], index=False)
-    _attack(n_test_attack).to_parquet(client_dir / SPLIT_FILENAME[Split.TEST_ATTACK], index=False)
+    _benign(n_test_benign).to_parquet(
+        client_dir / SPLIT_FILENAME[Split.TEST_BENIGN], index=False
+    )
+    _attack(n_test_attack).to_parquet(
+        client_dir / SPLIT_FILENAME[Split.TEST_ATTACK], index=False
+    )
 
 
 def _make_prepared_dir(
@@ -306,7 +311,7 @@ class TestB0SeparableData:
             tmp_path / "prepared",
             n_clients=2,
             n_features=n_features,
-            attack_shift=10.0, # very large shift
+            attack_shift=10.0,  # very large shift
         )
         output = tmp_path / "output"
 
@@ -446,8 +451,12 @@ class TestB0CalibrationPending:
         prepared = tmp_path / "prepared"
         rng = np.random.default_rng(42)
 
-        _make_synthetic_client(prepared / "client_ok", n_cal=200, n_features=n_features, rng=rng)
-        _make_synthetic_client(prepared / "client_small", n_cal=50, n_features=n_features, rng=rng)
+        _make_synthetic_client(
+            prepared / "client_ok", n_cal=200, n_features=n_features, rng=rng
+        )
+        _make_synthetic_client(
+            prepared / "client_small", n_cal=50, n_features=n_features, rng=rng
+        )
 
         result = _run_b0(
             prepared_dir=prepared,
@@ -662,4 +671,6 @@ class TestB0Auditability:
 
         out = _run_minimal_b0(tmp_path)
         m = json.loads((out / "metrics.json").read_text())
-        assert m["provenance"]["score_artifact_identity"] == NOT_APPLICABLE_B0_DIRECT_EVAL
+        assert (
+            m["provenance"]["score_artifact_identity"] == NOT_APPLICABLE_B0_DIRECT_EVAL
+        )

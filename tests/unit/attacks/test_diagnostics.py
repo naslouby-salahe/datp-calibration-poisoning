@@ -38,7 +38,9 @@ def _make_setup(fraction: float = 0.40):
         clean_cal=cal, source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN, tail_mass=0.10
     )
     rng = make_seed_rng(training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0)
-    inj = inject_fixed_budget(clean_cal=cal, reservoir=reservoir, fraction=fraction, rng=rng)
+    inj = inject_fixed_budget(
+        clean_cal=cal, reservoir=reservoir, fraction=fraction, rng=rng
+    )
     pois_cal = {
         cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
         for cid in eligible_ids
@@ -46,30 +48,42 @@ def _make_setup(fraction: float = 0.40):
 
     b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
     b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, b1.tau_global_clean)
-    b1_result = compute_metrics(MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None))
-    b2_result = compute_metrics(MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=None))
+    b1_result = compute_metrics(
+        MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None)
+    )
+    b2_result = compute_metrics(
+        MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=None)
+    )
     return col, b1_result, b2_result, victim_id
 
 
 class TestAsr:
     def test_asr_in_0_1(self) -> None:
         _, b1_result, _, victim_id = _make_setup()
-        asr = compute_asr(b1_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
+        asr = compute_asr(
+            b1_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+        )
         assert 0.0 <= asr.asr <= 1.0
 
     def test_asr_victim_id_recorded(self) -> None:
         _, _, b2_result, victim_id = _make_setup()
-        asr = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
+        asr = compute_asr(
+            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+        )
         assert asr.victim_id == victim_id
 
     def test_asr_policy_recorded(self) -> None:
         _, _, b2_result, victim_id = _make_setup()
-        asr = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
+        asr = compute_asr(
+            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+        )
         assert asr.policy == ThresholdPolicy.B2_PERSONALIZED
 
     def test_asr_raise_counts_positive_significant(self) -> None:
         _, _, b2_result, victim_id = _make_setup()
-        asr = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
+        asr = compute_asr(
+            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+        )
         # Victim should have significant positive delta (HIGH_SCORE injection).
         assert asr.n_significant >= 1
 
@@ -77,7 +91,9 @@ class TestAsr:
         """THRESHOLD_LOWER ASR should be 0 when we only raised a victim threshold."""
         _, _, b2_result, victim_id = _make_setup()
         # B2: only victim changes, direction is RAISE → no LOWER significant clients.
-        asr_lower = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_LOWER)
+        asr_lower = compute_asr(
+            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_LOWER
+        )
         # No clients should have Δτ < -scale since we raised the threshold.
         assert asr_lower.n_significant == 0
 
@@ -87,8 +103,14 @@ class TestAsr:
         col = build_score_collection(raw)
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
         b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        result = compute_metrics(MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None))
-        asr = compute_asr(result, victim_id=next(iter(col.eligible_ids)), objective=AttackerObjective.THRESHOLD_RAISE)
+        result = compute_metrics(
+            MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None)
+        )
+        asr = compute_asr(
+            result,
+            victim_id=next(iter(col.eligible_ids)),
+            objective=AttackerObjective.THRESHOLD_RAISE,
+        )
         assert asr.asr == pytest.approx(0.0)
 
 
@@ -97,7 +119,9 @@ class TestBlastRadius:
         """B2: only victim threshold changes → blast radius at most 1."""
         _, _, b2_result, victim_id = _make_setup()
         br = compute_blast_radius(b2_result, victim_id=victim_id)
-        assert br.n_significant <= 1, "B2 blast radius must be at most 1 for single victim"
+        assert br.n_significant <= 1, (
+            "B2 blast radius must be at most 1 for single victim"
+        )
 
     def test_b1_blast_radius_gte_b2(self) -> None:
         """B1: global effect → blast radius >= B2 blast radius."""
@@ -133,7 +157,7 @@ class TestSpillover:
     def test_n_non_victims_correct(self) -> None:
         _, _, b2_result, victim_id = _make_setup()
         sp = compute_spillover(b2_result, victim_id=victim_id)
-        assert sp.n_non_victims == 4 # 5 eligible - 1 victim
+        assert sp.n_non_victims == 4  # 5 eligible - 1 victim
 
     def test_spillover_ids_sorted(self) -> None:
         _, b1_result, _, victim_id = _make_setup()

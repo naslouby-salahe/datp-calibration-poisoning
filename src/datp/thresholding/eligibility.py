@@ -21,7 +21,6 @@ from datp.thresholding.thresholds import (
 )
 
 
-
 @dataclass(frozen=True, slots=True)
 class EligibilityResult:
     eligible_ids: tuple[str, ...]

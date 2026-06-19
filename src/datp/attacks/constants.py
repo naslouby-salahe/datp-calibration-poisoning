@@ -41,7 +41,9 @@ TRAINING_SEEDS: tuple[int, ...] = (0, 1, 2, 3, 4)
 POISONING_SEEDS: tuple[int, ...] = (100, 101, 102, 103, 104)
 ANALYSIS_SEEDS: tuple[int, ...] = (300, 301, 302, 303, 304)
 COMPROMISE_PATTERN_SEED: int = 400
-B4_RANDOM_STATE: int = 42  # for k-means only; coincidentally same as BOOTSTRAP_RANDOM_STATE
+B4_RANDOM_STATE: int = (
+    42  # for k-means only; coincidentally same as BOOTSTRAP_RANDOM_STATE
+)
 
 
 def default_b4_cluster_config() -> "B4ClusterConfig":

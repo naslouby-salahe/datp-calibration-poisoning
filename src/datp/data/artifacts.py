@@ -29,7 +29,9 @@ def write_client_splits(
 ) -> None:
     client_dir.mkdir(parents=True, exist_ok=True)
 
-    feature_cols = list(spec.feature_columns) if spec.feature_columns is not None else None
+    feature_cols = (
+        list(spec.feature_columns) if spec.feature_columns is not None else None
+    )
     for split, df in splits.items():
         path = client_dir / filename_for_split(split)
         write_artifact(df, path)

@@ -35,9 +35,7 @@ def load_parquets_from_dir(
     *allow_empty* is ``False`` and no parquet files are found.
     """
     if not directory.is_dir():
-        raise FileNotFoundError(
-            fmt_missing(_MODULE, f"score directory {directory}")
-        )
+        raise FileNotFoundError(fmt_missing(_MODULE, f"score directory {directory}"))
     parquets: dict[str, np.ndarray] = {}
     for pf in sorted(directory.glob(PathToken.PARQUET_GLOB)):
         parquets[pf.stem] = read_score_column(pf)

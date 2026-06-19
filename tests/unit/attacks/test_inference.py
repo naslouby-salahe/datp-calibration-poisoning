@@ -48,8 +48,7 @@ def _make_paired(
 def _uniform_paired(n_victims: int = 3, delta: float = 0.05) -> PairedDeltas:
     """All victims, all seeds, same positive delta_tau — fully feasible."""
     victims: dict[str, dict[int, float]] = {
-        f"v{i}": dict.fromkeys(SEEDS, delta)
-        for i in range(n_victims)
+        f"v{i}": dict.fromkeys(SEEDS, delta) for i in range(n_victims)
     }
     return _make_paired(victims)
 
@@ -57,6 +56,7 @@ def _uniform_paired(n_victims: int = 3, delta: float = 0.05) -> PairedDeltas:
 # ---------------------------------------------------------------------------
 # collect_paired_deltas
 # ---------------------------------------------------------------------------
+
 
 class TestCollectPairedDeltas:
     def test_all_seeds_present(self) -> None:
@@ -102,6 +102,7 @@ class TestCollectPairedDeltas:
 # compute_seed_aggregates
 # ---------------------------------------------------------------------------
 
+
 class TestComputeSeedAggregates:
     def test_uniform_delta_aggregates_to_same(self) -> None:
         paired = _uniform_paired(n_victims=3, delta=0.05)
@@ -117,7 +118,7 @@ class TestComputeSeedAggregates:
     def test_missing_seed_in_victim_gives_nan(self) -> None:
         # One victim has no entry for seed 104.
         victims = {
-            "v0": {100: 0.1, 101: 0.1, 102: 0.1, 103: 0.1}, # no 104
+            "v0": {100: 0.1, 101: 0.1, 102: 0.1, 103: 0.1},  # no 104
         }
         paired = _make_paired(victims)
         agg = compute_seed_aggregates(paired, SEEDS)
@@ -125,17 +126,19 @@ class TestComputeSeedAggregates:
 
     def test_infeasible_victims_excluded(self) -> None:
         # v0: all infeasible (delta=0.9); v1: all feasible (delta=0.1)
-        paired = PairedDeltas(deltas={
-            "v0": collect_paired_deltas(
-                victim_id="v0",
-                seed_deltas=dict.fromkeys(SEEDS, 0.9),
-                feasible_seeds=set(), # none feasible
-            ),
-            "v1": collect_paired_deltas(
-                victim_id="v1",
-                seed_deltas=dict.fromkeys(SEEDS, 0.1),
-            ),
-        })
+        paired = PairedDeltas(
+            deltas={
+                "v0": collect_paired_deltas(
+                    victim_id="v0",
+                    seed_deltas=dict.fromkeys(SEEDS, 0.9),
+                    feasible_seeds=set(),  # none feasible
+                ),
+                "v1": collect_paired_deltas(
+                    victim_id="v1",
+                    seed_deltas=dict.fromkeys(SEEDS, 0.1),
+                ),
+            }
+        )
         agg = compute_seed_aggregates(paired, SEEDS)
         for s in SEEDS:
             assert agg[s] == pytest.approx(0.1)
@@ -156,9 +159,10 @@ class TestComputeSeedAggregates:
 # sign_test
 # ---------------------------------------------------------------------------
 
+
 class TestSignTest:
     def test_all_positive_raise_consistent(self) -> None:
-        agg = dict.fromkeys(SEEDS, 0.05) # 5/5 positive
+        agg = dict.fromkeys(SEEDS, 0.05)  # 5/5 positive
         result = sign_test(agg, direction="raise")
         assert result.consistent
         assert result.n_positive == 5
@@ -171,7 +175,7 @@ class TestSignTest:
     def test_3_positive_raise_not_consistent(self) -> None:
         agg = {100: 0.1, 101: 0.1, 102: 0.1, 103: -0.1, 104: -0.1}
         result = sign_test(agg, direction="raise")
-        assert not result.consistent # 3/5 < threshold 4
+        assert not result.consistent  # 3/5 < threshold 4
 
     def test_4_positive_raise_consistent(self) -> None:
         agg = {100: 0.1, 101: 0.1, 102: 0.1, 103: 0.1, 104: -0.1}
@@ -204,6 +208,7 @@ class TestSignTest:
 # holm_adjust
 # ---------------------------------------------------------------------------
 
+
 class TestHolmAdjust:
     def test_returns_holm_result(self) -> None:
         result = holm_adjust([0.01, 0.05, 0.10])
@@ -223,7 +228,7 @@ class TestHolmAdjust:
         ps = [0.01, 0.02, 0.03]
         result = holm_adjust(ps)
         for raw, holm in zip(result.raw_p_values, result.holm_p_values):
-            assert holm >= raw - 1e-12 # allow tiny float error
+            assert holm >= raw - 1e-12  # allow tiny float error
 
     def test_single_p_value(self) -> None:
         result = holm_adjust([0.03])
@@ -238,6 +243,7 @@ class TestHolmAdjust:
 # bootstrap_seed_aggregates
 # ---------------------------------------------------------------------------
 
+
 class TestBootstrapSeedAggregates:
     def test_returns_bootstrap_result(self) -> None:
         agg = {s: 0.05 + 0.01 * i for i, s in enumerate(SEEDS)}
@@ -246,27 +252,47 @@ class TestBootstrapSeedAggregates:
 
     def test_ci_covers_positive_mean(self) -> None:
         agg = dict.fromkeys(SEEDS, 0.05)
-        result = bootstrap_seed_aggregates(agg, config=BootstrapConfig(n_bootstrap=1_000, analysis_seed=300))
+        result = bootstrap_seed_aggregates(
+            agg, config=BootstrapConfig(n_bootstrap=1_000, analysis_seed=300)
+        )
         assert result.ci_lower > 0.0
         assert result.ci_upper > 0.0
 
     def test_raises_with_too_few_finite(self) -> None:
-        agg = {100: float("nan"), 101: float("nan"), 102: float("nan"), 103: 0.1, 104: float("nan")}
+        agg = {
+            100: float("nan"),
+            101: float("nan"),
+            102: float("nan"),
+            103: 0.1,
+            104: float("nan"),
+        }
         with pytest.raises(ValueError, match="at least 2 finite"):
             bootstrap_seed_aggregates(agg)
 
     def test_seed_filter(self) -> None:
         agg = {s: float(i) * 0.01 for i, s in enumerate(SEEDS)}
-        r1 = bootstrap_seed_aggregates(agg, poisoning_seeds=(100, 101), config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
-        r2 = bootstrap_seed_aggregates(agg, poisoning_seeds=SEEDS, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
+        r1 = bootstrap_seed_aggregates(
+            agg,
+            poisoning_seeds=(100, 101),
+            config=BootstrapConfig(n_bootstrap=500, analysis_seed=300),
+        )
+        r2 = bootstrap_seed_aggregates(
+            agg,
+            poisoning_seeds=SEEDS,
+            config=BootstrapConfig(n_bootstrap=500, analysis_seed=300),
+        )
         # Different input → potentially different CI
         assert isinstance(r1, BootstrapResult)
         assert isinstance(r2, BootstrapResult)
 
     def test_reproducible_with_same_seed(self) -> None:
         agg = {s: 0.05 + 0.01 * i for i, s in enumerate(SEEDS)}
-        r1 = bootstrap_seed_aggregates(agg, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
-        r2 = bootstrap_seed_aggregates(agg, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
+        r1 = bootstrap_seed_aggregates(
+            agg, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300)
+        )
+        r2 = bootstrap_seed_aggregates(
+            agg, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300)
+        )
         assert r1.ci_lower == pytest.approx(r2.ci_lower)
         assert r1.ci_upper == pytest.approx(r2.ci_upper)
 
@@ -275,63 +301,110 @@ class TestBootstrapSeedAggregates:
 # compute_inference
 # ---------------------------------------------------------------------------
 
+
 class TestComputeInference:
     def test_returns_inference_result(self) -> None:
         paired = _uniform_paired(delta=0.05)
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-        ))
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+            )
+        )
         assert isinstance(result, InferenceResult)
 
     def test_seed_aggregates_populated(self) -> None:
         paired = _uniform_paired(delta=0.05)
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-        ))
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+            )
+        )
         assert set(result.seed_aggregates.keys()) == set(SEEDS)
 
     def test_sign_test_consistent_for_uniform_raise(self) -> None:
         paired = _uniform_paired(delta=0.05)
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-        ))
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+            )
+        )
         assert result.sign_test.consistent
 
     def test_bootstrap_ci_excludes_zero_for_clear_raise(self) -> None:
         paired = _uniform_paired(n_victims=5, delta=0.10)
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-            bootstrap_config=BootstrapConfig(n_bootstrap=2_000),
-        ))
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+                bootstrap_config=BootstrapConfig(n_bootstrap=2_000),
+            )
+        )
         assert result.bootstrap_ci.ci_lower > 0.0
 
     def test_holm_none_by_default(self) -> None:
         paired = _uniform_paired()
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-        ))
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+            )
+        )
         assert result.holm is None
 
     def test_holm_populated_when_requested(self) -> None:
         paired = _uniform_paired()
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-            holm_config=HolmConfig(p_values=[0.01, 0.02, 0.03]),
-        ))
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+                holm_config=HolmConfig(p_values=[0.01, 0.02, 0.03]),
+            )
+        )
         assert result.holm is not None
         assert isinstance(result.holm, HolmResult)
 
     def test_n_feasible_victims_correct(self) -> None:
         paired = _uniform_paired(n_victims=3)
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-        ))
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+            )
+        )
         assert result.n_feasible_victims == 3
 
     def test_infeasible_victim_excluded_from_count(self) -> None:
         # v0 fully infeasible; v1, v2 feasible
-        paired = PairedDeltas(deltas={
-            "v0": collect_paired_deltas(
-                victim_id="v0",
-                seed_deltas=dict.fromkeys(SEEDS, 0.05),
-                feasible_seeds=set(),
-            ),
-            "v1": collect_paired_deltas(victim_id="v1", seed_deltas=dict.fromkeys(SEEDS, 0.05)),
-            "v2": collect_paired_deltas(victim_id="v2", seed_deltas=dict.fromkeys(SEEDS, 0.05)),
-        })
-        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
-        ))
+        paired = PairedDeltas(
+            deltas={
+                "v0": collect_paired_deltas(
+                    victim_id="v0",
+                    seed_deltas=dict.fromkeys(SEEDS, 0.05),
+                    feasible_seeds=set(),
+                ),
+                "v1": collect_paired_deltas(
+                    victim_id="v1", seed_deltas=dict.fromkeys(SEEDS, 0.05)
+                ),
+                "v2": collect_paired_deltas(
+                    victim_id="v2", seed_deltas=dict.fromkeys(SEEDS, 0.05)
+                ),
+            }
+        )
+        result = compute_inference(
+            InferenceInput(
+                paired=paired,
+                poisoning_seeds=SEEDS,
+                direction="raise",
+            )
+        )
         assert result.n_feasible_victims == 2

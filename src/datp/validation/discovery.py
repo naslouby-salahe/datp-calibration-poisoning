@@ -28,9 +28,7 @@ def completed_metric_paths(base_dir: Path) -> list[Path]:
     )
 
 
-def parse_metric_path(
-    base_dir: Path, path: Path
-) -> BaselineRunId:
+def parse_metric_path(base_dir: Path, path: Path) -> BaselineRunId:
     """Parse ``<results_root>/<regime>/<baseline>/seed_N[/alpha_a]/metrics.json`` into a ``BaselineRunId``."""
     rel = path.relative_to(base_dir / ArtifactDir.RESULTS)
     parts = rel.parts
@@ -76,9 +74,7 @@ def iter_score_cells(base_dir: Path) -> list[ScoreCellLocation]:
         return []
     cells: list[ScoreCellLocation] = []
     for manifest_path in sorted(
-        scores_root.glob(
-            f"*/{PathToken.SEED_PREFIX}*/{ArtifactFile.SCORING_MANIFEST}"
-        )
+        scores_root.glob(f"*/{PathToken.SEED_PREFIX}*/{ArtifactFile.SCORING_MANIFEST}")
     ):
         cells.append(parse_score_cell_dir(scores_root, manifest_path.parent))
     for manifest_path in sorted(

@@ -17,20 +17,20 @@ class TestInitTracking:
     def test_disables_when_mlflow_unavailable(self, tmp_path: Path) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
-        t._MLFLOW = None # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
+        t._MLFLOW = None  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
             init_tracking(experiment_name="test", tracking_uri=tmp_path.as_uri())
-        assert t._TRACKING_ENABLED is False # noqa: SLF001
+        assert t._TRACKING_ENABLED is False  # noqa: SLF001
 
     def test_enables_when_mlflow_available(self, tmp_path: Path) -> None:
         mock = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = False # noqa: SLF001
+        t._TRACKING_ENABLED = False  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock):
             init_tracking(experiment_name="test_exp", tracking_uri=tmp_path.as_uri())
-        assert t._TRACKING_ENABLED is True # noqa: SLF001
+        assert t._TRACKING_ENABLED is True  # noqa: SLF001
         mock.set_tracking_uri.assert_called_once_with(tmp_path.as_uri())
         mock.set_experiment.assert_called_once_with("test_exp")
 
@@ -39,14 +39,14 @@ class TestTrackingRun:
     def test_yields_none_when_tracking_disabled(self) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = False # noqa: SLF001
+        t._TRACKING_ENABLED = False  # noqa: SLF001
         with tracking_run(run_name="test", params=None, tags=None):
             assert t._TRACKING_ENABLED is False
 
     def test_yields_none_when_mlflow_missing(self) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
             with tracking_run(run_name="test", params=None, tags=None):
                 assert t._TRACKING_ENABLED is True
@@ -59,7 +59,7 @@ class TestTrackingRun:
 
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             with tracking_run(
                 run_name="my_run",
@@ -68,9 +68,7 @@ class TestTrackingRun:
             ):
                 assert mock_mlflow.start_run.called
 
-        mock_mlflow.start_run.assert_called_once_with(
-            run_name="my_run", nested=False
-        )
+        mock_mlflow.start_run.assert_called_once_with(run_name="my_run", nested=False)
         mock_mlflow.log_params.assert_called_once_with({"k1": "v1"})
         mock_mlflow.set_tags.assert_called_once_with({"tag1": "val1"})
 
@@ -78,11 +76,11 @@ class TestTrackingRun:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         mock_run = MagicMock()
         mock_mlflow.start_run.return_value = mock_run
-        mock_mlflow.active_run.return_value = MagicMock() # already in a run
+        mock_mlflow.active_run.return_value = MagicMock()  # already in a run
 
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             with tracking_run(run_name="nested_run", params=None, tags=None):
                 assert mock_mlflow.active_run.called
@@ -96,13 +94,13 @@ class TestLogMetrics:
     def test_noop_when_tracking_disabled(self) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = False # noqa: SLF001
-        log_metrics({"a": 1.0}, step=None, prefix=None) # should not raise
+        t._TRACKING_ENABLED = False  # noqa: SLF001
+        log_metrics({"a": 1.0}, step=None, prefix=None)  # should not raise
 
     def test_noop_when_mlflow_missing(self) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
             log_metrics({"a": 1.0}, step=None, prefix=None)
 
@@ -110,7 +108,7 @@ class TestLogMetrics:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             log_metrics({"loss": 0.5, "acc": 1.0}, step=10, prefix=None)
 
@@ -123,7 +121,7 @@ class TestLogMetrics:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             log_metrics({"loss": 0.3}, step=None, prefix="train")
 
@@ -134,7 +132,7 @@ class TestLogMetrics:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             log_metrics(
                 {"ok": 1.0, "inf": float("inf"), "nan": float("nan")},
@@ -152,10 +150,10 @@ class TestLogMetrics:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             log_metrics(
-                {"ok": 1.0, "bad": "string"}, # type: ignore[dict-item]
+                {"ok": 1.0, "bad": "string"},  # type: ignore[dict-item]
                 step=None,
                 prefix=None,
             )
@@ -169,7 +167,7 @@ class TestLogMetrics:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             log_metrics({"inf": float("inf")}, step=None, prefix=None)
 
@@ -180,13 +178,13 @@ class TestLogParams:
     def test_noop_when_tracking_disabled(self) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = False # noqa: SLF001
-        log_params({"a": "v"}) # should not raise
+        t._TRACKING_ENABLED = False  # noqa: SLF001
+        log_params({"a": "v"})  # should not raise
 
     def test_noop_when_mlflow_missing(self) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
             log_params({"a": "v"})
 
@@ -194,26 +192,24 @@ class TestLogParams:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             log_params({"key1": "val1", "key2": "val2"})
 
-        mock_mlflow.log_params.assert_called_once_with(
-            {"key1": "val1", "key2": "val2"}
-        )
+        mock_mlflow.log_params.assert_called_once_with({"key1": "val1", "key2": "val2"})
 
 
 class TestLogArtifact:
     def test_noop_when_tracking_disabled(self, tmp_path: Path) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = False # noqa: SLF001
-        log_artifact(str(tmp_path / "fake.txt"), artifact_path=None) # should not raise
+        t._TRACKING_ENABLED = False  # noqa: SLF001
+        log_artifact(str(tmp_path / "fake.txt"), artifact_path=None)  # should not raise
 
     def test_noop_when_mlflow_missing(self, tmp_path: Path) -> None:
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
             log_artifact(str(tmp_path / "fake.txt"), artifact_path=None)
 
@@ -221,7 +217,7 @@ class TestLogArtifact:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
-        t._TRACKING_ENABLED = True # noqa: SLF001
+        t._TRACKING_ENABLED = True  # noqa: SLF001
         model_path = tmp_path / "model.pt"
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             log_artifact(model_path, artifact_path="models")

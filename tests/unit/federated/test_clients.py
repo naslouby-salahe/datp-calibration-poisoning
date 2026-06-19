@@ -25,7 +25,9 @@ def _make_ae(input_dim: int = 4, hidden_dims: list[int] | None = None) -> Autoen
     )
 
 
-def _mock_cfg(local_epochs: int = 1, lr: float = 0.01, batch_size: int = 8) -> MagicMock:
+def _mock_cfg(
+    local_epochs: int = 1, lr: float = 0.01, batch_size: int = 8
+) -> MagicMock:
     cfg = MagicMock()
     cfg.federation.local_epochs = local_epochs
     cfg.machine.batch_size_train = batch_size
@@ -112,7 +114,9 @@ class TestDatpClientShapeValidation:
 
     def test_error_includes_module_prefix_and_cid(self) -> None:
         model = _make_ae()
-        with pytest.raises(ValueError, match=r"\[federated\.types\].*client client_xyz"):
+        with pytest.raises(
+            ValueError, match=r"\[federated\.types\].*client client_xyz"
+        ):
             DatpClient(
                 cid="client_xyz",
                 model=model,
@@ -191,8 +195,7 @@ class TestDatpClientFit:
         params_after = get_parameters(model)
 
         any_changed = any(
-            not (a == b).all()
-            for a, b in zip(params_before, params_after, strict=True)
+            not (a == b).all() for a, b in zip(params_before, params_after, strict=True)
         )
         assert any_changed, "Model parameters should change after fit"
 
@@ -293,4 +296,6 @@ class TestDatpClientDeterminism:
         set_seeds(42)
         _, _, m_b = client_b.fit(get_parameters(model_b), {})
 
-        assert m_a[ClientMetricKey.TRAIN_LOSS] == pytest.approx(m_b[ClientMetricKey.TRAIN_LOSS], abs=1e-6)
+        assert m_a[ClientMetricKey.TRAIN_LOSS] == pytest.approx(
+            m_b[ClientMetricKey.TRAIN_LOSS], abs=1e-6
+        )

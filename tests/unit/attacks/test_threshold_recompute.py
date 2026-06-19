@@ -21,9 +21,7 @@ from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
 
-def _make_collection_and_pois_cal(
-    victim_idx: int = 0, fraction: float = 0.40
-) -> tuple:
+def _make_collection_and_pois_cal(victim_idx: int = 0, fraction: float = 0.40) -> tuple:
     """Build a score collection and a poisoned cal dict for one victim."""
     ss = make_standard_score_set(n_eligible=3, n_pending=1)
     raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}

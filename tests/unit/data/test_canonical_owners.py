@@ -105,9 +105,7 @@ def test_data_root_returns_data_subdir(tmp_path: Path) -> None:
 
 def test_raw_root_uses_canonical_raw_slug() -> None:
     assert raw_root(DatasetID.NBAIOT, ".") == Path("data/raw/N-BaIoT")
-    assert raw_root(DatasetID.CICIOT2023, ".") == Path(
-        "data/raw/CIC_IOT_Dataset2023"
-    )
+    assert raw_root(DatasetID.CICIOT2023, ".") == Path("data/raw/CIC_IOT_Dataset2023")
 
 
 def test_artifacts_dirs_do_not_expose_data_concepts() -> None:

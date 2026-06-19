@@ -47,7 +47,7 @@ class TestPrepareLoadPathConsistency:
         assert sorted(client_data.keys()) == sorted(DEVICES)
         for splits in client_data.values():
             assert splits.train is not None
-            assert splits.val is not None # cal → val
+            assert splits.val is not None  # cal → val
 
     def test_no_extra_nesting(self, prepared_dir: Path) -> None:
         nested = prepared_dir / "nbaiot"

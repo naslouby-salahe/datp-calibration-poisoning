@@ -84,6 +84,3 @@ def test_figure_dpi_minimum(tmp_path: Path) -> None:
     img = Image.open(path)
     dpi = img.info.get("dpi", (72, 72))
     assert dpi[0] >= 299.99 and dpi[1] >= 299.99, f"DPI too low: {dpi}"
-
-
-

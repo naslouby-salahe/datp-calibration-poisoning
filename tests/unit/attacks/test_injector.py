@@ -119,9 +119,7 @@ class TestDeterminism:
             clean_cal=c.cal, reservoir=reservoir, fraction=0.20, rng=_rng(100)
         )
         np.testing.assert_array_equal(res1.poisoned_cal, res2.poisoned_cal)
-        np.testing.assert_array_equal(
-            res1.positions_replaced, res2.positions_replaced
-        )
+        np.testing.assert_array_equal(res1.positions_replaced, res2.positions_replaced)
 
     def test_different_seed_different_result(self) -> None:
         c = make_eligible_client()

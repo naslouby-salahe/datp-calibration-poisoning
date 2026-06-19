@@ -43,6 +43,7 @@ class TestConfoundSummaryFor:
     def test_regime_b_returns_none(self) -> None:
         assert confound_summary_for(Regime.B) is None
 
+
 class TestChronologicalFlagsFor:
     def test_regime_a_is_chronological(self) -> None:
         assert chronological_flags_for(Regime.A) == (True, True)
@@ -52,6 +53,7 @@ class TestChronologicalFlagsFor:
 
     def test_regime_b_is_not_chronological(self) -> None:
         assert chronological_flags_for(Regime.B) == (False, False)
+
 
 class TestBuildCiciotProtocol:
     def test_returns_ciciot2023_dataset(self) -> None:

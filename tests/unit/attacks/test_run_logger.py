@@ -80,7 +80,7 @@ class TestBuildManifest:
 
     def test_generated_at_utc_present(self) -> None:
         m = _build_manifest(mu_flag_threshold=0.005)
-        assert m.generated_at_utc # non-empty ISO string
+        assert m.generated_at_utc  # non-empty ISO string
 
     def test_schema_version_is_1(self) -> None:
         m = _build_manifest(mu_flag_threshold=0.005)

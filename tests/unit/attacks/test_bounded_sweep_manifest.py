@@ -69,7 +69,7 @@ def _manifest(**overrides: object) -> BoundedSweepManifest:
         "results": (_row(),),
     }
     base.update(overrides)
-    return BoundedSweepManifest(**base) # type: ignore[arg-type]
+    return BoundedSweepManifest(**base)  # type: ignore[arg-type]
 
 
 def test_manifest_round_trips_through_json():
@@ -108,4 +108,4 @@ def test_manifest_rejects_missing_mu_flag_entry():
 def test_manifest_is_frozen():
     manifest = _manifest()
     with pytest.raises(ValidationError):
-        manifest.n_cells = 99 # type: ignore[misc]
+        manifest.n_cells = 99  # type: ignore[misc]

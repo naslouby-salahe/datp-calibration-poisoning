@@ -22,7 +22,9 @@ class CheckpointConvergenceMode(enum.StrEnum):
 
 
 class PrimaryCheckpointSelectionRule(enum.StrEnum):
-    GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A = "global_lower_tail_tradeoff_from_regime_a"
+    GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A = (
+        "global_lower_tail_tradeoff_from_regime_a"
+    )
 
 
 class CheckpointArtifactPathMode(enum.StrEnum):

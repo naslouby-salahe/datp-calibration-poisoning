@@ -259,9 +259,7 @@ class B4Metadata:
             )
         else:
             fingerprints = tuple(fingerprints_input)
-        object.__setattr__(
-            self, "fingerprints", ClientFingerprintTuple(fingerprints)
-        )
+        object.__setattr__(self, "fingerprints", ClientFingerprintTuple(fingerprints))
         scores_input: Any = self.silhouette_scores
         if hasattr(scores_input, "items"):
             silhouette_scores = tuple(

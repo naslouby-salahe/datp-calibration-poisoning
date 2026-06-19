@@ -35,7 +35,11 @@ class TestCompleteDetected:
             cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None),
             baseline=Baseline.B1,
         )
-        rp = ArtifactLayout(base_dir=tmp_path, regime=Regime.A).baseline_run(run).result_dir
+        rp = (
+            ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
+            .baseline_run(run)
+            .result_dir
+        )
         rp.mkdir(parents=True, exist_ok=True)
         (rp / "metrics.json").write_text(valid_metrics_json("b1", "a", 0))
 
@@ -57,7 +61,11 @@ class TestAbortedDetected:
             cell=TrainingCellId(regime=Regime.B, seed=1, alpha=None),
             baseline=Baseline.B2,
         )
-        rp = ArtifactLayout(base_dir=tmp_path, regime=Regime.B).baseline_run(run).result_dir
+        rp = (
+            ArtifactLayout(base_dir=tmp_path, regime=Regime.B)
+            .baseline_run(run)
+            .result_dir
+        )
         rp.mkdir(parents=True, exist_ok=True)
         (rp / "ABORTED.txt").write_text("round=5; OOM error")
 

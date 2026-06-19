@@ -80,7 +80,9 @@ def test_artifact_schema(tmp_path) -> None:
 
 def test_scoring_manifest_validation_fails_when_missing(tmp_path) -> None:
     cell = TrainingCellId(regime=Regime.A, seed=SEED, alpha=None)
-    score_base = ArtifactLayout(base_dir=tmp_path, regime=Regime.A).score_cell(cell).score_dir
+    score_base = (
+        ArtifactLayout(base_dir=tmp_path, regime=Regime.A).score_cell(cell).score_dir
+    )
     score_base.mkdir(parents=True)
     (score_base / ArtifactFile.SCORING_MANIFEST).write_text(
         '{"schema_version":"1","completion_status":"complete","expected_client_ids":["c1"],'

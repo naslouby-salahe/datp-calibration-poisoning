@@ -63,6 +63,7 @@ def assert_no_inplace_mutation(
 # Reservoir-source guardrail
 # ---------------------------------------------------------------------------
 
+
 def assert_reservoir_not_test_or_training(reservoir_source: ScoringStage) -> None:
     """Raise if ``reservoir_source`` is a test stage.
 
@@ -108,6 +109,7 @@ def assert_policy_not_b3(policy: ThresholdPolicy) -> None:
 # ---------------------------------------------------------------------------
 # Fraction-grid guardrail
 # ---------------------------------------------------------------------------
+
 
 def assert_fractions_in_locked_grid(
     fractions: Iterable[float],
@@ -158,7 +160,10 @@ def assert_bounded_scale_requires_single_client(
     Raises:
         GuardrailError: If scale is bounded sweep but scope is not SINGLE_CLIENT.
     """
-    if scale == ExperimentScale.BOUNDED and target_scope != PoisoningTargetScope.SINGLE_CLIENT:
+    if (
+        scale == ExperimentScale.BOUNDED
+        and target_scope != PoisoningTargetScope.SINGLE_CLIENT
+    ):
         raise GuardrailError(
             f"Calibration-poisoning guardrail: BOUNDED scale requires SINGLE_CLIENT target scope; "
             f"got {target_scope!r}. Multi-client and all-client scopes "

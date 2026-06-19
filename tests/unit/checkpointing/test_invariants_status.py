@@ -8,7 +8,10 @@ from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
 from datp.checkpointing.enums import CheckpointArtifactStatus
-from datp.checkpointing.invariants import CheckpointValidationConfig, validate_checkpoint_evaluation_invariants
+from datp.checkpointing.invariants import (
+    CheckpointValidationConfig,
+    validate_checkpoint_evaluation_invariants,
+)
 from datp.checkpointing.status import checkpoint_artifact_status
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
@@ -17,7 +20,9 @@ from datp.core.types import MetricsProvenance
 from datp.testsupport.checkpoint_protocol import build_fake_checkpoint_metrics
 
 
-def _write_manifest(layout: ArtifactLayout, cell: TrainingCellId, checkpoint_round: int) -> Path:
+def _write_manifest(
+    layout: ArtifactLayout, cell: TrainingCellId, checkpoint_round: int
+) -> Path:
     ckpt_path = (
         layout.checkpoint_dir_for_round(cell, checkpoint_round)
         / ArtifactFile.MODEL_CHECKPOINT
@@ -44,8 +49,12 @@ def _write_metric(
     checkpoint_round: int,
     manifest_path: Path,
 ) -> Path:
-    generated = build_fake_checkpoint_metrics(rounds=(checkpoint_round,), seeds=(cell.seed,))
-    metric = next((item for item in generated if item.baseline == baseline), generated[0])
+    generated = build_fake_checkpoint_metrics(
+        rounds=(checkpoint_round,), seeds=(cell.seed,)
+    )
+    metric = next(
+        (item for item in generated if item.baseline == baseline), generated[0]
+    )
     provenance = MetricsProvenance(
         config_identity="config",
         split_manifest_identity="split",

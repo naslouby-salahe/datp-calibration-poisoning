@@ -31,7 +31,10 @@ def test_regime_a_selection_returns_one_global_checkpoint() -> None:
 
     assert selection.regime == Regime.A
     assert selection.selected_round == 50
-    assert selection.rule == PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A
+    assert (
+        selection.rule
+        == PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A
+    )
     assert not hasattr(selection, "selected_by_regime")
 
 
@@ -87,7 +90,9 @@ def test_selection_ignores_cluster_policy_metrics() -> None:
 
     b2_metrics = tuple(metric for metric in base if metric.baseline == Baseline.B2)
     cluster_noise = tuple(
-        metric.model_copy(update={"baseline": policy, "cv_fpr": 99.0, "worst_client_fpr": 99.0})
+        metric.model_copy(
+            update={"baseline": policy, "cv_fpr": 99.0, "worst_client_fpr": 99.0}
+        )
         for metric in b2_metrics
         for policy in (Baseline.B3, Baseline.B4)
     )
@@ -97,4 +102,3 @@ def test_selection_ignores_cluster_policy_metrics() -> None:
 
     assert with_clusters.selected_round == baseline_selection.selected_round
     assert with_clusters.rule == baseline_selection.rule
-

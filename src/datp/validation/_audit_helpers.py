@@ -249,17 +249,19 @@ def _threshold_result(
     alpha: float | None = None,
 ) -> ThresholdResult:
     """Delegate to the canonical derive_threshold so audit and pipeline stay in lock-step."""
-    return derive_threshold(_DeriveInput(
-        baseline=baseline,
-        client_errors=cal_errors,
-        n_min=cfg.threshold.n_min,
-        q=cfg.threshold.q,
-        tau_global=tau_global,
-        regime=regime,
-        threshold_cfg=cfg.threshold,
-        seed=seed,
-        alpha=alpha,
-    ))
+    return derive_threshold(
+        _DeriveInput(
+            baseline=baseline,
+            client_errors=cal_errors,
+            n_min=cfg.threshold.n_min,
+            q=cfg.threshold.q,
+            tau_global=tau_global,
+            regime=regime,
+            threshold_cfg=cfg.threshold,
+            seed=seed,
+            alpha=alpha,
+        )
+    )
 
 
 def _build_partition_audit(

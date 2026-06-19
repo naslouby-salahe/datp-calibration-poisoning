@@ -24,7 +24,9 @@ def make_client_data(n_clients: int, seed: int = SEED) -> dict[str, ClientData]:
             train=torch.randn(N_TRAIN, N_FEATURES, generator=rng).to(device),
             val=torch.randn(N_VAL, N_FEATURES, generator=rng).to(device),
             test_benign=torch.randn(N_TEST, N_FEATURES, generator=rng).to(device),
-            test_attack=(torch.randn(N_TEST, N_FEATURES, generator=rng) + 5.0).to(device),
+            test_attack=(torch.randn(N_TEST, N_FEATURES, generator=rng) + 5.0).to(
+                device
+            ),
         )
     return data
 
@@ -53,9 +55,7 @@ def make_fl_cfg(
             "dataset": BASE_CONFIG.dataset.model_copy(
                 update={"feature_count": n_features}
             ),
-            "machine": BASE_CONFIG.machine.model_copy(
-                update={"batch_size_train": 64}
-            ),
+            "machine": BASE_CONFIG.machine.model_copy(update={"batch_size_train": 64}),
             "federation": FederationConfig(
                 local_epochs=1,
                 convergence=ConvergenceConfig(

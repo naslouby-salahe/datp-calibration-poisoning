@@ -90,8 +90,7 @@ def _ensure_fl_checkpoint_locked(
     key = request.key
     checkpoint_cfg = request.cfg.checkpoint_protocol
     protocol_enabled = (
-        isinstance(checkpoint_cfg, CheckpointProtocolConfig)
-        and checkpoint_cfg.enabled
+        isinstance(checkpoint_cfg, CheckpointProtocolConfig) and checkpoint_cfg.enabled
     )
 
     if checkpoint_status_fn is not None:
@@ -168,7 +167,9 @@ def _ensure_fl_checkpoint_locked(
         step_fn(SweepStep.TRAIN_FL, label)
 
     client_data = load_client_data(
-        request.prepared_dir, device=torch.device(DeviceType.CPU), splits=TRAINING_SPLITS
+        request.prepared_dir,
+        device=torch.device(DeviceType.CPU),
+        splits=TRAINING_SPLITS,
     )
     run_fl_training(
         request.cfg,

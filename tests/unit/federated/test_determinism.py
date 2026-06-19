@@ -11,8 +11,7 @@ from tests.fixtures.flower_smoke import run_flower_smoke
 def _run_experiment(seed: int | None, run_dir: Path) -> Path:
     metrics = {
         "losses_distributed": [
-            {"round": rnd, "loss": loss}
-            for rnd, loss in run_flower_smoke(seed=seed)
+            {"round": rnd, "loss": loss} for rnd, loss in run_flower_smoke(seed=seed)
         ],
     }
     return write_metrics_atomic(run_dir, metrics)

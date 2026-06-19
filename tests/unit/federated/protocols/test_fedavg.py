@@ -137,7 +137,9 @@ class TestRunFlTrainingRouting:
         captured = self._capture_sim_calls(monkeypatch)
 
         with pytest.raises(RuntimeError, match="stop-in-sim"):
-            run_fl_training(cfg, {}, seed, base_dir=tmp_path / "base", output_layout=layout)
+            run_fl_training(
+                cfg, {}, seed, base_dir=tmp_path / "base", output_layout=layout
+            )
 
         assert captured[0]["ckpt_dir"] == layout.checkpoint_dir(cell)
 

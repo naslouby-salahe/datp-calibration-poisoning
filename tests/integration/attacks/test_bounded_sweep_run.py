@@ -29,7 +29,7 @@ _N_FEATURES = 10
 _N_TRAIN = 200
 _N_CAL = 150
 _N_TEST = 50
-_N_CLIENTS = 4 # B4_CLUSTER's locked K=3 requires eligible_count > k
+_N_CLIENTS = 4  # B4_CLUSTER's locked K=3 requires eligible_count > k
 
 
 def _make_client_data(seed: int) -> dict[str, ClientData]:

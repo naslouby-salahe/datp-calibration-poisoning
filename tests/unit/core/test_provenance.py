@@ -31,7 +31,7 @@ class TestSha256Bytes:
 
     def test_output_is_64_char_hex(self) -> None:
         assert len(sha256_bytes(b"test")) == 64
-        int(sha256_bytes(b"test"), 16) # valid hex
+        int(sha256_bytes(b"test"), 16)  # valid hex
 
 
 # ── hash_file ─────────────────────────────────────────────────────────────
@@ -59,7 +59,9 @@ class TestHashFile:
         result = hash_file(f)
         assert len(result) == 64
         # Empty file has a well-known SHA-256
-        assert result == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        assert (
+            result == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
 
     def test_output_is_64_char_hex(self, tmp_path: Path) -> None:
         f = tmp_path / "f.bin"
@@ -129,7 +131,7 @@ class TestSourceHash:
         f2.write_text("y=2", encoding="utf-8")
         h_both = source_hash([f1, f2])
         h_one = source_hash([f1])
-        assert h_both != h_one # different because order + content differs
+        assert h_both != h_one  # different because order + content differs
 
     def test_path_order_matters(self, tmp_path: Path) -> None:
         f1 = tmp_path / "a.py"

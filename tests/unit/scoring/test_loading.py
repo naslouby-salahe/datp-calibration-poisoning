@@ -46,7 +46,9 @@ class TestReadScoreColumn:
         import pyarrow.parquet as pq
 
         path = tmp_path / "bad.parquet"
-        pq.write_table(pa.table({SCORE_COLUMN: pa.array([1, 2, 3], type=pa.int64())}), path)
+        pq.write_table(
+            pa.table({SCORE_COLUMN: pa.array([1, 2, 3], type=pa.int64())}), path
+        )
         with pytest.raises(TypeError, match="non-floating"):
             read_score_column(path)
 

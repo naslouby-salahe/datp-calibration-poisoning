@@ -74,7 +74,7 @@ class TestSimClientConfig:
     def test_is_frozen(self) -> None:
         c = SimClientConfig()
         with pytest.raises(Exception):
-            c.encoder_only = True # type: ignore[misc]
+            c.encoder_only = True  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ class TestTrainingResult:
     def test_is_frozen(self, tmp_path: Path) -> None:
         r = self._make(tmp_path)
         with pytest.raises(Exception):
-            r.seed = 99 # type: ignore[misc]
+            r.seed = 99  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ class TestExecuteFlowerSimulation:
 
         sim_mod._execute_flower_simulation(
             BASE_CONFIG,
-            lambda _ctx: None, # type: ignore[arg-type]
+            lambda _ctx: None,  # type: ignore[arg-type]
             7,
             None,
             "test",
@@ -306,7 +306,10 @@ class TestExecuteFlowerSimulation:
 
         assert called.get("num_supernodes") == 7
         assert len(resource_requests) == 1
-        assert resource_requests[0].per_client_ram_gb == BASE_CONFIG.machine.per_client_ram_gb
+        assert (
+            resource_requests[0].per_client_ram_gb
+            == BASE_CONFIG.machine.per_client_ram_gb
+        )
 
     def test_propagates_simulation_exception(
         self, monkeypatch: pytest.MonkeyPatch
@@ -330,7 +333,7 @@ class TestExecuteFlowerSimulation:
         with pytest.raises(RuntimeError, match="sim-boom"):
             sim_mod._execute_flower_simulation(
                 BASE_CONFIG,
-                lambda _ctx: None, # type: ignore[arg-type]
+                lambda _ctx: None,  # type: ignore[arg-type]
                 1,
                 None,
                 "test",

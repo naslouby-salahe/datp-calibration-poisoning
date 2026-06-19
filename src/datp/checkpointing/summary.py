@@ -72,7 +72,9 @@ def summarize_checkpoint_metrics(
     grouped: dict[tuple[Regime, Baseline, int], list[SweepMetrics]] = {}
     for item in metrics:
         if item.checkpoint_round is None:
-            raise ValueError(fmt(_MODULE, "Metric lacks checkpoint_round", "int", item.run_id))
+            raise ValueError(
+                fmt(_MODULE, "Metric lacks checkpoint_round", "int", item.run_id)
+            )
         key = (item.regime, item.baseline, item.checkpoint_round)
         grouped.setdefault(key, []).append(item)
     summaries: list[CheckpointBaselineSummary] = []
@@ -91,9 +93,13 @@ def summarize_checkpoint_metrics(
                 worst_client_tpr=_min(_worst_client_tpr(metric) for metric in items),
                 macro_f1=_mean(_mean_client_macro_f1(metric) for metric in items),
                 p10_macro_f1=_mean(metric.p10_macro_f1 for metric in items),
-                worst_client_balanced_accuracy=_min(metric.worst_ba for metric in items),
+                worst_client_balanced_accuracy=_min(
+                    metric.worst_ba for metric in items
+                ),
                 coverage_ratio=_min(metric.coverage_ratio for metric in items),
-                collapse_cell_count=sum(_collapse_cell_count(metric) for metric in items),
+                collapse_cell_count=sum(
+                    _collapse_cell_count(metric) for metric in items
+                ),
             )
         )
     return tuple(summaries)
@@ -106,9 +112,18 @@ def select_global_primary_checkpoint(
     bootstrap_seed: int,
 ) -> GlobalCheckpointSelection:
     if not metrics:
-        raise ValueError(fmt(_MODULE, "No checkpoint metrics supplied", "Regime A metrics", "empty"))
+        raise ValueError(
+            fmt(_MODULE, "No checkpoint metrics supplied", "Regime A metrics", "empty")
+        )
     if any(metric.regime != Regime.A for metric in metrics):
-        raise ValueError(fmt(_MODULE, "Selection input must be Regime A only", "regime a", "mixed regimes"))
+        raise ValueError(
+            fmt(
+                _MODULE,
+                "Selection input must be Regime A only",
+                "regime a",
+                "mixed regimes",
+            )
+        )
     summaries = summarize_checkpoint_metrics(metrics)
     b2_by_round = {
         summary.checkpoint_round: summary
@@ -179,7 +194,9 @@ def _regime_a_comparisons(
     grouped: dict[int, dict[Baseline, dict[int, SweepMetrics]]] = {}
     for metric in metrics:
         if metric.checkpoint_round is None:
-            raise ValueError(fmt(_MODULE, "Metric lacks checkpoint_round", "int", metric.run_id))
+            raise ValueError(
+                fmt(_MODULE, "Metric lacks checkpoint_round", "int", metric.run_id)
+            )
         baseline_map = grouped.setdefault(metric.checkpoint_round, {})
         seed_map = baseline_map.setdefault(metric.baseline, {})
         seed_map[metric.seed] = metric
@@ -192,11 +209,17 @@ def _regime_a_comparisons(
             continue
         seeds = tuple(sorted(set(b1) & set(b2)))
         if len(seeds) < 3:
-            raise ValueError(fmt(_MODULE, "BCa checkpoint selection needs at least 3 paired seeds", ">=3", str(len(seeds))))
+            raise ValueError(
+                fmt(
+                    _MODULE,
+                    "BCa checkpoint selection needs at least 3 paired seeds",
+                    ">=3",
+                    str(len(seeds)),
+                )
+            )
         cv_deltas = tuple(b1[seed].cv_fpr - b2[seed].cv_fpr for seed in seeds)
         worst_deltas = tuple(
-            b1[seed].worst_client_fpr - b2[seed].worst_client_fpr
-            for seed in seeds
+            b1[seed].worst_client_fpr - b2[seed].worst_client_fpr for seed in seeds
         )
         b1_cv = np.array([b1[seed].cv_fpr for seed in seeds], dtype=np.float64)
         b2_cv = np.array([b2[seed].cv_fpr for seed in seeds], dtype=np.float64)
@@ -238,16 +261,22 @@ def _collapse_cell_count(metric: SweepMetrics) -> int:
 
 
 def _mean_client_tpr(metric: SweepMetrics) -> float:
-    return _mean(detail.tpr for detail in metric.per_client if not detail.calibration_pending)
+    return _mean(
+        detail.tpr for detail in metric.per_client if not detail.calibration_pending
+    )
 
 
 def _worst_client_tpr(metric: SweepMetrics) -> float:
-    return _min(detail.tpr for detail in metric.per_client if not detail.calibration_pending)
+    return _min(
+        detail.tpr for detail in metric.per_client if not detail.calibration_pending
+    )
 
 
 def _mean_client_macro_f1(metric: SweepMetrics) -> float:
     return _mean(
-        detail.macro_f1 for detail in metric.per_client if not detail.calibration_pending
+        detail.macro_f1
+        for detail in metric.per_client
+        if not detail.calibration_pending
     )
 
 

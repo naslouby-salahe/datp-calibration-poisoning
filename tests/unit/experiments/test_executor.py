@@ -54,7 +54,6 @@ def _make_request(
     )
 
 
-
 class TestIsolatedBaselinesConstant:
     def test_does_not_contain_shared_baselines(self) -> None:
         for bl in (Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4):
@@ -112,7 +111,7 @@ class TestIsolatedBaselineExecutor:
         request = _make_request(Baseline.B0, tmp_path)
 
         with patch("datp.experiments.baselines.b0_centralized.run_b0"):
-            executor.run(request) # should not raise
+            executor.run(request)  # should not raise
 
     def test_error_message_includes_isolated_baselines(self, tmp_path: Path) -> None:
         executor = IsolatedBaselineExecutor(step_fn=None)
@@ -123,9 +122,7 @@ class TestIsolatedBaselineExecutor:
 
 class TestSharedTrainingExecutor:
     def test_instantiation(self) -> None:
-        executor = SharedTrainingExecutor(
-            step_fn=None, checkpoint_status_fn=None
-        )
+        executor = SharedTrainingExecutor(step_fn=None, checkpoint_status_fn=None)
         assert executor._step_fn is None
         assert executor._checkpoint_status_fn is None
 
@@ -142,9 +139,7 @@ class TestSharedTrainingExecutor:
 
         with (
             patch.object(executor, "_step_fn", wraps=record_step),
-            patch(
-                "datp.experiments.executor.ensure_fl_checkpoint"
-            ) as mock_ensure,
+            patch("datp.experiments.executor.ensure_fl_checkpoint") as mock_ensure,
             patch(
                 "datp.experiments.executor.load_main_cal_errors",
                 return_value={"c1": np.array([0.1, 0.2])},
@@ -167,12 +162,12 @@ class TestSharedTrainingExecutor:
 
         mock_ensure.assert_called_once()
         assert isinstance(ctx, SharedPipelineContext)
-        assert len(step_calls) >= 3 # LOAD_CAL_SCORES, COMPUTE_ELIGIBILITY, COMPUTE_TAU_GLOBAL, INIT_SCORE_PROVIDER
+        assert (
+            len(step_calls) >= 3
+        )  # LOAD_CAL_SCORES, COMPUTE_ELIGIBILITY, COMPUTE_TAU_GLOBAL, INIT_SCORE_PROVIDER
 
     def test_build_context_returns_typed_context(self, tmp_path: Path) -> None:
-        executor = SharedTrainingExecutor(
-            step_fn=None, checkpoint_status_fn=None
-        )
+        executor = SharedTrainingExecutor(step_fn=None, checkpoint_status_fn=None)
         request = _make_request(Baseline.B1, tmp_path)
 
         with (
@@ -300,7 +295,7 @@ class TestThresholdEvaluationExecutor:
         ):
             executor.run(request, ctx)
 
-        assert len(step_calls) >= 3 # DERIVE_THRESHOLD, EVALUATE, WRITE_METRICS
+        assert len(step_calls) >= 3  # DERIVE_THRESHOLD, EVALUATE, WRITE_METRICS
         assert step_calls[0][0] == SweepStep.DERIVE_THRESHOLD
 
 

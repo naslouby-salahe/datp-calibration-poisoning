@@ -42,7 +42,9 @@ def convergence_payload(checkpoint: Path) -> ConvergencePayload:
         status = ConvergenceStatus.UNKNOWN
     return ConvergencePayload(
         convergence_round=payload[ConvergenceSummaryKey.CONVERGENCE_ROUND],
-        convergence_criterion_value=payload[ConvergenceSummaryKey.CONVERGENCE_CRITERION],
+        convergence_criterion_value=payload[
+            ConvergenceSummaryKey.CONVERGENCE_CRITERION
+        ],
         convergence_status=status,
         curve_path=str(curve_path) if curve_path.exists() else None,
     )

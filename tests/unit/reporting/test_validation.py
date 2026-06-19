@@ -29,10 +29,10 @@ def test_rejects_non_baseline_value() -> None:
     ``MAIN_BODY_BASELINES`` membership check.
     """
     with pytest.raises(ValueError, match="not permitted"):
-        validate_main_body_role(["not_a_baseline"]) # type: ignore[list-item]
+        validate_main_body_role(["not_a_baseline"])  # type: ignore[list-item]
 
 
 def test_mixed_valid_and_invalid_raises() -> None:
     """When any element is not in MAIN_BODY_BASELINES the whole list is rejected."""
     with pytest.raises(ValueError, match="not permitted"):
-        validate_main_body_role([Baseline.B1, "b_unknown"]) # type: ignore[list-item]
+        validate_main_body_role([Baseline.B1, "b_unknown"])  # type: ignore[list-item]

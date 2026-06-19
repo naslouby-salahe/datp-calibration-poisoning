@@ -187,4 +187,4 @@ def test_score_cell_location_is_frozen(tmp_path: Path) -> None:
         cell_dir=tmp_path,
     )
     with pytest.raises(Exception):
-        loc.cell_dir = tmp_path / "other" # type: ignore[misc]
+        loc.cell_dir = tmp_path / "other"  # type: ignore[misc]

@@ -46,7 +46,9 @@ def prepare_regime_data(
         )
     if regime == Regime.C:
         if alpha is None:
-            raise ValueError(fmt("data.regimes", "alpha is required for regime c", "float", "None"))
+            raise ValueError(
+                fmt("data.regimes", "alpha is required for regime c", "float", "None")
+            )
         return partition_regime_c(
             raw_nbaiot_dir=raw_dir,
             output_dir=output_dir,
@@ -57,4 +59,6 @@ def prepare_regime_data(
             train_frac=train_frac,
             cal_frac=cal_frac,
         )
-    raise ValueError(fmt("data.regimes", "Unknown regime", "'a', 'b', or 'c'", repr(regime)))
+    raise ValueError(
+        fmt("data.regimes", "Unknown regime", "'a', 'b', or 'c'", repr(regime))
+    )

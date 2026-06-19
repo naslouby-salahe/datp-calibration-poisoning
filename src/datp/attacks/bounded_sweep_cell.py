@@ -51,7 +51,9 @@ def lock_mu_flag_threshold(
         ThresholdPolicy.B1_GLOBAL,
     )
     clean_metrics = compute_metrics(
-        MetricEngineInput(collection=collection, pair=clean_b1_pair, mu_flag_threshold=None)
+        MetricEngineInput(
+            collection=collection, pair=clean_b1_pair, mu_flag_threshold=None
+        )
     )
     return compute_mu_flag_threshold(clean_metrics.fleet_fpr.mean_fpr)
 

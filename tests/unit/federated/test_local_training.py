@@ -19,7 +19,9 @@ from datp.modeling.autoencoder import Autoencoder
 
 
 def _make_model() -> Autoencoder:
-    return Autoencoder(input_dim=4, hidden_dims=[3, 2], activation=Activation.RELU, use_bn=False)
+    return Autoencoder(
+        input_dim=4, hidden_dims=[3, 2], activation=Activation.RELU, use_bn=False
+    )
 
 
 class TestTrainLocal:
@@ -32,7 +34,9 @@ class TestTrainLocal:
         assert isinstance(loss, float)
         assert not torch.isnan(torch.tensor(loss))
 
-    def test_optimizer_uses_no_weight_decay(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_optimizer_uses_no_weight_decay(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Scope guard: local training uses no weight decay. Adding L2 regularization
         # would be an unmotivated change to the optimization regime.
         captured: dict[str, float] = {}

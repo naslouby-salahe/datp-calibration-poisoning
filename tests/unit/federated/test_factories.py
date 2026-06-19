@@ -75,36 +75,28 @@ class TestBuildModel:
         cfg.model.encoder_dims = [8, 4]
         model = build_model(cfg)
         # Encoder should have 4 linear layers: 4→8, 8→4, BN, ReLU patterns.
-        linear_layers = [
-            m for m in model.encoder if isinstance(m, torch.nn.Linear)
-        ]
+        linear_layers = [m for m in model.encoder if isinstance(m, torch.nn.Linear)]
         assert len(linear_layers) >= 2
 
     def test_respects_activation(self) -> None:
         cfg = _make_cfg()
         cfg.model.activation = Activation.TANH
         model = build_model(cfg)
-        activations = [
-            m for m in model.encoder if isinstance(m, torch.nn.Tanh)
-        ]
+        activations = [m for m in model.encoder if isinstance(m, torch.nn.Tanh)]
         assert len(activations) >= 1
 
     def test_respects_use_bn(self) -> None:
         cfg = _make_cfg()
         cfg.model.use_bn = True
         model = build_model(cfg)
-        bn_layers = [
-            m for m in model.encoder if isinstance(m, torch.nn.BatchNorm1d)
-        ]
+        bn_layers = [m for m in model.encoder if isinstance(m, torch.nn.BatchNorm1d)]
         assert len(bn_layers) >= 1
 
     def test_no_bn_when_disabled(self) -> None:
         cfg = _make_cfg()
         cfg.model.use_bn = False
         model = build_model(cfg)
-        bn_layers = [
-            m for m in model.encoder if isinstance(m, torch.nn.BatchNorm1d)
-        ]
+        bn_layers = [m for m in model.encoder if isinstance(m, torch.nn.BatchNorm1d)]
         assert len(bn_layers) == 0
 
     def test_custom_model_cls(self) -> None:
@@ -255,7 +247,9 @@ class TestWorkerSideSeeding:
         client_ids = sorted(client_data.keys())
 
         with patch("datp.federated.factories.set_seeds") as mock_seeds:
-            fn = make_client_fn(client_data, client_ids, cfg, torch.device(DeviceType.CPU))
+            fn = make_client_fn(
+                client_data, client_ids, cfg, torch.device(DeviceType.CPU)
+            )
             fn(_make_context(0))
 
         mock_seeds.assert_not_called()

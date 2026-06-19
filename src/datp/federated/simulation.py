@@ -157,7 +157,9 @@ def _execute_flower_simulation(
             num_gpus_per_client=cfg.machine.ray_num_gpus_per_client,
         )
     )
-    object_store_preflight = check_object_store_capacity(cfg.machine.ray_object_store_mb)
+    object_store_preflight = check_object_store_capacity(
+        cfg.machine.ray_object_store_mb
+    )
     logger.info(
         "ray object-store preflight",
         object_store_mb=object_store_preflight["object_store_mb"],
@@ -177,10 +179,13 @@ def _execute_flower_simulation(
         num_supernodes=num_clients,
         client_app=ClientApp(client_fn=client_fn),
         server_app=ServerApp(server_fn=server_fn),
-        backend_config=cast(BackendConfig, {
-            "init_args": {"object_store_memory": object_store_bytes},
-            "client_resources": client_resources,
-        }),
+        backend_config=cast(
+            BackendConfig,
+            {
+                "init_args": {"object_store_memory": object_store_bytes},
+                "client_resources": client_resources,
+            },
+        ),
         exit_event=EventType.PYTHON_API_RUN_SIMULATION_LEAVE,
     )
     logger.info("ray shutdown after FL simulation", label=label)
@@ -521,12 +526,14 @@ def run_fl_simulation(
                 scoring_batch_size=cfg.machine.scoring_batch_size,
             )
 
-    log_params({
-        "regime": str(regime),
-        "seed": str(seed),
-        "rounds_max": str(effective_rounds_max),
-        "label": label,
-    })
+    log_params(
+        {
+            "regime": str(regime),
+            "seed": str(seed),
+            "rounds_max": str(effective_rounds_max),
+            "label": label,
+        }
+    )
     log_metrics(
         {
             "converged_round": float(converged_round)

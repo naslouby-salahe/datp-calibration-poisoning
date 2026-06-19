@@ -570,7 +570,7 @@ def test_recomputation_excludes_attack_metrics_when_n_attack_zero() -> None:
         append_recomputation_records,
     )
     from datp.validation.enums import DenominatorStatus
-    
+
     records: list = []
     append_recomputation_records(
         records,
@@ -607,7 +607,7 @@ def test_recomputation_fails_on_denominator_mismatch() -> None:
         append_recomputation_records,
     )
     from datp.validation.enums import DenominatorStatus
-    
+
     records: list = []
     # confusion matrix: fp=1, tn=8 → actual n_benign used internally = 9
     # stored row says n_benign=10 and fpr=0.1 (= 1/10), but recomputed = 1/9 ≈ 0.111

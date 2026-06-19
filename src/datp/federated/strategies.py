@@ -87,7 +87,9 @@ def _build_participation_failure_report(
         failed_ids.append(cid)
         status = getattr(res, "status", None)
         reason = getattr(status, "message", None) or getattr(status, "code", None)
-        reasons.append(f"{cid}: {reason}" if reason else f"{cid}: returned failure status")
+        reasons.append(
+            f"{cid}: {reason}" if reason else f"{cid}: returned failure status"
+        )
     return ParticipationFailureReport(
         stage=stage,
         server_round=server_round,
@@ -272,7 +274,9 @@ class DatpFedAvg(FedAvg):
 
         self._monitor.record(server_round, weighted_loss)
 
-        stop_on_convergence = self._convergence_mode == CheckpointConvergenceMode.EARLY_STOP
+        stop_on_convergence = (
+            self._convergence_mode == CheckpointConvergenceMode.EARLY_STOP
+        )
         if self._monitor.should_stop(
             server_round, stop_on_convergence=stop_on_convergence
         ):

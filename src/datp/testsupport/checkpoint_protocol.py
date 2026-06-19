@@ -60,8 +60,16 @@ def _fake_metric(
     worst_ba: float,
 ) -> SweepMetrics:
     per_client = (
-        _client_detail("c1", fpr=worst_fpr, tpr=0.95, macro_f1=p10_macro_f1, ba=worst_ba),
-        _client_detail("c2", fpr=max(worst_fpr - 0.05, 0.0), tpr=0.96, macro_f1=p10_macro_f1 + 0.02, ba=worst_ba + 0.01),
+        _client_detail(
+            "c1", fpr=worst_fpr, tpr=0.95, macro_f1=p10_macro_f1, ba=worst_ba
+        ),
+        _client_detail(
+            "c2",
+            fpr=max(worst_fpr - 0.05, 0.0),
+            tpr=0.96,
+            macro_f1=p10_macro_f1 + 0.02,
+            ba=worst_ba + 0.01,
+        ),
     )
     aggregate = {
         "cv_fpr": cv_fpr,

@@ -166,7 +166,11 @@ def run_sweep(
 
 def _cell_is_done(cell: BaselineRunId, base_dir: Path) -> bool:
     ckpt_proto = BASE_CONFIG.checkpoint_protocol
-    if ckpt_proto is not None and ckpt_proto.enabled and cell.baseline not in ISOLATED_BASELINES:
+    if (
+        ckpt_proto is not None
+        and ckpt_proto.enabled
+        and cell.baseline not in ISOLATED_BASELINES
+    ):
         layout = ArtifactLayout(base_dir=base_dir, regime=cell.regime)
         return all(
             layout.baseline_run_for_round(cell, checkpoint_round).metrics_path.exists()
@@ -308,11 +312,15 @@ def _run_isolated_with_accounting(
     try:
         executor.run(request)
         result.completed += 1
-        console.print_baseline_result(cell.baseline, BaselineRunStatus.DONE, time.monotonic() - t0)
+        console.print_baseline_result(
+            cell.baseline, BaselineRunStatus.DONE, time.monotonic() - t0
+        )
     except Exception:
         logger.exception("cell failed", cell=cell.label())
         result.failed += 1
-        console.print_baseline_result(cell.baseline, BaselineRunStatus.FAILED, time.monotonic() - t0)
+        console.print_baseline_result(
+            cell.baseline, BaselineRunStatus.FAILED, time.monotonic() - t0
+        )
 
 
 def _sort_key(k: TrainingCellId) -> tuple[Regime, int, float]:
@@ -383,7 +391,9 @@ def _run_shared_cell_evaluation(
     )
     try:
         evaluator.run(cell_request, ctx)
-        console.print_baseline_result(cell.baseline, BaselineRunStatus.DONE, time.monotonic() - t0)
+        console.print_baseline_result(
+            cell.baseline, BaselineRunStatus.DONE, time.monotonic() - t0
+        )
         return True
     except Exception:
         logger.exception(
@@ -439,7 +449,9 @@ def _run_shared_fl_group(
             prepared_dir=prepared_dir,
             checkpoint_round=checkpoint_round,
         )
-        ctx = _build_shared_context(trainer, context_request, group_cells, checkpoint_round)
+        ctx = _build_shared_context(
+            trainer, context_request, group_cells, checkpoint_round
+        )
         if ctx is None:
             failed += len(group_cells)
             continue

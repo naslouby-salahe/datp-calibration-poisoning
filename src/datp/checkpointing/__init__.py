@@ -1,2 +1,1 @@
 """Journal checkpoint protocol helpers."""
-

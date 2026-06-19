@@ -42,7 +42,7 @@ class TestSeedRecord:
             training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0
         )
         with pytest.raises(Exception):
-            record.training_seed = 99 # type: ignore[misc]
+            record.training_seed = 99  # type: ignore[misc]
 
     def test_entropy_is_tuple_of_four(self) -> None:
         record = _seed_record(
@@ -117,12 +117,18 @@ class TestMakeRng:
 
     def test_different_child_indices_produce_different_sequences(self) -> None:
         rng0 = make_seed_rng(
-            training_seed=0, poisoning_seed=100, client_idx=0,
-            scope_idx=0, child_index=0,
+            training_seed=0,
+            poisoning_seed=100,
+            client_idx=0,
+            scope_idx=0,
+            child_index=0,
         )
         rng1 = make_seed_rng(
-            training_seed=0, poisoning_seed=100, client_idx=0,
-            scope_idx=0, child_index=1,
+            training_seed=0,
+            poisoning_seed=100,
+            client_idx=0,
+            scope_idx=0,
+            child_index=1,
         )
         assert not np.array_equal(rng0.random(10), rng1.random(10))
 

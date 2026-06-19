@@ -94,7 +94,9 @@ class ConvergenceMonitor:
             n_recorded=len(self._losses),
         )
 
-    def should_stop(self, server_round: int, *, stop_on_convergence: bool = True) -> bool:
+    def should_stop(
+        self, server_round: int, *, stop_on_convergence: bool = True
+    ) -> bool:
         if self._converged_round is not None:
             return stop_on_convergence
 

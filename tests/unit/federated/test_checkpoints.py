@@ -89,12 +89,15 @@ class TestSaveConvergenceArtifacts:
         )
         save_convergence_artifacts(tmp_path, snapshot, _make_conv_cfg())
 
-        payload = json.loads(
-            (tmp_path / ArtifactFile.CONVERGENCE_SUMMARY).read_text()
-        )
+        payload = json.loads((tmp_path / ArtifactFile.CONVERGENCE_SUMMARY).read_text())
         assert payload[ConvergenceSummaryKey.CONVERGENCE_ROUND] == 3
-        assert payload[ConvergenceSummaryKey.CONVERGENCE_CRITERION] == pytest.approx(0.02)
-        assert payload[ConvergenceSummaryKey.CONVERGENCE_STATUS] == ConvergenceStatus.CONVERGED
+        assert payload[ConvergenceSummaryKey.CONVERGENCE_CRITERION] == pytest.approx(
+            0.02
+        )
+        assert (
+            payload[ConvergenceSummaryKey.CONVERGENCE_STATUS]
+            == ConvergenceStatus.CONVERGED
+        )
         assert payload[ConvergenceSummaryKey.ACTUAL_ROUNDS] == 3
         assert payload[ConvergenceSummaryKey.ROUNDS_INITIAL] == 5
 
@@ -106,12 +109,13 @@ class TestSaveConvergenceArtifacts:
         )
         save_convergence_artifacts(tmp_path, snapshot, _make_conv_cfg())
 
-        payload = json.loads(
-            (tmp_path / ArtifactFile.CONVERGENCE_SUMMARY).read_text()
-        )
+        payload = json.loads((tmp_path / ArtifactFile.CONVERGENCE_SUMMARY).read_text())
         assert payload[ConvergenceSummaryKey.CONVERGENCE_ROUND] is None
         assert payload[ConvergenceSummaryKey.CONVERGENCE_CRITERION] is None
-        assert payload[ConvergenceSummaryKey.CONVERGENCE_STATUS] == ConvergenceStatus.NOT_CONVERGED
+        assert (
+            payload[ConvergenceSummaryKey.CONVERGENCE_STATUS]
+            == ConvergenceStatus.NOT_CONVERGED
+        )
 
     def test_empty_loss_history(self, tmp_path: Path) -> None:
         snapshot = ConvergenceSnapshot(
@@ -121,9 +125,7 @@ class TestSaveConvergenceArtifacts:
         )
         save_convergence_artifacts(tmp_path, snapshot, _make_conv_cfg())
 
-        payload = json.loads(
-            (tmp_path / ArtifactFile.CONVERGENCE_SUMMARY).read_text()
-        )
+        payload = json.loads((tmp_path / ArtifactFile.CONVERGENCE_SUMMARY).read_text())
         assert payload[ConvergenceSummaryKey.ACTUAL_ROUNDS] == 0
         assert payload[ConvergenceSummaryKey.WEIGHTED_LOSS] == []
 
@@ -155,7 +157,7 @@ class TestConvergenceSnapshot:
             criterion_value=0.0,
         )
         with pytest.raises(Exception):
-            s.converged_round = 5 # type: ignore[misc]
+            s.converged_round = 5  # type: ignore[misc]
 
 
 class TestSaveParamsSnapshot:

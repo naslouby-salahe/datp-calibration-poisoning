@@ -12,7 +12,7 @@ from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
 from datp.thresholding.thresholds import _DeriveInput, derive_threshold
 from datp.validation._audit_helpers import _threshold_result
 
-_REAL_DEVICES = list(DEVICE_FAMILY_MAP.keys()) # 9 real N-BaIoT device names
+_REAL_DEVICES = list(DEVICE_FAMILY_MAP.keys())  # 9 real N-BaIoT device names
 
 
 def _make_cal_errors(
@@ -50,15 +50,17 @@ def test_threshold_result_equals_derive_threshold_regime_a(baseline: Baseline) -
         tau_global,
         cfg=cfg,
     )
-    canonical_result = derive_threshold(_DeriveInput(
-        baseline=baseline,
-        client_errors=cal_errors,
-        n_min=cfg.threshold.n_min,
-        q=cfg.threshold.q,
-        tau_global=tau_global,
-        regime=Regime.A,
-        threshold_cfg=cfg.threshold,
-    ))
+    canonical_result = derive_threshold(
+        _DeriveInput(
+            baseline=baseline,
+            client_errors=cal_errors,
+            n_min=cfg.threshold.n_min,
+            q=cfg.threshold.q,
+            tau_global=tau_global,
+            regime=Regime.A,
+            threshold_cfg=cfg.threshold,
+        )
+    )
 
     assert audit_result is not None, f"audit returned None for {baseline}"
     assert canonical_result is not None
@@ -92,15 +94,17 @@ def test_b4_silhouette_mode_parity() -> None:
         tau_global,
         cfg=cfg,
     )
-    canonical_result = derive_threshold(_DeriveInput(
-        baseline=Baseline.B4,
-        client_errors=cal_errors,
-        n_min=cfg.threshold.n_min,
-        q=cfg.threshold.q,
-        tau_global=tau_global,
-        regime=Regime.A,
-        threshold_cfg=cfg.threshold,
-    ))
+    canonical_result = derive_threshold(
+        _DeriveInput(
+            baseline=Baseline.B4,
+            client_errors=cal_errors,
+            n_min=cfg.threshold.n_min,
+            q=cfg.threshold.q,
+            tau_global=tau_global,
+            regime=Regime.A,
+            threshold_cfg=cfg.threshold,
+        )
+    )
 
     assert audit_result is not None
     assert canonical_result is not None
@@ -131,15 +135,17 @@ def test_b4_fixed_mode_parity() -> None:
         tau_global,
         cfg=cfg,
     )
-    canonical_result = derive_threshold(_DeriveInput(
-        baseline=Baseline.B4,
-        client_errors=cal_errors,
-        n_min=cfg.threshold.n_min,
-        q=cfg.threshold.q,
-        tau_global=tau_global,
-        regime=Regime.A,
-        threshold_cfg=cfg.threshold,
-    ))
+    canonical_result = derive_threshold(
+        _DeriveInput(
+            baseline=Baseline.B4,
+            client_errors=cal_errors,
+            n_min=cfg.threshold.n_min,
+            q=cfg.threshold.q,
+            tau_global=tau_global,
+            regime=Regime.A,
+            threshold_cfg=cfg.threshold,
+        )
+    )
 
     assert audit_result is not None
     assert canonical_result is not None

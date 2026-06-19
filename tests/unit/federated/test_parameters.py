@@ -90,7 +90,7 @@ class TestSetParametersDevice:
 
 class TestEmptyModel:
     def test_get_parameters_empty_model(self) -> None:
-        model = nn.Sequential() # zero parameters
+        model = nn.Sequential()  # zero parameters
         params = get_parameters(model)
         assert params == []
 

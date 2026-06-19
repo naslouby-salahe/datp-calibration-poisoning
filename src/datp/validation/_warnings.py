@@ -172,11 +172,7 @@ def check_b2_utility_tradeoff(
         and b2.auroc_mean < b1.auroc_mean
     ):
         worsened.append(MetricName.AUROC)
-    if (
-        b1.cv_tpr is not None
-        and b2.cv_tpr is not None
-        and b2.cv_tpr < b1.cv_tpr
-    ):
+    if b1.cv_tpr is not None and b2.cv_tpr is not None and b2.cv_tpr < b1.cv_tpr:
         worsened.append(MetricName.CV_TPR)
     if worsened:
         warnings.append(

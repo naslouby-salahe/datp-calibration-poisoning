@@ -102,9 +102,7 @@ class B4ClusterConfig(BaseModel):
     @classmethod
     def k_must_be_three_for_regime_a(cls, v: int) -> int:
         if v != 3:
-            raise ValueError(
-                f"B4 k must be 3 for Regime A (N-BaIoT); got {v}"
-            )
+            raise ValueError(f"B4 k must be 3 for Regime A (N-BaIoT); got {v}")
         return v
 
 
@@ -187,9 +185,7 @@ class CalibrationPoisoningConfig(BaseModel):
         cls, v: CalibrationInjectionRule
     ) -> CalibrationInjectionRule:
         if v != CalibrationInjectionRule.REPLACE_FIXED_BUDGET:
-            raise ValueError(
-                f"injection_rule must be REPLACE_FIXED_BUDGET; got {v}"
-            )
+            raise ValueError(f"injection_rule must be REPLACE_FIXED_BUDGET; got {v}")
         return v
 
     @model_validator(mode="after")
@@ -198,8 +194,5 @@ class CalibrationPoisoningConfig(BaseModel):
             self.scale == ExperimentScale.BOUNDED
             and self.target_scope != PoisoningTargetScope.SINGLE_CLIENT
         ):
-            raise ValueError(
-                "BOUNDED scale requires SINGLE_CLIENT target scope"
-            )
+            raise ValueError("BOUNDED scale requires SINGLE_CLIENT target scope")
         return self
-

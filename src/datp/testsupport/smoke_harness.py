@@ -137,11 +137,11 @@ def run_smoke_cell(
             scope_idx=scope_idx,
         ),
     )
-    clean_pair = recompute_pair(
-        collection, clean_outcome.poisoned_cal_set, policy
-    )
+    clean_pair = recompute_pair(collection, clean_outcome.poisoned_cal_set, policy)
     clean_metrics = compute_metrics(
-        MetricEngineInput(collection=collection, pair=clean_pair, mu_flag_threshold=None)
+        MetricEngineInput(
+            collection=collection, pair=clean_pair, mu_flag_threshold=None
+        )
     )
 
     # Lock mu_flag_threshold from the clean fleet FPR.
@@ -160,11 +160,11 @@ def run_smoke_cell(
             scope_idx=scope_idx,
         ),
     )
-    poisoned_pair = recompute_pair(
-        collection, outcome.poisoned_cal_set, policy
-    )
+    poisoned_pair = recompute_pair(collection, outcome.poisoned_cal_set, policy)
     poisoned_metrics = compute_metrics(
-        MetricEngineInput(collection=collection, pair=poisoned_pair, mu_flag_threshold=mu_flag)
+        MetricEngineInput(
+            collection=collection, pair=poisoned_pair, mu_flag_threshold=mu_flag
+        )
     )
 
     return SmokeCellResult(
@@ -211,9 +211,7 @@ def victim_seed_deltas(
             spec=InjectionSpec(
                 source=source,
                 fraction=fraction,
-                seed_pair=SeedPair(
-                    training_seed=training_seed, poisoning_seed=ps
-                ),
+                seed_pair=SeedPair(training_seed=training_seed, poisoning_seed=ps),
                 scope_idx=scope_idx,
             ),
         )

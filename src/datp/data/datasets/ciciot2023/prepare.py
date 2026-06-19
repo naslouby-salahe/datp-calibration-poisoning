@@ -39,13 +39,15 @@ _CICIOT_MODULE = "data.ciciot"
 def _clean_client_frame(df: pl.DataFrame, features: list[str]) -> pl.DataFrame:
     before = len(df)
 
-    df = df.with_columns([
-        pl.when(pl.col(col).is_infinite())
-        .then(None)
-        .otherwise(pl.col(col))
-        .alias(col)
-        for col in features
-    ])
+    df = df.with_columns(
+        [
+            pl.when(pl.col(col).is_infinite())
+            .then(None)
+            .otherwise(pl.col(col))
+            .alias(col)
+            for col in features
+        ]
+    )
 
     cleaned = df.drop_nulls(subset=[*features, LABEL_COLUMN])
     dropped = before - len(cleaned)
@@ -131,7 +133,8 @@ def validate_schema(raw_dir: Path) -> None:
         _validate_sample_rows(csv_file, sample_df)
 
     logger.info(
-        "CICIoT2023 schema validation passed", n_files=len(csv_files),
+        "CICIoT2023 schema validation passed",
+        n_files=len(csv_files),
     )
 
 
@@ -160,7 +163,9 @@ def _prepare_client(
     if calibration_pending:
         logger.warning(
             "client PRE-CAP benign cal estimate below n_min",
-            client=client_id, cal_estimate=cal_estimate, n_min=n_min,
+            client=client_id,
+            cal_estimate=cal_estimate,
+            n_min=n_min,
         )
 
     df_capped = apply_ciciot_cap(
@@ -169,7 +174,7 @@ def _prepare_client(
         label_column=LABEL_COLUMN,
         benign_label=BENIGN_LABEL,
         attack_reserve_fraction=attack_reserve_fraction,
-        seed=seed
+        seed=seed,
     )
 
     benign_capped = df_capped.filter(pl.col(LABEL_COLUMN) == BENIGN_LABEL)
@@ -195,7 +200,9 @@ def _prepare_client(
     else:
         n_train = round(n_benign * 0.70)
         n_cal = round(n_benign * CAL_FRACTION)
-        shuffled = benign_features.sample(fraction=1.0, seed=seed, with_replacement=False)
+        shuffled = benign_features.sample(
+            fraction=1.0, seed=seed, with_replacement=False
+        )
         train_df = shuffled.slice(0, n_train)
         cal_df = shuffled.slice(n_train, n_cal)
         test_benign_df = shuffled.slice(n_train + n_cal)
@@ -228,7 +235,8 @@ def _prepare_client(
     if len(attack_capped) > 0:
         attack_labels_series = attack_capped[LABEL_COLUMN]
         unknown = [
-            lbl for lbl in attack_labels_series.unique().to_list()
+            lbl
+            for lbl in attack_labels_series.unique().to_list()
             if lbl != BENIGN_LABEL and attack_family(lbl) is None
         ]
         if unknown:
@@ -262,9 +270,12 @@ def _prepare_client(
     logger.info(
         "client prepared",
         client=client_id,
-        train=len(train_scaled), cal=len(cal_scaled),
-        test_benign=len(test_benign_scaled), test_attack=len(test_attack_scaled),
-        cal_pending=calibration_pending, eval_incomplete=evaluation_incomplete,
+        train=len(train_scaled),
+        cal=len(cal_scaled),
+        test_benign=len(test_benign_scaled),
+        test_attack=len(test_attack_scaled),
+        cal_pending=calibration_pending,
+        eval_incomplete=evaluation_incomplete,
     )
 
     return PartitionResult(
@@ -306,7 +317,13 @@ def prepare_ciciot(
     for csv_file in csv_files:
         client_id = csv_file.stem
         results[client_id] = _prepare_client(
-            client_id, csv_file, client_root, cap=cap, n_min=n_min, seed=seed, attack_reserve_fraction=attack_reserve_fraction,
+            client_id,
+            csv_file,
+            client_root,
+            cap=cap,
+            n_min=n_min,
+            seed=seed,
+            attack_reserve_fraction=attack_reserve_fraction,
         )
 
     eligible = sum(1 for v in results.values() if not v.calibration_pending)
@@ -314,7 +331,10 @@ def prepare_ciciot(
     eval_incomplete = sum(1 for v in results.values() if v.evaluation_incomplete)
     logger.info(
         "CICIoT2023 preparation complete",
-        eligible=eligible, pending=pending, eval_incomplete=eval_incomplete, total=len(results),
+        eligible=eligible,
+        pending=pending,
+        eval_incomplete=eval_incomplete,
+        total=len(results),
     )
 
     create_manifest(

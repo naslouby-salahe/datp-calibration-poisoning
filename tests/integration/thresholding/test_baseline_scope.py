@@ -29,7 +29,7 @@ class TestEnforceRegimeDecorator:
 
     def test_missing_regime_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="requires 'regime'"):
-            _dummy_regime_a() # type: ignore[call-arg]
+            _dummy_regime_a()  # type: ignore[call-arg]
 
     def test_multiple_allowed_regimes(self) -> None:
         assert _dummy_regime_ab(regime=Regime.A) == "ran with regime=a"

@@ -30,7 +30,9 @@ class CheckpointArtifactCellStatus:
         return (
             self.checkpoint == CheckpointArtifactStatus.PRESENT
             and self.scores == CheckpointArtifactStatus.PRESENT
-            and all(status == CheckpointArtifactStatus.PRESENT for status in result_statuses)
+            and all(
+                status == CheckpointArtifactStatus.PRESENT for status in result_statuses
+            )
         )
 
 

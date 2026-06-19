@@ -30,4 +30,3 @@ class RunState(StrEnum):
     DONE = "DONE"
     ABORTED = "ABORTED"
     CORRUPT = "CORRUPT"
-

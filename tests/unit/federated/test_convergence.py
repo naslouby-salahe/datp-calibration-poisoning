@@ -29,7 +29,7 @@ class TestConvergenceTrigger:
 
         assert stop_round is not None
         assert stop_round >= 5
-        assert stop_round >= 2 * 4 # 2*window
+        assert stop_round >= 2 * 4  # 2*window
         assert monitor.converged_round == stop_round
 
     def test_gradual_convergence(self) -> None:
@@ -46,7 +46,7 @@ class TestConvergenceTrigger:
 
         assert stop_round is not None
         assert stop_round >= 10
-        assert stop_round >= 2 * 5 # 2*window
+        assert stop_round >= 2 * 5  # 2*window
 
     def test_window_mean_comparison_differs_from_first_last(self) -> None:
         """The old first-vs-last behavior would give different answers from window-mean."""
@@ -77,7 +77,7 @@ class TestConvergenceTrigger:
         # Both windows will have mean=0.5, so rel_change=0
         losses = [0.5] * 8
         stop_round = _feed(monitor, losses)
-        assert stop_round == 8 # fires at exactly 2*window
+        assert stop_round == 8  # fires at exactly 2*window
 
 
 class TestRoundsInitialGuard:
@@ -204,7 +204,9 @@ class TestFromConfig:
         # With flat losses, convergence should not fire before round 40
         for r in range(1, 40):
             monitor.record(r, 0.5)
-            assert not monitor.should_stop(r), f"should_stop fired at round {r} < rounds_initial=40"
+            assert not monitor.should_stop(r), (
+                f"should_stop fired at round {r} < rounds_initial=40"
+            )
         # At round 40 with 39 flat losses recorded (need 2*window=20), should converge
         monitor.record(40, 0.5)
         assert monitor.should_stop(40)
@@ -212,14 +214,16 @@ class TestFromConfig:
 
     def test_from_config_missing_key_raises(self) -> None:
         with pytest.raises(AttributeError):
-            ConvergenceMonitor.from_config({"federation": {}}) # type: ignore[arg-type]
+            ConvergenceMonitor.from_config({"federation": {}})  # type: ignore[arg-type]
 
 
 class TestBaseConfigDefaults:
     def test_base_config_relative_threshold_is_0005(self) -> None:
         from datp.config.compose import BASE_CONFIG
 
-        assert BASE_CONFIG.federation.convergence.relative_threshold == pytest.approx(0.005)
+        assert BASE_CONFIG.federation.convergence.relative_threshold == pytest.approx(
+            0.005
+        )
 
     def test_base_config_window_is_10(self) -> None:
         from datp.config.compose import BASE_CONFIG
@@ -512,7 +516,7 @@ class TestAggregateEvaluateGuards:
         )
         strategy = self._make_strategy(monitor)
 
-        loss, metrics = strategy.aggregate_evaluate( # type: ignore[attr-defined]
+        loss, metrics = strategy.aggregate_evaluate(  # type: ignore[attr-defined]
             server_round=1, results=[], failures=[]
         )
 
@@ -533,7 +537,7 @@ class TestAggregateEvaluateGuards:
         result.num_examples = 0
         result.loss = 0.5
 
-        loss, metrics = strategy.aggregate_evaluate( # type: ignore[attr-defined]
+        loss, metrics = strategy.aggregate_evaluate(  # type: ignore[attr-defined]
             server_round=1, results=[(proxy, result)], failures=[]
         )
 
@@ -558,7 +562,7 @@ class TestAggregateEvaluateGuards:
         res_b.num_examples = 300
         res_b.loss = 0.8
 
-        loss, metrics = strategy.aggregate_evaluate( # type: ignore[attr-defined]
+        loss, metrics = strategy.aggregate_evaluate(  # type: ignore[attr-defined]
             server_round=1, results=[(proxy_a, res_a), (proxy_b, res_b)], failures=[]
         )
 

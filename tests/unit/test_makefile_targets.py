@@ -22,11 +22,15 @@ def _registered_root_commands() -> set[str]:
 
 
 def _make_targets() -> set[str]:
-    return set(re.findall(r"^([A-Za-z0-9_.-]+):(?:\s|$)", _makefile_text(), re.MULTILINE))
+    return set(
+        re.findall(r"^([A-Za-z0-9_.-]+):(?:\s|$)", _makefile_text(), re.MULTILINE)
+    )
 
 
 def test_command_reference_make_targets_exist() -> None:
-    documented = set(re.findall(r"\bmake\s+([A-Za-z0-9_.-]+)", _command_reference_text()))
+    documented = set(
+        re.findall(r"\bmake\s+([A-Za-z0-9_.-]+)", _command_reference_text())
+    )
     targets = _make_targets()
     assert documented - targets == set()
 

@@ -45,9 +45,7 @@ def _make_cfg(rounds: int = 2) -> DatpConfig:
             "dataset": BASE_CONFIG.dataset.model_copy(
                 update={"feature_count": _N_FEATURES}
             ),
-            "machine": BASE_CONFIG.machine.model_copy(
-                update={"batch_size_train": 64}
-            ),
+            "machine": BASE_CONFIG.machine.model_copy(update={"batch_size_train": 64}),
             "federation": FederationConfig(
                 local_epochs=1,
                 convergence=ConvergenceConfig(

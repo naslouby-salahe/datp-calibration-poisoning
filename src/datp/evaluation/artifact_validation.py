@@ -135,9 +135,7 @@ def _client_row_context(
     return ClientRowContext(validation_ids.pending, validation_ids.incomplete, module)
 
 
-def _validate_provenance(
-    provenance: Mapping[str, object], *, module: str
-) -> list[str]:
+def _validate_provenance(provenance: Mapping[str, object], *, module: str) -> list[str]:
     errors: list[str] = []
     vague = [
         key.value
@@ -205,11 +203,17 @@ def _validate_client_row(
         errors.append(
             f"[{context.module}] MISSING per-client fields for {cid}: {', '.join(sorted(missing_client))}"
         )
-    if cid in context.pending_ids and row.get(PayloadKey.CALIBRATION_PENDING) is not True:
+    if (
+        cid in context.pending_ids
+        and row.get(PayloadKey.CALIBRATION_PENDING) is not True
+    ):
         errors.append(
             f"[{context.module}] FAIL pending client {cid} missing calibration_pending=true"
         )
-    if cid in context.incomplete_ids and row.get(PayloadKey.EVALUATION_INCOMPLETE) is not True:
+    if (
+        cid in context.incomplete_ids
+        and row.get(PayloadKey.EVALUATION_INCOMPLETE) is not True
+    ):
         errors.append(
             f"[{context.module}] FAIL eval-incomplete client {cid} missing evaluation_incomplete=true"
         )

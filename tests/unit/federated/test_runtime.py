@@ -21,24 +21,22 @@ from datp.federated.runtime import (
 
 class TestObjectStoreCapacity:
     def test_fits_returns_observed_facts(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(
-            "datp.federated.runtime.get_available_ram_gb", lambda: 8.0
-        )
+        monkeypatch.setattr("datp.federated.runtime.get_available_ram_gb", lambda: 8.0)
         result = check_object_store_capacity(1024)
         assert result["object_store_mb"] == 1024
         assert result["available_ram_mb"] == 8 * 1024
 
-    def test_exceeds_available_ram_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(
-            "datp.federated.runtime.get_available_ram_gb", lambda: 1.0
-        )
+    def test_exceeds_available_ram_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("datp.federated.runtime.get_available_ram_gb", lambda: 1.0)
         with pytest.raises(RuntimeError, match="exceeds available RAM"):
             check_object_store_capacity(4096)
 
-    def test_equal_to_available_ram_passes(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(
-            "datp.federated.runtime.get_available_ram_gb", lambda: 2.0
-        )
+    def test_equal_to_available_ram_passes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("datp.federated.runtime.get_available_ram_gb", lambda: 2.0)
         result = check_object_store_capacity(2 * 1024)
         assert result["object_store_mb"] == 2 * 1024
 
@@ -102,14 +100,18 @@ class TestGetAvailableRamGb:
         assert isinstance(result, float)
         assert result > 0
 
-    def test_falls_back_to_proc_meminfo(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_falls_back_to_proc_meminfo(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         meminfo = tmp_path / "meminfo"
         meminfo.write_text("MemAvailable: 16777216 kB\n")
         monkeypatch.setattr("datp.federated.runtime._MEMINFO_PATH", meminfo)
         monkeypatch.setitem(sys.modules, "psutil", None)
         assert get_available_ram_gb() == pytest.approx(16.0)
 
-    def test_raises_when_neither_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_raises_when_neither_available(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setitem(sys.modules, "psutil", None)
         monkeypatch.setattr("datp.federated.runtime._read_meminfo_gib", lambda: None)
         with pytest.raises(RuntimeError, match="Cannot determine available RAM"):
@@ -158,7 +160,7 @@ class TestDeriveClientResources:
                 num_gpus_per_client=0.0,
             )
         )
-        assert result["num_cpus"] == pytest.approx(2.0) # ceil(8 / 4)
+        assert result["num_cpus"] == pytest.approx(2.0)  # ceil(8 / 4)
 
     def test_device_and_resources_agree_cuda(
         self, monkeypatch: pytest.MonkeyPatch

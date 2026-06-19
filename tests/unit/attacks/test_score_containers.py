@@ -20,10 +20,7 @@ from datp.testsupport.synthetic_scores import (
 
 def _collection_from_synthetics() -> ScoreCollection:
     ss = make_standard_score_set(n_eligible=3, n_pending=1)
-    raw = {
-        c.client_id: (c.cal, c.test_benign, c.test_attack)
-        for c in ss.clients
-    }
+    raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
     return build_score_collection(raw)
 
 

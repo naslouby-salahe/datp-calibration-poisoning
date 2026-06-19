@@ -41,4 +41,6 @@ def cliffs_delta(x: np.ndarray, y: np.ndarray) -> CliffsDeltaResult:
     less = int(np.sum(x[:, None] < y[None, :]))
     delta = (more - less) / (x.size * y.size)
 
-    return CliffsDeltaResult(delta=float(delta), magnitude=_cliffs_magnitude(abs(delta)))
+    return CliffsDeltaResult(
+        delta=float(delta), magnitude=_cliffs_magnitude(abs(delta))
+    )

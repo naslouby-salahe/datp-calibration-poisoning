@@ -70,7 +70,9 @@ class InjectionOutcome:
 
     @cached_property
     def poisoned_cal(self):
-        return {client.client_id: client.cal for client in self.poisoned_cal_set.clients}
+        return {
+            client.client_id: client.cal for client in self.poisoned_cal_set.clients
+        }
 
 
 def _build_poisoned_clients(
@@ -149,7 +151,9 @@ class MultiInjectionOutcome:
 
     @cached_property
     def poisoned_cal(self):
-        return {client.client_id: client.cal for client in self.poisoned_cal_set.clients}
+        return {
+            client.client_id: client.cal for client in self.poisoned_cal_set.clients
+        }
 
 
 def _validate_and_order_victim_ids(victim_ids: Sequence[str]) -> tuple[str, ...]:
@@ -188,7 +192,9 @@ def inject_multi_victim(
     victim_cal_map = {
         vid: per_victim[vid].poisoned_cal_set.for_client(vid).cal for vid in ordered
     }
-    poisoned_clients = _build_poisoned_clients(collection, victim_cal_map=victim_cal_map)
+    poisoned_clients = _build_poisoned_clients(
+        collection, victim_cal_map=victim_cal_map
+    )
 
     return MultiInjectionOutcome(
         victim_ids=ordered,

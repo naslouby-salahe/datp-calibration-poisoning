@@ -85,7 +85,13 @@ def _build_cell(
         for client_id in clients:
             (partition_root / client_id).mkdir(parents=True, exist_ok=True)
 
-    ckpt = base_dir / "checkpoints" / regime.value / f"seed_{seed}" / ArtifactFile.MODEL_CHECKPOINT
+    ckpt = (
+        base_dir
+        / "checkpoints"
+        / regime.value
+        / f"seed_{seed}"
+        / ArtifactFile.MODEL_CHECKPOINT
+    )
     if checkpoint_present:
         ckpt.parent.mkdir(parents=True, exist_ok=True)
         ckpt.write_bytes(b"fixture-checkpoint-bytes")
@@ -126,7 +132,9 @@ def _build_cell(
         )
 
     if include_sentinel:
-        (cell_dir / ArtifactFile.SCORING_SENTINEL).write_text("done\n", encoding="utf-8")
+        (cell_dir / ArtifactFile.SCORING_SENTINEL).write_text(
+            "done\n", encoding="utf-8"
+        )
 
     return cell_dir
 

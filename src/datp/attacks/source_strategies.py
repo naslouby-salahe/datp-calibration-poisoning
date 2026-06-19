@@ -31,6 +31,7 @@ _BOUNDED_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
     }
 )
 
+
 # Diagnostic-only sources — gated behind allow_diagnostic.
 def _select_reservoir(
     *,

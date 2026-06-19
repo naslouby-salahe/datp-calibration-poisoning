@@ -34,8 +34,8 @@ def test_canonical_path() -> None:
     rp = layout_a.baseline_run(_run(Regime.A, Baseline.B1, 0)).result_dir
     parts = rp.parts
     assert "b1" in parts, f"result_dir should contain baseline 'b1': {rp}"
-    assert parts[-2] == "b1" # baseline segment
-    assert parts[-3] == "a" # regime segment
+    assert parts[-2] == "b1"  # baseline segment
+    assert parts[-3] == "a"  # regime segment
     assert parts[-1].startswith("seed_")
 
     rp_alpha = layout_c.baseline_run(_run(Regime.C, Baseline.B2, 1, 0.5)).result_dir

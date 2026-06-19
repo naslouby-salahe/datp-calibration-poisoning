@@ -109,7 +109,6 @@ class TestRegimeBaselines:
         assert Baseline.B0 not in REGIME_BASELINES[Regime.C]
 
 
-
 class TestIsolatedBaselines:
     def test_only_b0_is_isolated(self) -> None:
         assert ISOLATED_BASELINES == frozenset({Baseline.B0})

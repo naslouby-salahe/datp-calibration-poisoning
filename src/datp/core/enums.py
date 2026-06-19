@@ -226,9 +226,6 @@ def policy_for_baseline(baseline: Baseline) -> "ThresholdPolicy | None":
             return None
 
 
-
-
-
 # Derived maps — do not duplicate in other modules; import from here.
 
 REGIME_BASELINES: dict[Regime, frozenset[Baseline]] = {

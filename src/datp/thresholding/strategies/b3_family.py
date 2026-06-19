@@ -74,8 +74,6 @@ def compute(
         tau_global=tau_global,
         eligible_thresholds=eligible_map,
         pending_clients=pending,
-        b3_metadata=B3Metadata(
-            family_info=B3FamilyInfoTuple(family_info.values())
-        ),
+        b3_metadata=B3Metadata(family_info=B3FamilyInfoTuple(family_info.values())),
         b4_metadata=None,
     )

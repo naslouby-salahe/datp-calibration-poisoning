@@ -51,7 +51,9 @@ def save_params_snapshot(params: NDArrays, ckpt_dir: Path) -> Path:
     """
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     snap_file = ckpt_dir / ArtifactFile.PARAMS_SNAPSHOT
-    tmp_file = ckpt_dir / "params_writing.npz"  # .npz suffix prevents numpy appending a second one
+    tmp_file = (
+        ckpt_dir / "params_writing.npz"
+    )  # .npz suffix prevents numpy appending a second one
     np.savez(str(tmp_file), *params)
     tmp_file.rename(snap_file)
     logger.info("params snapshot saved", path=str(snap_file), n_arrays=len(params))

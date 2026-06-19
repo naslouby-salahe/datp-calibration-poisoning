@@ -104,9 +104,7 @@ def print_banner(
         lines.append(f"Alpha: [cyan]{alpha:g}[/cyan]")
     lines.append(f"Output: [dim]{output_dir}[/dim]")
     console.print(
-        Panel(
-            "\n".join(lines), title=_Title.DIAGNOSTIC, border_style=_Style.CYAN
-        )
+        Panel("\n".join(lines), title=_Title.DIAGNOSTIC, border_style=_Style.CYAN)
     )
 
 
@@ -120,7 +118,9 @@ def step_context(step: DiagnosticStep) -> Iterator[None]:
         yield
     except Exception:
         elapsed = time.monotonic() - t0
-        console.print(f" [red]{_Symbol.CROSS} {_Message.FAILED}[/red] [dim]({elapsed:.1f}s)[/dim]")
+        console.print(
+            f" [red]{_Symbol.CROSS} {_Message.FAILED}[/red] [dim]({elapsed:.1f}s)[/dim]"
+        )
         raise
     elapsed = time.monotonic() - t0
     console.print(f" [green]{_Symbol.CHECK}[/green] [dim]({elapsed:.1f}s)[/dim]")
@@ -149,8 +149,12 @@ def print_summary(
     table = Table(title=title, border_style=_Style.GREEN)
     table.add_column(_Label.METRIC, style="bold")
     table.add_column(_Label.VALUE)
-    table.add_row(_Label.B1_CV_FPR, f"{b1_cv_fpr:.4f} ({_Label.COVERAGE}: {eligible}/{total})")
-    table.add_row(_Label.B2_CV_FPR, f"{b2_cv_fpr:.4f} ({_Label.COVERAGE}: {eligible}/{total})")
+    table.add_row(
+        _Label.B1_CV_FPR, f"{b1_cv_fpr:.4f} ({_Label.COVERAGE}: {eligible}/{total})"
+    )
+    table.add_row(
+        _Label.B2_CV_FPR, f"{b2_cv_fpr:.4f} ({_Label.COVERAGE}: {eligible}/{total})"
+    )
     table.add_row(_Label.DELTA_CV_FPR, f"{delta:.4f}")
     if contingency is not None:
         table.add_row(_Label.CONTINGENCY, contingency.value.upper())
@@ -196,9 +200,7 @@ def print_sweep_banner(
         f"Regime: [cyan]{regime_display}[/cyan] Cells: [cyan]{cell_count}[/cyan]",
         f"Output: [dim]{base_dir}[/dim]",
     ]
-    console.print(
-        Panel("\n".join(lines), title=_Title.SWEEP, border_style=_Style.CYAN)
-    )
+    console.print(Panel("\n".join(lines), title=_Title.SWEEP, border_style=_Style.CYAN))
 
 
 def print_dry_run_summary(regime_counts: dict[Regime, int], total_cells: int) -> None:

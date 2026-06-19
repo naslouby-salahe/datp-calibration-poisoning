@@ -69,7 +69,7 @@ class TestPipelineRequest:
             checkpoint_round=None,
         )
         with pytest.raises((AttributeError, TypeError)):
-            req.baseline = Baseline.B2 # type: ignore[misc]
+            req.baseline = Baseline.B2  # type: ignore[misc]
 
 
 class TestSharedPipelineContext:
@@ -189,7 +189,7 @@ class TestContingencyRecord:
             rationale="test",
         )
         with pytest.raises((AttributeError, TypeError, ValueError)):
-            record.decision = ContingencyDecision.CONTINGENCY # type: ignore[misc]
+            record.decision = ContingencyDecision.CONTINGENCY  # type: ignore[misc]
 
     def test_is_preliminary_diagnostic_default(self) -> None:
         """is_preliminary_diagnostic defaults to True and is always True for this record type."""

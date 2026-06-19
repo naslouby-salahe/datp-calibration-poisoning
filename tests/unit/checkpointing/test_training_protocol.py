@@ -62,6 +62,7 @@ def test_strategy_log_only_mode_does_not_enter_stopped_state() -> None:
 
 def test_checkpoint_save_schedule_and_b4_k_are_fixed() -> None:
     import pytest
+
     if BASE_CONFIG.checkpoint_protocol is None:
         pytest.skip("checkpoint protocol not configured in base YAML")
     assert BASE_CONFIG.checkpoint_protocol.milestones == (
@@ -74,7 +75,10 @@ def test_checkpoint_save_schedule_and_b4_k_are_fixed() -> None:
         200,
     )
     assert BASE_CONFIG.checkpoint_protocol.max_rounds == 200
-    assert BASE_CONFIG.checkpoint_protocol.convergence_mode == CheckpointConvergenceMode.LOG_ONLY
+    assert (
+        BASE_CONFIG.checkpoint_protocol.convergence_mode
+        == CheckpointConvergenceMode.LOG_ONLY
+    )
     assert BASE_CONFIG.threshold.b4_k_regime_a == 3
 
 

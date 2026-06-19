@@ -24,6 +24,7 @@ _MODULE = "thresholding.thresholds"
 @dataclass(frozen=True, slots=True)
 class _DeriveArgs:
     """Common arguments for baseline threshold derivation."""
+
     client_errors: dict[str, np.ndarray]
     n_min: int
     q: float
@@ -91,7 +92,9 @@ def _derive_b1(args: _DeriveArgs) -> ThresholdResult:
 def _derive_b2(args: _DeriveArgs, tau_global: float) -> ThresholdResult:
     from datp.thresholding.strategies import b2_personalized as b2_mod
 
-    return b2_mod.compute(args.client_errors, args.n_min, tau_global, q=args.q, run=args.run)
+    return b2_mod.compute(
+        args.client_errors, args.n_min, tau_global, q=args.q, run=args.run
+    )
 
 
 def _derive_b3(args: _DeriveArgs, tau_global: float, regime: Regime) -> ThresholdResult:
@@ -116,13 +119,21 @@ def _derive_b3(args: _DeriveArgs, tau_global: float, regime: Regime) -> Threshol
             )
         )
     return b3_mod.compute(
-        args.client_errors, args.n_min, tau_global, family_map,
-        q=args.q, regime=regime, run=args.run,
+        args.client_errors,
+        args.n_min,
+        tau_global,
+        family_map,
+        q=args.q,
+        regime=regime,
+        run=args.run,
     )
 
 
 def _derive_b4(
-    args: _DeriveArgs, tau_global: float, regime: Regime, threshold_cfg: "ThresholdConfig"
+    args: _DeriveArgs,
+    tau_global: float,
+    regime: Regime,
+    threshold_cfg: "ThresholdConfig",
 ) -> ThresholdResult:
     from datp.thresholding.strategies import b4_cluster as b4_mod
 
@@ -150,6 +161,7 @@ def _derive_b4(
 @dataclass(frozen=True, slots=True)
 class _DeriveInput:
     """Bundled inputs for threshold derivation."""
+
     baseline: Baseline
     client_errors: dict[str, np.ndarray]
     n_min: int

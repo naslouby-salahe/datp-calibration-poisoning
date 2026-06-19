@@ -72,7 +72,11 @@ def _write_valid_manifest(
 
 def test_validate_scoring_manifest_passes_with_valid_manifest(tmp_path: Path) -> None:
     sb = _score_base(tmp_path)
-    _write_valid_manifest(sb, ["c0", "c1"], [Split.CAL.value, Split.TEST_BENIGN.value, Split.TEST_ATTACK.value])
+    _write_valid_manifest(
+        sb,
+        ["c0", "c1"],
+        [Split.CAL.value, Split.TEST_BENIGN.value, Split.TEST_ATTACK.value],
+    )
     result = validate_scoring_manifest(sb)
     assert result["completion_status"] == ScoringManifestStatus.COMPLETE
 
@@ -101,7 +105,9 @@ def test_validate_scoring_manifest_fails_incomplete_status(tmp_path: Path) -> No
         "expected_splits": [Split.CAL.value],
         "records": [],
     }
-    (sb / ArtifactFile.SCORING_MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
+    (sb / ArtifactFile.SCORING_MANIFEST).write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
     with pytest.raises(ValueError, match="Scoring manifest incomplete"):
         validate_scoring_manifest(sb)
 
@@ -118,7 +124,9 @@ def test_validate_scoring_manifest_fails_missing_records(tmp_path: Path) -> None
         "actual_splits": [],
         "records": [],
     }
-    (sb / ArtifactFile.SCORING_MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
+    (sb / ArtifactFile.SCORING_MANIFEST).write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
     with pytest.raises(ValueError, match="Scoring manifest incomplete"):
         validate_scoring_manifest(sb)
 
@@ -286,9 +294,7 @@ class TestScoringStageClientDataAttr:
 
 
 class TestScoreClients:
-    def test_score_clients_writes_parquet_and_manifest(
-        self, tmp_path: Path
-    ) -> None:
+    def test_score_clients_writes_parquet_and_manifest(self, tmp_path: Path) -> None:
         import io
 
         import torch

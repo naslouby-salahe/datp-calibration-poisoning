@@ -50,7 +50,9 @@ class TestManifestWriteReadRoundtrip:
             dataset=DatasetID.NBAIOT,
             raw_files=files,
             raw_base_dir=base,
-            metadata=ManifestMetadata.model_validate({"n_devices": 2, "n_features": 115}),
+            metadata=ManifestMetadata.model_validate(
+                {"n_devices": 2, "n_features": 115}
+            ),
             manifest_path=mpath,
         )
         loaded = PartitionManifest.load(mpath)
@@ -72,7 +74,9 @@ class TestVerifyManifestHashes:
             dataset=DatasetID.NBAIOT,
             raw_files=files,
             raw_base_dir=base,
-            metadata=ManifestMetadata.model_validate({"n_devices": 2, "n_features": 115}),
+            metadata=ManifestMetadata.model_validate(
+                {"n_devices": 2, "n_features": 115}
+            ),
             manifest_path=mpath,
         )
         PartitionManifest.load(mpath).verify_hashes(base)
@@ -84,7 +88,9 @@ class TestVerifyManifestHashes:
             dataset=DatasetID.NBAIOT,
             raw_files=files,
             raw_base_dir=base,
-            metadata=ManifestMetadata.model_validate({"n_devices": 2, "n_features": 115}),
+            metadata=ManifestMetadata.model_validate(
+                {"n_devices": 2, "n_features": 115}
+            ),
             manifest_path=mpath,
         )
         files[0].write_bytes(b"MUTATED CONTENT")
@@ -98,7 +104,9 @@ class TestVerifyManifestHashes:
             dataset=DatasetID.NBAIOT,
             raw_files=files,
             raw_base_dir=base,
-            metadata=ManifestMetadata.model_validate({"n_devices": 2, "n_features": 115}),
+            metadata=ManifestMetadata.model_validate(
+                {"n_devices": 2, "n_features": 115}
+            ),
             manifest_path=mpath,
         )
         files[1].unlink()
@@ -232,22 +240,26 @@ class TestManifestMetadataValidation:
         assert m.n_features == 50
 
     def test_allows_extra_fields(self):
-        m = ManifestMetadata.model_validate({
-            "n_devices": 3,
-            "n_features": 100,
-            "extra_field": "preserved",
-        })
+        m = ManifestMetadata.model_validate(
+            {
+                "n_devices": 3,
+                "n_features": 100,
+                "extra_field": "preserved",
+            }
+        )
         assert m.n_devices == 3
         assert m.n_features == 100
         # extra fields are stored via ConfigDict(extra="allow")
         assert m.model_extra == {"extra_field": "preserved"}
 
     def test_both_n_devices_and_n_clients_accepted(self):
-        m = ManifestMetadata.model_validate({
-            "n_devices": 5,
-            "n_clients": 10,
-            "n_features": 115,
-        })
+        m = ManifestMetadata.model_validate(
+            {
+                "n_devices": 5,
+                "n_clients": 10,
+                "n_features": 115,
+            }
+        )
         assert m.n_devices == 5
         assert m.n_clients == 10
 
@@ -262,5 +274,7 @@ class TestManifestEmptyHashes:
             "metadata": {"n_devices": 2, "n_features": 115},
         }
         _write_json(p, data)
-        with pytest.raises(RuntimeError, match=r"\[data\.manifests\].*file_hashes.*empty"):
+        with pytest.raises(
+            RuntimeError, match=r"\[data\.manifests\].*file_hashes.*empty"
+        ):
             PartitionManifest.load(p)

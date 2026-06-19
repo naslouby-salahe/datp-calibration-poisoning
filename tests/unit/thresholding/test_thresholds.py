@@ -12,7 +12,7 @@ from datp.thresholding.thresholds import (
 
 class TestPercentileThreshold:
     def test_known_uniform(self) -> None:
-        errors = np.arange(1.0, 101.0) # 1..100
+        errors = np.arange(1.0, 101.0)  # 1..100
         result = percentile_threshold(errors, q=0.95)
         expected = float(np.percentile(errors, 95))
         assert result == pytest.approx(expected)
@@ -118,7 +118,7 @@ class TestConformalThreshold:
 
     def test_no_hardcoded_alpha(self) -> None:
         """Conformal alpha must come from config, not be hardcoded."""
-        errors = np.arange(1.0, 101.0) # 100 elements
+        errors = np.arange(1.0, 101.0)  # 100 elements
         tau_05 = conformal_threshold(errors, 0.05)
         tau_10 = conformal_threshold(errors, 0.10)
         # Different alpha values produce different thresholds
