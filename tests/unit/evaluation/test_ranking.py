@@ -14,8 +14,8 @@ class TestBinaryRankingMetrics:
 
     def test_construct_with_values(self) -> None:
         m = BinaryRankingMetrics(auroc=0.95, pr_auc=0.87)
-        assert m.auroc == 0.95
-        assert m.pr_auc == 0.87
+        assert m.auroc == pytest.approx(0.95)
+        assert m.pr_auc == pytest.approx(0.87)
 
     def test_construct_with_none(self) -> None:
         m = BinaryRankingMetrics(auroc=None, pr_auc=None)
@@ -83,8 +83,8 @@ class TestComputeBinaryRankingMetrics:
         result = compute_binary_ranking_metrics(
             np.array([0.3]), np.array([0.7])
         )
-        assert result.auroc == 1.0
-        assert result.pr_auc == 1.0
+        assert result.auroc == pytest.approx(1.0)
+        assert result.pr_auc == pytest.approx(1.0)
 
     def test_single_sample_tied(self) -> None:
         result = compute_binary_ranking_metrics(
@@ -101,6 +101,6 @@ class TestComputeBinaryRankingMetrics:
         result = compute_binary_ranking_metrics(benign, attack)
         # AUROC = 0.0 for perfectly inverted ranking;
         # PR-AUC baseline equals class fraction and will not dip to 0.
-        assert result.auroc == 0.0
+        assert result.auroc == pytest.approx(0.0)
         assert result.pr_auc is not None
         assert 0.3 <= result.pr_auc <= 0.5

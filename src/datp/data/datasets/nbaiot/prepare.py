@@ -24,6 +24,7 @@ from datp.data.splits import Split
 from datp.data.catalog import SplitPolicyRole
 
 logger = get_logger(__name__)
+_NBAIOT_MODULE = "data.nbaiot"
 
 
 def _raw_nbaiot_files(raw_dir: Path) -> list[Path]:
@@ -61,19 +62,19 @@ def _compute_split_indices(n: int) -> dict[str, tuple[int, int]]:
 
     if indices[SplitPolicyRole.GAP1][0] != indices[SplitPolicyRole.TRAIN][1]:
         raise ValueError(
-            fmt("data.nbaiot", "Gap1 alignment error", "gap1 following train", "gap")
+            fmt(_NBAIOT_MODULE, "Gap1 alignment error", "gap1 following train", "gap")
         )
     if indices[SplitPolicyRole.CAL][0] != indices[SplitPolicyRole.GAP1][1]:
         raise ValueError(
-            fmt("data.nbaiot", "Cal alignment error", "cal following gap1", "gap")
+            fmt(_NBAIOT_MODULE, "Cal alignment error", "cal following gap1", "gap")
         )
     if indices[SplitPolicyRole.GAP2][0] != indices[SplitPolicyRole.CAL][1]:
         raise ValueError(
-            fmt("data.nbaiot", "Gap2 alignment error", "gap2 following cal", "gap")
+            fmt(_NBAIOT_MODULE, "Gap2 alignment error", "gap2 following cal", "gap")
         )
     if indices[SplitPolicyRole.TEST_BENIGN][0] != indices[SplitPolicyRole.GAP2][1]:
         raise ValueError(
-            fmt("data.nbaiot", "Test alignment error", "test following gap2", "gap")
+            fmt(_NBAIOT_MODULE, "Test alignment error", "test following gap2", "gap")
         )
     return {role.value: bounds for role, bounds in indices.items()}
 
@@ -113,7 +114,7 @@ def _prepare_device(
 
     benign_csv = device_raw / BENIGN_TRAFFIC_FILE
     if not benign_csv.exists():
-        raise FileNotFoundError(fmt_missing("data.nbaiot", str(benign_csv)))
+        raise FileNotFoundError(fmt_missing(_NBAIOT_MODULE, str(benign_csv)))
     benign_df = pl.read_csv(benign_csv)
     feature_cols = benign_df.columns
     n_benign = len(benign_df)
@@ -218,7 +219,7 @@ def prepare_nbaiot(
 
     if not raw_dir.is_dir():
         raise FileNotFoundError(
-            fmt_missing("data.nbaiot", f"Raw N-BaIoT directory {raw_dir}")
+            fmt_missing(_NBAIOT_MODULE, f"Raw N-BaIoT directory {raw_dir}")
         )
 
     results: dict[str, PartitionResult] = {}

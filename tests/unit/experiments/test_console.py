@@ -62,38 +62,38 @@ def test_display_enums_are_non_empty() -> None:
 # ── print_banner ──────────────────────────────────────────────────────────
 
 
-def test_print_banner_basic() -> None:
+def test_print_banner_basic(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_banner(Regime.A, 42, "/tmp/out")
+        print_banner(Regime.A, 42, str(tmp_path / "out"))
     assert mock_print.called
 
 
-def test_print_banner_with_alpha() -> None:
+def test_print_banner_with_alpha(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_banner(Regime.C, 7, "/tmp/out", alpha=0.5)
+        print_banner(Regime.C, 7, str(tmp_path / "out"), alpha=0.5)
     assert mock_print.called
 
 
 # ── print_summary ─────────────────────────────────────────────────────────
 
 
-def test_print_summary_basic() -> None:
+def test_print_summary_basic(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_summary(Regime.A, 1, 0.1, 0.05, (8, 10), "/tmp/out", 12.3)
+        print_summary(Regime.A, 1, 0.1, 0.05, (8, 10), str(tmp_path / "out"), 12.3)
     assert mock_print.called
 
 
-def test_print_summary_with_contingency() -> None:
+def test_print_summary_with_contingency(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
         print_summary(
-            Regime.A, 1, 0.1, 0.05, (8, 10), "/tmp/out", 12.3, contingency=ContingencyDecision.GO
+            Regime.A, 1, 0.1, 0.05, (8, 10), str(tmp_path / "out"), 12.3, contingency=ContingencyDecision.GO
         )
     assert mock_print.called
 
 
-def test_print_summary_with_alpha() -> None:
+def test_print_summary_with_alpha(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_summary(Regime.C, 1, 0.1, 0.05, (8, 10), "/tmp/out", 12.3, alpha=0.5)
+        print_summary(Regime.C, 1, 0.1, 0.05, (8, 10), str(tmp_path / "out"), 12.3, alpha=0.5)
     assert mock_print.called
 
 
@@ -103,7 +103,7 @@ def test_print_summary_with_alpha() -> None:
 def test_step_context_success() -> None:
     with patch.object(console, "print") as mock_print:
         with step_context(DiagnosticStep.SET_SEEDS):
-            pass
+            assert mock_print.called
     assert mock_print.call_count >= 2
 
 
@@ -139,15 +139,15 @@ def test_print_baseline_result_failed() -> None:
 # ── print_sweep_banner ────────────────────────────────────────────────────
 
 
-def test_print_sweep_banner_all_regimes() -> None:
+def test_print_sweep_banner_all_regimes(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_sweep_banner(None, 10, "/tmp/base")
+        print_sweep_banner(None, 10, str(tmp_path / "base"))
     assert mock_print.called
 
 
-def test_print_sweep_banner_specific_regime() -> None:
+def test_print_sweep_banner_specific_regime(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_sweep_banner(Regime.A, 5, "/tmp/base")
+        print_sweep_banner(Regime.A, 5, str(tmp_path / "base"))
     assert mock_print.called
 
 
@@ -193,15 +193,15 @@ def test_print_group_header_with_alpha() -> None:
 # ── print_checkpoint_status ───────────────────────────────────────────────
 
 
-def test_print_checkpoint_status_found() -> None:
+def test_print_checkpoint_status_found(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_checkpoint_status(True, Path("/tmp/ckpt/model.pt"))
+        print_checkpoint_status(True, tmp_path / "ckpt/model.pt")
     assert mock_print.called
 
 
-def test_print_checkpoint_status_not_found() -> None:
+def test_print_checkpoint_status_not_found(tmp_path: Path) -> None:
     with patch.object(console, "print") as mock_print:
-        print_checkpoint_status(False, Path("/tmp/ckpt/model.pt"))
+        print_checkpoint_status(False, tmp_path / "ckpt/model.pt")
     assert mock_print.called
 
 

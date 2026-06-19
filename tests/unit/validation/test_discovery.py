@@ -181,10 +181,10 @@ def test_completed_metric_paths_with_alpha(tmp_path: Path) -> None:
 # ─── ScoreCellLocation ──────────────────────────────────────────────
 
 
-def test_score_cell_location_is_frozen() -> None:
+def test_score_cell_location_is_frozen(tmp_path: Path) -> None:
     loc = ScoreCellLocation(
         cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None),
-        cell_dir=Path("/tmp"),
+        cell_dir=tmp_path,
     )
     with pytest.raises(Exception):
-        loc.cell_dir = Path("/other") # type: ignore[misc]
+        loc.cell_dir = tmp_path / "other" # type: ignore[misc]

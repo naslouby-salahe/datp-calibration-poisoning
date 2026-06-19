@@ -11,7 +11,7 @@ from typing import cast
 import torch
 import torch.nn as nn
 from flwr.client import Client, ClientApp
-from flwr.common import Context, Parameters, ndarrays_to_parameters
+from flwr.common import Context, NDArrays, Parameters, ndarrays_to_parameters
 from flwr.common.telemetry import EventType
 from flwr.server import ServerApp, ServerConfig
 from flwr.server.serverapp_components import ServerAppComponents
@@ -288,6 +288,96 @@ def load_scoring_data(
     )
 
 
+def _checkpoint_dirs_by_round(
+    checkpoint_cfg: CheckpointProtocolConfig | None,
+    protocol_enabled: bool,
+    ckpt_dir: Path,
+    regime: Regime,
+    seed: int,
+    alpha: float | None,
+) -> dict[int, Path]:
+    if checkpoint_cfg is None or not protocol_enabled:
+        return {}
+
+    from datp.artifacts.layout import ArtifactLayout
+    from datp.core.identity import TrainingCellId
+
+    layout = ArtifactLayout(
+        base_dir=_artifact_root_from_path(ckpt_dir, ArtifactDir.CHECKPOINTS),
+        regime=regime,
+    )
+    cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
+    return {
+        round_count: layout.checkpoint_dir_for_round(cell, round_count)
+        for round_count in checkpoint_cfg.milestones
+    }
+
+
+def _params_for_checkpoint_round(
+    checkpoint_round: int,
+    strategy: DatpFedAvg,
+    ckpt_dir_by_round: dict[int, Path],
+) -> NDArrays:
+    if checkpoint_round in strategy.parameter_snapshots:
+        return strategy.parameter_snapshots[checkpoint_round]
+    round_params = load_params_snapshot(ckpt_dir_by_round[checkpoint_round])
+    if round_params is None:
+        raise RuntimeError(
+            fmt(
+                _MODULE,
+                "Missing scoring snapshot (neither in memory nor on disk)",
+                str(checkpoint_round),
+                "None",
+            )
+        )
+    return round_params
+
+
+def _score_checkpoint_protocol_rounds(
+    *,
+    model: Autoencoder,
+    param_module: nn.Module,
+    strategy: DatpFedAvg,
+    checkpoint_cfg: CheckpointProtocolConfig,
+    ckpt_dir_by_round: dict[int, Path],
+    scoring_data: dict[str, ClientData],
+    score_base: Path,
+    regime: Regime,
+    seed: int,
+    alpha: float | None,
+    cfg: DatpConfig,
+) -> None:
+    from datp.artifacts.layout import ArtifactLayout
+    from datp.core.identity import TrainingCellId
+
+    score_layout = ArtifactLayout(
+        base_dir=_artifact_root_from_path(score_base, ArtifactDir.SCORES),
+        regime=regime,
+    )
+    score_cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
+    for checkpoint_round in checkpoint_cfg.milestones:
+        round_params = _params_for_checkpoint_round(
+            checkpoint_round, strategy, ckpt_dir_by_round
+        )
+        set_parameters(param_module, round_params)
+        round_score_base = score_layout.score_cell_for_round(
+            score_cell, checkpoint_round
+        ).score_dir
+        round_ckpt = ckpt_dir_by_round[checkpoint_round] / ArtifactFile.MODEL_CHECKPOINT
+        score_clients(
+            model=model,
+            client_data=scoring_data,
+            score_base=round_score_base,
+            regime=regime,
+            seed=seed,
+            alpha=alpha,
+            dataset=dataset_for_regime(regime),
+            checkpoint_path=round_ckpt,
+            checkpoint_round=checkpoint_round,
+            scoring_batch_size=cfg.machine.scoring_batch_size,
+        )
+
+
 def run_fl_simulation(
     cfg: DatpConfig,
     client_data: dict[str, ClientData] | None,
@@ -336,23 +426,9 @@ def run_fl_simulation(
         n_clients=num_clients,
     )
 
-    # Build checkpoint directory map before strategy creation so it can be passed
-    # as checkpoint_disk_dirs for immediate disk persistence at each milestone.
-    ckpt_dir_by_round: dict[int, Path] = {}
-    if protocol_enabled:
-        assert checkpoint_cfg is not None
-        from datp.artifacts.layout import ArtifactLayout
-        from datp.core.identity import TrainingCellId
-
-        _layout = ArtifactLayout(
-            base_dir=_artifact_root_from_path(ckpt_dir, ArtifactDir.CHECKPOINTS),
-            regime=regime,
-        )
-        _cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
-        ckpt_dir_by_round = {
-            round_count: _layout.checkpoint_dir_for_round(_cell, round_count)
-            for round_count in checkpoint_cfg.milestones
-        }
+    ckpt_dir_by_round = _checkpoint_dirs_by_round(
+        checkpoint_cfg, protocol_enabled, ckpt_dir, regime, seed, alpha
+    )
 
     strategy = DatpFedAvg.from_config(
         cfg,
@@ -418,48 +494,19 @@ def run_fl_simulation(
         scoring_data = load_scoring_data(client_data, prepared_dir)
         if protocol_enabled:
             assert checkpoint_cfg is not None
-            from datp.artifacts.layout import ArtifactLayout
-            from datp.core.identity import TrainingCellId
-
-            score_layout = ArtifactLayout(
-                base_dir=_artifact_root_from_path(score_base, ArtifactDir.SCORES),
+            _score_checkpoint_protocol_rounds(
+                model=model,
+                param_module=param_module,
+                strategy=strategy,
+                checkpoint_cfg=checkpoint_cfg,
+                ckpt_dir_by_round=ckpt_dir_by_round,
+                scoring_data=scoring_data,
+                score_base=score_base,
                 regime=regime,
+                seed=seed,
+                alpha=alpha,
+                cfg=cfg,
             )
-            score_cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
-            in_memory_snapshots = strategy.parameter_snapshots
-            for checkpoint_round in checkpoint_cfg.milestones:
-                if checkpoint_round in in_memory_snapshots:
-                    round_params = in_memory_snapshots[checkpoint_round]
-                else:
-                    round_params = load_params_snapshot(ckpt_dir_by_round[checkpoint_round])
-                    if round_params is None:
-                        raise RuntimeError(
-                            fmt(
-                                _MODULE,
-                                "Missing scoring snapshot (neither in memory nor on disk)",
-                                str(checkpoint_round),
-                                "None",
-                            )
-                        )
-                set_parameters(param_module, round_params)
-                round_score_base = score_layout.score_cell_for_round(
-                    score_cell, checkpoint_round
-                ).score_dir
-                round_ckpt = (
-                    ckpt_dir_by_round[checkpoint_round] / ArtifactFile.MODEL_CHECKPOINT
-                )
-                score_clients(
-                    model=model,
-                    client_data=scoring_data,
-                    score_base=round_score_base,
-                    regime=regime,
-                    seed=seed,
-                    alpha=alpha,
-                    dataset=dataset_for_regime(regime),
-                    checkpoint_path=round_ckpt,
-                    checkpoint_round=checkpoint_round,
-                    scoring_batch_size=cfg.machine.scoring_batch_size,
-                )
         else:
             score_clients(
                 model=model,

@@ -56,7 +56,7 @@ class TestScoreCollection:
 
     def test_coverage_ratio_empty(self) -> None:
         col = build_score_collection({})
-        assert col.coverage_ratio == 0.0
+        assert col.coverage_ratio == pytest.approx(0.0)
 
     def test_n_min_boundary(self) -> None:
         e = make_eligible_client(client_id="e0")

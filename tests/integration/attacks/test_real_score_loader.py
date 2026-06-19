@@ -20,7 +20,7 @@ _SEED = 42
 
 
 def _make_client_data(n_clients: int, seed: int = _SEED) -> dict[str, ClientData]:
-    device = resolve_device(require_cuda=True)
+    device = resolve_device(require_cuda=False)
     rng = torch.Generator().manual_seed(seed)
     data = {}
     for i in range(n_clients):

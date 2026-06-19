@@ -61,7 +61,9 @@ def test_two_client_flower_simulation() -> None:
 
         def fit(self, parameters, config):
             _set_params(self.model, parameters)
-            optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01)
+            optimizer = torch.optim.SGD(
+                self.model.parameters(), lr=0.01, momentum=0.0, weight_decay=0.0
+            )
             self.model.train()
             for _ in range(1):
                 pred = self.model(self.data)

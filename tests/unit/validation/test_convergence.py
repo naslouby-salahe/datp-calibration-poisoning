@@ -40,17 +40,18 @@ def _write_curve(ckpt_dir: Path) -> Path:
 
 
 class TestConvergencePayload:
-    def test_construction(self) -> None:
+    def test_construction(self, tmp_path: Path) -> None:
+        curve_path = str(tmp_path / "curve.csv")
         p = ConvergencePayload(
             convergence_round=5,
             convergence_criterion_value=0.01,
             convergence_status=ConvergenceStatus.CONVERGED,
-            curve_path="/tmp/curve.csv",
+            curve_path=curve_path,
         )
         assert p.convergence_round == 5
         assert p.convergence_criterion_value == 0.01
         assert p.convergence_status == ConvergenceStatus.CONVERGED
-        assert p.curve_path == "/tmp/curve.csv"
+        assert p.curve_path == curve_path
 
     def test_construction_with_none_round_and_value(self) -> None:
         p = ConvergencePayload(

@@ -14,24 +14,24 @@ from datp.core.tracking import (
 
 
 class TestInitTracking:
-    def test_disables_when_mlflow_unavailable(self) -> None:
+    def test_disables_when_mlflow_unavailable(self, tmp_path: Path) -> None:
         import datp.core.tracking as t
 
         t._TRACKING_ENABLED = True # noqa: SLF001
         t._MLFLOW = None # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
-            init_tracking(experiment_name="test", tracking_uri="file:///tmp")
+            init_tracking(experiment_name="test", tracking_uri=tmp_path.as_uri())
         assert t._TRACKING_ENABLED is False # noqa: SLF001
 
-    def test_enables_when_mlflow_available(self) -> None:
+    def test_enables_when_mlflow_available(self, tmp_path: Path) -> None:
         mock = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
         t._TRACKING_ENABLED = False # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock):
-            init_tracking(experiment_name="test_exp", tracking_uri="file:///tmp")
+            init_tracking(experiment_name="test_exp", tracking_uri=tmp_path.as_uri())
         assert t._TRACKING_ENABLED is True # noqa: SLF001
-        mock.set_tracking_uri.assert_called_once_with("file:///tmp")
+        mock.set_tracking_uri.assert_called_once_with(tmp_path.as_uri())
         mock.set_experiment.assert_called_once_with("test_exp")
 
 
@@ -41,7 +41,7 @@ class TestTrackingRun:
 
         t._TRACKING_ENABLED = False # noqa: SLF001
         with tracking_run(run_name="test", params=None, tags=None):
-            pass # should not raise
+            assert t._TRACKING_ENABLED is False
 
     def test_yields_none_when_mlflow_missing(self) -> None:
         import datp.core.tracking as t
@@ -49,7 +49,7 @@ class TestTrackingRun:
         t._TRACKING_ENABLED = True # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
             with tracking_run(run_name="test", params=None, tags=None):
-                pass
+                assert t._TRACKING_ENABLED is True
 
     def test_starts_run_with_params_and_tags(self) -> None:
         mock_mlflow = MagicMock(spec=_MlflowModule)
@@ -66,7 +66,7 @@ class TestTrackingRun:
                 params={"k1": "v1"},
                 tags={"tag1": "val1"},
             ):
-                pass
+                assert mock_mlflow.start_run.called
 
         mock_mlflow.start_run.assert_called_once_with(
             run_name="my_run", nested=False
@@ -85,7 +85,7 @@ class TestTrackingRun:
         t._TRACKING_ENABLED = True # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
             with tracking_run(run_name="nested_run", params=None, tags=None):
-                pass
+                assert mock_mlflow.active_run.called
 
         mock_mlflow.start_run.assert_called_once_with(
             run_name="nested_run", nested=True
@@ -204,27 +204,28 @@ class TestLogParams:
 
 
 class TestLogArtifact:
-    def test_noop_when_tracking_disabled(self) -> None:
+    def test_noop_when_tracking_disabled(self, tmp_path: Path) -> None:
         import datp.core.tracking as t
 
         t._TRACKING_ENABLED = False # noqa: SLF001
-        log_artifact("/tmp/fake.txt", artifact_path=None) # should not raise
+        log_artifact(str(tmp_path / "fake.txt"), artifact_path=None) # should not raise
 
-    def test_noop_when_mlflow_missing(self) -> None:
+    def test_noop_when_mlflow_missing(self, tmp_path: Path) -> None:
         import datp.core.tracking as t
 
         t._TRACKING_ENABLED = True # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
-            log_artifact("/tmp/fake.txt", artifact_path=None)
+            log_artifact(str(tmp_path / "fake.txt"), artifact_path=None)
 
-    def test_delegates_to_mlflow_with_path_conversion(self) -> None:
+    def test_delegates_to_mlflow_with_path_conversion(self, tmp_path: Path) -> None:
         mock_mlflow = MagicMock(spec=_MlflowModule)
         import datp.core.tracking as t
 
         t._TRACKING_ENABLED = True # noqa: SLF001
+        model_path = tmp_path / "model.pt"
         with patch("datp.core.tracking._import_mlflow", return_value=mock_mlflow):
-            log_artifact(Path("/tmp/model.pt"), artifact_path="models")
+            log_artifact(model_path, artifact_path="models")
 
         mock_mlflow.log_artifact.assert_called_once_with(
-            "/tmp/model.pt", artifact_path="models"
+            str(model_path), artifact_path="models"
         )

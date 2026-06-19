@@ -92,7 +92,7 @@ class TestBaselineRunId:
         run = BaselineRunId(cell=cell, baseline=Baseline.B2)
         assert run.regime == Regime.C
         assert run.seed == 3
-        assert run.alpha == 0.5
+        assert run.alpha == pytest.approx(0.5)
 
     def test_equality(self) -> None:
         cell = TrainingCellId(regime=Regime.A, seed=1, alpha=None)
@@ -188,10 +188,10 @@ class TestAlphaFromLabel:
         assert math.isinf(alpha_from_label("iid")) # type: ignore[arg-type]
 
     def test_numeric_returns_float(self) -> None:
-        assert alpha_from_label("0.5") == 0.5
+        assert alpha_from_label("0.5") == pytest.approx(0.5)
 
     def test_zero_returns_zero(self) -> None:
-        assert alpha_from_label("0") == 0.0
+        assert alpha_from_label("0") == pytest.approx(0.0)
 
 
 class TestFormatAlphaDir:
@@ -210,7 +210,7 @@ class TestParseAlphaDir:
         assert math.isinf(parse_alpha_dir(PathToken.ALPHA_IID)) # type: ignore[arg-type]
 
     def test_numeric_returns_float(self) -> None:
-        assert parse_alpha_dir("alpha_0.5") == 0.5
+        assert parse_alpha_dir("alpha_0.5") == pytest.approx(0.5)
 
     def test_empty_string_returns_none(self) -> None:
         assert parse_alpha_dir("") is None

@@ -37,8 +37,9 @@ class TestUnknownKeys:
             ModelConfig(input_dim=None) # type: ignore[call-arg]
 
     def test_null_required_key_fails(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             ModelConfig(input_dim=None) # type: ignore[call-arg]
+        assert exc_info.value.errors()[0]["type"] == "int_type"
 
 
 class TestOverrideNotStripped:

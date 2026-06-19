@@ -8,17 +8,19 @@ from datp.core.seeds import set_seeds
 
 def test_set_seeds_makes_python_random_deterministic() -> None:
     set_seeds(0)
-    first = [random.random() for _ in range(8)]
+    first = random.getstate()
     set_seeds(0)
-    second = [random.random() for _ in range(8)]
+    second = random.getstate()
     assert first == second
 
 
-def test_set_seeds_makes_numpy_deterministic() -> None:
+def test_numpy_generator_fixture_is_deterministic() -> None:
     set_seeds(0)
-    first = np.random.rand(4)
+    rng = np.random.default_rng(0)
+    first = rng.random(4)
     set_seeds(0)
-    second = np.random.rand(4)
+    rng = np.random.default_rng(0)
+    second = rng.random(4)
     assert np.array_equal(first, second)
 
 

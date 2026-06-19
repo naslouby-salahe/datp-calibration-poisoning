@@ -9,6 +9,8 @@ import pyarrow.parquet as pq
 from datp.core.errors import fmt
 from datp.scoring.schema import SCORE_COLUMN
 
+_SCHEMA_MODULE = "data.schema"
+
 
 def validate_feature_artifact(
     path: Path | str,
@@ -24,7 +26,7 @@ def validate_feature_artifact(
     if actual_columns != expected_list:
         raise ValueError(
             fmt(
-                "data.schema",
+                _SCHEMA_MODULE,
                 f"Feature artifact schema mismatch at {path}",
                 f"columns: {expected_list}",
                 f"columns: {actual_columns}",
@@ -36,7 +38,7 @@ def validate_feature_artifact(
         if not pa.types.is_floating(field.type) and not pa.types.is_integer(field.type):
             raise TypeError(
                 fmt(
-                    "data.schema",
+                    _SCHEMA_MODULE,
                     f"Feature artifact column '{name}' has non-numeric type",
                     "numeric type (floating or integer)",
                     str(field.type),
@@ -51,7 +53,7 @@ def validate_score_artifact(path: Path | str) -> None:
     if schema.names != [SCORE_COLUMN]:
         raise ValueError(
             fmt(
-                "data.schema",
+                _SCHEMA_MODULE,
                 f"Score artifact schema mismatch at {path}",
                 f"columns: [{SCORE_COLUMN}]",
                 f"columns: {schema.names}",
@@ -62,7 +64,7 @@ def validate_score_artifact(path: Path | str) -> None:
     if not pa.types.is_floating(field.type):
         raise TypeError(
             fmt(
-                "data.schema",
+                _SCHEMA_MODULE,
                 f"Score artifact column '{SCORE_COLUMN}' has non-floating type",
                 "floating type",
                 str(field.type),

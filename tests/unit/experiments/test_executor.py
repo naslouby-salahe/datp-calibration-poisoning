@@ -202,8 +202,8 @@ class TestSharedTrainingExecutor:
         assert np.array_equal(ctx.client_errors["c1"], np.array([0.1, 0.2]))
         assert ctx.eligible == ["c1"]
         assert ctx.pending == []
-        assert ctx.client_taus == {"c1": 0.15}
-        assert ctx.tau_global == 0.15
+        assert ctx.client_taus == pytest.approx({"c1": 0.15})
+        assert ctx.tau_global == pytest.approx(0.15)
         assert ctx.score_provider is mock_sp.return_value
 
 

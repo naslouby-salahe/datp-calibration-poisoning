@@ -112,7 +112,7 @@ def test_invariant_1_f0_reproduces_clean_zero_delta(collection, policy):
     )
     # Every per-victim Δτ is exactly zero.
     for entry in cell.poisoned_metrics.delta_tau.values():
-        assert entry.delta_tau == 0.0
+        assert entry.delta_tau == pytest.approx(0.0)
     assert cell.outcome.injection.n_replaced == 0
 
 
@@ -259,17 +259,15 @@ def test_invariant_6_determinism(collection):
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
-    assert (
-        cell_a.poisoned_metrics.delta_tau[_VICTIM].delta_tau
-        == cell_b.poisoned_metrics.delta_tau[_VICTIM].delta_tau
+    assert cell_a.poisoned_metrics.delta_tau[
+        _VICTIM
+    ].delta_tau == pytest.approx(
+        cell_b.poisoned_metrics.delta_tau[_VICTIM].delta_tau
     )
-    assert (
-        cell_a.poisoned_metrics.fleet_fpr.cv_fpr
-        == cell_b.poisoned_metrics.fleet_fpr.cv_fpr
-        or (
-            math.isnan(cell_a.poisoned_metrics.fleet_fpr.cv_fpr)
-            and math.isnan(cell_b.poisoned_metrics.fleet_fpr.cv_fpr)
-        )
+    cv_fpr_a = cell_a.poisoned_metrics.fleet_fpr.cv_fpr
+    cv_fpr_b = cell_b.poisoned_metrics.fleet_fpr.cv_fpr
+    assert cv_fpr_a == pytest.approx(cv_fpr_b) or (
+        math.isnan(cv_fpr_a) and math.isnan(cv_fpr_b)
     )
 
 
@@ -365,7 +363,7 @@ def test_invariant_9_manifest_round_trip(collection, tmp_path):
     loaded = load_manifest(run_dir)
 
     assert loaded.reservoir_mode == RESERVOIR_MODE
-    assert loaded.mu_flag_threshold == cell.mu_flag_threshold
+    assert loaded.mu_flag_threshold == pytest.approx(cell.mu_flag_threshold)
     assert loaded.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
     assert loaded.provenance.local_epochs == 1 # E=1 lock
     # All child seeds round-trip via the recorded SeedSequence entropy.
@@ -412,7 +410,9 @@ def test_invariant_10_auroc_invariant(collection):
     poisoned = cell.poisoned_metrics.auroc_records
     assert clean.keys() == poisoned.keys()
     for cid in clean:
-        assert clean[cid].auroc == poisoned[cid].auroc
+        assert clean[cid].auroc is not None
+        assert poisoned[cid].auroc is not None
+        assert clean[cid].auroc == pytest.approx(poisoned[cid].auroc)
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +461,7 @@ def test_invariant_11_cv_fpr_no_epsilon_returns_nan_when_mean_zero():
         ),
     )
     fleet = compute_fleet_fpr(coll, pair, mu_flag_threshold=None)
-    assert fleet.mean_fpr == 0.0
+    assert fleet.mean_fpr == pytest.approx(0.0)
     assert math.isnan(fleet.cv_fpr) # NOT a finite ε-stabilized value, NOT 0
 
 

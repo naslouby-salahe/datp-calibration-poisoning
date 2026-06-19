@@ -18,7 +18,7 @@ def test_summary_computes_checkpoint_metrics() -> None:
     summaries = summarize_checkpoint_metrics(metrics)
 
     assert {summary.checkpoint_round for summary in summaries} == {25, 50}
-    assert all(summary.coverage_ratio == 1.0 for summary in summaries)
+    assert all(summary.coverage_ratio == pytest.approx(1.0) for summary in summaries)
     assert all(summary.collapse_cell_count == 0 for summary in summaries)
 
 

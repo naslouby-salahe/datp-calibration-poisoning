@@ -61,7 +61,7 @@ def test_select_triples_rejects_nonpositive_count():
 
 def test_select_pairs_returns_all_pairs_by_default():
     pairs = select_pairs(_VICTIMS)
-    assert len(pairs) == 9 * 8 // 2  # C(9, 2) = 36
+    assert len(pairs) == 36
     assert len(set(pairs)) == len(pairs)
     for p in pairs:
         assert list(p) == sorted(p)

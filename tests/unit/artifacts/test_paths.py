@@ -81,13 +81,13 @@ class TestCanonicalResultPath:
         )
         assert p == Path("outputs/results/c/b2/seed_3/alpha_0.1")
 
-    def test_canonical_result_path_custom_base(self) -> None:
+    def test_canonical_result_path_custom_base(self, tmp_path: Path) -> None:
         p = (
-            ArtifactLayout(base_dir=Path("/tmp/out"), regime=Regime.B)
+            ArtifactLayout(base_dir=tmp_path / "out", regime=Regime.B)
             .baseline_run(_run(Regime.B, Baseline.B4, 1))
             .result_dir
         )
-        assert p == Path("/tmp/out/results/b/b4/seed_1")
+        assert p == tmp_path / "out/results/b/b4/seed_1"
 
     def test_canonical_result_path_includes_baseline(self) -> None:
         p = (

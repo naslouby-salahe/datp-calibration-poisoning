@@ -45,7 +45,7 @@ def _make_paired(
 def _uniform_paired(n_victims: int = 3, delta: float = 0.05) -> PairedDeltas:
     """All victims, all seeds, same positive delta_tau — fully feasible."""
     victims = {
-        f"v{i}": {s: delta for s in SEEDS}
+        f"v{i}": dict.fromkeys(SEEDS, delta)
         for i in range(n_victims)
     }
     return _make_paired(victims)
@@ -59,21 +59,21 @@ class TestCollectPairedDeltas:
     def test_all_seeds_present(self) -> None:
         result = collect_paired_deltas(
             victim_id="v0",
-            seed_deltas={s: 0.1 for s in SEEDS},
+            seed_deltas=dict.fromkeys(SEEDS, 0.1),
         )
         assert set(result.keys()) == set(SEEDS)
 
     def test_default_all_feasible(self) -> None:
         result = collect_paired_deltas(
             victim_id="v0",
-            seed_deltas={s: 0.1 for s in SEEDS},
+            seed_deltas=dict.fromkeys(SEEDS, 0.1),
         )
         assert all(sd.feasible for sd in result.values())
 
     def test_feasible_filter(self) -> None:
         result = collect_paired_deltas(
             victim_id="v0",
-            seed_deltas={s: 0.1 for s in SEEDS},
+            seed_deltas=dict.fromkeys(SEEDS, 0.1),
             feasible_seeds={100, 101},
         )
         assert result[100].feasible
@@ -125,12 +125,12 @@ class TestComputeSeedAggregates:
         paired = PairedDeltas(deltas={
             "v0": collect_paired_deltas(
                 victim_id="v0",
-                seed_deltas={s: 0.9 for s in SEEDS},
+                seed_deltas=dict.fromkeys(SEEDS, 0.9),
                 feasible_seeds=set(), # none feasible
             ),
             "v1": collect_paired_deltas(
                 victim_id="v1",
-                seed_deltas={s: 0.1 for s in SEEDS},
+                seed_deltas=dict.fromkeys(SEEDS, 0.1),
             ),
         })
         agg = compute_seed_aggregates(paired, SEEDS)
@@ -140,8 +140,8 @@ class TestComputeSeedAggregates:
     def test_average_across_victims(self) -> None:
         # v0: 0.0, v1: 0.2 → mean 0.1
         victims = {
-            "v0": {s: 0.0 for s in SEEDS},
-            "v1": {s: 0.2 for s in SEEDS},
+            "v0": dict.fromkeys(SEEDS, 0.0),
+            "v1": dict.fromkeys(SEEDS, 0.2),
         }
         paired = _make_paired(victims)
         agg = compute_seed_aggregates(paired, SEEDS)
@@ -155,13 +155,13 @@ class TestComputeSeedAggregates:
 
 class TestSignTest:
     def test_all_positive_raise_consistent(self) -> None:
-        agg = {s: 0.05 for s in SEEDS} # 5/5 positive
+        agg = dict.fromkeys(SEEDS, 0.05) # 5/5 positive
         result = sign_test(agg, direction="raise")
         assert result.consistent
         assert result.n_positive == 5
 
     def test_all_negative_lower_consistent(self) -> None:
-        agg = {s: -0.05 for s in SEEDS}
+        agg = dict.fromkeys(SEEDS, -0.05)
         result = sign_test(agg, direction="lower")
         assert result.consistent
 
@@ -187,12 +187,12 @@ class TestSignTest:
         assert result.n_zero == 1
 
     def test_threshold_in_result(self) -> None:
-        agg = {s: 0.1 for s in SEEDS}
+        agg = dict.fromkeys(SEEDS, 0.1)
         result = sign_test(agg, direction="raise")
         assert result.sign_consistency_threshold == 4
 
     def test_n_total_correct(self) -> None:
-        agg = {s: 0.1 for s in SEEDS}
+        agg = dict.fromkeys(SEEDS, 0.1)
         result = sign_test(agg, direction="raise")
         assert result.n_total == 5
 
@@ -242,7 +242,7 @@ class TestBootstrapSeedAggregates:
         assert isinstance(result, BootstrapResult)
 
     def test_ci_covers_positive_mean(self) -> None:
-        agg = {s: 0.05 for s in SEEDS}
+        agg = dict.fromkeys(SEEDS, 0.05)
         result = bootstrap_seed_aggregates(agg, n_bootstrap=1_000, analysis_seed=300)
         assert result.ci_lower > 0.0
         assert result.ci_upper > 0.0
@@ -345,11 +345,11 @@ class TestComputeInference:
         paired = PairedDeltas(deltas={
             "v0": collect_paired_deltas(
                 victim_id="v0",
-                seed_deltas={s: 0.05 for s in SEEDS},
+                seed_deltas=dict.fromkeys(SEEDS, 0.05),
                 feasible_seeds=set(),
             ),
-            "v1": collect_paired_deltas(victim_id="v1", seed_deltas={s: 0.05 for s in SEEDS}),
-            "v2": collect_paired_deltas(victim_id="v2", seed_deltas={s: 0.05 for s in SEEDS}),
+            "v1": collect_paired_deltas(victim_id="v1", seed_deltas=dict.fromkeys(SEEDS, 0.05)),
+            "v2": collect_paired_deltas(victim_id="v2", seed_deltas=dict.fromkeys(SEEDS, 0.05)),
         })
         result = compute_inference(
             paired,

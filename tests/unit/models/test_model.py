@@ -123,7 +123,13 @@ class TestLossDecreases:
         model = Autoencoder(
             NBAIOT_INPUT_DIM, NBAIOT_HIDDEN, activation=Activation.RELU, use_bn=False
         )
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=1e-3,
+            betas=(0.9, 0.999),
+            eps=1e-8,
+            weight_decay=0.0,
+        )
 
         # Synthetic benign data
         x = torch.randn(100, NBAIOT_INPUT_DIM)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from datp.artifacts.poison_names import THRESHOLD_QUANTILE
 from datp.attacks.diagnostics import (
     compute_asr,
@@ -50,29 +52,29 @@ def _make_setup(fraction: float = 0.40):
 
 class TestAsr:
     def test_asr_in_0_1(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, b1_result, _, victim_id = _make_setup()
         asr = compute_asr(b1_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
         assert 0.0 <= asr.asr <= 1.0
 
     def test_asr_victim_id_recorded(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, _, b2_result, victim_id = _make_setup()
         asr = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
         assert asr.victim_id == victim_id
 
     def test_asr_policy_recorded(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, _, b2_result, victim_id = _make_setup()
         asr = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
         assert asr.policy == ThresholdPolicy.B2_PERSONALIZED
 
     def test_asr_raise_counts_positive_significant(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, _, b2_result, victim_id = _make_setup()
         asr = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE)
         # Victim should have significant positive delta (HIGH_SCORE injection).
         assert asr.n_significant >= 1
 
     def test_asr_lower_zero_for_raise_attack(self) -> None:
         """THRESHOLD_LOWER ASR should be 0 when we only raised a victim threshold."""
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, _, b2_result, victim_id = _make_setup()
         # B2: only victim changes, direction is RAISE → no LOWER significant clients.
         asr_lower = compute_asr(b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_LOWER)
         # No clients should have Δτ < -scale since we raised the threshold.
@@ -85,31 +87,31 @@ class TestAsr:
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
         b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
         result = compute_metrics(col, b1, None)
-        asr = compute_asr(result, victim_id=list(col.eligible_ids)[0], objective=AttackerObjective.THRESHOLD_RAISE)
-        assert asr.asr == 0.0
+        asr = compute_asr(result, victim_id=next(iter(col.eligible_ids)), objective=AttackerObjective.THRESHOLD_RAISE)
+        assert asr.asr == pytest.approx(0.0)
 
 
 class TestBlastRadius:
     def test_b2_blast_radius_victim_only(self) -> None:
         """B2: only victim threshold changes → blast radius at most 1."""
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, _, b2_result, victim_id = _make_setup()
         br = compute_blast_radius(b2_result, victim_id=victim_id)
         assert br.n_significant <= 1, "B2 blast radius must be at most 1 for single victim"
 
     def test_b1_blast_radius_gte_b2(self) -> None:
         """B1: global effect → blast radius >= B2 blast radius."""
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, b1_result, b2_result, victim_id = _make_setup()
         br1 = compute_blast_radius(b1_result, victim_id=victim_id)
         br2 = compute_blast_radius(b2_result, victim_id=victim_id)
         assert br1.n_significant >= br2.n_significant
 
     def test_blast_fraction_in_0_1(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, b1_result, _, victim_id = _make_setup()
         br = compute_blast_radius(b1_result, victim_id=victim_id)
         assert 0.0 <= br.blast_fraction <= 1.0
 
     def test_n_eligible_correct(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, b1_result, _, _ = _make_setup()
         br = compute_blast_radius(b1_result)
         assert br.n_eligible == 5
 
@@ -117,22 +119,22 @@ class TestBlastRadius:
 class TestSpillover:
     def test_b2_no_spillover(self) -> None:
         """B2 single-victim attack: only victim threshold changes → no spillover."""
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, _, b2_result, victim_id = _make_setup()
         sp = compute_spillover(b2_result, victim_id=victim_id)
         assert sp.n_spillover == 0, "B2 should have no spillover for single victim"
         assert len(sp.spillover_client_ids) == 0
 
     def test_spillover_does_not_include_victim(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, b1_result, _, victim_id = _make_setup()
         sp = compute_spillover(b1_result, victim_id=victim_id)
         assert victim_id not in sp.spillover_client_ids
 
     def test_n_non_victims_correct(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, _, b2_result, victim_id = _make_setup()
         sp = compute_spillover(b2_result, victim_id=victim_id)
         assert sp.n_non_victims == 4 # 5 eligible - 1 victim
 
     def test_spillover_ids_sorted(self) -> None:
-        col, b1_result, b2_result, victim_id = _make_setup()
+        _, b1_result, _, victim_id = _make_setup()
         sp = compute_spillover(b1_result, victim_id=victim_id)
         assert sp.spillover_client_ids == tuple(sorted(sp.spillover_client_ids))

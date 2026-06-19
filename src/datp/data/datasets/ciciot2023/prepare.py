@@ -33,6 +33,7 @@ from datp.data.scaling import apply_scaler, fit_scaler
 from datp.data.splits import Split
 
 logger = get_logger(__name__)
+_CICIOT_MODULE = "data.ciciot"
 
 
 def _clean_client_frame(df: pl.DataFrame, features: list[str]) -> pl.DataFrame:
@@ -72,7 +73,7 @@ def _validate_sample_rows(csv_file: Path, sample_df: pl.DataFrame) -> None:
     if len(sample_df) == 0:
         raise ValueError(
             fmt(
-                "data.ciciot",
+                _CICIOT_MODULE,
                 f"Empty CICIoT2023 CSV: {csv_file.name}",
                 "at least 1 sample row",
                 "0 rows",
@@ -85,7 +86,7 @@ def _validate_sample_rows(csv_file: Path, sample_df: pl.DataFrame) -> None:
         if not dtype.is_numeric():
             raise ValueError(
                 fmt(
-                    "data.ciciot",
+                    _CICIOT_MODULE,
                     f"Non-numeric feature sample in {csv_file.name}",
                     "numeric CICFlowMeter feature columns",
                     f"non-numeric feature value in {col} ({dtype})",
@@ -95,7 +96,7 @@ def _validate_sample_rows(csv_file: Path, sample_df: pl.DataFrame) -> None:
     if sample_df.select(pl.col(LABEL_COLUMN).is_null().any()).item():
         raise ValueError(
             fmt(
-                "data.ciciot",
+                _CICIOT_MODULE,
                 f"Missing label sample in {csv_file.name}",
                 "non-null Label values",
                 "null Label value",
@@ -111,7 +112,7 @@ def validate_schema(raw_dir: Path) -> None:
 
     if not csv_files:
         raise FileNotFoundError(
-            fmt_missing("data.ciciot", f"MERGED_CSV files in {merged_dir}")
+            fmt_missing(_CICIOT_MODULE, f"MERGED_CSV files in {merged_dir}")
         )
 
     expected_columns = list(EXPECTED_COLUMNS)
@@ -121,7 +122,7 @@ def validate_schema(raw_dir: Path) -> None:
         if actual_columns != expected_columns:
             raise ValueError(
                 fmt(
-                    "data.ciciot",
+                    _CICIOT_MODULE,
                     f"Schema mismatch in {csv_file.name}",
                     f"columns {expected_columns}",
                     f"columns {actual_columns}",
@@ -233,7 +234,7 @@ def _prepare_client(
         if unknown:
             raise ValueError(
                 fmt(
-                    "data.ciciot",
+                    _CICIOT_MODULE,
                     f"Unknown attack labels in {client_id}",
                     "labels mappable to a known attack family",
                     str(sorted(unknown)),
@@ -251,7 +252,7 @@ def _prepare_client(
     if len(test_attack_scaled) > 0 and len(labels_df) != len(test_attack_scaled):
         raise ValueError(
             fmt(
-                "data.ciciot",
+                _CICIOT_MODULE,
                 f"Attack label count mismatch for {client_id}",
                 str(len(test_attack_scaled)),
                 str(len(labels_df)),

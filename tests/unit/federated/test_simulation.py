@@ -206,15 +206,13 @@ class TestClientDataNotMutated:
 
         class _FakeCatalog:
             def __init__(self, **_kw: object) -> None:
-                # no-op: catalog state provided as class attributes
-                pass
+                assert _kw
 
             client_ids = ["client_0"]
             num_clients = 1
 
             def validate_prepared_splits(self) -> None:
-                # no-op: no disk access needed in this test
-                pass
+                assert self.client_ids == ["client_0"]
 
         monkeypatch.setattr(sim_mod, "TrainingClientCatalog", _FakeCatalog)
         monkeypatch.setattr(sim_mod, "make_client_fn", fake_make_client_fn)

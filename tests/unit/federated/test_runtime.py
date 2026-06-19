@@ -45,7 +45,7 @@ class TestObjectStoreCapacity:
 
 class TestRayMemoryThreshold:
     def test_ray_memory_threshold_value(self) -> None:
-        assert BASE_CONFIG.runtime.ray_memory_threshold == 0.90
+        assert BASE_CONFIG.runtime.ray_memory_threshold == pytest.approx(0.90)
 
     def test_ray_memory_threshold_enforced(
         self, monkeypatch: pytest.MonkeyPatch
@@ -133,7 +133,7 @@ class TestDeriveClientResources:
             )
         )
         assert isinstance(result, dict)
-        assert result["num_gpus"] == 0.5
+        assert result["num_gpus"] == pytest.approx(0.5)
         assert "num_cpus" in result
 
     def test_num_gpus_zero_when_cpu_mode(self) -> None:
@@ -146,7 +146,7 @@ class TestDeriveClientResources:
                 num_gpus_per_client=0.5,
             )
         )
-        assert result["num_gpus"] == 0.0
+        assert result["num_gpus"] == pytest.approx(0.0)
 
     def test_honours_max_concurrent_override(self) -> None:
         result = derive_client_resources(
@@ -158,7 +158,7 @@ class TestDeriveClientResources:
                 num_gpus_per_client=0.0,
             )
         )
-        assert result["num_cpus"] == 2.0 # ceil(8 / 4)
+        assert result["num_cpus"] == pytest.approx(2.0) # ceil(8 / 4)
 
     def test_device_and_resources_agree_cuda(
         self, monkeypatch: pytest.MonkeyPatch
@@ -192,4 +192,4 @@ class TestDeriveClientResources:
             )
         )
         assert device.type == DeviceType.CPU
-        assert resources["num_gpus"] == 0.0
+        assert resources["num_gpus"] == pytest.approx(0.0)

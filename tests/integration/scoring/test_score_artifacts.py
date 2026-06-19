@@ -5,116 +5,38 @@ from typing import cast
 import numpy as np
 import pandas as pd
 import pytest
-import torch
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
-from datp.checkpointing.enums import CheckpointProtocolMode
-from datp.config.compose import BASE_CONFIG
-from datp.config.models import (
-    ConvergenceConfig,
-    DatpConfig,
-    FederationConfig,
-)
 from datp.core.enums import Regime, ScoringStage
 from datp.core.identity import TrainingCellId
 from datp.core.seeds import set_seeds
 from datp.data.splits import Split
 from datp.federated.protocols.fedavg import run_fl_training
-from datp.federated.types import ClientData
 from datp.scoring.generation import validate_scoring_manifest
 from datp.scoring.schema import ScoringManifestStatus
+from tests.fixtures.fl_training import SEED, make_client_data, make_fl_cfg
 
-_N_FEATURES = 10
-_N_TRAIN = 200
-_N_VAL = 50
-_N_TEST = 50
-_SEED = 42
 _STAGES = (ScoringStage.CAL, ScoringStage.TEST_BENIGN, ScoringStage.TEST_ATTACK)
-
-
-def _make_client_data(n_clients: int, seed: int = _SEED) -> dict[str, ClientData]:
-    device = torch.device("cpu")
-    rng = torch.Generator().manual_seed(seed)
-    data = {}
-    for i in range(n_clients):
-        data[f"client_{i}"] = ClientData(
-            train=torch.randn(_N_TRAIN, _N_FEATURES, generator=rng).to(device),
-            val=torch.randn(_N_VAL, _N_FEATURES, generator=rng).to(device),
-            test_benign=torch.randn(_N_TEST, _N_FEATURES, generator=rng).to(device),
-            test_attack=(torch.randn(_N_TEST, _N_FEATURES, generator=rng) + 5.0).to(
-                device
-            ),
-        )
-    return data
-
-
-def _make_cfg(
-    regime: Regime = Regime.A,
-    n_features: int = _N_FEATURES,
-    rounds: int = 2,
-) -> DatpConfig:
-    checkpoint_protocol = BASE_CONFIG.checkpoint_protocol
-    disabled_checkpoint_protocol = (
-        checkpoint_protocol.model_copy(
-            update={"mode": CheckpointProtocolMode.DISABLED}
-        )
-        if checkpoint_protocol is not None
-        else None
-    )
-    return BASE_CONFIG.model_copy(
-        update={
-            "regime": regime,
-            "model": BASE_CONFIG.model.model_copy(
-                update={
-                    "input_dim": n_features,
-                    "encoder_dims": [8, 4],
-                }
-            ),
-            "dataset": BASE_CONFIG.dataset.model_copy(
-                update={
-                    "feature_count": n_features,
-                }
-            ),
-            "machine": BASE_CONFIG.machine.model_copy(
-                update={
-                    "batch_size_train": 64,
-                }
-            ),
-            "federation": FederationConfig(
-                local_epochs=1,
-                convergence=ConvergenceConfig(
-                    rounds_initial=1,
-                    rounds_max=rounds,
-                    relative_threshold=0.001,
-                    window=2,
-                    round_timeout_s=300.0,
-                ),
-            ),
-            # Disable checkpoint protocol: these tests verify basic scoring
-            # artifact layout, not the checkpoint protocol artifact paths.
-            "checkpoint_protocol": disabled_checkpoint_protocol,
-        }
-    )
 
 
 @pytest.mark.integration
 def test_artifacts_written(tmp_path) -> None:
-    set_seeds(_SEED)
-    cfg = _make_cfg(regime=Regime.A, rounds=2)
-    client_data = _make_client_data(n_clients=2)
+    set_seeds(SEED)
+    cfg = make_fl_cfg(regime=Regime.A, rounds=2)
+    client_data = make_client_data(n_clients=2)
     client_ids = sorted(client_data.keys())
 
     run_fl_training(
         cfg=cfg,
         client_data=client_data,
-        seed=_SEED,
+        seed=SEED,
         alpha=None,
         base_dir=tmp_path,
     )
 
     layout = ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
-    cell = TrainingCellId(regime=Regime.A, seed=_SEED, alpha=None)
+    cell = TrainingCellId(regime=Regime.A, seed=SEED, alpha=None)
     for cid in client_ids:
         for stage in _STAGES:
             expected = layout.score_file(cell, stage, cid)
@@ -129,20 +51,20 @@ def test_artifacts_written(tmp_path) -> None:
 
 @pytest.mark.integration
 def test_artifact_schema(tmp_path) -> None:
-    set_seeds(_SEED)
-    cfg = _make_cfg(regime=Regime.A, rounds=2)
-    client_data = _make_client_data(n_clients=2)
-    first_cid = sorted(client_data.keys())[0]
+    set_seeds(SEED)
+    cfg = make_fl_cfg(regime=Regime.A, rounds=2)
+    client_data = make_client_data(n_clients=2)
+    first_cid = min(client_data.keys())
 
     run_fl_training(
         cfg=cfg,
         client_data=client_data,
-        seed=_SEED,
+        seed=SEED,
         alpha=None,
         base_dir=tmp_path,
     )
 
-    cell = TrainingCellId(regime=Regime.A, seed=_SEED, alpha=None)
+    cell = TrainingCellId(regime=Regime.A, seed=SEED, alpha=None)
     parquet_file = ArtifactLayout(base_dir=tmp_path, regime=Regime.A).score_file(
         cell, ScoringStage.CAL, first_cid
     )
@@ -157,7 +79,7 @@ def test_artifact_schema(tmp_path) -> None:
 
 
 def test_scoring_manifest_validation_fails_when_missing(tmp_path) -> None:
-    cell = TrainingCellId(regime=Regime.A, seed=_SEED, alpha=None)
+    cell = TrainingCellId(regime=Regime.A, seed=SEED, alpha=None)
     score_base = ArtifactLayout(base_dir=tmp_path, regime=Regime.A).score_cell(cell).score_dir
     score_base.mkdir(parents=True)
     (score_base / ArtifactFile.SCORING_MANIFEST).write_text(

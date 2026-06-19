@@ -39,7 +39,7 @@ def test_valid_sidecars_pass(tmp_path: Path) -> None:
 def test_missing_sidecar_fails(tmp_path: Path) -> None:
     figures_dir = tmp_path / "figures"
     figures_dir.mkdir(parents=True)
-    one_fig = sorted(_REPRESENTATIVE_SEED_FIGURES)[0]
+    one_fig = min(_REPRESENTATIVE_SEED_FIGURES)
     _write_sidecar(figures_dir, one_fig, _valid_sidecar(one_fig))
     errors = _validate_figure_sidecars(figures_dir)
     assert any("Missing figure sidecar" in e for e in errors)

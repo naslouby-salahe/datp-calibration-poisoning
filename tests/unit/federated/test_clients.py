@@ -57,7 +57,7 @@ class TestDatpClientConstruction:
         )
         assert client._local_epochs == 3
         assert client._batch_size == 16
-        assert client._lr == 0.05
+        assert client._lr == pytest.approx(0.05)
 
 
 # ── Shape validation (reject bad tensors before training) ────────────────
@@ -228,7 +228,7 @@ class TestDatpClientEvaluate:
         assert count == 8
         assert loss > 0.0
         assert ClientMetricKey.VAL_LOSS in metrics
-        assert metrics[ClientMetricKey.VAL_LOSS] == loss
+        assert metrics[ClientMetricKey.VAL_LOSS] == pytest.approx(loss)
 
     def test_sets_model_to_eval_mode(self) -> None:
         model = _make_ae()

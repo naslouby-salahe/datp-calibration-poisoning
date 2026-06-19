@@ -64,7 +64,7 @@ class TestDeltaTau:
         pois_cal, victim_id = _inject_one_victim(col)
         b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean)
         dt = compute_delta_tau(col, b2)
-        assert dt[victim_id].delta_tau != 0.0
+        assert not math.isclose(dt[victim_id].delta_tau, 0.0, abs_tol=1e-10)
 
     def test_f0_all_delta_zero(self) -> None:
         col = _make_collection()
@@ -79,7 +79,7 @@ class TestDeltaTau:
         pois_cal, victim_id = _inject_one_victim(col)
         b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean)
         dt = compute_delta_tau(col, b2)
-        assert dt[victim_id].delta_tau_rel != 0.0
+        assert not math.isclose(dt[victim_id].delta_tau_rel, 0.0, abs_tol=1e-10)
 
     def test_delta_tau_scale_positive(self) -> None:
         col = _make_collection()
@@ -185,7 +185,9 @@ class TestAurocRecords:
         r1 = compute_auroc_records(col)
         r2 = compute_auroc_records(col) # same input → same output
         for cid in col.eligible_ids:
-            assert r1[cid].auroc == r2[cid].auroc
+            assert r1[cid].auroc is not None
+            assert r2[cid].auroc is not None
+            assert r1[cid].auroc == pytest.approx(r2[cid].auroc)
 
 
 class TestMuFlagThreshold:
@@ -198,7 +200,7 @@ class TestMuFlagThreshold:
         assert val > 0.0
 
     def test_zero_mean(self) -> None:
-        assert compute_mu_flag_threshold(0.0) == 0.0
+        assert compute_mu_flag_threshold(0.0) == pytest.approx(0.0)
 
     def test_magnitude_preserved(self) -> None:
         # 0.8 / 8 = 0.1 → 0.10
@@ -221,4 +223,4 @@ class TestComputeMetrics:
         result = compute_metrics(col, b2, mu_flag_threshold=0.05)
         assert set(result.delta_tau.keys()) == set(col.eligible_ids)
         assert set(result.auroc_records.keys()) == set(col.eligible_ids)
-        assert result.mu_flag_threshold == 0.05
+        assert result.mu_flag_threshold == pytest.approx(0.05)

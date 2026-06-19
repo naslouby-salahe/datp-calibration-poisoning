@@ -27,7 +27,7 @@ from datp.reporting.tables import (
     generate_table4,
 )
 
-RNG = np.random.RandomState(99)
+RNG = np.random.default_rng(99)
 
 _DEVICE_IDS = [f"dev_{i}" for i in range(6)]
 _ELIGIBLE_IDS = _DEVICE_IDS[:5]
@@ -97,7 +97,8 @@ def _make_eval_result(baseline: Baseline, seed: int) -> EvaluationResult:
         (
             c.client_id
             for c in clients
-            if c.client_id in _ELIGIBLE_IDS and c.metrics.fpr == worst_fpr
+            if c.client_id in _ELIGIBLE_IDS
+            and math.isclose(c.metrics.fpr, worst_fpr, abs_tol=1e-12)
         ),
         None,
     )
@@ -200,8 +201,8 @@ def test_build_table_row_single_seed() -> None:
     results = [_make_eval_result(Baseline.B2, 0)]
     row = _build_table_row(Baseline.B2, results)
     assert row.baseline == Baseline.B2
-    assert row.cv_fpr_std == 0.0
-    assert row.cv_tpr_std == 0.0
+    assert row.cv_fpr_std == pytest.approx(0.0)
+    assert row.cv_tpr_std == pytest.approx(0.0)
 
 
 def test_build_table_row_eligible_count_mismatch_raises() -> None:

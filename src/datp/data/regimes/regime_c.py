@@ -98,7 +98,7 @@ def _stratified_split(
 
     unique_devices = np.unique(device_labels)
     for dev in unique_devices:
-        dev_indices = np.where(device_labels == dev)[0].copy()
+        dev_indices = np.nonzero(device_labels == dev)[0].copy()
         rng.shuffle(dev_indices)
 
         n = len(dev_indices)

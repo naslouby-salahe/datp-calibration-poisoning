@@ -54,7 +54,7 @@ def _cell(
     )
 
 
-_BASE = Path("/tmp/outputs")
+_BASE = Path("outputs")
 _LAYOUT = PoisonLayout(base_dir=_BASE)
 
 

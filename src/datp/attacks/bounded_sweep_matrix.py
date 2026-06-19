@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from itertools import product
 
 from datp.attacks.constants import (
     BOUNDED_SWEEP_FRACTIONS,
@@ -73,22 +74,19 @@ def _enumerate_single_victim_matrix(
             raise KeyError(
                 f"no victim list provided for training_seed={training_seed}"
             )
-        for victim_id in victims:
-            for policy in DEFAULT_POLICIES:
-                for source in BOUNDED_SWEEP_SOURCES:
-                    for fraction in fractions:
-                        cells.append(
-                            SweepCellSpec(
-                                seed_pair=SeedPair(
-                                    training_seed=training_seed,
-                                    poisoning_seed=poisoning_seed,
-                                ),
-                                victim_id=victim_id,
-                                policy=policy,
-                                source=source,
-                                fraction=fraction,
-                            )
-                        )
+        seed_pair = SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed)
+        cells.extend(
+            SweepCellSpec(
+                seed_pair=seed_pair,
+                victim_id=victim_id,
+                policy=policy,
+                source=source,
+                fraction=fraction,
+            )
+            for victim_id, policy, source, fraction in product(
+                victims, DEFAULT_POLICIES, BOUNDED_SWEEP_SOURCES, fractions
+            )
+        )
     return tuple(cells)
 
 

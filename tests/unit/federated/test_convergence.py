@@ -219,7 +219,7 @@ class TestBaseConfigDefaults:
     def test_base_config_relative_threshold_is_0005(self) -> None:
         from datp.config.compose import BASE_CONFIG
 
-        assert BASE_CONFIG.federation.convergence.relative_threshold == 0.005
+        assert BASE_CONFIG.federation.convergence.relative_threshold == pytest.approx(0.005)
 
     def test_base_config_window_is_10(self) -> None:
         from datp.config.compose import BASE_CONFIG

@@ -98,9 +98,9 @@ def test_regime_c_prepared_dir_format(tmp_path: Path) -> None:
     assert "seed_3" in str(path)
 
 
-def test_data_root_returns_data_subdir() -> None:
+def test_data_root_returns_data_subdir(tmp_path: Path) -> None:
     assert data_root(".") == Path("data")
-    assert data_root(Path("/tmp")) == Path("/tmp/data")
+    assert data_root(tmp_path) == tmp_path / "data"
 
 
 def test_raw_root_uses_canonical_raw_slug() -> None:

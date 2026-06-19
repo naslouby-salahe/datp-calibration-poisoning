@@ -12,7 +12,7 @@ this module enforces that constraint.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -38,59 +38,85 @@ class ManifestEmissionError(ValueError):
     """Raised when manifest cannot be emitted due to a lock violation."""
 
 
+@dataclass(frozen=True, slots=True)
+class ManifestBuildRequest:
+    """Inputs needed to build a run manifest."""
+
+    dataset: str
+    scale: ExperimentScale
+    policy: ThresholdPolicy
+    objective: AttackerObjective
+    source: PoisoningSourceStrategy
+    fraction: float
+    target_scope: PoisoningTargetScope
+    training_seed: int
+    poisoning_seed: int
+    client_idx: int
+    scope_idx: int
+    mu_flag_threshold: float | None
+    repository: str
+    local_epochs: int
+    checkpoint_round: int | None
+    injection_rule: CalibrationInjectionRule
+    reservoir_mode: str
+
+
+def _manifest_request_from_kwargs(
+    legacy_kwargs: dict[str, object],
+) -> ManifestBuildRequest:
+    request_kwargs = {
+        "local_epochs": 1,
+        "checkpoint_round": None,
+        "injection_rule": CalibrationInjectionRule.REPLACE_FIXED_BUDGET,
+        "reservoir_mode": RESERVOIR_MODE,
+        **legacy_kwargs,
+    }
+    return ManifestBuildRequest(**request_kwargs)  # type: ignore[arg-type]
+
+
 def build_manifest(
-    *,
-    dataset: str,
-    scale: ExperimentScale,
-    policy: ThresholdPolicy,
-    objective: AttackerObjective,
-    source: PoisoningSourceStrategy,
-    fraction: float,
-    target_scope: PoisoningTargetScope,
-    training_seed: int,
-    poisoning_seed: int,
-    client_idx: int,
-    scope_idx: int,
-    mu_flag_threshold: float | None,
-    repository: str,
-    local_epochs: int = 1,
-    checkpoint_round: int | None = None,
-    injection_rule: CalibrationInjectionRule = (
-        CalibrationInjectionRule.REPLACE_FIXED_BUDGET
-    ),
-    reservoir_mode: str = RESERVOIR_MODE,
+    request: ManifestBuildRequest | None = None,
+    **legacy_kwargs: object,
 ) -> RunManifest:
     """Build a RunManifest for one experiment cell.
 
     mu_flag_threshold may be None only if you intend to update it before any
     poisoned run. Call emit_manifest only after locking mu_flag_threshold.
     """
+    if request is None:
+        request = _manifest_request_from_kwargs(legacy_kwargs)
+    elif legacy_kwargs:
+        raise TypeError("build_manifest accepts either request or keyword inputs")
+
     record = SeedRecord(
-        pair=SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
-        client_idx=client_idx,
-        scope_idx=scope_idx,
+        pair=SeedPair(
+            training_seed=request.training_seed,
+            poisoning_seed=request.poisoning_seed,
+        ),
+        client_idx=request.client_idx,
+        scope_idx=request.scope_idx,
     )
     provenance = ProvenanceRecord(
-        local_epochs=local_epochs,
-        repository=repository,
-        checkpoint_round=checkpoint_round,
+        local_epochs=request.local_epochs,
+        repository=request.repository,
+        checkpoint_round=request.checkpoint_round,
     )
     return RunManifest(
-        dataset=dataset,
-        scale=scale,
-        policy=policy,
-        objective=objective,
-        source=source,
-        injection_rule=injection_rule,
-        fraction=fraction,
-        target_scope=target_scope,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
-        client_idx=client_idx,
-        scope_idx=scope_idx,
+        dataset=request.dataset,
+        scale=request.scale,
+        policy=request.policy,
+        objective=request.objective,
+        source=request.source,
+        injection_rule=request.injection_rule,
+        fraction=request.fraction,
+        target_scope=request.target_scope,
+        training_seed=request.training_seed,
+        poisoning_seed=request.poisoning_seed,
+        client_idx=request.client_idx,
+        scope_idx=request.scope_idx,
         provenance=provenance,
-        reservoir_mode=reservoir_mode,
-        mu_flag_threshold=mu_flag_threshold,
+        reservoir_mode=request.reservoir_mode,
+        mu_flag_threshold=request.mu_flag_threshold,
         seed_record=record,
         generated_at_utc=datetime.now(timezone.utc).isoformat(),
     )
@@ -146,17 +172,5 @@ def write_run_log_entry(entry: RunLogEntry, log_path: Path) -> None:
     so the file can be read line-by-line as JSONL.
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    record = {
-        "dataset": entry.dataset,
-        "policy": entry.policy,
-        "objective": entry.objective,
-        "source": entry.source,
-        "fraction": entry.fraction,
-        "training_seed": entry.training_seed,
-        "poisoning_seed": entry.poisoning_seed,
-        "mu_flag_threshold": entry.mu_flag_threshold,
-        "manifest_path": entry.manifest_path,
-        "generated_at_utc": entry.generated_at_utc,
-    }
     with log_path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record) + "\n")
+        f.write(json.dumps(asdict(entry)) + "\n")

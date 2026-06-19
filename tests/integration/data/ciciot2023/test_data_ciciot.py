@@ -62,6 +62,10 @@ skip_no_data = pytest.mark.skipif(
 )
 
 
+def _clean_nonfinite_rows(df: pd.DataFrame) -> pd.DataFrame:
+    return df.replace([np.inf, -np.inf], np.nan).dropna()
+
+
 @skip_no_data
 @pytest.mark.integration
 class TestSchemaAllFiles:
@@ -128,8 +132,7 @@ class TestCapApplied:
 
         # Load real data, sanitize inf (test focus is cap logic, not data quality).
         df = pd.read_csv(src)
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.dropna(inplace=True)
+        df = _clean_nonfinite_rows(df)
 
         single_raw = tmp_path / "single_raw" / "CSV" / "MERGED_CSV"
         single_raw.mkdir(parents=True)
@@ -167,9 +170,7 @@ class TestCapApplied:
 
         # Load and sanitize inf (test focus is cap logic, not data quality).
         pdf = pd.read_csv(src, nrows=100_000)
-        pdf.replace([np.inf, -np.inf], np.nan, inplace=True)
-        pdf.dropna(inplace=True)
-        pdf = pdf.reset_index(drop=True)
+        pdf = _clean_nonfinite_rows(pdf).reset_index(drop=True)
 
         if len(pdf) <= 50_000:
             pytest.skip("Client file too small after cleaning to test cap")
@@ -208,8 +209,7 @@ class TestCapApplied:
 
         # Load and sanitize (test focus is artifact format, not data quality).
         df = pd.read_csv(src, nrows=60_000)
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.dropna(inplace=True)
+        df = _clean_nonfinite_rows(df)
 
         single_raw = tmp_path / "single_raw" / "CSV" / "MERGED_CSV"
         single_raw.mkdir(parents=True)
@@ -299,8 +299,7 @@ class TestCalibrationPendingFlag:
         """
         src = MERGED_DIR / _SINGLE_CLIENT_FILE
         df = pd.read_csv(src)
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.dropna(inplace=True)
+        df = _clean_nonfinite_rows(df)
 
         benign_rows = df[df[LABEL_COLUMN] == BENIGN_LABEL].head(2000)
         attack_rows = df[df[LABEL_COLUMN] != BENIGN_LABEL].head(500)
@@ -324,8 +323,7 @@ class TestCalibrationPendingFlag:
 
         # Load and sanitize (test focus is flag logic, not data quality).
         df = pd.read_csv(src)
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.dropna(inplace=True)
+        df = _clean_nonfinite_rows(df)
 
         single_raw = tmp_path / "raw" / "CSV" / "MERGED_CSV"
         single_raw.mkdir(parents=True)

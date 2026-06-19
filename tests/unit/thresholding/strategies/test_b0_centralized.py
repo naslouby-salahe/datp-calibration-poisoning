@@ -88,6 +88,33 @@ def _run_b0_pooled_norm(**kwargs):
     return _execute_b0_pooled_norm(B0RunRequest(**kwargs))
 
 
+def _run_minimal_b0(tmp_path: Path) -> Path:
+    n_features = 4
+    prepared = _make_prepared_dir(
+        tmp_path / "prepared", n_clients=2, n_features=n_features
+    )
+    out = tmp_path / "out"
+    _run_b0(
+        prepared_dir=prepared,
+        output_dir=out,
+        seed=0,
+        input_dim=n_features,
+        hidden_dims=[4],
+        n_min=10,
+        q=0.95,
+        epochs=5,
+        patience=3,
+        lr=1e-3,
+        batch_size=32,
+        val_fraction=0.1,
+        activation=Activation.RELU,
+        use_bn=False,
+        training_progress_interval=1,
+        regime=Regime.A,
+    )
+    return out
+
+
 class TestB0AurocThreshold:
     def test_auroc_threshold(self, tmp_path: Path) -> None:
         n_features = 10
@@ -619,31 +646,7 @@ class TestB0Auditability:
         )
 
     def test_checkpoint_hash_in_provenance(self, tmp_path: Path) -> None:
-        n_features = 4
-        prepared = _make_prepared_dir(
-            tmp_path / "prepared", n_clients=2, n_features=n_features
-        )
-        out = tmp_path / "out"
-
-        _run_b0(
-            prepared_dir=prepared,
-            output_dir=out,
-            seed=0,
-            input_dim=n_features,
-            hidden_dims=[4],
-            n_min=10,
-            q=0.95,
-            epochs=5,
-            patience=3,
-            lr=1e-3,
-            batch_size=32,
-            val_fraction=0.1,
-            activation=Activation.RELU,
-            use_bn=False,
-            training_progress_interval=1,
-            regime=Regime.A,
-        )
-
+        out = _run_minimal_b0(tmp_path)
         m = json.loads((out / "metrics.json").read_text())
         provenance = m.get("provenance", {})
         identity = provenance.get("model_checkpoint_identity", "")
@@ -657,30 +660,6 @@ class TestB0Auditability:
     def test_score_artifact_identity_is_not_applicable(self, tmp_path: Path) -> None:
         from datp.core.provenance import NOT_APPLICABLE_B0_DIRECT_EVAL
 
-        n_features = 4
-        prepared = _make_prepared_dir(
-            tmp_path / "prepared", n_clients=2, n_features=n_features
-        )
-        out = tmp_path / "out"
-
-        _run_b0(
-            prepared_dir=prepared,
-            output_dir=out,
-            seed=0,
-            input_dim=n_features,
-            hidden_dims=[4],
-            n_min=10,
-            q=0.95,
-            epochs=5,
-            patience=3,
-            lr=1e-3,
-            batch_size=32,
-            val_fraction=0.1,
-            activation=Activation.RELU,
-            use_bn=False,
-            training_progress_interval=1,
-            regime=Regime.A,
-        )
-
+        out = _run_minimal_b0(tmp_path)
         m = json.loads((out / "metrics.json").read_text())
         assert m["provenance"]["score_artifact_identity"] == NOT_APPLICABLE_B0_DIRECT_EVAL

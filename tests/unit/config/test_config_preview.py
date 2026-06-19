@@ -34,7 +34,7 @@ class TestComposeRequest:
         req = ComposeRequest.model_validate(
             {"regime": Regime.C, "baseline": Baseline.B1, "seed": 0, "alpha": 0.5}
         )
-        assert req.alpha == 0.5
+        assert req.alpha == pytest.approx(0.5)
 
     def test_alpha_required_for_regime_c(self) -> None:
         with pytest.raises(ValueError, match="alpha is required for regime c"):
@@ -104,7 +104,7 @@ class TestComposeConfig:
         assert cfg.seed == 0
         assert cfg.model.input_dim == 115
         assert cfg.federation.convergence.rounds_initial == 40
-        assert cfg.threshold.q == 0.95
+        assert cfg.threshold.q == pytest.approx(0.95)
 
     def test_regime_c_requires_alpha(self) -> None:
         with pytest.raises(ComposeError, match="alpha is required for regime c"):
@@ -112,7 +112,7 @@ class TestComposeConfig:
 
     def test_regime_c_with_alpha(self) -> None:
         cfg = compose_config(regime=Regime.C, baseline=Baseline.B1, seed=0, alpha=0.5)
-        assert cfg.alpha == 0.5
+        assert cfg.alpha == pytest.approx(0.5)
 
     def test_b3_not_valid_for_regime_b(self) -> None:
         with pytest.raises(ComposeError, match="b3 is not valid for regime b"):
@@ -190,7 +190,7 @@ class TestWriteResolvedConfig:
         cfg = compose_config(regime=Regime.C, baseline=Baseline.B1, seed=0, alpha=0.5)
         dest = write_resolved_config(cfg, tmp_path)
         content = yaml.safe_load(dest.read_text())
-        assert content["alpha"] == 0.5
+        assert content["alpha"] == pytest.approx(0.5)
 
 
 class TestPreviewConfig:

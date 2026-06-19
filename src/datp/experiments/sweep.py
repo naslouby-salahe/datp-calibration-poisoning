@@ -318,6 +318,87 @@ def _sort_key(k: TrainingCellId) -> tuple[Regime, int, float]:
     return (k.regime, k.seed, k.alpha if k.alpha is not None else -1.0)
 
 
+def _enabled_checkpoint_rounds(cfg: DatpConfig) -> tuple[int | None, ...]:
+    ckpt_proto = cfg.checkpoint_protocol
+    if ckpt_proto is not None and ckpt_proto.enabled:
+        return tuple(ckpt_proto.milestones)
+    return (None,)
+
+
+def _write_group_resolved_configs(
+    group_cells: list[BaselineRunId],
+    pre_composed_configs: dict[BaselineRunId, DatpConfig],
+    base_dir: Path,
+    checkpoint_rounds: tuple[int | None, ...],
+) -> None:
+    for cell in group_cells:
+        cell_cfg = pre_composed_configs[cell]
+        for checkpoint_round in checkpoint_rounds:
+            _write_cell_resolved_config(
+                cell, cell_cfg, base_dir, checkpoint_round=checkpoint_round
+            )
+
+
+def _build_shared_context(
+    trainer: SharedTrainingExecutor,
+    request: PipelineRequest,
+    group_cells: list[BaselineRunId],
+    checkpoint_round: int | None,
+) -> object | None:
+    try:
+        return trainer.build_context(request)
+    except Exception:
+        logger.exception(
+            "shared group setup failed",
+            regime=request.key.regime,
+            seed=request.key.seed,
+            alpha=request.key.alpha,
+            checkpoint_round=checkpoint_round,
+            n_failed=len(group_cells),
+        )
+        for cell in group_cells:
+            console.print_baseline_result(cell.baseline, BaselineRunStatus.FAILED, 0.0)
+        return None
+
+
+def _run_shared_cell_evaluation(
+    evaluator: ThresholdEvaluationExecutor,
+    cell: BaselineRunId,
+    cell_cfg: DatpConfig,
+    key: TrainingCellId,
+    base_dir: Path,
+    prepared_dir: Path,
+    checkpoint_round: int | None,
+    ctx: object,
+) -> bool:
+    t0 = time.monotonic()
+    cell_request = PipelineRequest(
+        key=key,
+        baseline=cell.baseline,
+        cfg=cell_cfg,
+        base_dir=base_dir,
+        prepared_dir=prepared_dir,
+        checkpoint_round=checkpoint_round,
+    )
+    try:
+        evaluator.run(cell_request, ctx)
+        console.print_baseline_result(cell.baseline, BaselineRunStatus.DONE, time.monotonic() - t0)
+        return True
+    except Exception:
+        logger.exception(
+            "cell failed",
+            baseline=cell.baseline,
+            regime=key.regime,
+            seed=key.seed,
+            alpha=key.alpha,
+            checkpoint_round=checkpoint_round,
+        )
+        console.print_baseline_result(
+            cell.baseline, BaselineRunStatus.FAILED, time.monotonic() - t0
+        )
+        return False
+
+
 def _run_shared_fl_group(
     group_cells: list[BaselineRunId],
     pre_composed_configs: dict[BaselineRunId, DatpConfig],
@@ -333,16 +414,10 @@ def _run_shared_fl_group(
     cfg = pre_composed_configs[first_cell]
     prepared_dir = prepared_root_for_regime(regime, _data_root, seed=seed, alpha=alpha)
 
-    ckpt_proto = cfg.checkpoint_protocol
-    for cell in group_cells:
-        cell_cfg = pre_composed_configs[cell]
-        if ckpt_proto is not None and ckpt_proto.enabled:
-            for checkpoint_round in ckpt_proto.milestones:
-                _write_cell_resolved_config(
-                    cell, cell_cfg, base_dir, checkpoint_round=checkpoint_round
-                )
-        else:
-            _write_cell_resolved_config(cell, cell_cfg, base_dir, checkpoint_round=None)
+    checkpoint_rounds = _enabled_checkpoint_rounds(cfg)
+    _write_group_resolved_configs(
+        group_cells, pre_composed_configs, base_dir, checkpoint_rounds
+    )
 
     key = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
     set_seeds(seed)
@@ -354,7 +429,6 @@ def _run_shared_fl_group(
 
     completed = 0
     failed = 0
-    checkpoint_rounds = ckpt_proto.milestones if (ckpt_proto is not None and ckpt_proto.enabled) else (None,)
     for checkpoint_round in checkpoint_rounds:
         context_request = PipelineRequest(
             key=key,
@@ -364,49 +438,25 @@ def _run_shared_fl_group(
             prepared_dir=prepared_dir,
             checkpoint_round=checkpoint_round,
         )
-        try:
-            ctx = trainer.build_context(context_request)
-        except Exception:
-            logger.exception(
-                "shared group setup failed",
-                regime=regime,
-                seed=seed,
-                alpha=alpha,
-                checkpoint_round=checkpoint_round,
-                n_failed=len(group_cells),
-            )
-            for cell in group_cells:
-                console.print_baseline_result(cell.baseline, BaselineRunStatus.FAILED, 0.0)
+        ctx = _build_shared_context(trainer, context_request, group_cells, checkpoint_round)
+        if ctx is None:
             failed += len(group_cells)
             continue
         for cell in group_cells:
-            t0 = time.monotonic()
             cell_cfg = pre_composed_configs[cell]
-            cell_request = PipelineRequest(
+            if _run_shared_cell_evaluation(
+                evaluator,
+                cell,
+                cell_cfg,
                 key=key,
-                baseline=cell.baseline,
-                cfg=cell_cfg,
                 base_dir=base_dir,
                 prepared_dir=prepared_dir,
                 checkpoint_round=checkpoint_round,
-            )
-            try:
-                evaluator.run(cell_request, ctx)
+                ctx=ctx,
+            ):
                 completed += 1
-                console.print_baseline_result(cell.baseline, BaselineRunStatus.DONE, time.monotonic() - t0)
-            except Exception:
-                logger.exception(
-                    "cell failed",
-                    baseline=cell.baseline,
-                    regime=regime,
-                    seed=seed,
-                    alpha=alpha,
-                    checkpoint_round=checkpoint_round,
-                )
+            else:
                 failed += 1
-                console.print_baseline_result(
-                    cell.baseline, BaselineRunStatus.FAILED, time.monotonic() - t0
-                )
 
     return completed, failed
 

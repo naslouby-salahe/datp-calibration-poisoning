@@ -93,7 +93,7 @@ class TestSaveConvergenceArtifacts:
             (tmp_path / ArtifactFile.CONVERGENCE_SUMMARY).read_text()
         )
         assert payload[ConvergenceSummaryKey.CONVERGENCE_ROUND] == 3
-        assert payload[ConvergenceSummaryKey.CONVERGENCE_CRITERION] == 0.02
+        assert payload[ConvergenceSummaryKey.CONVERGENCE_CRITERION] == pytest.approx(0.02)
         assert payload[ConvergenceSummaryKey.CONVERGENCE_STATUS] == ConvergenceStatus.CONVERGED
         assert payload[ConvergenceSummaryKey.ACTUAL_ROUNDS] == 3
         assert payload[ConvergenceSummaryKey.ROUNDS_INITIAL] == 5
@@ -135,9 +135,9 @@ class TestConvergenceSnapshot:
             converged_round=2,
             criterion_value=0.01,
         )
-        assert s.loss_history == [1.0, 0.5]
+        assert s.loss_history == pytest.approx([1.0, 0.5])
         assert s.converged_round == 2
-        assert s.criterion_value == 0.01
+        assert s.criterion_value == pytest.approx(0.01)
 
     def test_none_fields(self) -> None:
         s = ConvergenceSnapshot(

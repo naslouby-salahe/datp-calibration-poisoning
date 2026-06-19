@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import typing
+from pathlib import Path
 
 
 def test_baseline_types_importable():
@@ -228,16 +229,14 @@ def test_baseline_run_paths_is_frozen_dataclass():
     assert BaselineRunPaths.__dataclass_params__.frozen # type: ignore[attr-defined]
 
 
-def test_path_contracts_compose_with_identity():
+def test_path_contracts_compose_with_identity(tmp_path: Path):
     """Guard: path contracts must accept identity types."""
-    from pathlib import Path
-
     from datp.artifacts.layout import ArtifactLayout
     from datp.core.enums import Baseline, Regime
     from datp.core.identity import BaselineRunId, TrainingCellId
 
     cell = TrainingCellId(regime=Regime.A, seed=1, alpha=None)
-    layout = ArtifactLayout(base_dir=Path("/tmp/out"), regime=Regime.A)
+    layout = ArtifactLayout(base_dir=tmp_path / "out", regime=Regime.A)
 
     sc_paths = layout.score_cell(cell)
     assert "seed_1" in str(sc_paths.checkpoint_dir)

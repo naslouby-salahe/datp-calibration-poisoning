@@ -51,10 +51,10 @@ class TestMetricValue:
         assert _metric_value(None) is None
 
     def test_int_returns_float(self) -> None:
-        assert _metric_value(42) == 42.0
+        assert _metric_value(42) == pytest.approx(42.0)
 
     def test_float_returns_float(self) -> None:
-        assert _metric_value(3.14) == 3.14
+        assert _metric_value(3.14) == pytest.approx(3.14)
 
     def test_tensor_returns_float(self) -> None:
         t = torch.tensor(2.718, requires_grad=True)
@@ -68,7 +68,7 @@ class TestMetricValue:
         t = torch.tensor(1.0, device=DeviceType.CUDA, requires_grad=True)
         result = _metric_value(t)
         assert isinstance(result, float)
-        assert result == 1.0
+        assert result == pytest.approx(1.0)
 
     def test_unknown_type_returns_none(self) -> None:
         assert _metric_value("not a metric") is None # type: ignore[arg-type]
@@ -94,7 +94,7 @@ class TestAELightningModule:
             training_progress_interval=5,
         )
         assert lm.model is model
-        assert lm.lr == 0.001
+        assert lm.lr == pytest.approx(0.001)
         assert lm.max_epochs == 10
         assert lm.completed_epochs == 0
 
@@ -122,5 +122,5 @@ class TestAELightningModule:
         )
         opt = lm.configure_optimizers()
         assert isinstance(opt, torch.optim.Adam)
-        assert opt.defaults["lr"] == 0.001
-        assert opt.defaults["weight_decay"] == 0.0
+        assert opt.defaults["lr"] == pytest.approx(0.001)
+        assert opt.defaults["weight_decay"] == pytest.approx(0.0)

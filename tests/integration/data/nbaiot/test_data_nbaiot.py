@@ -186,7 +186,7 @@ class TestNoLeak:
             )
 
     def test_no_leak_parquet_content(self, prepared: tuple[Path, dict]) -> None:
-        output_dir, result = prepared
+        output_dir, _ = prepared
         for device_id in _REPRESENTATIVE_DEVICES:
             dev_dir = output_dir / device_id
             train_df = pd.read_parquet(dev_dir / filename_for_split(Split.TRAIN))

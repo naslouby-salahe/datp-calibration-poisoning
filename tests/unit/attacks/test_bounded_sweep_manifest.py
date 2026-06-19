@@ -86,8 +86,8 @@ def test_undefined_cv_serializes_as_null_and_round_trips_to_nan():
     assert '"cv_fpr":null' in payload
     restored = BoundedSweepResultRow.model_validate_json(payload)
     assert math.isnan(restored.cv_fpr)
-    assert restored.cv_fpr != 0.0
-    assert restored.mean_fpr == 0.0
+    assert not math.isclose(restored.cv_fpr, 0.0, abs_tol=1e-12)
+    assert restored.mean_fpr == pytest.approx(0.0)
 
 
 def test_manifest_rejects_n_cells_mismatch():

@@ -34,8 +34,8 @@ def _write_client_splits(
     n_rows: int = 20,
 ) -> None:
     client_dir.mkdir(parents=True, exist_ok=True)
-    rng = np.random.RandomState(42)
-    arr = rng.randn(n_rows, n_features)
+    rng = np.random.default_rng(42)
+    arr = rng.standard_normal((n_rows, n_features))
     for split in splits:
         df = pl.DataFrame({f"f{i}": arr[:, i] for i in range(n_features)})
         write_artifact(df, split_path(client_dir, split))

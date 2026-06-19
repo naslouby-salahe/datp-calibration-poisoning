@@ -56,7 +56,7 @@ def inject_fixed_budget(
     n = clean_cal.shape[0]
     poisoned = clean_cal.copy()
 
-    if fraction == 0.0:
+    if fraction <= 0.0:
         return InjectionResult(
             poisoned_cal=poisoned,
             n_replaced=0,

@@ -19,6 +19,7 @@ Rules:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Literal
 
 import numpy as np
@@ -140,11 +141,11 @@ def sign_test(
     consistent = True when ≥4/5 sign consistency in expected direction.
     """
     values = list(seed_aggregates.values())
-    n_nan = sum(1 for v in values if v != v)  # isnan
-    finite = [v for v in values if v == v]
+    n_nan = sum(1 for v in values if math.isnan(v))
+    finite = [v for v in values if not math.isnan(v)]
     n_positive = sum(1 for v in finite if v > 0)
     n_negative = sum(1 for v in finite if v < 0)
-    n_zero = sum(1 for v in finite if v == 0)
+    n_zero = sum(1 for v in finite if math.isclose(v, 0.0, abs_tol=0.0))
 
     if direction == "raise":
         n_consistent = n_positive
@@ -232,7 +233,7 @@ def bootstrap_seed_aggregates(
     else:
         values = list(seed_aggregates.values())
 
-    finite_values = [v for v in values if v == v]  # filter nan
+    finite_values = [v for v in values if not math.isnan(v)]
     if len(finite_values) < 2:
         raise ValueError(
             f"Need at least 2 finite seed aggregates for bootstrap CI; "

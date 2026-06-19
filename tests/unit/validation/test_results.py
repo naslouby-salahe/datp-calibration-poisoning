@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -59,6 +60,18 @@ CLIENTS = (
     "Philips_B120N10_Baby_Monitor",
 )
 
+_SAFE_SCORE_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def _safe_score_path(root: Path, stage: str, client_id: str) -> Path:
+    if not _SAFE_SCORE_NAME.fullmatch(client_id):
+        raise ValueError(f"Unsafe client id in score fixture: {client_id}")
+    base = (root / "scores/a/seed_0").resolve()
+    path = (base / stage / f"{client_id}.parquet").resolve()
+    if not path.is_relative_to(base):
+        raise ValueError(f"Score fixture path escapes base: {path}")
+    return path
+
 
 def _write_scores(root: Path) -> None:
     for index, client_id in enumerate(CLIENTS):
@@ -72,7 +85,7 @@ def _write_scores(root: Path) -> None:
         }.items():
             write_artifact(
                 pl.DataFrame({SCORE_COLUMN: values}),
-                root / "scores/a/seed_0" / stage / f"{client_id}.parquet",
+                _safe_score_path(root, stage, client_id),
             )
 
 

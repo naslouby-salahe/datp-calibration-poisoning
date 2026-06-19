@@ -14,7 +14,7 @@ from datp.reporting.figures import (
     generate_figure4,
 )
 
-RNG = np.random.RandomState(42)
+RNG = np.random.default_rng(42)
 
 DEVICE_NAMES = [f"device_{i}" for i in range(5)]
 

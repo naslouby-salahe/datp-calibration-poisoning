@@ -85,9 +85,9 @@ class TestHashJsonable:
         h = hash_jsonable({"nested": {"list": [1, 2, 3]}, "str": "hello"})
         assert len(h) == 64
 
-    def test_non_serializable_falls_back_to_str(self) -> None:
+    def test_non_serializable_falls_back_to_str(self, tmp_path: Path) -> None:
         """default=str in json.dumps means any object can be hashed."""
-        result = hash_jsonable({Path("/tmp")})
+        result = hash_jsonable({tmp_path})
         assert len(result) == 64
 
 

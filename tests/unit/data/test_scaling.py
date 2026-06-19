@@ -25,10 +25,10 @@ class TestFitScaler:
         assert scaler.mean_ is not None
         assert scaler.scale_ is not None
         np.testing.assert_allclose(
-            scaler.mean_, train_df.values.mean(axis=0), atol=1e-10
+            scaler.mean_, train_df.to_numpy().mean(axis=0), atol=1e-10
         )
         np.testing.assert_allclose(
-            scaler.scale_, train_df.values.std(axis=0, ddof=0), atol=1e-10 # type: ignore[arg-type]
+            scaler.scale_, train_df.to_numpy().std(axis=0, ddof=0), atol=1e-10
         )
 
         # Applying to train should give ~zero mean, ~unit std

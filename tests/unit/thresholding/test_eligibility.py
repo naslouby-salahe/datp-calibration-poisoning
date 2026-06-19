@@ -62,7 +62,7 @@ class TestIdentifyEligible:
         assert set(pending) == {"client_d"}
 
     def test_n_min_from_param(self, client_errors: dict[str, np.ndarray]) -> None:
-        eligible, pending = identify_eligible(client_errors, n_min=500)
+        eligible, _ = identify_eligible(client_errors, n_min=500)
         assert "client_a" not in eligible
         assert "client_b" not in eligible
 

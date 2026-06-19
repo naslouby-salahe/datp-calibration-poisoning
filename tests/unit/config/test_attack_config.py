@@ -111,7 +111,7 @@ class TestConfigValid:
         assert cfg.objective == AttackerObjective.THRESHOLD_RAISE
         assert cfg.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
         assert cfg.defense == PoisoningDefense.NONE
-        assert cfg.fractions == (0.0, 0.10, 0.20, 0.40)
+        assert cfg.fractions == pytest.approx((0.0, 0.10, 0.20, 0.40))
         assert cfg.n_min == 100
         assert cfg.mu_flag_threshold is None
 
@@ -130,7 +130,7 @@ class TestConfigValid:
 
     def test_mu_flag_threshold_can_be_set(self) -> None:
         cfg = _valid_config(mu_flag_threshold=0.025)
-        assert cfg.mu_flag_threshold == 0.025
+        assert cfg.mu_flag_threshold == pytest.approx(0.025)
 
     def test_all_three_policies_accepted(self) -> None:
         for policy in ThresholdPolicy:

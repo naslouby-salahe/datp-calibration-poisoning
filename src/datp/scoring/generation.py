@@ -42,6 +42,37 @@ logger = get_logger(__name__)
 _MODULE = "scoring.generation"
 
 
+def _resolve_within_base(base: Path, candidate: Path) -> Path:
+    resolved_base = base.resolve()
+    resolved_candidate = candidate.resolve()
+    if not resolved_candidate.is_relative_to(resolved_base):
+        raise ValueError(
+            fmt(
+                _MODULE,
+                "Path escapes scoring directory",
+                str(resolved_base),
+                str(resolved_candidate),
+            )
+        )
+    return resolved_candidate
+
+
+def _score_output_path(score_base: Path, stage: ScoringStage, client_id: str) -> Path:
+    filename = f"{client_id}{PathToken.PARQUET_EXT}"
+    if Path(filename).name != filename:
+        raise ValueError(
+            fmt(
+                _MODULE,
+                "Invalid client id for score artifact path",
+                "client id without path separators",
+                client_id,
+            )
+        )
+    out_path = Path(score_base) / stage.value / filename
+    _resolve_within_base(Path(score_base), out_path)
+    return out_path
+
+
 def compute_reconstruction_errors(
     model: Autoencoder, data: torch.Tensor, batch_size: int | None = None
 ) -> np.ndarray:
@@ -86,7 +117,8 @@ def _score_record(
 
 
 def validate_scoring_manifest(score_base: Path) -> dict[str, object]:
-    manifest_path = Path(score_base) / ArtifactFile.SCORING_MANIFEST
+    score_base = Path(score_base)
+    manifest_path = score_base / ArtifactFile.SCORING_MANIFEST
     if not manifest_path.exists():
         raise FileNotFoundError(
             fmt(_MODULE, "Scoring manifest missing", str(manifest_path), "missing file")
@@ -100,17 +132,32 @@ def validate_scoring_manifest(score_base: Path) -> dict[str, object]:
     }
     actual = {(str(row["client_id"]), str(row["split"])) for row in records}
     missing = sorted(expected - actual)
-    missing_files = sorted(
-        str(row["path"]) for row in records if not Path(str(row["path"])).exists()
-    )
+    missing_files: list[str] = []
+    invalid_files: list[str] = []
+    for row in records:
+        path = Path(str(row["path"]))
+        try:
+            resolved_path = _resolve_within_base(score_base, path)
+        except ValueError:
+            invalid_files.append(str(path))
+            continue
+        if not resolved_path.exists():
+            missing_files.append(str(path))
+    missing_files.sort()
+    invalid_files.sort()
     completion_status = manifest["completion_status"]
-    if completion_status != ScoringManifestStatus.COMPLETE or missing or missing_files:
+    if (
+        completion_status != ScoringManifestStatus.COMPLETE
+        or missing
+        or missing_files
+        or invalid_files
+    ):
         raise ValueError(
             fmt(
                 _MODULE,
                 "Scoring manifest incomplete",
                 "complete manifest with all expected score files",
-                f"status={completion_status}, missing={missing}, missing_files={missing_files}",
+                f"status={completion_status}, missing={missing}, missing_files={missing_files}, invalid_files={invalid_files}",
             )
         )
     return manifest
@@ -157,7 +204,7 @@ def _score_one_split(
     if data.device != model_device:
         data = data.to(model_device, non_blocking=True)
     errors = compute_reconstruction_errors(model, data, batch_size=batch_size)
-    out_path = score_base / stage / f"{cid}{PathToken.PARQUET_EXT}"
+    out_path = _score_output_path(score_base, stage, cid)
     write_artifact(_errors_to_dataframe(errors), out_path)
     logger.debug(
         "wrote scores",

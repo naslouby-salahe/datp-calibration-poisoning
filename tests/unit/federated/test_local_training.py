@@ -44,7 +44,7 @@ class TestTrainLocal:
 
         monkeypatch.setattr(torch.optim, "Adam", _capturing_adam)
         train_local(_make_model(), torch.randn(16, 4), epochs=1, batch_size=8, lr=0.01)
-        assert captured["weight_decay"] == 0.0
+        assert captured["weight_decay"] == pytest.approx(0.0)
 
     def test_multiple_epochs_reduce_loss(self) -> None:
         set_seeds(0)

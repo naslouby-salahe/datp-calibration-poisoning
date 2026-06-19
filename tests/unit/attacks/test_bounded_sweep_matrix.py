@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from datp.attacks.bounded_sweep_matrix import (
@@ -34,12 +36,12 @@ def test_matrix_policies_are_exactly_default_three():
 
 def test_matrix_excludes_fraction_005():
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED)
-    assert all(c.fraction != 0.05 for c in cells)
+    assert all(not math.isclose(c.fraction, 0.05, abs_tol=0.0) for c in cells)
 
 
 def test_matrix_fractions_are_exactly_locked_grid():
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED)
-    assert {c.fraction for c in cells} == {0.0, 0.10, 0.20, 0.40}
+    assert sorted({c.fraction for c in cells}) == pytest.approx([0.0, 0.10, 0.20, 0.40])
 
 
 def test_matrix_sources_are_exactly_bounded_three():
@@ -80,7 +82,9 @@ def test_full_matrix_size_is_exactly_2025():
 
 def test_full_matrix_fractions_add_005_to_bounded_grid():
     cells = enumerate_full_sweep_matrix(_VICTIMS_BY_SEED)
-    assert {c.fraction for c in cells} == {0.0, 0.05, 0.10, 0.20, 0.40}
+    assert sorted({c.fraction for c in cells}) == pytest.approx(
+        [0.0, 0.05, 0.10, 0.20, 0.40]
+    )
 
 
 def test_full_matrix_superset_of_bounded_matrix():
@@ -88,7 +92,7 @@ def test_full_matrix_superset_of_bounded_matrix():
     full = set(enumerate_full_sweep_matrix(_VICTIMS_BY_SEED))
     assert bounded.issubset(full)
     # The only difference is the 0.05 cells.
-    assert {c.fraction for c in (full - bounded)} == {0.05}
+    assert sorted({c.fraction for c in (full - bounded)}) == pytest.approx([0.05])
 
 
 def test_full_matrix_keeps_all_other_locks():

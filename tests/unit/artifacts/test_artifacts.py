@@ -72,7 +72,7 @@ class TestRunLifecycleMarkers:
     def test_run_state_after_success(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "state_ok"
         with RunLifecycle(run_dir):
-            pass
+            assert (run_dir / "IN_PROGRESS").exists()
         assert check_run_state(run_dir) == RunState.DONE
 
     def test_run_state_after_failure(self, tmp_path: Path) -> None:
@@ -111,7 +111,7 @@ class TestAbortedMarker:
     def test_aborted_marker_not_written_on_success(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "no_abort"
         with RunLifecycle(run_dir):
-            pass
+            assert (run_dir / "IN_PROGRESS").exists()
         assert not (run_dir / "ABORTED.txt").exists()
 
 

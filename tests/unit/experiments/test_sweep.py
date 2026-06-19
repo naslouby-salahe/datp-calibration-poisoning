@@ -115,7 +115,8 @@ class TestCheckpointProtocolCompletion:
         from datp.config.compose import BASE_CONFIG
         from datp.core.identity import TrainingCellId
 
-        if BASE_CONFIG.checkpoint_protocol is None:
+        protocol = BASE_CONFIG.checkpoint_protocol
+        if protocol is None:
             pytest.skip("checkpoint protocol not configured in base YAML")
         run = BaselineRunId(
             cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None),
@@ -134,14 +135,15 @@ class TestCheckpointProtocolCompletion:
         from datp.config.compose import BASE_CONFIG
         from datp.core.identity import TrainingCellId
 
-        if BASE_CONFIG.checkpoint_protocol is None:
+        protocol = BASE_CONFIG.checkpoint_protocol
+        if protocol is None:
             pytest.skip("checkpoint protocol not configured in base YAML")
         run = BaselineRunId(
             cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None),
             baseline=Baseline.B1,
         )
         layout = ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
-        for checkpoint_round in BASE_CONFIG.checkpoint_protocol.milestones:
+        for checkpoint_round in protocol.milestones:
             result_dir = layout.baseline_run_for_round(run, checkpoint_round).result_dir
             result_dir.mkdir(parents=True, exist_ok=True)
             (result_dir / "metrics.json").write_text(valid_metrics_json("b1", "a", 0))

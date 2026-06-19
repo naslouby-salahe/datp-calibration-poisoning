@@ -253,7 +253,7 @@ def compute_mu_flag_threshold(mean_clean_fpr: float) -> float:
     running the poisoned pipeline.
     """
     raw = mean_clean_fpr / 8.0
-    if raw == 0.0:
+    if math.isclose(raw, 0.0, abs_tol=0.0):
         return 0.0
     # Round to 2 significant figures.
     magnitude = math.floor(math.log10(abs(raw)))

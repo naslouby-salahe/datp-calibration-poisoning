@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
 from pathlib import Path
 
 import typer
@@ -22,9 +23,6 @@ from datp.thresholding.metrics_serialization import SweepMetrics
 app = typer.Typer(help="Journal checkpoint protocol commands.")
 _stdout = Console()
 
-_SMOKE_ROOT = Path("/tmp/datp_checkpoint_protocol_smoke")
-
-
 @app.command("preview")
 def preview() -> None:
     """Print the resolved journal checkpoint protocol config."""
@@ -37,12 +35,20 @@ def preview() -> None:
 
 @app.command("smoke")
 def smoke(
-    artifact_root: Path = typer.Option(
-        _SMOKE_ROOT,
+    artifact_root: Path | None = typer.Option(
+        None,
         help="Temporary artifact root. Must not be outputs/.",
     ),
 ) -> None:
     """Create a tiny temp-root protocol fixture and select one global checkpoint."""
+    if artifact_root is None:
+        with tempfile.TemporaryDirectory(prefix="datp_checkpoint_protocol_smoke_") as tmp:
+            _run_smoke(Path(tmp))
+        return
+    _run_smoke(artifact_root)
+
+
+def _run_smoke(artifact_root: Path) -> None:
     _reject_outputs_path(artifact_root)
     if artifact_root.exists():
         shutil.rmtree(artifact_root)

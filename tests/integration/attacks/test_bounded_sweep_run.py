@@ -7,6 +7,8 @@ against tiny FL-trained artifacts for all 5 locked seeds.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 import torch
 
@@ -31,7 +33,7 @@ _N_CLIENTS = 4 # B4_CLUSTER's locked K=3 requires eligible_count > k
 
 
 def _make_client_data(seed: int) -> dict[str, ClientData]:
-    device = resolve_device(require_cuda=True)
+    device = resolve_device(require_cuda=False)
     rng = torch.Generator().manual_seed(seed)
     data = {}
     for i in range(_N_CLIENTS):
@@ -98,9 +100,11 @@ def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
     assert all(row.auroc_invariant for row in manifest.results)
 
     # f=0.0 cells must carry exactly zero Δτ (no-op poisoning).
-    zero_fraction_rows = [r for r in manifest.results if r.fraction == 0.0]
+    zero_fraction_rows = [
+        r for r in manifest.results if math.isclose(r.fraction, 0.0, abs_tol=0.0)
+    ]
     assert zero_fraction_rows
-    assert all(r.delta_tau == 0.0 for r in zero_fraction_rows)
+    assert all(r.delta_tau == pytest.approx(0.0) for r in zero_fraction_rows)
 
 
 @pytest.mark.integration

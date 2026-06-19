@@ -126,7 +126,7 @@ class TestRunManifest:
 
     def test_mu_flag_threshold_can_be_set(self) -> None:
         m = _valid_manifest(mu_flag_threshold=0.025)
-        assert m.mu_flag_threshold == 0.025
+        assert m.mu_flag_threshold == pytest.approx(0.025)
 
     def test_e5_provenance_rejected(self) -> None:
         with pytest.raises(ValidationError, match="E=5 rejected"):

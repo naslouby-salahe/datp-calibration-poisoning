@@ -9,11 +9,11 @@ from datp.validation.enums import HomogeneityVerdict
 
 
 def _uniform(low: float, high: float, n: int, seed: int) -> np.ndarray:
-    return np.random.RandomState(seed).uniform(low, high, n).astype(np.float64)
+    return np.random.default_rng(seed).uniform(low, high, n).astype(np.float64)
 
 
 def test_identical_distributions_produce_homogeneous() -> None:
-    rng = np.random.RandomState(0)
+    rng = np.random.default_rng(0)
     shared = rng.uniform(0.0, 0.5, 200).astype(np.float64)
     cal = {f"c{i}": shared.copy() for i in range(5)}
     result = compute_ciciot_homogeneity(

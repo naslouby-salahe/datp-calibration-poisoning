@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import math
 
-from jinja2 import Environment, PackageLoader
+from jinja2 import Environment, PackageLoader, select_autoescape
 
 _env = Environment(
     loader=PackageLoader("datp.reporting", "templates"),
-    autoescape=False,
+    autoescape=select_autoescape(
+        enabled_extensions=("html", "htm", "xml"),
+        default_for_string=True,
+        default=False,
+    ),
     trim_blocks=True,
     lstrip_blocks=True,
 )

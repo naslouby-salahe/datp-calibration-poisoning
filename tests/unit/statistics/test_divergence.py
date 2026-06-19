@@ -26,7 +26,7 @@ class TestPairwiseJsDivergence:
     def test_returns_n_pairs(self) -> None:
         probs = [np.array([0.25, 0.75])] * 4
         js = pairwise_js_divergence(probs)
-        assert js.shape == (6,) # C(4,2) = 6
+        assert js.shape == (6,)
 
     def test_symmetry(self) -> None:
         p = np.array([0.8, 0.2])
@@ -120,4 +120,4 @@ class TestPairwiseJsFromDistributions:
     def test_n_pairs_correct(self) -> None:
         dists = [np.array([0.5, 0.5])] * 5
         s = pairwise_js_from_distributions(dists)
-        assert s.n_pairs == 10 # C(5,2) = 10
+        assert s.n_pairs == 10

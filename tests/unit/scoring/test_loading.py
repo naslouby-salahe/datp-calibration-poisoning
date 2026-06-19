@@ -14,6 +14,7 @@ from datp.scoring.loading import (
     read_score_column,
 )
 from datp.scoring.schema import SCORE_COLUMN
+from tests.fixtures.scoring_loading import assert_loads_client_score_parquets
 from tests.unit.conftest import _write_score_artifact
 
 # ── read_score_column ─────────────────────────────────────────────────────
@@ -62,12 +63,7 @@ class TestReadScoreColumn:
 
 class TestLoadParquetsFromDir:
     def test_loads_all_parquets(self, tmp_path: Path) -> None:
-        _write_score_artifact(tmp_path / "client_a.parquet", [0.1, 0.2])
-        _write_score_artifact(tmp_path / "client_b.parquet", [0.3, 0.4, 0.5])
-        result = load_parquets_from_dir(tmp_path)
-        assert set(result.keys()) == {"client_a", "client_b"}
-        np.testing.assert_allclose(result["client_a"], [0.1, 0.2])
-        np.testing.assert_allclose(result["client_b"], [0.3, 0.4, 0.5])
+        assert_loads_client_score_parquets(tmp_path)
 
     def test_empty_directory_when_allow_empty_true(self, tmp_path: Path) -> None:
         result = load_parquets_from_dir(tmp_path, allow_empty=True)
