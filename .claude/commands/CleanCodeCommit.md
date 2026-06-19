@@ -118,6 +118,24 @@ Use a message that describes what category of findings was addressed.
 
 ---
 
+## Step 3b — Push after commit
+
+After a successful commit, push to the remote:
+
+```bash
+git push
+```
+
+**Push constraints:**
+- Do **not** force-push (`--force` / `--force-with-lease`).
+- Do **not** push to `main`/`master` directly if branch protection rules are in
+  place — push to the current branch as-is and let CI/PR handle it.
+- If the push fails (no upstream, diverged history, protected branch), record
+  the error clearly in the report under "Push result" and continue to Step 4.
+  Do **not** retry with `--force`.
+
+---
+
 ## Step 4 — SonarCloud re-query after commit
 
 After committing, check whether CI or SonarCloud analysis is expected to run.
@@ -199,10 +217,12 @@ Final commit:           <sha after last commit>
 Date:                   <date>
 Iterations completed:   <N> / 5
 
---- Commits created ---
+--- Commits created and pushed ---
 <commit sha>  <message>
 <commit sha>  <message>
 ...
+
+Push result:            PUSHED | FAILED (<reason>)
 
 --- Checks (final state) ---
 ruff format:            PASS | FAIL | SKIPPED
