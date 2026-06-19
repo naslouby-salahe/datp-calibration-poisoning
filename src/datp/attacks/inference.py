@@ -261,6 +261,13 @@ def bootstrap_seed_aggregates(
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
+class HolmConfig:
+    """Holm adjustment parameters.  DESCRIPTIVE ONLY."""
+    p_values: list[float]
+    alpha: float = 0.05
+
+
+@dataclass(frozen=True, slots=True)
 class InferenceResult:
     """Full two-layer inference result for one (policy, fraction, source, objective)
     cell.
@@ -285,33 +292,21 @@ def compute_inference(
     poisoning_seeds: tuple[int, ...],
     direction: Literal["raise", "lower"],
     bootstrap_config: BootstrapConfig = BootstrapConfig(),
-    include_holm: bool = False,
-    holm_p_values: list[float] | None = None,
-    holm_alpha: float = 0.05,
+    holm_config: HolmConfig | None = None,
 ) -> InferenceResult:
-    """Compute full two-layer inference.
-
-    Steps:
-    1. Aggregate feasible victim deltas per seed (Layer 2).
-    2. Bootstrap CI on seed-level aggregates (primary).
-    3. Sign test on seed-level aggregates (supporting).
-    4. Holm if include_holm=True and holm_p_values provided (descriptive).
-    """
+    """Compute full two-layer inference."""
     seed_aggregates = compute_seed_aggregates(paired, poisoning_seeds)
     boot = bootstrap_seed_aggregates(
-        seed_aggregates,
-        poisoning_seeds=poisoning_seeds,
-        config=bootstrap_config,
+        seed_aggregates, poisoning_seeds=poisoning_seeds, config=bootstrap_config
     )
     sign = sign_test(seed_aggregates, direction=direction)
 
     holm = None
-    if include_holm and holm_p_values is not None:
-        holm = holm_adjust(holm_p_values, alpha=holm_alpha)
+    if holm_config is not None:
+        holm = holm_adjust(holm_config.p_values, alpha=holm_config.alpha)
 
     n_feasible = sum(
-        1
-        for victim_dict in paired.deltas.values()
+        1 for victim_dict in paired.deltas.values()
         if any(sd.feasible for sd in victim_dict.values())
     )
 

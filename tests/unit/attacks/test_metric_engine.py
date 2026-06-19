@@ -16,6 +16,7 @@ from datp.attacks.metric_engine import (
     compute_metrics,
     compute_mu_flag_threshold,
 )
+from datp.attacks.types import MetricEngineInput
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
 from datp.attacks.threshold_recompute import compute_b1_pair, compute_b2_pair
@@ -212,7 +213,7 @@ class TestComputeMetrics:
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)
         b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        result = compute_metrics(col, b1, None)
+        result = compute_metrics(MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None))
         assert isinstance(result, MetricResult)
         assert result.policy == ThresholdPolicy.B1_GLOBAL
 
@@ -220,7 +221,7 @@ class TestComputeMetrics:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
         b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean)
-        result = compute_metrics(col, b2, mu_flag_threshold=0.05)
+        result = compute_metrics(MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=0.05))
         assert set(result.delta_tau.keys()) == set(col.eligible_ids)
         assert set(result.auroc_records.keys()) == set(col.eligible_ids)
         assert result.mu_flag_threshold == pytest.approx(0.05)

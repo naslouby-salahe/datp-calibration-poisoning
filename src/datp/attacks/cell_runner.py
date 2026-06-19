@@ -199,13 +199,11 @@ def inject_multi_victim(
 
 def recompute_pair(
     collection: ScoreCollection,
-    poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
+    poisoned_cal_set: PoisonedCalibrationSet,
     policy: ThresholdPolicy,
-    *,
-    q: float = THRESHOLD_QUANTILE,
-    seed: int = 0,
 ) -> PolicyPair:
     """Recompute the clean/poisoned threshold pair for one policy."""
+    q = THRESHOLD_QUANTILE
     if policy == ThresholdPolicy.B1_GLOBAL:
         return compute_b1_pair(collection, poisoned_cal_set, q)
     if policy == ThresholdPolicy.B2_PERSONALIZED:
@@ -214,7 +212,7 @@ def recompute_pair(
         ).tau_global_clean
         return compute_b2_pair(collection, poisoned_cal_set, q, tau_global_clean)
     if policy == ThresholdPolicy.B4_CLUSTER:
-        return compute_b4_pair(collection, poisoned_cal_set, q, seed=seed)
+        return compute_b4_pair(collection, poisoned_cal_set, q)
     assert_never(policy)
 
 

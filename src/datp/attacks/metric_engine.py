@@ -265,46 +265,27 @@ def compute_mu_flag_threshold(mean_clean_fpr: float) -> float:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def compute_metrics(
-    inputs: MetricEngineInput | ScoreCollection,
-    pair: ThresholdPairBase | None = None,
-    mu_flag_threshold: float | None = None,
-    *,
-    auroc_records: AurocSet | None = None,
-) -> MetricResult:
+def compute_metrics(inputs: MetricEngineInput) -> MetricResult:
     """Compute full metric result for one threshold pair.
 
-    mu_flag_threshold must be pre-computed from clean artifacts and passed in.
-    auroc_records is invariant across every cell sharing the same collection
-    (test scores are never touched by calibration poisoning) — callers
-    sweeping many cells for one collection may precompute it once via
-    ``compute_auroc_records`` and pass it here to avoid redundant recompute.
-    When omitted, it is computed internally as before.
-    Returns MetricResult with all metrics.
+    mu_flag_threshold must be pre-computed from clean artifacts and passed in
+    via *inputs*.  auroc_records is invariant across every cell sharing the
+    same collection (test scores are never touched by calibration poisoning).
+    When *inputs.auroc_set* is None it is computed internally.
     """
-    if isinstance(inputs, MetricEngineInput):
-        collection = inputs.collection
-        pair = inputs.pair
-        mu_flag_threshold = inputs.mu_flag_threshold
-        if auroc_records is None:
-            auroc_records = inputs.auroc_set
-    else:
-        collection = inputs
-        if pair is None:
-            raise TypeError("pair is required when compute_metrics is called with a collection")
-        if auroc_records is None:
-            auroc_records = compute_auroc_records(collection)
-
+    auroc_records = inputs.auroc_set
     if auroc_records is None:
-        auroc_records = compute_auroc_records(collection)
+        auroc_records = compute_auroc_records(inputs.collection)
 
-    delta_tau = compute_delta_tau(collection, pair)
-    fleet_fpr = compute_fleet_fpr(collection, pair, mu_flag_threshold)
+    delta_tau = compute_delta_tau(inputs.collection, inputs.pair)
+    fleet_fpr = compute_fleet_fpr(
+        inputs.collection, inputs.pair, inputs.mu_flag_threshold
+    )
 
     return MetricResult(
-        policy=pair.policy,
+        policy=inputs.pair.policy,
         delta_tau=delta_tau,
         fleet_fpr=fleet_fpr,
         auroc_records=auroc_records,
-        mu_flag_threshold=mu_flag_threshold,
+        mu_flag_threshold=inputs.mu_flag_threshold,
     )

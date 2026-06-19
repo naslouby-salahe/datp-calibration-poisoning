@@ -176,47 +176,45 @@ def _validate_metrics_provenance(
     metrics_path: Path,
 ) -> None:
     provenance = metrics.provenance
-    if provenance.score_artifact_identity != context.score_manifest_identity:
+    _check_identity_match(
+        provenance.score_artifact_identity,
+        context.score_manifest_identity,
+        "score manifest",
+        str(context.score_manifest_path),
+    )
+    _check_identity_match(
+        provenance.model_checkpoint_identity,
+        context.manifest.checkpoint_identity,
+        "checkpoint identity",
+        metrics_path.name,
+    )
+    _check_optional_identity(
+        provenance.config_identity,
+        context.config_identity,
+        "config hash",
+    )
+    _check_optional_identity(
+        provenance.split_manifest_identity,
+        context.split_manifest_identity,
+        "split manifest hash",
+    )
+
+
+def _check_identity_match(
+    actual: str, expected: str, label: str, path_hint: str
+) -> None:
+    if actual != expected:
         raise ValueError(
-            fmt(
-                _MODULE,
-                "Metrics use a different score manifest",
-                str(context.score_manifest_path),
-                metrics_path.name,
-            )
+            fmt(_MODULE, f"Metrics use a different {label}", expected, actual)
         )
-    if provenance.model_checkpoint_identity != context.manifest.checkpoint_identity:
+
+
+def _check_optional_identity(
+    actual: str | None, expected: str | None, label: str
+) -> None:
+    if expected is not None and actual != expected:
         raise ValueError(
-            fmt(
-                _MODULE,
-                "Metrics use a different checkpoint identity",
-                context.manifest.checkpoint_identity,
-                provenance.model_checkpoint_identity,
-            )
-        )
-    if (
-        context.config_identity is not None
-        and provenance.config_identity != context.config_identity
-    ):
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "Metrics config hash mismatch",
-                context.config_identity,
-                provenance.config_identity,
-            )
-        )
-    if (
-        context.split_manifest_identity is not None
-        and provenance.split_manifest_identity != context.split_manifest_identity
-    ):
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "Metrics split manifest hash mismatch",
-                context.split_manifest_identity,
-                provenance.split_manifest_identity,
-            )
+            fmt(_MODULE, f"Metrics {label} mismatch", str(expected), str(actual))
         )
 
 

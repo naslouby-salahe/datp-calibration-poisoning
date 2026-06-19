@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -18,6 +19,15 @@ if TYPE_CHECKING:
     from datp.config.models import ThresholdConfig
 
 _MODULE = "thresholding.thresholds"
+
+
+@dataclass(frozen=True, slots=True)
+class _DeriveArgs:
+    """Common arguments for baseline threshold derivation."""
+    client_errors: dict[str, np.ndarray]
+    n_min: int
+    q: float
+    run: BaselineRunId
 
 
 def percentile_threshold(errors: np.ndarray, q: float) -> float:
@@ -72,43 +82,25 @@ def conformal_threshold(errors: np.ndarray, alpha: float) -> float:
     return float(sorted_errors[k - 1])
 
 
-def _derive_b1(
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    q: float,
-    run: BaselineRunId,
-) -> ThresholdResult:
+def _derive_b1(args: _DeriveArgs) -> ThresholdResult:
     from datp.thresholding.strategies import b1_global as b1_mod
 
-    return b1_mod.compute(client_errors, n_min, q=q, run=run)
+    return b1_mod.compute(args.client_errors, args.n_min, q=args.q, run=args.run)
 
 
-def _derive_b2(
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    tau_global: float,
-    q: float,
-    run: BaselineRunId,
-) -> ThresholdResult:
+def _derive_b2(args: _DeriveArgs, tau_global: float) -> ThresholdResult:
     from datp.thresholding.strategies import b2_personalized as b2_mod
 
-    return b2_mod.compute(client_errors, n_min, tau_global, q=q, run=run)
+    return b2_mod.compute(args.client_errors, args.n_min, tau_global, q=args.q, run=args.run)
 
 
-def _derive_b3(
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    tau_global: float,
-    q: float,
-    regime: Regime,
-    run: BaselineRunId,
-) -> ThresholdResult:
+def _derive_b3(args: _DeriveArgs, tau_global: float, regime: Regime) -> ThresholdResult:
     from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
     from datp.thresholding.strategies import b3_family as b3_mod
 
     family_map: dict[str, str] = {}
     missing_family: list[str] = []
-    for cid in client_errors:
+    for cid in args.client_errors:
         family = DEVICE_FAMILY_MAP.get(cid)
         if family is None:
             missing_family.append(cid)
@@ -124,38 +116,33 @@ def _derive_b3(
             )
         )
     return b3_mod.compute(
-        client_errors, n_min, tau_global, family_map, q=q, regime=regime, run=run
+        args.client_errors, args.n_min, tau_global, family_map,
+        q=args.q, regime=regime, run=args.run,
     )
 
 
 def _derive_b4(
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    tau_global: float,
-    q: float,
-    regime: Regime,
-    run: BaselineRunId,
-    threshold_cfg: "ThresholdConfig",
+    args: _DeriveArgs, tau_global: float, regime: Regime, threshold_cfg: "ThresholdConfig"
 ) -> ThresholdResult:
     from datp.thresholding.strategies import b4_cluster as b4_mod
 
     mode = threshold_cfg.b4_regime_a_mode
     k_for_a = (
-        0  # silhouette selection
+        0
         if regime == Regime.A and mode == B4RegimeAMode.SILHOUETTE
         else threshold_cfg.b4_k_regime_a
     )
     return b4_mod.compute(
-        client_errors,
-        n_min,
+        args.client_errors,
+        args.n_min,
         tau_global,
-        q=q,
+        q=args.q,
         random_state=threshold_cfg.b4_random_state,
         k_regime_a=k_for_a,
         k_candidates=threshold_cfg.b4_k_candidates,
         n_init=threshold_cfg.b4_n_init,
         max_iter=threshold_cfg.b4_max_iter,
-        run=run,
+        run=args.run,
         regime=regime,
     )
 
@@ -176,17 +163,16 @@ def derive_threshold(
         cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
         baseline=baseline,
     )
+    args = _DeriveArgs(client_errors=client_errors, n_min=n_min, q=q, run=run)
 
     if baseline == Baseline.B1:
-        return _derive_b1(client_errors, n_min, q, run)
+        return _derive_b1(args)
     if baseline == Baseline.B2:
-        return _derive_b2(client_errors, n_min, tau_global, q, run)
+        return _derive_b2(args, tau_global)
     if baseline == Baseline.B3:
-        return _derive_b3(client_errors, n_min, tau_global, q, regime, run)
+        return _derive_b3(args, tau_global, regime)
     if baseline == Baseline.B4:
-        return _derive_b4(
-            client_errors, n_min, tau_global, q, regime, run, threshold_cfg
-        )
+        return _derive_b4(args, tau_global, regime, threshold_cfg)
 
     raise ValueError(
         fmt(

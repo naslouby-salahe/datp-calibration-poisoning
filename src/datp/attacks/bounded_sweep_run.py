@@ -75,7 +75,6 @@ def _row_for_cell(
 ) -> BoundedSweepResultRow:
     result = run_sweep_cell(
         spec,
-        collection,
         config=SweepCellConfig(
             collection=collection,
             mu_flag_threshold=mu_flag_threshold,

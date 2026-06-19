@@ -19,6 +19,7 @@ from datp.attacks.defenses import (
     trimmed_calibration,
 )
 from datp.attacks.score_containers import build_score_collection
+from datp.attacks.types import PoisonedCalibrationSet
 from datp.attacks.enums import (
     PoisoningDefense,
     PoisoningSourceStrategy,
@@ -148,7 +149,11 @@ def _abs_delta_tau_for_poisoned(
             defense=PoisoningDefense.TRIMMED_CALIBRATION,
             trim_fraction=0.15,
         )
-    pair = recompute_pair(work_col, work_pois, ThresholdPolicy.B2_PERSONALIZED, q=_Q)
+    pair = recompute_pair(
+        work_col,
+        PoisonedCalibrationSet.from_mapping(work_pois),
+        ThresholdPolicy.B2_PERSONALIZED,
+    )
     return abs(pair.thresholds_pois[victim] - pair.thresholds_clean[victim])
 
 
@@ -200,7 +205,11 @@ def test_defense_runs_end_to_end_through_recompute_pipeline():
         defense=PoisoningDefense.TRIMMED_CALIBRATION,
         trim_fraction=0.05,
     )
-    pair = recompute_pair(work_col, work_pois, ThresholdPolicy.B2_PERSONALIZED, q=_Q)
+    pair = recompute_pair(
+        work_col,
+        PoisonedCalibrationSet.from_mapping(work_pois),
+        ThresholdPolicy.B2_PERSONALIZED,
+    )
     assert math.isfinite(pair.thresholds_clean[victim])
     assert math.isfinite(pair.thresholds_pois[victim])
 

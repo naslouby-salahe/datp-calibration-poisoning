@@ -41,6 +41,7 @@ from datp.attacks.cell_runner import (
     recompute_pair,
 )
 from datp.attacks.metric_engine import (
+    MetricEngineInput,
     MetricResult,
     compute_metrics,
     compute_mu_flag_threshold,
@@ -137,9 +138,11 @@ def run_smoke_cell(
         ),
     )
     clean_pair = recompute_pair(
-        collection, clean_outcome.poisoned_cal_set, policy, q=q, seed=b4_seed
+        collection, clean_outcome.poisoned_cal_set, policy
     )
-    clean_metrics = compute_metrics(collection, clean_pair, None)
+    clean_metrics = compute_metrics(
+        MetricEngineInput(collection=collection, pair=clean_pair, mu_flag_threshold=None)
+    )
 
     # Lock mu_flag_threshold from the clean fleet FPR.
     mu_flag = compute_mu_flag_threshold(clean_metrics.fleet_fpr.mean_fpr)
@@ -158,9 +161,11 @@ def run_smoke_cell(
         ),
     )
     poisoned_pair = recompute_pair(
-        collection, outcome.poisoned_cal_set, policy, q=q, seed=b4_seed
+        collection, outcome.poisoned_cal_set, policy
     )
-    poisoned_metrics = compute_metrics(collection, poisoned_pair, mu_flag)
+    poisoned_metrics = compute_metrics(
+        MetricEngineInput(collection=collection, pair=poisoned_pair, mu_flag_threshold=mu_flag)
+    )
 
     return SmokeCellResult(
         policy=policy,
@@ -212,8 +217,10 @@ def victim_seed_deltas(
                 scope_idx=scope_idx,
             ),
         )
-        pair = recompute_pair(collection, outcome.poisoned_cal_set, policy, q=q)
-        entry = compute_metrics(collection, pair, None).delta_tau[victim_id]
+        pair = recompute_pair(collection, outcome.poisoned_cal_set, policy)
+        entry = compute_metrics(
+            MetricEngineInput(collection=collection, pair=pair, mu_flag_threshold=None)
+        ).delta_tau[victim_id]
         deltas[ps] = entry.delta_tau
     return deltas
 

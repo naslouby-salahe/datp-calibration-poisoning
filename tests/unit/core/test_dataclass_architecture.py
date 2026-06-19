@@ -116,6 +116,24 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # SweepCellSpec.target_scope: protocol lock — the bounded sweep
         # matrix is always SINGLE_CLIENT; any other scope is out of scope here
         ("attacks/bounded_sweep_matrix.py", "SweepCellSpec", "target_scope"),
+        # MetricEngineInput: None defaults represent "not yet locked/computed"
+        ("attacks/types.py", "MetricEngineInput", "mu_flag_threshold"),
+        ("attacks/types.py", "MetricEngineInput", "auroc_set"),
+        # SweepCellConfig: per-training-seed runtime config; scope_idx/q/b4_seed
+        # are protocol-constant hyperparams; auroc_set is lazy-computed
+        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "auroc_set"),
+        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "scope_idx"),
+        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "q"),
+        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "b4_seed"),
+        # InjectionSpec: scope_idx/tail_mass are protocol-constant defaults
+        ("attacks/cell_runner.py", "InjectionSpec", "scope_idx"),
+        ("attacks/cell_runner.py", "InjectionSpec", "tail_mass"),
+        # BootstrapConfig: CI hyperparameters with protocol-locked defaults
+        ("attacks/inference.py", "BootstrapConfig", "ci"),
+        ("attacks/inference.py", "BootstrapConfig", "n_bootstrap"),
+        ("attacks/inference.py", "BootstrapConfig", "analysis_seed"),
+        # HolmConfig: alpha is the standard Holm threshold
+        ("attacks/inference.py", "HolmConfig", "alpha"),
     }
 )
 

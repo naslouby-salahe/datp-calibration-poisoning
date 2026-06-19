@@ -12,6 +12,7 @@ from datp.attacks.diagnostics import (
 )
 from datp.attacks.injector import inject_fixed_budget
 from datp.attacks.metric_engine import compute_metrics
+from datp.attacks.types import MetricEngineInput
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
 from datp.attacks.threshold_recompute import compute_b1_pair, compute_b2_pair
@@ -45,8 +46,8 @@ def _make_setup(fraction: float = 0.40):
 
     b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
     b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, b1.tau_global_clean)
-    b1_result = compute_metrics(col, b1, None)
-    b2_result = compute_metrics(col, b2, None)
+    b1_result = compute_metrics(MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None))
+    b2_result = compute_metrics(MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=None))
     return col, b1_result, b2_result, victim_id
 
 
@@ -86,7 +87,7 @@ class TestAsr:
         col = build_score_collection(raw)
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
         b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        result = compute_metrics(col, b1, None)
+        result = compute_metrics(MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None))
         asr = compute_asr(result, victim_id=next(iter(col.eligible_ids)), objective=AttackerObjective.THRESHOLD_RAISE)
         assert asr.asr == pytest.approx(0.0)
 

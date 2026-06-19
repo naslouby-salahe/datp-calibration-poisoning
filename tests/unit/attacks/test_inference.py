@@ -8,6 +8,7 @@ import pytest
 
 from datp.attacks.inference import (
     BootstrapConfig,
+    HolmConfig,
     HolmResult,
     InferenceResult,
     PairedDeltas,
@@ -326,8 +327,7 @@ class TestComputeInference:
             paired,
             poisoning_seeds=SEEDS,
             direction="raise",
-            include_holm=True,
-            holm_p_values=[0.01, 0.02, 0.03],
+            holm_config=HolmConfig(p_values=[0.01, 0.02, 0.03]),
         )
         assert result.holm is not None
         assert isinstance(result.holm, HolmResult)

@@ -23,7 +23,6 @@ from datp.attacks.cell_runner import (
 from datp.attacks.bounded_sweep_matrix import SweepCellSpec
 from datp.attacks.metric_engine import (
     MetricResult,
-    compute_auroc_records,
     compute_metrics,
     compute_mu_flag_threshold,
 )
@@ -50,9 +49,10 @@ def lock_mu_flag_threshold(
         collection,
         PoisonedCalibrationSet.from_mapping(clean_cal),
         ThresholdPolicy.B1_GLOBAL,
-        q=q,
     )
-    clean_metrics = compute_metrics(collection, clean_b1_pair, None)
+    clean_metrics = compute_metrics(
+        MetricEngineInput(collection=collection, pair=clean_b1_pair, mu_flag_threshold=None)
+    )
     return compute_mu_flag_threshold(clean_metrics.fleet_fpr.mean_fpr)
 
 
@@ -96,70 +96,16 @@ class SweepCellResult:
         return self.seed_pair.poisoning_seed
 
 
-def _resolve_sweep_cell_args(
-    spec_or_collection: SweepCellSpec | ScoreCollection,
-    collection: ScoreCollection | None = None,
-    *,
-    victim_id: str | None = None,
-    policy: ThresholdPolicy | None = None,
-    source: PoisoningSourceStrategy | None = None,
-    fraction: float | None = None,
-    training_seed: int | None = None,
-    poisoning_seed: int | None = None,
-) -> tuple[SweepCellSpec, ScoreCollection]:
-    """Normalise the dual calling convention into (SweepCellSpec, ScoreCollection).
-
-    New-style callers pass a ``SweepCellSpec`` directly; legacy callers pass a
-    ``ScoreCollection`` plus individual keyword arguments.  The legacy path is
-    kept for test convenience only.
-    """
-    if isinstance(spec_or_collection, ScoreCollection):
-        if collection is not None:
-            raise TypeError("legacy calls must not pass collection separately")
-        collection = spec_or_collection
-        if (
-            victim_id is None
-            or policy is None
-            or source is None
-            or fraction is None
-            or training_seed is None
-            or poisoning_seed is None
-        ):
-            raise TypeError(
-                "legacy run_sweep_cell calls require "
-                "victim/policy/source/fraction/seeds"
-            )
-        spec = SweepCellSpec(
-            seed_pair=SeedPair(
-                training_seed=training_seed,
-                poisoning_seed=poisoning_seed,
-            ),
-            victim_id=victim_id,
-            policy=policy,
-            source=source,
-            fraction=fraction,
-        )
-        return spec, collection
-    if collection is None:
-        raise TypeError("collection is required when passing SweepCellSpec")
-    return spec_or_collection, collection
-
-
 def _cell_injection_and_metrics(
-    collection: ScoreCollection,
     spec: SweepCellSpec,
     config: SweepCellConfig,
     *,
     fraction: float,
     mu_flag_threshold: float | None,
 ) -> tuple[PolicyPair, MetricResult]:
-    """Run one injection + threshold recompute + metric evaluation.
-
-    Used for both the clean baseline (fraction=0, mu_flag_threshold=None) and
-    the poisoned outcome (fraction>0, mu_flag_threshold=locked_value).
-    """
+    """Run one injection + threshold recompute + metric evaluation."""
     outcome = inject_single_victim(
-        collection,
+        config.collection,
         victim_id=spec.victim_id,
         spec=InjectionSpec(
             source=spec.source,
@@ -169,15 +115,13 @@ def _cell_injection_and_metrics(
         ),
     )
     pair = recompute_pair(
-        collection,
+        config.collection,
         outcome.poisoned_cal_set,
         spec.policy,
-        q=config.q,
-        seed=config.b4_seed,
     )
     metrics = compute_metrics(
         MetricEngineInput(
-            collection=collection,
+            collection=config.collection,
             pair=pair,
             mu_flag_threshold=mu_flag_threshold,
             auroc_set=config.auroc_set,
@@ -187,72 +131,17 @@ def _cell_injection_and_metrics(
 
 
 def run_sweep_cell(
-    spec_or_collection: SweepCellSpec | ScoreCollection,
-    collection: ScoreCollection | None = None,
+    spec: SweepCellSpec,
     *,
-    config: SweepCellConfig | None = None,
-    mu_flag_threshold: float | None = None,
-    auroc_set: AurocSet | None = None,
-    # ── legacy keyword-only args (for test convenience) ──
-    victim_id: str | None = None,
-    policy: ThresholdPolicy | None = None,
-    source: PoisoningSourceStrategy | None = None,
-    fraction: float | None = None,
-    training_seed: int | None = None,
-    poisoning_seed: int | None = None,
-    scope_idx: int = 0,
-    q: float = THRESHOLD_QUANTILE,
-    b4_seed: int = 0,
+    config: SweepCellConfig,
 ) -> SweepCellResult:
-    """Run one bounded cell using a pre-locked ``mu_flag_threshold``.
-
-    *config* (``SweepCellConfig``) bundles the collection, locked
-    mu_flag_threshold, precomputed auroc_set, and hyperparameters.  When
-    omitted it is built from the legacy keyword arguments so existing test
-    code continues to work without change.
-
-    New callers should prefer::
-
-        run_sweep_cell(spec, collection, config=cfg)
-    """
-    spec, collection = _resolve_sweep_cell_args(
-        spec_or_collection,
-        collection,
-        victim_id=victim_id,
-        policy=policy,
-        source=source,
-        fraction=fraction,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
-    )
-    if config is None:
-        if mu_flag_threshold is None:
-            raise TypeError("mu_flag_threshold is required")
-        if auroc_set is None:
-            auroc_set = compute_auroc_records(collection)
-        config = SweepCellConfig(
-            collection=collection,
-            mu_flag_threshold=mu_flag_threshold,
-            auroc_set=auroc_set,
-            scope_idx=scope_idx,
-            q=q,
-            b4_seed=b4_seed,
-        )
-
-    # Clean baseline (fraction 0 → poisoned cal == clean cal).
+    """Run one bounded cell using a pre-locked ``mu_flag_threshold``."""
     clean_pair, clean_metrics = _cell_injection_and_metrics(
-        collection, spec, config, fraction=0.0, mu_flag_threshold=None
+        spec, config, fraction=0.0, mu_flag_threshold=None
     )
-
-    # Poisoned outcome.
     poisoned_pair, poisoned_metrics = _cell_injection_and_metrics(
-        collection,
-        spec,
-        config,
-        fraction=spec.fraction,
-        mu_flag_threshold=config.mu_flag_threshold,
+        spec, config, fraction=spec.fraction, mu_flag_threshold=config.mu_flag_threshold
     )
-
     return SweepCellResult(
         policy=spec.policy,
         victim_id=spec.victim_id,
