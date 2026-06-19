@@ -44,6 +44,7 @@ from datp.attacks.cell_runner import (
 )
 from datp.attacks.guardrails import assert_no_inplace_mutation
 from datp.attacks.inference import (
+    InferenceInput,
     PairedDeltas,
     SeedDelta,
     collect_paired_deltas,
@@ -324,11 +325,11 @@ def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
         )
     paired = PairedDeltas(deltas=deltas)
 
-    result = compute_inference(
-        paired,
+    result = compute_inference(InferenceInput(
+        paired=paired,
         poisoning_seeds=POISONING_SEEDS,
         direction="raise",
-    )
+    ))
     # Layer 2: exactly 5 seed-level aggregates (one per poisoning seed).
     assert len(result.seed_aggregates) == len(POISONING_SEEDS) == 5
     # Bootstrap CI is computed on the 5 aggregates — NOT on 9*5 = 45 raw deltas.

@@ -286,27 +286,30 @@ class InferenceResult:
     n_feasible_victims: int
 
 
-def compute_inference(
-    paired: PairedDeltas,
-    *,
-    poisoning_seeds: tuple[int, ...],
-    direction: Literal["raise", "lower"],
-    bootstrap_config: BootstrapConfig = BootstrapConfig(),
-    holm_config: HolmConfig | None = None,
-) -> InferenceResult:
+@dataclass(frozen=True, slots=True)
+class InferenceInput:
+    """Bundled inputs for full two-layer inference."""
+    paired: PairedDeltas
+    poisoning_seeds: tuple[int, ...]
+    direction: Literal["raise", "lower"]
+    bootstrap_config: BootstrapConfig = BootstrapConfig()
+    holm_config: HolmConfig | None = None
+
+
+def compute_inference(inputs: InferenceInput) -> InferenceResult:
     """Compute full two-layer inference."""
-    seed_aggregates = compute_seed_aggregates(paired, poisoning_seeds)
+    seed_aggregates = compute_seed_aggregates(inputs.paired, inputs.poisoning_seeds)
     boot = bootstrap_seed_aggregates(
-        seed_aggregates, poisoning_seeds=poisoning_seeds, config=bootstrap_config
+        seed_aggregates, poisoning_seeds=inputs.poisoning_seeds, config=inputs.bootstrap_config
     )
-    sign = sign_test(seed_aggregates, direction=direction)
+    sign = sign_test(seed_aggregates, direction=inputs.direction)
 
     holm = None
-    if holm_config is not None:
-        holm = holm_adjust(holm_config.p_values, alpha=holm_config.alpha)
+    if inputs.holm_config is not None:
+        holm = holm_adjust(inputs.holm_config.p_values, alpha=inputs.holm_config.alpha)
 
     n_feasible = sum(
-        1 for victim_dict in paired.deltas.values()
+        1 for victim_dict in inputs.paired.deltas.values()
         if any(sd.feasible for sd in victim_dict.values())
     )
 

@@ -134,6 +134,9 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/inference.py", "BootstrapConfig", "analysis_seed"),
         # HolmConfig: alpha is the standard Holm threshold
         ("attacks/inference.py", "HolmConfig", "alpha"),
+        # InferenceInput: bootstrap_config and holm_config have sensible defaults
+        ("attacks/inference.py", "InferenceInput", "bootstrap_config"),
+        ("attacks/inference.py", "InferenceInput", "holm_config"),
     }
 )
 

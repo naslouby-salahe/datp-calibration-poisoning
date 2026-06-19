@@ -7,6 +7,7 @@ import math
 import pytest
 
 from datp.attacks.inference import (
+    InferenceInput,
     BootstrapConfig,
     HolmConfig,
     HolmResult,
@@ -277,68 +278,47 @@ class TestBootstrapSeedAggregates:
 class TestComputeInference:
     def test_returns_inference_result(self) -> None:
         paired = _uniform_paired(delta=0.05)
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
-        )
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
+        ))
         assert isinstance(result, InferenceResult)
 
     def test_seed_aggregates_populated(self) -> None:
         paired = _uniform_paired(delta=0.05)
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
-        )
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
+        ))
         assert set(result.seed_aggregates.keys()) == set(SEEDS)
 
     def test_sign_test_consistent_for_uniform_raise(self) -> None:
         paired = _uniform_paired(delta=0.05)
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
-        )
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
+        ))
         assert result.sign_test.consistent
 
     def test_bootstrap_ci_excludes_zero_for_clear_raise(self) -> None:
         paired = _uniform_paired(n_victims=5, delta=0.10)
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
             bootstrap_config=BootstrapConfig(n_bootstrap=2_000),
-        )
+        ))
         assert result.bootstrap_ci.ci_lower > 0.0
 
     def test_holm_none_by_default(self) -> None:
         paired = _uniform_paired()
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
-        )
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
+        ))
         assert result.holm is None
 
     def test_holm_populated_when_requested(self) -> None:
         paired = _uniform_paired()
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
             holm_config=HolmConfig(p_values=[0.01, 0.02, 0.03]),
-        )
+        ))
         assert result.holm is not None
         assert isinstance(result.holm, HolmResult)
 
     def test_n_feasible_victims_correct(self) -> None:
         paired = _uniform_paired(n_victims=3)
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
-        )
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
+        ))
         assert result.n_feasible_victims == 3
 
     def test_infeasible_victim_excluded_from_count(self) -> None:
@@ -352,9 +332,6 @@ class TestComputeInference:
             "v1": collect_paired_deltas(victim_id="v1", seed_deltas=dict.fromkeys(SEEDS, 0.05)),
             "v2": collect_paired_deltas(victim_id="v2", seed_deltas=dict.fromkeys(SEEDS, 0.05)),
         })
-        result = compute_inference(
-            paired,
-            poisoning_seeds=SEEDS,
-            direction="raise",
-        )
+        result = compute_inference(InferenceInput(paired=paired, poisoning_seeds=SEEDS, direction="raise",
+        ))
         assert result.n_feasible_victims == 2
