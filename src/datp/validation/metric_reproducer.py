@@ -35,7 +35,7 @@ from datp.evaluation.metrics import (
     evaluate_baseline,
 )
 from datp.scoring.loading import ScoreProvider, load_parquets_from_dir
-from datp.thresholding.thresholds import derive_threshold
+from datp.thresholding.thresholds import _DeriveInput, derive_threshold
 from datp.validation.constants import (
     COVERAGE_RATIO_TOLERANCE,
     RECOMPUTED_METRICS_INDEX_JSON,
@@ -363,9 +363,9 @@ def _compute_b1_tau_global(
     seed: int = 0,
     alpha: float | None = None,
 ) -> float:
-    b1_result = derive_threshold(
-        Baseline.B1,
-        cal_errors,
+    b1_result = derive_threshold(_DeriveInput(
+        baseline=Baseline.B1,
+        client_errors=cal_errors,
         n_min=cfg.threshold.n_min,
         q=cfg.threshold.q,
         tau_global=0.0,
@@ -373,7 +373,7 @@ def _compute_b1_tau_global(
         threshold_cfg=cfg.threshold,
         seed=seed,
         alpha=alpha,
-    )
+    ))
     return float(b1_result.tau_global)
 
 
@@ -639,9 +639,9 @@ def reproduce_cell_metrics(
             missing_baselines.append(baseline)
             continue
         stored = _read_metrics_json(metrics_path)
-        threshold_result = derive_threshold(
-            baseline,
-            cal_errors,
+        threshold_result = derive_threshold(_DeriveInput(
+            baseline=baseline,
+            client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
             q=cfg.threshold.q,
             tau_global=tau_global_b1,
@@ -649,7 +649,7 @@ def reproduce_cell_metrics(
             threshold_cfg=cfg.threshold,
             seed=seed,
             alpha=alpha,
-        )
+        ))
         evaluation, client_thresholds = _evaluate(
             threshold_result,
             score_provider,

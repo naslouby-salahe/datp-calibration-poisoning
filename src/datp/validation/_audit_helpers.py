@@ -30,7 +30,7 @@ from datp.evaluation.ranking import compute_binary_ranking_metrics
 from datp.scoring.loading import read_score_column as _read_scores
 from datp.scoring.schema import SCORING_MANIFEST_NOT_PROVIDED
 from datp.statistics.constants import EXTREME_PERCENTILE
-from datp.thresholding.thresholds import derive_threshold
+from datp.thresholding.thresholds import _DeriveInput, derive_threshold
 from datp.validation._audit_types import (
     _AuditAccumulator,
     _RunContext,
@@ -249,9 +249,9 @@ def _threshold_result(
     alpha: float | None = None,
 ) -> ThresholdResult:
     """Delegate to the canonical derive_threshold so audit and pipeline stay in lock-step."""
-    return derive_threshold(
-        baseline,
-        cal_errors,
+    return derive_threshold(_DeriveInput(
+        baseline=baseline,
+        client_errors=cal_errors,
         n_min=cfg.threshold.n_min,
         q=cfg.threshold.q,
         tau_global=tau_global,
@@ -259,7 +259,7 @@ def _threshold_result(
         threshold_cfg=cfg.threshold,
         seed=seed,
         alpha=alpha,
-    )
+    ))
 
 
 def _build_partition_audit(

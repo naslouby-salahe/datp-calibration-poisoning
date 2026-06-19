@@ -137,6 +137,10 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # InferenceInput: bootstrap_config and holm_config have sensible defaults
         ("attacks/inference.py", "InferenceInput", "bootstrap_config"),
         ("attacks/inference.py", "InferenceInput", "holm_config"),
+        # _DeriveInput: seed=0 is the canonical deterministic default; alpha=None
+        # means "no alpha sweep" — both are genuine domain sentinels
+        ("thresholding/thresholds.py", "_DeriveInput", "seed"),
+        ("thresholding/thresholds.py", "_DeriveInput", "alpha"),
     }
 )
 

@@ -27,7 +27,7 @@ from datp.thresholding.eligibility import (
     identify_eligible,
 )
 from datp.thresholding.metrics_serialization import SweepMetrics, build_metrics_dict
-from datp.thresholding.thresholds import derive_threshold
+from datp.thresholding.thresholds import _DeriveInput, derive_threshold
 
 logger = get_logger(__name__)
 
@@ -123,17 +123,17 @@ class ThresholdEvaluationExecutor:
 
         with RunLifecycle(res_dir, baseline=baseline, seed=ctx.key.seed):
             self._step(SweepStep.DERIVE_THRESHOLD, baseline)
-            threshold_result = derive_threshold(
-                baseline,
-                ctx.client_errors,
-                cfg.threshold.n_min,
-                cfg.threshold.q,
-                ctx.tau_global,
-                ctx.key.regime,
+            threshold_result = derive_threshold(_DeriveInput(
+                baseline=baseline,
+                client_errors=ctx.client_errors,
+                n_min=cfg.threshold.n_min,
+                q=cfg.threshold.q,
+                tau_global=ctx.tau_global,
+                regime=ctx.key.regime,
                 threshold_cfg=cfg.threshold,
                 seed=ctx.key.seed,
                 alpha=ctx.key.alpha,
-            )
+            ))
             logger.info(
                 "threshold derivation complete",
                 baseline=baseline,

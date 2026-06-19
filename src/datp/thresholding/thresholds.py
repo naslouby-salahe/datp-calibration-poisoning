@@ -147,38 +147,43 @@ def _derive_b4(
     )
 
 
-def derive_threshold(
-    baseline: Baseline,
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    q: float,
-    tau_global: float,
-    regime: Regime,
-    *,
-    threshold_cfg: "ThresholdConfig",
-    seed: int = 0,
-    alpha: float | None = None,
-) -> ThresholdResult:
-    run = BaselineRunId(
-        cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
-        baseline=baseline,
-    )
-    args = _DeriveArgs(client_errors=client_errors, n_min=n_min, q=q, run=run)
+@dataclass(frozen=True, slots=True)
+class _DeriveInput:
+    """Bundled inputs for threshold derivation."""
+    baseline: Baseline
+    client_errors: dict[str, np.ndarray]
+    n_min: int
+    q: float
+    tau_global: float
+    regime: Regime
+    threshold_cfg: "ThresholdConfig"
+    seed: int = 0
+    alpha: float | None = None
 
-    if baseline == Baseline.B1:
+
+def derive_threshold(inputs: _DeriveInput) -> ThresholdResult:
+    run = BaselineRunId(
+        cell=TrainingCellId(regime=inputs.regime, seed=inputs.seed, alpha=inputs.alpha),
+        baseline=inputs.baseline,
+    )
+    args = _DeriveArgs(
+        client_errors=inputs.client_errors, n_min=inputs.n_min, q=inputs.q, run=run
+    )
+
+    if inputs.baseline == Baseline.B1:
         return _derive_b1(args)
-    if baseline == Baseline.B2:
-        return _derive_b2(args, tau_global)
-    if baseline == Baseline.B3:
-        return _derive_b3(args, tau_global, regime)
-    if baseline == Baseline.B4:
-        return _derive_b4(args, tau_global, regime, threshold_cfg)
+    if inputs.baseline == Baseline.B2:
+        return _derive_b2(args, inputs.tau_global)
+    if inputs.baseline == Baseline.B3:
+        return _derive_b3(args, inputs.tau_global, inputs.regime)
+    if inputs.baseline == Baseline.B4:
+        return _derive_b4(args, inputs.tau_global, inputs.regime, inputs.threshold_cfg)
 
     raise ValueError(
         fmt(
             "thresholds",
             "Unknown baseline for threshold derivation",
             "b1/b2/b3/b4",
-            repr(baseline),
+            repr(inputs.baseline),
         )
     )

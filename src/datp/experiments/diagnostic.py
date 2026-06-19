@@ -28,7 +28,7 @@ from datp.experiments.enums import (
 from datp.experiments.executor import SharedTrainingExecutor
 from datp.experiments.models import ContingencyRecord, PipelineRequest
 from datp.thresholding.metrics_serialization import SweepMetrics, build_metrics_dict
-from datp.thresholding.thresholds import derive_threshold
+from datp.thresholding.thresholds import _DeriveInput, derive_threshold
 
 logger = get_logger(__name__)
 
@@ -195,29 +195,29 @@ def _run_b1_b2_evaluation(
     q = cfg.threshold.q
 
     with step_context(DiagnosticStep.DERIVE_THRESHOLDS):
-        b1_result = derive_threshold(
-            Baseline.B1,
-            ctx.client_errors,
-            n_min,
-            q,
-            ctx.tau_global,
-            regime,
+        b1_result = derive_threshold(_DeriveInput(
+            baseline=Baseline.B1,
+            client_errors=ctx.client_errors,
+            n_min=n_min,
+            q=q,
+            tau_global=ctx.tau_global,
+            regime=regime,
             threshold_cfg=cfg.threshold,
             seed=seed,
             alpha=alpha,
-        )
+        ))
         tau_global = b1_result.tau_global
-        b2_result = derive_threshold(
-            Baseline.B2,
-            ctx.client_errors,
-            n_min,
-            q,
-            tau_global,
-            regime,
+        b2_result = derive_threshold(_DeriveInput(
+            baseline=Baseline.B2,
+            client_errors=ctx.client_errors,
+            n_min=n_min,
+            q=q,
+            tau_global=tau_global,
+            regime=regime,
             threshold_cfg=cfg.threshold,
             seed=seed,
             alpha=alpha,
-        )
+        ))
 
     with step_context(DiagnosticStep.EVALUATE):
         score_root = ArtifactLayout(
