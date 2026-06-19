@@ -10,16 +10,16 @@ from datp.config.attack_config import (
     CalibrationPoisoningConfig,
     SeedPools,
 )
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
-    ExperimentScale,
     PoisoningDefense,
     PoisoningKnowledge,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.experiments.enums import ExperimentScale
 
 # ── SeedPools ──────────────────────────────────────────────────────────
 

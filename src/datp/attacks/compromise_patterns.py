@@ -15,7 +15,7 @@ from itertools import combinations
 
 import numpy as np
 
-from datp.artifacts.poison_names import COMPROMISE_PATTERN_SEED
+from datp.attacks.constants import COMPROMISE_PATTERN_SEED
 
 DEFAULT_N_TRIPLES: int = 20
 

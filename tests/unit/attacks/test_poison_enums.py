@@ -1,21 +1,22 @@
 from __future__ import annotations
 
-from datp.core.poison_enums import (
+from datp.attacks.constants import (
     BOUNDED_SWEEP_FRACTIONS,
     BOUNDED_SWEEP_OBJECTIVES,
     BOUNDED_SWEEP_SOURCES,
     DEFAULT_POLICIES,
     FULL_SWEEP_FRACTIONS,
+)
+from datp.attacks.enums import (
     AttackerObjective,
-    AuditDisposition,
     CalibrationInjectionRule,
-    ExperimentScale,
     PoisoningDefense,
     PoisoningKnowledge,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.experiments.enums import ExperimentScale
 
 
 class TestThresholdPolicy:
@@ -71,7 +72,7 @@ class TestPoisoningSourceStrategy:
 
     def test_diagnostic_only_member_exists(self) -> None:
         assert (
-            PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+            PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE
             in PoisoningSourceStrategy
         )
 
@@ -100,9 +101,7 @@ class TestPoisoningKnowledge:
         assert PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS == "gray_box_score_access"
 
     def test_white_box_diagnostic_only_value(self) -> None:
-        assert (
-            PoisoningKnowledge.WHITE_BOX_DIAGNOSTIC_ONLY == "white_box_diagnostic_only"
-        )
+        assert PoisoningKnowledge.WHITE_BOX == "white_box"
 
     def test_exactly_two_members(self) -> None:
         assert len(PoisoningKnowledge) == 2
@@ -116,10 +115,7 @@ class TestPoisoningTargetScope:
         assert PoisoningTargetScope.MULTI_CLIENT == "multi_client"
 
     def test_all_clients_diagnostic_only_value(self) -> None:
-        assert (
-            PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY
-            == "all_clients_diagnostic_only"
-        )
+        assert PoisoningTargetScope.ALL_CLIENTS == "all_clients"
 
 
 class TestPoisoningDefense:
@@ -148,20 +144,6 @@ class TestExperimentScale:
 
     def test_exactly_four_members(self) -> None:
         assert len(ExperimentScale) == 4
-
-
-class TestAuditDisposition:
-    def test_keep_core_value(self) -> None:
-        assert AuditDisposition.KEEP_CORE == "keep_core"
-
-    def test_quarantine_journal_value(self) -> None:
-        assert AuditDisposition.QUARANTINE_JOURNAL == "quarantine_journal"
-
-    def test_block_unsafe_value(self) -> None:
-        assert AuditDisposition.BLOCK_UNSAFE == "block_unsafe"
-
-    def test_exactly_five_members(self) -> None:
-        assert len(AuditDisposition) == 5
 
 
 class TestBoundedSweepFractions:

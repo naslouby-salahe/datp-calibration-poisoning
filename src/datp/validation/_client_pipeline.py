@@ -141,6 +141,16 @@ def _extract_b4_fingerprint(
     )
 
 
+def _b4_silhouette_scores_by_client(scores: Any) -> dict[str, float]:
+    """Normalize B4 silhouette metadata for validation schema export."""
+    if hasattr(scores, "items"):
+        return {str(client_id): float(score) for client_id, score in scores.items()}
+    return {
+        score.client_id: float(score.score)
+        for score in scores
+    }
+
+
 def _build_b4_cluster_records(
     acc: _AuditAccumulator,
     ctx: _RunContext,
@@ -151,7 +161,9 @@ def _build_b4_cluster_records(
         return
     for cluster_id, info in threshold_result.metadata.b4.cluster_info.items():
         for client_id in info.members:
-            fp = threshold_result.metadata.b4.fingerprints.get(client_id, [])
+            fp = threshold_result.metadata.b4.fingerprints.get(client_id)
+            if fp is None:
+                fp = ()
             fp_mean, fp_std, fp_skew, fp_p95 = _extract_b4_fingerprint(fp)
             acc.cluster_records.append(
                 ClusterAssignmentRecord(
@@ -168,7 +180,9 @@ def _build_b4_cluster_records(
                     fingerprint_p95=fp_p95,
                     k_selected=threshold_result.metadata.b4.k,
                     silhouette=threshold_result.metadata.b4.silhouette,
-                    silhouette_scores=threshold_result.metadata.b4.silhouette_scores,
+                    silhouette_scores=_b4_silhouette_scores_by_client(
+                        threshold_result.metadata.b4.silhouette_scores
+                    ),
                 )
             )
 

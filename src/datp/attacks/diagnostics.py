@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from datp.attacks.metric_engine import MetricResult
-from datp.core.poison_enums import AttackerObjective, ThresholdPolicy
+from datp.attacks.enums import AttackerObjective, ThresholdPolicy
 
 
 @dataclass(frozen=True, slots=True)

@@ -10,24 +10,42 @@ from datp.core.seed_sequence import (
     derive_seed_record,
     make_seed_rng,
 )
+from datp.core.seeds import SeedPair
+
+
+def _seed_record(
+    *,
+    training_seed: int,
+    poisoning_seed: int,
+    client_idx: int,
+    scope_idx: int,
+) -> SeedRecord:
+    return SeedRecord(
+        pair=SeedPair(
+            training_seed=training_seed,
+            poisoning_seed=poisoning_seed,
+        ),
+        client_idx=client_idx,
+        scope_idx=scope_idx,
+    )
 
 
 class TestSeedRecord:
     def test_entropy_matches_inputs(self) -> None:
-        record = SeedRecord(
+        record = _seed_record(
             training_seed=0, poisoning_seed=100, client_idx=3, scope_idx=0
         )
         assert record.entropy == (0, 100, 3, 0)
 
     def test_frozen_immutable(self) -> None:
-        record = SeedRecord(
+        record = _seed_record(
             training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0
         )
         with pytest.raises(Exception):
             record.training_seed = 99 # type: ignore[misc]
 
     def test_entropy_is_tuple_of_four(self) -> None:
-        record = SeedRecord(
+        record = _seed_record(
             training_seed=1, poisoning_seed=101, client_idx=2, scope_idx=1
         )
         assert isinstance(record.entropy, tuple)

@@ -10,8 +10,8 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass
 
-from datp.core.poison_enums import ExperimentScale
 from datp.data.catalog import DatasetID
+from datp.experiments.enums import ExperimentScale
 
 
 class ExperimentStage(enum.StrEnum):

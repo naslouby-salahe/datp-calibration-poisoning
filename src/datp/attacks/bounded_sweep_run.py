@@ -15,7 +15,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from datp.artifacts.poison_layout import PoisonLayout
-from datp.artifacts.poison_names import POISONING_SEEDS, TRAINING_SEEDS
+from datp.attacks.constants import (
+    BOUNDED_SWEEP_FRACTIONS,
+    BOUNDED_SWEEP_SOURCES,
+    DEFAULT_POLICIES,
+    POISONING_SEEDS,
+    TRAINING_SEEDS,
+)
 from datp.attacks.bounded_sweep_cell import (
     SweepCellResult,
     lock_mu_flag_threshold,
@@ -30,22 +36,20 @@ from datp.attacks.bounded_sweep_matrix import (
     enumerate_bounded_sweep_matrix,
 )
 from datp.attacks.diagnostics import compute_blast_radius, compute_spillover
-from datp.attacks.metric_engine import AurocRecord, compute_auroc_records
+from datp.attacks.metric_engine import compute_auroc_records
 from datp.attacks.real_score_loader import load_real_score_collection
-from datp.attacks.run_manifest import ProvenanceRecord, SeedRecordModel
+from datp.attacks.run_manifest import ProvenanceRecord
 from datp.attacks.score_containers import ScoreCollection
-from datp.attacks.source_strategies import objective_for_source
+from datp.attacks.types import AurocSet
+from datp.attacks.enums import objective_for_source
 from datp.core.enums import Regime
 from datp.config.attack_config import CalibrationPoisoningConfig
-from datp.core.poison_enums import (
-    BOUNDED_SWEEP_FRACTIONS,
-    BOUNDED_SWEEP_SOURCES,
-    DEFAULT_POLICIES,
+from datp.attacks.enums import (
     AttackerObjective,
-    ExperimentScale,
     PoisoningKnowledge,
     PoisoningTargetScope,
 )
+from datp.experiments.enums import ExperimentScale
 from datp.core.seed_sequence import derive_seed_record
 
 _REPOSITORY_NAME: str = "datp-calibration-poisoning"
@@ -54,7 +58,11 @@ _REPOSITORY_NAME: str = "datp-calibration-poisoning"
 def _auroc_invariant(result: SweepCellResult) -> bool:
     clean = result.clean_metrics.auroc_records
     poisoned = result.poisoned_metrics.auroc_records
-    return all(clean[cid].auroc == poisoned[cid].auroc for cid in clean)
+    return all(
+        clean.for_client(record.client_id).auroc
+        == poisoned.for_client(record.client_id).auroc
+        for record in clean.records
+    )
 
 
 def _row_for_cell(
@@ -62,29 +70,21 @@ def _row_for_cell(
     spec: SweepCellSpec,
     *,
     mu_flag_threshold: float,
-    auroc_records: dict[str, AurocRecord],
+    auroc_set: AurocSet,
 ) -> BoundedSweepResultRow:
     result = run_sweep_cell(
+        spec,
         collection,
-        victim_id=spec.victim_id,
-        policy=spec.policy,
-        source=spec.source,
-        fraction=spec.fraction,
-        training_seed=spec.training_seed,
-        poisoning_seed=spec.poisoning_seed,
         mu_flag_threshold=mu_flag_threshold,
-        auroc_records=auroc_records,
+        auroc_set=auroc_set,
     )
     entry = result.poisoned_metrics.delta_tau[spec.victim_id]
     blast = compute_blast_radius(result.poisoned_metrics, victim_id=spec.victim_id)
     spill = compute_spillover(result.poisoned_metrics, victim_id=spec.victim_id)
-    seed_record = SeedRecordModel.from_record(
-        derive_seed_record(
-            training_seed=spec.training_seed,
-            poisoning_seed=spec.poisoning_seed,
-            client_idx=collection.client_index(spec.victim_id),
-            scope_idx=0,
-        )
+    seed_record = derive_seed_record(
+        spec.seed_pair,
+        client_idx=collection.client_index(spec.victim_id),
+        scope_idx=0,
     )
     return BoundedSweepResultRow(
         policy=spec.policy,
@@ -112,7 +112,10 @@ def _row_for_cell(
     )
 
 
-def run_nbaiot_bounded_sweep(*, base_dir: Path) -> BoundedSweepManifest:
+def run_nbaiot_bounded_sweep(
+    base_dir: Path,
+    config: CalibrationPoisoningConfig | None = None,
+) -> BoundedSweepManifest:
     """Execute the locked bounded matrix and return the assembled manifest.
 
     Loads one real score collection per training seed, locks
@@ -124,20 +127,21 @@ def run_nbaiot_bounded_sweep(*, base_dir: Path) -> BoundedSweepManifest:
     # via CalibrationPoisoningConfig validators. Any drift in locked constants
     # (fractions out of [0,1], B4 k≠3, seed-pool mismatch, wrong injection rule)
     # raises here before any score data is loaded.
-    CalibrationPoisoningConfig(
-        policy=DEFAULT_POLICIES[0],
-        objective=AttackerObjective.THRESHOLD_RAISE,
-        source=BOUNDED_SWEEP_SOURCES[0],
-        knowledge=PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
-        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-        scale=ExperimentScale.BOUNDED,
-    )
+    if config is None:
+        config = CalibrationPoisoningConfig(
+            policy=DEFAULT_POLICIES[0],
+            objective=AttackerObjective.THRESHOLD_RAISE,
+            source=BOUNDED_SWEEP_SOURCES[0],
+            knowledge=PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
+            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+            scale=ExperimentScale.BOUNDED,
+        )
     collections: dict[int, ScoreCollection] = {}
     mu_flag_by_seed: dict[int, float] = {}
-    auroc_by_seed: dict[int, dict[str, AurocRecord]] = {}
+    auroc_by_seed: dict[int, AurocSet] = {}
     victims_by_seed: dict[int, Sequence[str]] = {}
 
-    for training_seed in TRAINING_SEEDS:
+    for training_seed in config.seeds.training:
         collection = load_real_score_collection(
             regime=Regime.A, seed=training_seed, base_dir=base_dir
         )
@@ -152,7 +156,7 @@ def run_nbaiot_bounded_sweep(*, base_dir: Path) -> BoundedSweepManifest:
             collections[spec.training_seed],
             spec,
             mu_flag_threshold=mu_flag_by_seed[spec.training_seed],
-            auroc_records=auroc_by_seed[spec.training_seed],
+            auroc_set=auroc_by_seed[spec.training_seed],
         )
         for spec in cells
     ]

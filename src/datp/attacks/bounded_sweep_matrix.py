@@ -13,16 +13,20 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from datp.artifacts.poison_names import POISONING_SEEDS, TRAINING_SEEDS
-from datp.core.poison_enums import (
+from datp.attacks.constants import (
     BOUNDED_SWEEP_FRACTIONS,
     BOUNDED_SWEEP_SOURCES,
     DEFAULT_POLICIES,
     FULL_SWEEP_FRACTIONS,
+    POISONING_SEEDS,
+    TRAINING_SEEDS,
+)
+from datp.attacks.enums import (
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.core.seeds import SeedPair
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,13 +37,20 @@ class SweepCellSpec:
     fraction). ``target_scope`` is always SINGLE_CLIENT for the bounded matrix.
     """
 
-    training_seed: int
-    poisoning_seed: int
+    seed_pair: SeedPair
     victim_id: str
     policy: ThresholdPolicy
     source: PoisoningSourceStrategy
     fraction: float
     target_scope: PoisoningTargetScope = PoisoningTargetScope.SINGLE_CLIENT
+
+    @property
+    def training_seed(self) -> int:
+        return self.seed_pair.training_seed
+
+    @property
+    def poisoning_seed(self) -> int:
+        return self.seed_pair.poisoning_seed
 
 
 def _enumerate_single_victim_matrix(
@@ -68,8 +79,10 @@ def _enumerate_single_victim_matrix(
                     for fraction in fractions:
                         cells.append(
                             SweepCellSpec(
-                                training_seed=training_seed,
-                                poisoning_seed=poisoning_seed,
+                                seed_pair=SeedPair(
+                                    training_seed=training_seed,
+                                    poisoning_seed=poisoning_seed,
+                                ),
                                 victim_id=victim_id,
                                 policy=policy,
                                 source=source,

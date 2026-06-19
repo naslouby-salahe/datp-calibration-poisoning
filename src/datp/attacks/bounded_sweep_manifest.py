@@ -19,17 +19,17 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from datp.attacks.run_manifest import (
     RESERVOIR_MODE,
     ProvenanceRecord,
-    SeedRecordModel,
 )
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.core.seed_sequence import SeedRecord
 from datp.data.catalog import DatasetID
+from datp.experiments.enums import ExperimentScale
 
 
 class BoundedSweepResultRow(BaseModel):
@@ -51,7 +51,7 @@ class BoundedSweepResultRow(BaseModel):
     victim_id: str
     training_seed: int
     poisoning_seed: int
-    seed_record: SeedRecordModel
+    seed_record: SeedRecord
 
     delta_tau: float
     delta_tau_rel: float

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from datp.artifacts.poison_names import COMPROMISE_PATTERN_SEED
+from datp.attacks.constants import COMPROMISE_PATTERN_SEED
 from datp.attacks.compromise_patterns import (
     DEFAULT_N_TRIPLES,
     select_pairs,

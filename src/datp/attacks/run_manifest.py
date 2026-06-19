@@ -9,15 +9,15 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
 from datp.core.seed_sequence import SeedRecord
+from datp.experiments.enums import ExperimentScale
 
 # Canonical split description — do not vary; this locks split semantics.
 SPLIT_SEMANTICS: str = "chronological_benign_only_60_1_20_1_18"
@@ -48,36 +48,6 @@ class ProvenanceRecord(BaseModel):
                 f"provenance.local_epochs must be 1; got {v} — E={v} rejected"
             )
         return v
-
-
-class SeedRecordModel(BaseModel):
-    """Pydantic-serializable mirror of SeedRecord for manifest embedding."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    training_seed: int
-    poisoning_seed: int
-    client_idx: int
-    scope_idx: int
-    entropy: tuple[int, int, int, int]
-
-    @classmethod
-    def from_record(cls, record: SeedRecord) -> "SeedRecordModel":
-        return cls(
-            training_seed=record.training_seed,
-            poisoning_seed=record.poisoning_seed,
-            client_idx=record.client_idx,
-            scope_idx=record.scope_idx,
-            entropy=record.entropy,
-        )
-
-    def to_record(self) -> SeedRecord:
-        return SeedRecord(
-            training_seed=self.training_seed,
-            poisoning_seed=self.poisoning_seed,
-            client_idx=self.client_idx,
-            scope_idx=self.scope_idx,
-        )
 
 
 class RunManifest(BaseModel):
@@ -118,7 +88,7 @@ class RunManifest(BaseModel):
     mu_flag_threshold: float | None
 
     # Every derived child seed recorded for reproducibility.
-    seed_record: SeedRecordModel
+    seed_record: SeedRecord
 
     # ISO-8601 UTC timestamp.
     generated_at_utc: str

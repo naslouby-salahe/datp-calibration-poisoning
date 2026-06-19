@@ -5,14 +5,16 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from datp.attacks.reservoir import ReservoirStatus
+from datp.attacks.enums import (
+    PoisoningSourceStrategy,
+    ReservoirStatus,
+    is_diagnostic_source,
+)
 from datp.attacks.source_strategies import (
     DiagnosticSourceError,
-    is_diagnostic_source,
     near_null_criterion,
-    select_reservoir,
+    _select_reservoir,
 )
-from datp.core.poison_enums import PoisoningSourceStrategy
 from datp.testsupport.synthetic_scores import make_eligible_client
 
 _TAIL_MASS = 0.10
@@ -29,7 +31,7 @@ class TestIsDiagnosticSource:
 
     def test_diagnostic_source_flagged(self) -> None:
         assert is_diagnostic_source(
-            PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+            PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE
         )
 
 
@@ -44,14 +46,14 @@ class TestSelectReservoirBoundedSources:
     )
     def test_bounded_sources_succeed(self, source: PoisoningSourceStrategy) -> None:
         c = make_eligible_client()
-        res = select_reservoir(source=source, clean_cal=c.cal, tail_mass=_TAIL_MASS)
+        res = _select_reservoir(source=source, clean_cal=c.cal, tail_mass=_TAIL_MASS)
         assert res.status == ReservoirStatus.FEASIBLE
         assert res.source == source
 
     def test_does_not_mutate_clean(self) -> None:
         c = make_eligible_client()
         original = c.cal.copy()
-        select_reservoir(
+        _select_reservoir(
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             clean_cal=c.cal,
             tail_mass=_TAIL_MASS,
@@ -63,8 +65,8 @@ class TestDiagnosticGate:
     def test_diagnostic_source_without_flag_raises(self) -> None:
         c = make_eligible_client()
         with pytest.raises(DiagnosticSourceError, match="diagnostic-only"):
-            select_reservoir(
-                source=PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
+            _select_reservoir(
+                source=PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
                 clean_cal=c.cal,
                 tail_mass=_TAIL_MASS,
                 allow_diagnostic=False,
@@ -72,23 +74,23 @@ class TestDiagnosticGate:
 
     def test_diagnostic_source_with_flag_succeeds(self) -> None:
         c = make_eligible_client()
-        res = select_reservoir(
-            source=PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
+        res = _select_reservoir(
+            source=PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
             clean_cal=c.cal,
             tail_mass=_TAIL_MASS,
             allow_diagnostic=True,
         )
         assert (
             res.source
-            == PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+            == PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE
         )
 
     def test_diagnostic_source_default_blocked(self) -> None:
         """Default allow_diagnostic=False blocks diagnostic source."""
         c = make_eligible_client()
         with pytest.raises(DiagnosticSourceError):
-            select_reservoir(
-                source=PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
+            _select_reservoir(
+                source=PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
                 clean_cal=c.cal,
                 tail_mass=_TAIL_MASS,
             )
@@ -127,13 +129,18 @@ class TestDirectionalEffects:
     ) -> tuple[float, float]:
         """Return (tau_clean, tau_pois) for one synthetic eligible client."""
         from datp.attacks.injector import inject_fixed_budget
-        from datp.core.seed_sequence import make_seed_rng
+        from datp.core.seed_sequence import SeedRecord, make_seed_rng
+        from datp.core.seeds import SeedPair
 
         c = make_eligible_client(client_idx=0)
         rng = make_seed_rng(
-            training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0
+            SeedRecord(
+                pair=SeedPair(training_seed=0, poisoning_seed=100),
+                client_idx=0,
+                scope_idx=0,
+            )
         )
-        reservoir = select_reservoir(
+        reservoir = _select_reservoir(
             source=source, clean_cal=c.cal, tail_mass=_TAIL_MASS
         )
         result = inject_fixed_budget(

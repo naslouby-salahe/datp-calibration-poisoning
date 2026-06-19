@@ -97,6 +97,48 @@ class FederationConfig(BaseModel):
     local_epochs: int
 
 
+def _validate_checkpoint_milestones(
+    milestones: tuple[int, ...],
+    max_rounds: int,
+) -> None:
+    if not milestones:
+        raise ValueError("checkpoint milestones must not be empty")
+    if len(set(milestones)) != len(milestones):
+        raise ValueError("checkpoint milestones must not contain duplicates")
+    if tuple(sorted(milestones)) != milestones:
+        raise ValueError("checkpoint milestones must be sorted ascending")
+    if any(round_count <= 0 for round_count in milestones):
+        raise ValueError("checkpoint milestones must be positive")
+    largest = max(milestones)
+    if largest > max_rounds:
+        raise ValueError("checkpoint milestone cannot exceed max_rounds")
+    if max_rounds < largest:
+        raise ValueError("max_rounds cannot be lower than largest milestone")
+
+
+def _validate_checkpoint_selection(
+    regime: Regime,
+    rule: PrimaryCheckpointSelectionRule,
+) -> None:
+    if regime != Regime.A:
+        raise ValueError("checkpoint selection must use Regime A")
+    if rule != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A:
+        raise ValueError("unsupported primary checkpoint selection rule")
+
+
+def _validate_checkpoint_modes(
+    convergence_mode: CheckpointConvergenceMode,
+    artifact_path_mode: CheckpointArtifactPathMode,
+) -> None:
+    if convergence_mode not in (
+        CheckpointConvergenceMode.LOG_ONLY,
+        CheckpointConvergenceMode.EARLY_STOP,
+    ):
+        raise ValueError("unsupported checkpoint convergence mode")
+    if artifact_path_mode != CheckpointArtifactPathMode.ROUND_AWARE:
+        raise ValueError("checkpoint protocol requires round-aware artifact paths")
+
+
 class CheckpointProtocolConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     mode: CheckpointProtocolMode
@@ -127,33 +169,12 @@ class CheckpointProtocolConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_checkpoint_protocol(self) -> "CheckpointProtocolConfig":
-        if not self.milestones:
-            raise ValueError("checkpoint milestones must not be empty")
-        if len(set(self.milestones)) != len(self.milestones):
-            raise ValueError("checkpoint milestones must not contain duplicates")
-        if tuple(sorted(self.milestones)) != self.milestones:
-            raise ValueError("checkpoint milestones must be sorted ascending")
-        if any(round_count <= 0 for round_count in self.milestones):
-            raise ValueError("checkpoint milestones must be positive")
-        largest = max(self.milestones)
-        if largest > self.max_rounds:
-            raise ValueError("checkpoint milestone cannot exceed max_rounds")
-        if self.max_rounds < largest:
-            raise ValueError("max_rounds cannot be lower than largest milestone")
-        if self.primary_selection_regime != Regime.A:
-            raise ValueError("checkpoint selection must use Regime A")
-        if (
-            self.primary_selection_rule
-            != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A
-        ):
-            raise ValueError("unsupported primary checkpoint selection rule")
-        if self.convergence_mode not in (
-            CheckpointConvergenceMode.LOG_ONLY,
-            CheckpointConvergenceMode.EARLY_STOP,
-        ):
-            raise ValueError("unsupported checkpoint convergence mode")
-        if self.artifact_path_mode != CheckpointArtifactPathMode.ROUND_AWARE:
-            raise ValueError("checkpoint protocol requires round-aware artifact paths")
+        _validate_checkpoint_milestones(self.milestones, self.max_rounds)
+        _validate_checkpoint_selection(
+            self.primary_selection_regime,
+            self.primary_selection_rule,
+        )
+        _validate_checkpoint_modes(self.convergence_mode, self.artifact_path_mode)
         return self
 
     @property
@@ -188,7 +209,7 @@ class StatisticsConfig(BaseModel):
     ci_level: float
     bootstrap_seed: int
     significance_alpha: float
-    # GO if CV(FPR)[B1, Regime A single-seed] > this value (preliminary single-seed diagnostic only).
+    # Preliminary single-seed GO threshold for CV(FPR)[B1, Regime A].
     dispersion_threshold: float
 
 

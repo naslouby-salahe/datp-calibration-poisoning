@@ -17,37 +17,56 @@ Pending clients receive tau_global in both policies.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 
 from datp.attacks.score_containers import ScoreCollection
-from datp.core.poison_enums import ThresholdPolicy
+from datp.attacks.enums import ThresholdPolicy
+from datp.attacks.types import PoisonedCalibrationSet, ThresholdPairBase
+from datp.core.enums import Baseline
+from datp.core.types import ClientThreshold
 from datp.thresholding.eligibility import (
+    CalibrationErrorSet,
+    ClientThresholdsCollection,
+    EligibilityResult,
     compute_client_thresholds,
     compute_tau_global,
 )
 
 
-@dataclass(frozen=True, slots=True)
-class ThresholdPair:
-    """Clean and poisoned threshold pair for one policy over all clients.
+ThresholdPair = ThresholdPairBase
 
-    thresholds_clean / thresholds_pois: eligible-client-indexed thresholds.
-    Pending clients receive tau_global (not stored here; access via
-    tau_global_clean / tau_global_pois).
-    """
 
-    policy: ThresholdPolicy
-    tau_global_clean: float
-    tau_global_pois: float
-    thresholds_clean: dict[str, float]
-    thresholds_pois: dict[str, float]
+def _error_set_from_collection(collection: ScoreCollection) -> CalibrationErrorSet:
+    return CalibrationErrorSet.from_mapping(collection.eligible_cal_dict())
+
+
+def _error_set_from_poisoned(
+    poisoned_cal_set: PoisonedCalibrationSet, eligible_ids: tuple[str, ...]
+) -> CalibrationErrorSet:
+    return CalibrationErrorSet.from_mapping(
+        {cid: poisoned_cal_set.for_client(cid).cal for cid in eligible_ids}
+    )
+
+
+def _uniform_thresholds(
+    eligible_ids: tuple[str, ...], tau: float, strategy: Baseline
+) -> ClientThresholdsCollection:
+    return ClientThresholdsCollection(
+        entries=tuple(
+            ClientThreshold(
+                client_id=cid,
+                threshold=tau,
+                calibration_pending=False,
+                strategy=strategy,
+            )
+            for cid in eligible_ids
+        )
+    )
 
 
 def compute_b1_pair(
     collection: ScoreCollection,
-    poisoned_cal: dict[str, np.ndarray],
+    poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
     q: float,
 ) -> ThresholdPair:
     """Compute B1 (global) threshold pair from clean vs poisoned cal.
@@ -59,19 +78,24 @@ def compute_b1_pair(
     poisoned_cal must contain entries for all eligible clients; values for
     non-victim eligible clients are expected to equal their clean cal.
     """
-    eligible_ids = list(collection.eligible_ids)
+    if not isinstance(poisoned_cal_set, PoisonedCalibrationSet):
+        poisoned_cal_set = PoisonedCalibrationSet.from_mapping(poisoned_cal_set)
+    eligible_ids = collection.eligible_ids
+    eligibility = EligibilityResult(eligible_ids=eligible_ids, pending_ids=())
 
-    clean_cal = collection.eligible_cal_dict()
-    taus_clean = compute_client_thresholds(clean_cal, eligible_ids, q=q)
+    taus_clean = compute_client_thresholds(
+        _error_set_from_collection(collection), eligibility, q=q
+    )
     tau_global_clean = compute_tau_global(taus_clean)
 
-    pois_eligible_cal = {cid: poisoned_cal[cid] for cid in eligible_ids}
-    taus_pois = compute_client_thresholds(pois_eligible_cal, eligible_ids, q=q)
+    taus_pois = compute_client_thresholds(
+        _error_set_from_poisoned(poisoned_cal_set, eligible_ids), eligibility, q=q
+    )
     tau_global_pois = compute_tau_global(taus_pois)
 
     # B1: all eligible clients share tau_global; per-client dict is uniform.
-    thresholds_clean = dict.fromkeys(eligible_ids, tau_global_clean)
-    thresholds_pois = dict.fromkeys(eligible_ids, tau_global_pois)
+    thresholds_clean = _uniform_thresholds(eligible_ids, tau_global_clean, Baseline.B1)
+    thresholds_pois = _uniform_thresholds(eligible_ids, tau_global_pois, Baseline.B1)
 
     return ThresholdPair(
         policy=ThresholdPolicy.B1_GLOBAL,
@@ -84,7 +108,7 @@ def compute_b1_pair(
 
 def compute_b2_pair(
     collection: ScoreCollection,
-    poisoned_cal: dict[str, np.ndarray],
+    poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
     q: float,
     tau_global_clean: float,
 ) -> ThresholdPair:
@@ -98,13 +122,18 @@ def compute_b2_pair(
 
     poisoned_cal must contain entries for all eligible clients.
     """
-    eligible_ids = list(collection.eligible_ids)
+    if not isinstance(poisoned_cal_set, PoisonedCalibrationSet):
+        poisoned_cal_set = PoisonedCalibrationSet.from_mapping(poisoned_cal_set)
+    eligible_ids = collection.eligible_ids
+    eligibility = EligibilityResult(eligible_ids=eligible_ids, pending_ids=())
 
-    clean_cal = collection.eligible_cal_dict()
-    taus_clean = compute_client_thresholds(clean_cal, eligible_ids, q=q)
+    taus_clean = compute_client_thresholds(
+        _error_set_from_collection(collection), eligibility, q=q
+    )
 
-    pois_eligible_cal = {cid: poisoned_cal[cid] for cid in eligible_ids}
-    taus_pois = compute_client_thresholds(pois_eligible_cal, eligible_ids, q=q)
+    taus_pois = compute_client_thresholds(
+        _error_set_from_poisoned(poisoned_cal_set, eligible_ids), eligibility, q=q
+    )
 
     tau_global_pois = compute_tau_global(taus_pois)
 
@@ -112,6 +141,6 @@ def compute_b2_pair(
         policy=ThresholdPolicy.B2_PERSONALIZED,
         tau_global_clean=tau_global_clean,
         tau_global_pois=tau_global_pois,
-        thresholds_clean=dict(taus_clean),
-        thresholds_pois=dict(taus_pois),
+        thresholds_clean=taus_clean,
+        thresholds_pois=taus_pois,
     )

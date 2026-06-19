@@ -34,8 +34,8 @@ import pytest
 from datp.artifacts.poison_names import (
     B4_K,
     CALIBRATION_POISONING_OUTPUT_ROOT,
-    POISONING_SEEDS,
 )
+from datp.attacks.constants import POISONING_SEEDS
 from datp.attacks.b4_recompute import B4ThresholdPair
 from datp.attacks.cell_runner import inject_single_victim, pending_threshold
 from datp.attacks.guardrails import assert_no_inplace_mutation
@@ -56,14 +56,15 @@ from datp.attacks.run_manifest import RESERVOIR_MODE
 from datp.attacks.score_containers import build_score_collection
 from datp.attacks.source_strategies import near_null_criterion
 from datp.attacks.threshold_recompute import ThresholdPair
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.core.enums import Baseline
+from datp.experiments.enums import ExperimentScale
 from datp.testsupport.smoke_harness import (
     b4_cluster_count,
     collection_from_score_set,
@@ -71,6 +72,7 @@ from datp.testsupport.smoke_harness import (
     victim_seed_deltas,
 )
 from datp.testsupport.synthetic_scores import make_standard_score_set
+from datp.thresholding.eligibility import ClientThresholdsCollection
 
 pytestmark = pytest.mark.integration
 
@@ -449,8 +451,14 @@ def test_invariant_11_cv_fpr_no_epsilon_returns_nan_when_mean_zero():
         policy=ThresholdPolicy.B2_PERSONALIZED,
         tau_global_clean=0.5,
         tau_global_pois=0.5,
-        thresholds_clean=dict.fromkeys(coll.eligible_ids, 0.5),
-        thresholds_pois=dict.fromkeys(coll.eligible_ids, 0.5),
+        thresholds_clean=ClientThresholdsCollection.from_mapping(
+            dict.fromkeys(coll.eligible_ids, 0.5),
+            Baseline.B2,
+        ),
+        thresholds_pois=ClientThresholdsCollection.from_mapping(
+            dict.fromkeys(coll.eligible_ids, 0.5),
+            Baseline.B2,
+        ),
     )
     fleet = compute_fleet_fpr(coll, pair, mu_flag_threshold=None)
     assert fleet.mean_fpr == 0.0

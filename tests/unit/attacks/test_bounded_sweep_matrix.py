@@ -8,7 +8,7 @@ from datp.attacks.bounded_sweep_matrix import (
     enumerate_bounded_sweep_matrix,
     enumerate_full_sweep_matrix,
 )
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,

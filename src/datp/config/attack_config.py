@@ -11,29 +11,31 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datp.artifacts.poison_names import (
-    ANALYSIS_SEEDS,
     B4_K,
     B4_MAX_ITER,
     B4_N_INIT,
-    B4_RANDOM_STATE,
-    COMPROMISE_PATTERN_SEED,
     N_MIN,
-    POISONING_SEEDS,
     TAIL_MASS,
-    TRAINING_SEEDS,
     TRIM_FRACTION_PRIMARY,
 )
-from datp.core.poison_enums import (
+from datp.attacks.constants import (
+    ANALYSIS_SEEDS,
+    B4_RANDOM_STATE,
     BOUNDED_SWEEP_FRACTIONS,
+    COMPROMISE_PATTERN_SEED,
+    POISONING_SEEDS,
+    TRAINING_SEEDS,
+)
+from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
-    ExperimentScale,
     PoisoningDefense,
     PoisoningKnowledge,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.experiments.enums import ExperimentScale
 
 
 class SeedPools(BaseModel):

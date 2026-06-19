@@ -16,46 +16,54 @@ from datp.attacks.run_logger import (
     write_run_log_entry,
 )
 from datp.attacks.run_manifest import RunManifest
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.experiments.enums import ExperimentScale
 
-_COMMON = dict(
-    dataset="nbaiot_regime_a",
-    scale=ExperimentScale.SMOKE,
-    policy=ThresholdPolicy.B1_GLOBAL,
-    objective=AttackerObjective.THRESHOLD_RAISE,
-    source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-    fraction=0.40,
-    target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-    training_seed=0,
-    poisoning_seed=100,
-    client_idx=0,
-    scope_idx=0,
-    repository="datp-calibration-poisoning",
-)
+
+def _build_manifest(
+    *,
+    mu_flag_threshold: float | None,
+    local_epochs: int = 1,
+) -> RunManifest:
+    return build_manifest(
+        dataset="nbaiot_regime_a",
+        scale=ExperimentScale.SMOKE,
+        policy=ThresholdPolicy.B1_GLOBAL,
+        objective=AttackerObjective.THRESHOLD_RAISE,
+        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        fraction=0.40,
+        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+        training_seed=0,
+        poisoning_seed=100,
+        client_idx=0,
+        scope_idx=0,
+        repository="datp-calibration-poisoning",
+        mu_flag_threshold=mu_flag_threshold,
+        local_epochs=local_epochs,
+    )
 
 
 class TestBuildManifest:
     def test_returns_manifest(self) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         assert isinstance(m, RunManifest)
 
     def test_mu_flag_threshold_recorded(self) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         assert m.mu_flag_threshold == pytest.approx(0.005)
 
     def test_mu_flag_threshold_none_allowed_at_build(self) -> None:
         # Building with None is allowed; emission enforces non-None.
-        m = build_manifest(**_COMMON, mu_flag_threshold=None)
+        m = _build_manifest(mu_flag_threshold=None)
         assert m.mu_flag_threshold is None
 
     def test_seed_entropy_matches_inputs(self) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         assert m.seed_record.training_seed == 0
         assert m.seed_record.poisoning_seed == 100
         assert m.seed_record.client_idx == 0
@@ -64,29 +72,29 @@ class TestBuildManifest:
 
     def test_provenance_e1_enforced(self) -> None:
         with pytest.raises(ValueError, match="E=5 rejected"):
-            build_manifest(**_COMMON, mu_flag_threshold=0.005, local_epochs=5)
+            _build_manifest(mu_flag_threshold=0.005, local_epochs=5)
 
     def test_fraction_recorded(self) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         assert m.fraction == pytest.approx(0.40)
 
     def test_generated_at_utc_present(self) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         assert m.generated_at_utc # non-empty ISO string
 
     def test_schema_version_is_1(self) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         assert m.schema_version == "1"
 
 
 class TestEmitManifest:
     def test_writes_file(self, tmp_path: Path) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         path = emit_manifest(m, tmp_path)
         assert path.exists()
 
     def test_roundtrip(self, tmp_path: Path) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         emit_manifest(m, tmp_path)
         loaded = load_manifest(tmp_path)
         assert loaded.mu_flag_threshold == pytest.approx(0.005)
@@ -94,18 +102,18 @@ class TestEmitManifest:
         assert loaded.fraction == m.fraction
 
     def test_raises_if_mu_flag_none(self, tmp_path: Path) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=None)
+        m = _build_manifest(mu_flag_threshold=None)
         with pytest.raises(ManifestEmissionError, match="mu_flag_threshold"):
             emit_manifest(m, tmp_path)
 
     def test_creates_run_dir(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "some" / "nested" / "dir"
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         emit_manifest(m, run_dir)
         assert run_dir.is_dir()
 
     def test_json_is_valid(self, tmp_path: Path) -> None:
-        m = build_manifest(**_COMMON, mu_flag_threshold=0.005)
+        m = _build_manifest(mu_flag_threshold=0.005)
         path = emit_manifest(m, tmp_path)
         data = json.loads(path.read_text())
         assert data["schema_version"] == "1"

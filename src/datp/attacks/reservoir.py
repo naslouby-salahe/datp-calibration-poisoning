@@ -14,17 +14,11 @@ Degenerate tails (< 2 distinct values) are flagged INFEASIBLE.
 
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass
 
 import numpy as np
 
-from datp.core.poison_enums import PoisoningSourceStrategy
-
-
-class ReservoirStatus(enum.StrEnum):
-    FEASIBLE = "feasible"
-    INFEASIBLE_DEGENERATE_TAIL = "infeasible_degenerate_tail"
+from datp.attacks.enums import PoisoningSourceStrategy, ReservoirStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +68,7 @@ def build_reservoir(
         pool = sorted_cal[-n_tail:].copy()
     elif source in (
         PoisoningSourceStrategy.LOW_SCORE_BENIGN,
-        PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
+        PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
     ):
         pool = sorted_cal[:n_tail].copy()
     else:

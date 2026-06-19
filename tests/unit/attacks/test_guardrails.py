@@ -13,11 +13,13 @@ from datp.attacks.guardrails import (
     assert_policy_not_b3,
     assert_reservoir_not_test_or_training,
 )
-from datp.core.poison_enums import (
-    BOUNDED_SWEEP_FRACTIONS,
-    ExperimentScale,
+from datp.attacks.constants import BOUNDED_SWEEP_FRACTIONS
+from datp.attacks.enums import (
+    PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.core.enums import ScoringStage
+from datp.experiments.enums import ExperimentScale
 
 
 class TestNoInplaceMutation:
@@ -45,30 +47,14 @@ class TestNoInplaceMutation:
 
 class TestReservoirNotTestOrTraining:
     def test_calibration_label_passes(self) -> None:
-        assert_reservoir_not_test_or_training("calibration")
+        assert_reservoir_not_test_or_training(ScoringStage.CAL)
 
     def test_benign_cal_label_passes(self) -> None:
-        assert_reservoir_not_test_or_training("victim_local_benign_cal")
+        assert_reservoir_not_test_or_training(ScoringStage.CAL)
 
     def test_test_label_raises(self) -> None:
         with pytest.raises(GuardrailError, match="test"):
-            assert_reservoir_not_test_or_training("test_scores")
-
-    def test_training_label_raises(self) -> None:
-        with pytest.raises(GuardrailError, match="training"):
-            assert_reservoir_not_test_or_training("training_data")
-
-    def test_train_label_raises(self) -> None:
-        with pytest.raises(GuardrailError, match="train"):
-            assert_reservoir_not_test_or_training("train_split")
-
-    def test_case_insensitive_test(self) -> None:
-        with pytest.raises(GuardrailError):
-            assert_reservoir_not_test_or_training("TEST_SCORES")
-
-    def test_case_insensitive_training(self) -> None:
-        with pytest.raises(GuardrailError):
-            assert_reservoir_not_test_or_training("TRAINING")
+            assert_reservoir_not_test_or_training(ScoringStage.TEST_BENIGN)
 
 
 class TestPolicyNotB3:
@@ -125,28 +111,28 @@ class TestFractionsInLockedGrid:
 class TestBoundedScaleRequiresSingleClient:
     def test_bounded_with_single_client_passes(self) -> None:
         assert_bounded_scale_requires_single_client(
-            ExperimentScale.BOUNDED, "single_client"
+            ExperimentScale.BOUNDED, PoisoningTargetScope.SINGLE_CLIENT
         )
 
     def test_bounded_with_multi_client_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
             assert_bounded_scale_requires_single_client(
-                ExperimentScale.BOUNDED, "multi_client"
+                ExperimentScale.BOUNDED, PoisoningTargetScope.MULTI_CLIENT
             )
 
     def test_bounded_with_all_clients_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
             assert_bounded_scale_requires_single_client(
-                ExperimentScale.BOUNDED, "all_clients_diagnostic_only"
+                ExperimentScale.BOUNDED, PoisoningTargetScope.ALL_CLIENTS
             )
 
     def test_full_scale_multi_client_passes(self) -> None:
         # Non-bounded scales are not gated by this guardrail.
         assert_bounded_scale_requires_single_client(
-            ExperimentScale.FULL, "multi_client"
+            ExperimentScale.FULL, PoisoningTargetScope.MULTI_CLIENT
         )
 
     def test_smoke_scale_multi_client_passes(self) -> None:
         assert_bounded_scale_requires_single_client(
-            ExperimentScale.SMOKE, "multi_client"
+            ExperimentScale.SMOKE, PoisoningTargetScope.MULTI_CLIENT
         )

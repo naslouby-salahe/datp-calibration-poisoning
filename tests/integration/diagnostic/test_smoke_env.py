@@ -1,4 +1,5 @@
 import math
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -18,7 +19,7 @@ _SMOKE_SEED = 42
 @pytest.mark.integration
 def test_two_client_flower_simulation() -> None:
     from flwr.client import NumPyClient
-    from flwr.common import Context, ndarrays_to_parameters
+    from flwr.common import Context, Scalar, ndarrays_to_parameters
     from flwr.server import ServerConfig
     from flwr.server.strategy import FedAvg
     from flwr.simulation import start_simulation
@@ -76,7 +77,7 @@ def test_two_client_flower_simulation() -> None:
             with torch.no_grad():
                 pred = self.model(self.data)
                 loss = nn.functional.mse_loss(pred, self.data).item()
-            return float(loss), len(self.data), {"loss": float(loss)}
+            return float(loss), len(self.data), {"loss": cast(Scalar, float(loss))}
 
     def client_fn(context: Context):
         cid = str(context.node_config["partition-id"])
@@ -94,12 +95,15 @@ def test_two_client_flower_simulation() -> None:
         initial_parameters=ndarrays_to_parameters(initial_params),
     )
 
-    history = start_simulation(
-        client_fn=client_fn,
-        num_clients=_SMOKE_NUM_CLIENTS,
-        config=ServerConfig(num_rounds=_SMOKE_NUM_ROUNDS),
-        strategy=strategy,
-        ray_init_args={"num_cpus": 2, "include_dashboard": False},
+    history = cast(
+        Any,
+        start_simulation(
+            client_fn=client_fn,
+            num_clients=_SMOKE_NUM_CLIENTS,
+            config=ServerConfig(num_rounds=_SMOKE_NUM_ROUNDS),
+            strategy=strategy,
+            ray_init_args={"num_cpus": 2, "include_dashboard": False},
+        ),
     )
 
     assert len(history.losses_distributed) == _SMOKE_NUM_ROUNDS, (

@@ -9,16 +9,20 @@ Guardrails do NOT swallow exceptions or silently return False.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable
 
 import numpy as np
 
-from datp.core.poison_enums import (
-    BOUNDED_SWEEP_FRACTIONS,
-    FULL_SWEEP_FRACTIONS,
-    ExperimentScale,
+from datp.attacks.constants import (
+    BOUNDED_SWEEP_FRACTION_SET,
+    FULL_SWEEP_FRACTION_SET,
+)
+from datp.attacks.enums import (
+    PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.core.enums import ScoringStage
+from datp.experiments.enums import ExperimentScale
 
 
 class GuardrailError(ValueError):
@@ -59,32 +63,24 @@ def assert_no_inplace_mutation(
 # Reservoir-source guardrail
 # ---------------------------------------------------------------------------
 
-_FORBIDDEN_RESERVOIR_TERMS: frozenset[str] = frozenset({"test", "training", "train"})
-
-
-def assert_reservoir_not_test_or_training(reservoir_label: str) -> None:
-    """Raise if ``reservoir_label`` implies test or training scores.
+def assert_reservoir_not_test_or_training(reservoir_source: ScoringStage) -> None:
+    """Raise if ``reservoir_source`` is a test stage.
 
     Reservoirs must be victim-local benign *calibration* scores only.
     Test scores must never influence the reservoir. Training scores are not
     a calibration pool.
 
     Args:
-        reservoir_label: A string identifying the reservoir source
-            (e.g., a stage name, file path component, or enum value).
+        reservoir_source: Scoring stage used for reservoir construction.
 
     Raises:
         GuardrailError: If any forbidden term appears in the label.
     """
-    lower = reservoir_label.lower()
-    for term in _FORBIDDEN_RESERVOIR_TERMS:
-        if term in lower:
-            raise GuardrailError(
-                f"Calibration-poisoning guardrail: reservoir label {reservoir_label!r} "
-                f"contains forbidden term {term!r}. "
-                "Reservoirs must be victim-local benign calibration scores only — "
-                "test and training scores are excluded."
-            )
+    if reservoir_source in (ScoringStage.TEST_BENIGN, ScoringStage.TEST_ATTACK):
+        raise GuardrailError(
+            f"Calibration-poisoning guardrail: reservoir source {reservoir_source!r} "
+            "is forbidden. Reservoirs must be victim-local benign calibration scores only."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -113,11 +109,8 @@ def assert_policy_not_b3(policy: ThresholdPolicy) -> None:
 # Fraction-grid guardrail
 # ---------------------------------------------------------------------------
 
-_FULL_FRACTIONS: frozenset[float] = frozenset(FULL_SWEEP_FRACTIONS)
-
-
 def assert_fractions_in_locked_grid(
-    fractions: Sequence[float],
+    fractions: Iterable[float],
     scale: ExperimentScale,
 ) -> None:
     """Raise if any fraction is outside the locked grid for ``scale``.
@@ -133,17 +126,18 @@ def assert_fractions_in_locked_grid(
     Raises:
         GuardrailError: If any fraction is not in the allowed grid.
     """
-    if scale == ExperimentScale.FULL:
-        allowed = _FULL_FRACTIONS
-    else:
-        allowed = frozenset(BOUNDED_SWEEP_FRACTIONS)
-    for f in fractions:
-        if not any(abs(f - a) < 1e-9 for a in allowed):
-            raise GuardrailError(
-                f"Calibration-poisoning guardrail: fraction {f} is not in the locked grid "
-                f"{sorted(allowed)} for scale {scale!r}. "
-                "Fractions are fixed by the locked scientific protocol grid."
-            )
+    allowed = (
+        FULL_SWEEP_FRACTION_SET
+        if scale == ExperimentScale.FULL
+        else BOUNDED_SWEEP_FRACTION_SET
+    )
+    invalid = [f for f in fractions if f not in allowed]
+    if invalid:
+        raise GuardrailError(
+            f"Calibration-poisoning guardrail: fractions {invalid!r} are not in the locked grid "
+            f"{sorted(allowed)} for scale {scale!r}. "
+            "Fractions are fixed by the locked scientific protocol grid."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +147,7 @@ def assert_fractions_in_locked_grid(
 
 def assert_bounded_scale_requires_single_client(
     scale: ExperimentScale,
-    target_scope_value: str,
+    target_scope: PoisoningTargetScope,
 ) -> None:
     """Raise if BOUNDED scale is paired with a non-SINGLE_CLIENT target scope.
 
@@ -164,9 +158,9 @@ def assert_bounded_scale_requires_single_client(
     Raises:
         GuardrailError: If scale is bounded sweep but scope is not SINGLE_CLIENT.
     """
-    if scale == ExperimentScale.BOUNDED and target_scope_value != "single_client":
+    if scale == ExperimentScale.BOUNDED and target_scope != PoisoningTargetScope.SINGLE_CLIENT:
         raise GuardrailError(
             f"Calibration-poisoning guardrail: BOUNDED scale requires SINGLE_CLIENT target scope; "
-            f"got {target_scope_value!r}. Multi-client and all-client scopes "
+            f"got {target_scope!r}. Multi-client and all-client scopes "
             "are diagnostic-only and must not be used in bounded runs."
         )

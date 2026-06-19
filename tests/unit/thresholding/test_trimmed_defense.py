@@ -19,7 +19,7 @@ from datp.attacks.defenses import (
     trimmed_calibration,
 )
 from datp.attacks.score_containers import build_score_collection
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     PoisoningDefense,
     PoisoningSourceStrategy,
     ThresholdPolicy,

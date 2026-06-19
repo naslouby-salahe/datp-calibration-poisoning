@@ -16,7 +16,6 @@ from datp.config.models import (
     DatpConfig,
     FederationConfig,
 )
-from datp.core.device import resolve_device
 from datp.core.enums import Regime, ScoringStage
 from datp.core.identity import TrainingCellId
 from datp.core.seeds import set_seeds
@@ -35,7 +34,7 @@ _STAGES = (ScoringStage.CAL, ScoringStage.TEST_BENIGN, ScoringStage.TEST_ATTACK)
 
 
 def _make_client_data(n_clients: int, seed: int = _SEED) -> dict[str, ClientData]:
-    device = resolve_device(require_cuda=True)
+    device = torch.device("cpu")
     rng = torch.Generator().manual_seed(seed)
     data = {}
     for i in range(n_clients):
@@ -55,6 +54,14 @@ def _make_cfg(
     n_features: int = _N_FEATURES,
     rounds: int = 2,
 ) -> DatpConfig:
+    checkpoint_protocol = BASE_CONFIG.checkpoint_protocol
+    disabled_checkpoint_protocol = (
+        checkpoint_protocol.model_copy(
+            update={"mode": CheckpointProtocolMode.DISABLED}
+        )
+        if checkpoint_protocol is not None
+        else None
+    )
     return BASE_CONFIG.model_copy(
         update={
             "regime": regime,
@@ -86,9 +93,7 @@ def _make_cfg(
             ),
             # Disable checkpoint protocol: these tests verify basic scoring
             # artifact layout, not the checkpoint protocol artifact paths.
-            "checkpoint_protocol": BASE_CONFIG.checkpoint_protocol.model_copy(
-                update={"mode": CheckpointProtocolMode.DISABLED}
-            ),
+            "checkpoint_protocol": disabled_checkpoint_protocol,
         }
     )
 

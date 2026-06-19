@@ -3,6 +3,15 @@ from __future__ import annotations
 import enum
 
 
+class ExperimentScale(enum.StrEnum):
+    """Experiment execution scale gate."""
+
+    SMOKE = "smoke"
+    BOUNDED = "bounded"
+    FULL = "full"
+    STRETCH = "stretch"
+
+
 class DiagnosticStep(enum.StrEnum):
     COMPOSE_CONFIG = "compose_config"
     VALIDATE_CONFIG = "validate_config"

@@ -5,6 +5,13 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 import numpy as np
 import torch
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class SeedPair:
+    training_seed: int
+    poisoning_seed: int
 
 
 def set_seeds(seed: int) -> None:

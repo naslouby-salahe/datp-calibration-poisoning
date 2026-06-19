@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datp.attacks.enums import ThresholdPolicy
 
 
 class DatasetID(enum.StrEnum):
@@ -54,6 +58,10 @@ class PathToken(enum.StrEnum):
     SEED_PREFIX = "seed_"
     ROUND_PREFIX = "round_"
     ALPHA_PREFIX = "alpha_"
+    FRACTION_PREFIX = "f_"
+    SCOPE_PREFIX = "scope_"
+    TRAIN_PREFIX = "train_"
+    POISON_PREFIX = "poison_"
     ALPHA_IID = "alpha_iid"
 
 
@@ -180,9 +188,9 @@ class AbsorptionClass(enum.StrEnum):
     Ratio = Δ_personalized / Δ_FedAvg where each Δ = CV(FPR)[B1] − CV(FPR)[B2].
     """
 
-    STRONG_RETENTION = "strong_retention"
-    PARTIAL = "partial"
-    NEAR_FULL = "near_full"
+    STRONG_B2_RETENTION = "strong_b2_retention"
+    PARTIAL_ABSORPTION = "partial_absorption"
+    NEAR_FULL_ABSORPTION = "near_full_absorption"
 
 
 def classify_absorption(
@@ -198,10 +206,24 @@ def classify_absorption(
     ``ExperimentConfig.absorption_partial``. Do not hardcode.
     """
     if ratio >= strong_retention_threshold:
-        return AbsorptionClass.STRONG_RETENTION
+        return AbsorptionClass.STRONG_B2_RETENTION
     if ratio >= partial_threshold:
-        return AbsorptionClass.PARTIAL
-    return AbsorptionClass.NEAR_FULL
+        return AbsorptionClass.PARTIAL_ABSORPTION
+    return AbsorptionClass.NEAR_FULL_ABSORPTION
+
+
+def policy_for_baseline(baseline: Baseline) -> "ThresholdPolicy | None":
+    from datp.attacks.enums import ThresholdPolicy
+
+    match baseline:
+        case Baseline.B1:
+            return ThresholdPolicy.B1_GLOBAL
+        case Baseline.B2:
+            return ThresholdPolicy.B2_PERSONALIZED
+        case Baseline.B4:
+            return ThresholdPolicy.B4_CLUSTER
+        case _:
+            return None
 
 
 

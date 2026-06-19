@@ -26,14 +26,16 @@ from datp.artifacts.poison_names import (
     ManifestFile,
     RunFile,
 )
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.core.enums import PathToken
+from datp.core.seeds import SeedPair
 from datp.data.catalog import DatasetID
+from datp.experiments.enums import ExperimentScale
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,8 +53,15 @@ class CellId:
     source: PoisoningSourceStrategy
     fraction: float
     target_scope: PoisoningTargetScope
-    training_seed: int
-    poisoning_seed: int
+    seed_pair: SeedPair
+
+    @property
+    def training_seed(self) -> int:
+        return self.seed_pair.training_seed
+
+    @property
+    def poisoning_seed(self) -> int:
+        return self.seed_pair.poisoning_seed
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.fraction <= 1.0):
@@ -92,16 +101,16 @@ class PoisonLayout:
         return self.base_dir / CALIBRATION_POISONING_OUTPUT_ROOT
 
     def _fraction_segment(self, fraction: float) -> str:
-        return f"f_{fraction:.2f}"
+        return f"{PathToken.FRACTION_PREFIX}{fraction:.2f}"
 
     def _scope_segment(self, scope: PoisoningTargetScope) -> str:
-        return f"scope_{scope.value}"
+        return f"{PathToken.SCOPE_PREFIX}{scope.value}"
 
     def _training_seed_segment(self, seed: int) -> str:
-        return f"train_{seed}"
+        return f"{PathToken.TRAIN_PREFIX}{seed}"
 
     def _poisoning_seed_segment(self, seed: int) -> str:
-        return f"poison_{seed}"
+        return f"{PathToken.POISON_PREFIX}{seed}"
 
     def run_dir(self, cell: CellId) -> Path:
         """Return the canonical run directory for one experiment cell."""

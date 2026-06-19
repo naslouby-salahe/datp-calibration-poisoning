@@ -11,16 +11,16 @@ from datp.attacks.run_manifest import (
     SPLIT_SEMANTICS,
     ProvenanceRecord,
     RunManifest,
-    SeedRecordModel,
 )
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.core.seed_sequence import derive_seed_record
+from datp.core.seed_sequence import SeedRecord, derive_seed_record
+from datp.core.seeds import SeedPair
+from datp.experiments.enums import ExperimentScale
 from datp.validation.enums import AuditStatus
 from datp.validation.provenance_gate import (
     ProvenanceCheckCode,
@@ -48,14 +48,12 @@ def _seed_model(
     poisoning_seed: int = 100,
     client_idx: int = 0,
     scope_idx: int = 0,
-) -> SeedRecordModel:
-    record = derive_seed_record(
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
+) -> SeedRecord:
+    return derive_seed_record(
+        SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
         client_idx=client_idx,
         scope_idx=scope_idx,
     )
-    return SeedRecordModel.from_record(record)
 
 
 def _manifest(**overrides: object) -> RunManifest:

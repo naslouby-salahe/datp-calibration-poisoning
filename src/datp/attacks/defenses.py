@@ -19,8 +19,8 @@ from typing import assert_never
 
 import numpy as np
 
-from datp.attacks.score_containers import ClientScores, ScoreCollection
-from datp.core.poison_enums import PoisoningDefense
+from datp.attacks.score_containers import ClientScores, ClientScoresTuple, ScoreCollection
+from datp.attacks.enums import PoisoningDefense
 
 
 def trimmed_calibration(cal: np.ndarray, trim_fraction: float) -> np.ndarray:
@@ -51,15 +51,15 @@ def build_defended_collection(
     principle drop below ``n_min`` after trimming — that is the honest cost of
     the defense and is reported, not hidden).
     """
-    defended_clients = {
-        cid: ClientScores(
+    defended_clients = ClientScoresTuple(
+        ClientScores(
             client_id=cid,
             cal=trimmed_calibration(c.cal, trim_fraction),
             test_benign=c.test_benign,
             test_attack=c.test_attack,
         )
-        for cid, c in collection.clients.items()
-    }
+        for cid, c in collection.iter_clients()
+    )
     return ScoreCollection(clients=defended_clients, n_min=collection.n_min)
 
 

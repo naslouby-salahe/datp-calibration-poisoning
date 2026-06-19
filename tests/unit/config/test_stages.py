@@ -10,8 +10,8 @@ from datp.config.stages import (
     all_stage_configs,
     get_stage_config,
 )
-from datp.core.poison_enums import ExperimentScale
 from datp.data.catalog import DatasetID
+from datp.experiments.enums import ExperimentScale
 
 
 class TestExperimentStage:

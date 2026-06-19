@@ -13,7 +13,7 @@ from datp.attacks.threshold_recompute import (
     compute_b1_pair,
     compute_b2_pair,
 )
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     PoisoningSourceStrategy,
     ThresholdPolicy,
 )

@@ -10,7 +10,7 @@ from datp.core.enums import Regime
 from datp.core.errors import fmt
 from datp.core.identity import BaselineRunId
 from datp.core.regime import enforce_regime
-from datp.core.types import B3FamilyInfo, B3Metadata, ThresholdResult
+from datp.core.types import B3FamilyInfo, B3FamilyInfoTuple, B3Metadata, ThresholdResult
 from datp.thresholding.eligibility import (
     build_threshold_result,
     compute_client_thresholds,
@@ -61,6 +61,7 @@ def compute(
     family_info: dict[str, B3FamilyInfo] = {}
     for family, taus in family_taus.items():
         family_info[family] = B3FamilyInfo(
+            family_name=family,
             tau_family=tau_per_family[family],
             eligible_count=len(taus),
             members=tuple(cid for cid in eligible if family_map[cid] == family),
@@ -73,6 +74,8 @@ def compute(
         tau_global=tau_global,
         eligible_thresholds=eligible_map,
         pending_clients=pending,
-        b3_metadata=B3Metadata(family_info=family_info),
+        b3_metadata=B3Metadata(
+            family_info=B3FamilyInfoTuple(family_info.values())
+        ),
         b4_metadata=None,
     )

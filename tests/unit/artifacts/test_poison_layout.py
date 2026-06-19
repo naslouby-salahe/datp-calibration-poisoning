@@ -11,24 +11,27 @@ from datp.artifacts.poison_names import (
     B4_K,
     B4_MAX_ITER,
     B4_N_INIT,
-    B4_RANDOM_STATE,
     CALIBRATION_POISONING_OUTPUT_ROOT,
-    COMPROMISE_PATTERN_SEED,
     MATERIALITY_FACTOR,
     N_MIN,
     TAIL_MASS,
     ManifestFile,
     RunFile,
 )
-from datp.core.poison_enums import (
+from datp.attacks.constants import (
+    B4_RANDOM_STATE,
     BOUNDED_SWEEP_FRACTIONS,
+    COMPROMISE_PATTERN_SEED,
+)
+from datp.attacks.enums import (
     AttackerObjective,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
 from datp.data.catalog import DatasetID
+from datp.core.seeds import SeedPair
+from datp.experiments.enums import ExperimentScale
 
 
 def _cell(
@@ -44,8 +47,10 @@ def _cell(
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
         fraction=fraction,
         target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
+        seed_pair=SeedPair(
+            training_seed=training_seed,
+            poisoning_seed=poisoning_seed,
+        ),
     )
 
 
@@ -169,8 +174,7 @@ class TestCellId:
                 source=PoisoningSourceStrategy.RANDOM_BENIGN,
                 fraction=1.5,
                 target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-                training_seed=0,
-                poisoning_seed=100,
+                seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
             )
 
     def test_dataset_is_enum_typed(self) -> None:

@@ -50,11 +50,3 @@ TRIM_FRACTION_APPENDIX: float = 0.10
 B4_K: int = 3
 B4_N_INIT: int = 10
 B4_MAX_ITER: int = 300
-B4_RANDOM_STATE: int = 42
-
-# Locked seed pools.
-TRAINING_SEEDS: tuple[int, ...] = (0, 1, 2, 3, 4)
-POISONING_SEEDS: tuple[int, ...] = (100, 101, 102, 103, 104)
-ANALYSIS_SEEDS: tuple[int, ...] = (300, 301, 302, 303, 304)
-COMPROMISE_PATTERN_SEED: int = 400
-

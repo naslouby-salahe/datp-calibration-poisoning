@@ -13,7 +13,7 @@ from datp.attacks.metric_engine import compute_metrics
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
 from datp.attacks.threshold_recompute import compute_b1_pair, compute_b2_pair
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
     PoisoningSourceStrategy,
     ThresholdPolicy,

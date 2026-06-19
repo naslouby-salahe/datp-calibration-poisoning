@@ -6,7 +6,7 @@ Three bounded sweep strategies:
   LOW_SCORE_BENIGN — lower tail_mass fraction → threshold lowers.
 
 Diagnostic-only strategy (never in main matrix, never in gray-box claims):
-  LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY — requires explicit allow_diagnostic=True.
+  TARGETED_REMOVAL_LOW_SCORE — requires explicit allow_diagnostic=True.
 
 Near-null criterion for RANDOM: |Δτ| ≤ delta_tau_null_threshold is an audit flag,
 not an auto-kill. Evaluation logic decides whether to flag, not this module.
@@ -16,8 +16,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from datp.attacks.enums import (
+    PoisoningSourceStrategy,
+    is_diagnostic_source,
+)
 from datp.attacks.reservoir import ReservoirResult, build_reservoir
-from datp.core.poison_enums import AttackerObjective, PoisoningSourceStrategy
 
 # bounded source strategies — fixed by scientific protocol.
 _BOUNDED_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
@@ -29,17 +32,7 @@ _BOUNDED_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
 )
 
 # Diagnostic-only sources — gated behind allow_diagnostic.
-_DIAGNOSTIC_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
-    {PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY}
-)
-
-
-def is_diagnostic_source(source: PoisoningSourceStrategy) -> bool:
-    """Return True if source is diagnostic-only (not for bounded or full matrix)."""
-    return source in _DIAGNOSTIC_SOURCES
-
-
-def select_reservoir(
+def _select_reservoir(
     *,
     source: PoisoningSourceStrategy,
     clean_cal: np.ndarray,
@@ -64,23 +57,6 @@ def select_reservoir(
 
 class DiagnosticSourceError(ValueError):
     """Raised when a diagnostic source is used without allow_diagnostic=True."""
-
-
-def objective_for_source(
-    source: PoisoningSourceStrategy,
-) -> AttackerObjective | None:
-    """Directional objective implied by a source strategy, for ASR computation.
-
-    HIGH_SCORE_BENIGN pairs with THRESHOLD_RAISE; LOW_SCORE_BENIGN pairs with
-    THRESHOLD_LOWER. RANDOM_BENIGN is a non-directional control and has no
-    objective pairing (returns None). The objective is derived metadata, not
-    an independent sweep axis crossed with source.
-    """
-    if source == PoisoningSourceStrategy.HIGH_SCORE_BENIGN:
-        return AttackerObjective.THRESHOLD_RAISE
-    if source == PoisoningSourceStrategy.LOW_SCORE_BENIGN:
-        return AttackerObjective.THRESHOLD_LOWER
-    return None
 
 
 def near_null_criterion(

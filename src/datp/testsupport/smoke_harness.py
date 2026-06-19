@@ -28,10 +28,10 @@ from datp.artifacts.poison_names import (
     B4_K,
     B4_MAX_ITER,
     B4_N_INIT,
-    B4_RANDOM_STATE,
     N_MIN,
     THRESHOLD_QUANTILE,
 )
+from datp.attacks.constants import B4_RANDOM_STATE
 from datp.attacks.cell_runner import (
     InjectionOutcome,
     PolicyPair,
@@ -52,7 +52,7 @@ from datp.attacks.score_containers import (
 )
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     PoisoningSourceStrategy,
     ThresholdPolicy,
 )
@@ -132,7 +132,7 @@ def run_smoke_cell(
         scope_idx=scope_idx,
     )
     clean_pair = recompute_pair(
-        collection, clean_outcome.poisoned_cal, policy, q=q, seed=b4_seed
+        collection, clean_outcome.poisoned_cal_set, policy, q=q, seed=b4_seed
     )
     clean_metrics = compute_metrics(collection, clean_pair, None)
 
@@ -150,7 +150,7 @@ def run_smoke_cell(
         scope_idx=scope_idx,
     )
     poisoned_pair = recompute_pair(
-        collection, outcome.poisoned_cal, policy, q=q, seed=b4_seed
+        collection, outcome.poisoned_cal_set, policy, q=q, seed=b4_seed
     )
     poisoned_metrics = compute_metrics(collection, poisoned_pair, mu_flag)
 
@@ -201,7 +201,7 @@ def victim_seed_deltas(
             poisoning_seed=ps,
             scope_idx=scope_idx,
         )
-        pair = recompute_pair(collection, outcome.poisoned_cal, policy, q=q)
+        pair = recompute_pair(collection, outcome.poisoned_cal_set, policy, q=q)
         entry = compute_metrics(collection, pair, None).delta_tau[victim_id]
         deltas[ps] = entry.delta_tau
     return deltas

@@ -854,7 +854,7 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
                 },
                 SidecarField.METRIC_NAMES: [MetricName.FPR.value, "cv_fpr_delta_b1_b2"],
                 SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE_WITH_CONFIRMATORY_SIDECAR_DELTA.value,
-                SidecarField.SEED_SCOPE: SeedScope.ALL_SEED.value,
+                SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
                 SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
                 SidecarField.BASELINES: [Baseline.B1.value, Baseline.B2.value, Baseline.B4.value],
                 SidecarField.PAIRED_SEED_CV_FPR_DELTA: [
@@ -945,7 +945,7 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
                 },
                 SidecarField.METRIC_NAMES: [MetricName.CV_FPR.value],
                 SidecarField.EVIDENCE_ROLE: EvidenceRole.SECONDARY.value,
-                SidecarField.SEED_SCOPE: SeedScope.ALL_SEED.value,
+                SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
                 SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
                 SidecarField.BASELINES: list(regime_c_baselines),
                 SidecarField.SEED_AGGREGATION_POLICY: "mean with one-standard-deviation band across configured seeds",

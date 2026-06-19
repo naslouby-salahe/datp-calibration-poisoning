@@ -7,7 +7,7 @@ import pytest
 
 from datp.attacks.injector import inject_fixed_budget
 from datp.attacks.reservoir import ReservoirResult, ReservoirStatus, build_reservoir
-from datp.core.poison_enums import PoisoningSourceStrategy
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import (
     make_degenerate_tail_client,

@@ -21,17 +21,17 @@ from datp.attacks.run_manifest import (
     RESERVOIR_MODE,
     ProvenanceRecord,
     RunManifest,
-    SeedRecordModel,
 )
-from datp.core.poison_enums import (
+from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
-    ExperimentScale,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
 from datp.core.seed_sequence import SeedRecord
+from datp.core.seeds import SeedPair
+from datp.experiments.enums import ExperimentScale
 
 
 class ManifestEmissionError(ValueError):
@@ -66,8 +66,7 @@ def build_manifest(
     poisoned run. Call emit_manifest only after locking mu_flag_threshold.
     """
     record = SeedRecord(
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
+        pair=SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
         client_idx=client_idx,
         scope_idx=scope_idx,
     )
@@ -92,7 +91,7 @@ def build_manifest(
         provenance=provenance,
         reservoir_mode=reservoir_mode,
         mu_flag_threshold=mu_flag_threshold,
-        seed_record=SeedRecordModel.from_record(record),
+        seed_record=record,
         generated_at_utc=datetime.now(timezone.utc).isoformat(),
     )
 

@@ -82,6 +82,8 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # ResultTable: mutable builder pattern
         ("reporting/tables.py", "ResultTable", "rows"),
         ("reporting/tables.py", "ResultTable", "footnote"),
+        # ScoreCollection: derived eligibility cache populated in __post_init__
+        ("attacks/score_containers.py", "ScoreCollection", "_eligible_result"),
         # TrackingPayload (if any)
         ("core/tracking.py", "_TrackingPayload", "payload"),
         # DiagnosticInlineIdentity: canonical provenance sentinel strings (genuinely domain-invariant)

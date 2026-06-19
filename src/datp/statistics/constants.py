@@ -1,4 +1,7 @@
 # Cliff's delta magnitude boundaries (Romano et al., 2006, Table 1).
+DEFAULT_CI_LEVEL: float = 0.95
+BOOTSTRAP_RANDOM_STATE: int = 42
+
 CLIFFS_DELTA_NEGLIGIBLE = 0.147
 CLIFFS_DELTA_SMALL = 0.33
 CLIFFS_DELTA_MEDIUM = 0.474

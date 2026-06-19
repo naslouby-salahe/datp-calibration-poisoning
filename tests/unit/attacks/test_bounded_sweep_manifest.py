@@ -11,23 +11,21 @@ from datp.attacks.bounded_sweep_manifest import (
     BoundedSweepManifest,
     BoundedSweepResultRow,
 )
-from datp.attacks.run_manifest import ProvenanceRecord, SeedRecordModel
-from datp.core.poison_enums import (
+from datp.attacks.run_manifest import ProvenanceRecord
+from datp.attacks.enums import (
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
 from datp.core.seed_sequence import derive_seed_record
+from datp.core.seeds import SeedPair
 
 
 def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResultRow:
-    seed_record = SeedRecordModel.from_record(
-        derive_seed_record(
-            training_seed=training_seed,
-            poisoning_seed=poisoning_seed,
-            client_idx=0,
-            scope_idx=0,
-        )
+    seed_record = derive_seed_record(
+        SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
+        client_idx=0,
+        scope_idx=0,
     )
     return BoundedSweepResultRow(
         policy=ThresholdPolicy.B1_GLOBAL,

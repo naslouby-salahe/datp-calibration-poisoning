@@ -30,13 +30,17 @@ def _make_synthetic_raw(base: Path) -> Path:
     for dev in _DEVICES:
         dev_dir = raw / dev
         dev_dir.mkdir(parents=True)
-        pd.DataFrame(rng.randn(_N_BENIGN, _N_FEATURES), columns=cols).to_csv(
+        pd.DataFrame(
+            rng.randn(_N_BENIGN, _N_FEATURES), columns=pd.Index(cols)
+        ).to_csv(
             dev_dir / "benign_traffic.csv",
             index=False,
         )
         atk_dir = dev_dir / "gafgyt_attacks"
         atk_dir.mkdir()
-        pd.DataFrame(rng.randn(_N_ATTACK, _N_FEATURES), columns=cols).to_csv(
+        pd.DataFrame(
+            rng.randn(_N_ATTACK, _N_FEATURES), columns=pd.Index(cols)
+        ).to_csv(
             atk_dir / "combo.csv",
             index=False,
         )

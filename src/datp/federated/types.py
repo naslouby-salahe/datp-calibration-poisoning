@@ -56,8 +56,9 @@ def validate_tensor_non_empty(tensor: torch.Tensor, name: str, client_id: str) -
 
 
 def validate_tensor_finite(tensor: torch.Tensor, name: str, client_id: str) -> None:
-    if not torch.isfinite(tensor).all():
-        n_nonfinite = int((~torch.isfinite(tensor)).sum().item())
+    finite_mask = torch.isfinite(tensor)
+    n_nonfinite = int((~finite_mask).sum().item())
+    if n_nonfinite > 0:
         raise ValueError(
             fmt(
                 _MODULE,

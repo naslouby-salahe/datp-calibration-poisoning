@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from datp.artifacts.poison_names import POISONING_SEEDS, TRAINING_SEEDS
+from datp.attacks.constants import POISONING_SEEDS, TRAINING_SEEDS
 from datp.attacks.bounded_sweep_run import (
     run_nbaiot_bounded_sweep,
     write_nbaiot_bounded_sweep_manifest,

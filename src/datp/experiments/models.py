@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -11,6 +12,7 @@ from datp.config.models import DatpConfig
 from datp.core.enums import Baseline
 from datp.core.identity import TrainingCellId
 from datp.experiments.enums import ContingencyDecision
+from datp.thresholding.eligibility import ClientThresholdsCollection
 
 if TYPE_CHECKING:
     from datp.scoring.loading import ScoreProvider
@@ -34,7 +36,7 @@ class SharedPipelineContext:
     client_errors: dict[str, np.ndarray]
     eligible: list[str]
     pending: list[str]
-    client_taus: dict[str, float]
+    client_taus: ClientThresholdsCollection | Mapping[str, float]
     tau_global: float
     score_provider: ScoreProvider
     checkpoint_round: int | None

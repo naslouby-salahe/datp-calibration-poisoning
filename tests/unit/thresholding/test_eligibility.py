@@ -9,9 +9,15 @@ from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
 from datp.core.types import (
     B3FamilyInfo,
+    B3FamilyInfoTuple,
     B3Metadata,
     B4ClusterInfo,
+    B4ClusterInfoTuple,
     B4Metadata,
+    ClientFingerprint,
+    ClientFingerprintTuple,
+    ClientSilhouetteScore,
+    ClientSilhouetteScoreTuple,
     ClientThreshold,
     ThresholdResult,
 )
@@ -212,15 +218,18 @@ class TestBuildThresholdResult:
 
     def test_with_b3_metadata(self) -> None:
         b3_meta = B3Metadata(
-            family_info={
-                "cameras": B3FamilyInfo(
+            family_info=B3FamilyInfoTuple(
+                (
+                    B3FamilyInfo(
+                    family_name="cameras",
                     tau_family=0.25,
                     eligible_count=2,
                     members=("a", "b"),
                     threshold_variance=0.01,
                     singleton=False,
+                    ),
                 )
-            }
+            )
         )
         result = build_threshold_result(
             run=_run(Baseline.B3),
@@ -236,13 +245,41 @@ class TestBuildThresholdResult:
     def test_with_b4_metadata(self) -> None:
         b4_meta = B4Metadata(
             k=2,
-            cluster_info={
-                "cluster_0": B4ClusterInfo(tau_cluster=0.3, members=("a",)),
-                "cluster_1": B4ClusterInfo(tau_cluster=0.7, members=("b",)),
-            },
+            cluster_info=B4ClusterInfoTuple(
+                (
+                    B4ClusterInfo(
+                    cluster_id="cluster_0", tau_cluster=0.3, members=("a",)
+                    ),
+                    B4ClusterInfo(
+                    cluster_id="cluster_1", tau_cluster=0.7, members=("b",)
+                    ),
+                )
+            ),
             silhouette=0.85,
-            silhouette_scores={"2": 0.85, "3": 0.72},
-            fingerprints={"a": (1.0, 0.5, 0.1, 2.0), "b": (3.0, 0.2, -0.1, 4.0)},
+            silhouette_scores=ClientSilhouetteScoreTuple(
+                (
+                    ClientSilhouetteScore(client_id="2", score=0.85),
+                    ClientSilhouetteScore(client_id="3", score=0.72),
+                )
+            ),
+            fingerprints=ClientFingerprintTuple(
+                (
+                    ClientFingerprint(
+                        client_id="a",
+                        mean=1.0,
+                        variance=0.5,
+                        skewness=0.1,
+                        p95=2.0,
+                    ),
+                    ClientFingerprint(
+                        client_id="b",
+                        mean=3.0,
+                        variance=0.2,
+                        skewness=-0.1,
+                        p95=4.0,
+                    ),
+                )
+            ),
         )
         result = build_threshold_result(
             run=_run(Baseline.B4),

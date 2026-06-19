@@ -7,7 +7,7 @@ from datp.evaluation.artifact_validation import validate_metrics_payload
 
 
 def _base_provenance(**overrides: str) -> dict:
-    base = {
+    base: dict[PayloadKey | str, str] = {
         PayloadKey.CONFIG_IDENTITY: "abc123",
         PayloadKey.SPLIT_MANIFEST_IDENTITY: "def456",
         PayloadKey.MODEL_CHECKPOINT_IDENTITY: "ghi789",

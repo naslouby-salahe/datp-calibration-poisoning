@@ -37,13 +37,18 @@ def inject_fixed_budget(
 ) -> InjectionResult:
     """Replace a fixed budget of positions with reservoir-sampled values.
 
-    clean_cal: the victim's clean calibration scores (never mutated).
-    reservoir: the victim-local reservoir to sample from.
-    fraction: poisoning fraction f in [0, 1].
-    rng: deterministic Generator from SeedSequence.
+    Args:
+        clean_cal: Victim clean calibration scores. Never mutated.
+        reservoir: Victim-local reservoir to sample from.
+        fraction: Poisoning fraction ``f`` in ``[0, 1]``.
+        rng: Deterministic generator from ``SeedSequence``.
 
-    Returns an InjectionResult with the poisoned array and metadata.
-    Raises ValueError if reservoir is INFEASIBLE.
+    Returns:
+        Injection metadata and the poisoned calibration array.
+
+    Raises:
+        ValueError: If ``fraction`` is outside ``[0, 1]`` or the reservoir is
+            infeasible.
     """
     if fraction < 0.0 or fraction > 1.0:
         raise ValueError(f"fraction must be in [0, 1]; got {fraction}")

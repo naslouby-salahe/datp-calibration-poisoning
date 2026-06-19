@@ -18,7 +18,7 @@ from datp.attacks.cell_runner import (
     inject_single_victim,
 )
 from datp.attacks.score_containers import ScoreCollection, build_score_collection
-from datp.core.poison_enums import PoisoningSourceStrategy
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
 _SOURCE = PoisoningSourceStrategy.HIGH_SCORE_BENIGN

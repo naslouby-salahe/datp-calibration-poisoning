@@ -36,6 +36,8 @@ class TestComputeBinaryRankingMetrics:
         benign = rng.normal(0.5, 0.1, size=500).astype(np.float64)
         attack = rng.normal(0.5, 0.1, size=500).astype(np.float64)
         result = compute_binary_ranking_metrics(benign, attack)
+        assert result.auroc is not None
+        assert result.pr_auc is not None
         assert 0.3 < result.auroc < 0.7
         assert 0.3 < result.pr_auc < 0.7
 
@@ -44,6 +46,8 @@ class TestComputeBinaryRankingMetrics:
         benign = rng.normal(0.3, 0.1, size=200).astype(np.float64)
         attack = rng.normal(0.7, 0.1, size=200).astype(np.float64)
         result = compute_binary_ranking_metrics(benign, attack)
+        assert result.auroc is not None
+        assert result.pr_auc is not None
         assert result.auroc > 0.8
         assert result.pr_auc > 0.8
 
@@ -86,6 +90,8 @@ class TestComputeBinaryRankingMetrics:
         result = compute_binary_ranking_metrics(
             np.array([0.5]), np.array([0.5])
         )
+        assert result.auroc is not None
+        assert result.pr_auc is not None
         assert 0.0 <= result.auroc <= 1.0
         assert 0.0 <= result.pr_auc <= 1.0
 
@@ -96,4 +102,5 @@ class TestComputeBinaryRankingMetrics:
         # AUROC = 0.0 for perfectly inverted ranking;
         # PR-AUC baseline equals class fraction and will not dip to 0.
         assert result.auroc == 0.0
+        assert result.pr_auc is not None
         assert 0.3 <= result.pr_auc <= 0.5

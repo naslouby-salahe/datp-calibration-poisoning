@@ -18,10 +18,14 @@ from dataclasses import dataclass
 import numpy as np
 
 from datp.artifacts.poison_names import MATERIALITY_FACTOR
-from datp.attacks.b4_recompute import B4ThresholdPair
 from datp.attacks.score_containers import ScoreCollection
-from datp.attacks.threshold_recompute import ThresholdPair
-from datp.core.poison_enums import ThresholdPolicy
+from datp.attacks.types import (
+    AurocRecord,
+    AurocSet,
+    MetricEngineInput,
+    ThresholdPairBase,
+)
+from datp.attacks.enums import ThresholdPolicy
 from datp.evaluation.ranking import compute_binary_ranking_metrics
 from datp.statistics.cv import cv
 
@@ -79,18 +83,6 @@ class FleetFprMetrics:
 
 
 # ---------------------------------------------------------------------------
-# AUROC invariance record
-# ---------------------------------------------------------------------------
-
-@dataclass(frozen=True, slots=True)
-class AurocRecord:
-    """AUROC per eligible client (invariant under calibration-channel attack)."""
-
-    client_id: str
-    auroc: float | None
-
-
-# ---------------------------------------------------------------------------
 # Full metric result for one (policy, poisoning-condition) pair
 # ---------------------------------------------------------------------------
 
@@ -107,7 +99,7 @@ class MetricResult:
     policy: ThresholdPolicy
     delta_tau: dict[str, DeltaTauEntry]
     fleet_fpr: FleetFprMetrics
-    auroc_records: dict[str, AurocRecord]
+    auroc_records: AurocSet
     mu_flag_threshold: float | None
 
 
@@ -130,7 +122,7 @@ def _client_fpr(
 
 def compute_delta_tau(
     collection: ScoreCollection,
-    pair: ThresholdPair | B4ThresholdPair,
+    pair: ThresholdPairBase,
 ) -> dict[str, DeltaTauEntry]:
     """Compute per-victim Δτ family for all eligible clients.
 
@@ -143,7 +135,7 @@ def compute_delta_tau(
         tp = pair.thresholds_pois[cid]
         dt = tp - tc
         dt_rel = dt / max(abs(tc), _DELTA_TAU_REL_EPS)
-        clean_cal = collection.clients[cid].cal
+        clean_cal = collection.for_client(cid).cal
         iqr = float(
             np.percentile(clean_cal, _IQR_P75) - np.percentile(clean_cal, _IQR_P25)
         )
@@ -167,7 +159,7 @@ def compute_delta_tau(
 
 def compute_fleet_fpr(
     collection: ScoreCollection,
-    pair: ThresholdPair | B4ThresholdPair,
+    pair: ThresholdPairBase,
     mu_flag_threshold: float | None,
 ) -> FleetFprMetrics:
     """Compute CV(FPR) + coverage + guard metrics under poisoned thresholds.
@@ -181,7 +173,7 @@ def compute_fleet_fpr(
     worst_id: str | None = None
 
     for cid in eligible_ids:
-        tb = collection.clients[cid].test_benign
+        tb = collection.for_client(cid).test_benign
         tau = pair.thresholds_pois[cid]
         fpr = _client_fpr(tb, tau)
         fprs.append(fpr)
@@ -235,18 +227,18 @@ def compute_fleet_fpr(
 
 def compute_auroc_records(
     collection: ScoreCollection,
-) -> dict[str, AurocRecord]:
+) -> AurocSet:
     """Compute AUROC per eligible client from test scores.
 
     Test scores are NEVER modified by calibration poisoning.
     AUROC is therefore invariant; this function records it for auditability.
     """
-    records: dict[str, AurocRecord] = {}
+    records: list[AurocRecord] = []
     for cid in collection.eligible_ids:
-        c = collection.clients[cid]
+        c = collection.for_client(cid)
         ranking = compute_binary_ranking_metrics(c.test_benign, c.test_attack)
-        records[cid] = AurocRecord(client_id=cid, auroc=ranking.auroc)
-    return records
+        records.append(AurocRecord(client_id=cid, auroc=ranking.auroc))
+    return AurocSet(records=tuple(records))
 
 
 # ---------------------------------------------------------------------------
@@ -274,11 +266,11 @@ def compute_mu_flag_threshold(mean_clean_fpr: float) -> float:
 # ---------------------------------------------------------------------------
 
 def compute_metrics(
-    collection: ScoreCollection,
-    pair: ThresholdPair | B4ThresholdPair,
-    mu_flag_threshold: float | None,
+    inputs: MetricEngineInput | ScoreCollection,
+    pair: ThresholdPairBase | None = None,
+    mu_flag_threshold: float | None = None,
     *,
-    auroc_records: dict[str, AurocRecord] | None = None,
+    auroc_records: AurocSet | None = None,
 ) -> MetricResult:
     """Compute full metric result for one threshold pair.
 
@@ -290,10 +282,20 @@ def compute_metrics(
     When omitted, it is computed internally as before.
     Returns MetricResult with all metrics.
     """
+    if isinstance(inputs, MetricEngineInput):
+        collection = inputs.collection
+        pair = inputs.pair
+        mu_flag_threshold = inputs.mu_flag_threshold
+        auroc_records = inputs.auroc_set
+    else:
+        collection = inputs
+        if pair is None:
+            raise TypeError("pair is required when compute_metrics is called with a collection")
+        if auroc_records is None:
+            auroc_records = compute_auroc_records(collection)
+
     delta_tau = compute_delta_tau(collection, pair)
     fleet_fpr = compute_fleet_fpr(collection, pair, mu_flag_threshold)
-    if auroc_records is None:
-        auroc_records = compute_auroc_records(collection)
 
     return MetricResult(
         policy=pair.policy,

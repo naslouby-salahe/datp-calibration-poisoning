@@ -16,7 +16,16 @@ from datp.core.errors import fmt
 from datp.core.identity import BaselineRunId
 from datp.core.logging import get_logger
 from datp.core.regime import enforce_regime
-from datp.core.types import B4ClusterInfo, B4Metadata, ThresholdResult
+from datp.core.types import (
+    B4ClusterInfo,
+    B4ClusterInfoTuple,
+    B4Metadata,
+    ClientFingerprint,
+    ClientFingerprintTuple,
+    ClientSilhouetteScore,
+    ClientSilhouetteScoreTuple,
+    ThresholdResult,
+)
 from datp.thresholding.eligibility import (
     build_threshold_result,
     compute_client_thresholds,
@@ -294,6 +303,7 @@ def _cluster_info(
 ) -> dict[str, B4ClusterInfo]:
     return {
         f"cluster_{cluster}": B4ClusterInfo(
+            cluster_id=f"cluster_{cluster}",
             tau_cluster=tau_per_cluster[cluster],
             members=tuple(
                 cid for cid in eligible_ids if client_cluster[cid] == cluster
@@ -322,15 +332,22 @@ def _b4_metadata(
 ) -> B4Metadata:
     return B4Metadata(
         k=metadata_input.k,
-        cluster_info=metadata_input.cluster_info,
+        cluster_info=B4ClusterInfoTuple(metadata_input.cluster_info.values()),
         silhouette=metadata_input.silhouette,
-        silhouette_scores={
-            str(k): v for k, v in metadata_input.silhouette_scores.items()
-        },
-        fingerprints={
-            cid: tuple(metadata_input.fingerprints[cid].tolist())
+        silhouette_scores=ClientSilhouetteScoreTuple(
+            ClientSilhouetteScore(client_id=str(k), score=v)
+            for k, v in metadata_input.silhouette_scores.items()
+        ),
+        fingerprints=ClientFingerprintTuple(
+            ClientFingerprint(
+                client_id=cid,
+                mean=float(metadata_input.fingerprints[cid][0]),
+                variance=float(metadata_input.fingerprints[cid][1]),
+                skewness=float(metadata_input.fingerprints[cid][2]),
+                p95=float(metadata_input.fingerprints[cid][3]),
+            )
             for cid in eligible_ids
-        },
+        ),
     )
 
 
@@ -391,7 +408,7 @@ def _compute_b4_thresholds(request: _B4ComputationRequest) -> _B4ComputationResu
     client_cluster, cluster_taus_map, tau_per_cluster = _cluster_thresholds(
         eligible_ids=eligible_ids,
         labels=labels,
-        client_taus=client_taus,
+        client_taus=dict(client_taus.items()),
     )
     _log_clustering(
         k=k,

@@ -19,9 +19,11 @@ from datp.attacks.metric_engine import (
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
 from datp.attacks.threshold_recompute import compute_b1_pair, compute_b2_pair
-from datp.core.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.core.enums import Baseline
 from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import make_standard_score_set
+from datp.thresholding.eligibility import ClientThresholdsCollection
 
 
 def _make_collection():
@@ -126,7 +128,10 @@ class TestFleetFpr:
             tau_global_clean=b1.tau_global_clean,
             tau_global_pois=high_tau,
             thresholds_clean=b1.thresholds_clean,
-            thresholds_pois=dict.fromkeys(b1.thresholds_pois, high_tau),
+            thresholds_pois=ClientThresholdsCollection.from_mapping(
+                dict.fromkeys(b1.thresholds_pois, high_tau),
+                Baseline.B1,
+            ),
         )
         fleet = compute_fleet_fpr(col, high_pair, None)
         assert math.isnan(fleet.cv_fpr), "CV(FPR) must be nan when mean FPR = 0"

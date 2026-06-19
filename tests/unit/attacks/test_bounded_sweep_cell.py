@@ -6,7 +6,7 @@ import math
 
 from datp.attacks.bounded_sweep_cell import lock_mu_flag_threshold, run_sweep_cell
 from datp.attacks.score_containers import build_score_collection
-from datp.core.poison_enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
 

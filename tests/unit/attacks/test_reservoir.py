@@ -8,7 +8,7 @@ from datp.attacks.reservoir import (
     ReservoirStatus,
     build_reservoir,
 )
-from datp.core.poison_enums import PoisoningSourceStrategy
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.testsupport.synthetic_scores import (
     make_degenerate_tail_client,
     make_eligible_client,
