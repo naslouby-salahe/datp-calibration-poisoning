@@ -11,7 +11,7 @@ from rich.console import Console
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
-from datp.checkpointing.invariants import validate_checkpoint_evaluation_invariants
+from datp.checkpointing.invariants import CheckpointValidationConfig, validate_checkpoint_evaluation_invariants
 from datp.checkpointing.status import checkpoint_artifact_status
 from datp.checkpointing.summary import select_global_primary_checkpoint
 from datp.config.compose import BASE_CONFIG
@@ -90,16 +90,18 @@ def evaluate_from_scores(
     )
     metrics_paths = tuple(path for path in candidate_paths if path.exists())
     invariant = validate_checkpoint_evaluation_invariants(
-        regime=regime,
-        seed=seed,
-        checkpoint_round=checkpoint_round,
-        score_manifest_path=layout.score_cell_for_round(
-            cell, checkpoint_round
-        ).manifest_path,
+        CheckpointValidationConfig(
+            regime=regime,
+            seed=seed,
+            checkpoint_round=checkpoint_round,
+            score_manifest_path=layout.score_cell_for_round(
+                cell, checkpoint_round
+            ).manifest_path,
+            config_identity=None,
+            split_manifest_identity=None,
+            min_coverage_ratio=0.0,
+        ),
         metrics_paths=metrics_paths,
-        config_identity=None,
-        split_manifest_identity=None,
-        min_coverage_ratio=0.0,
     )
     _stdout.print(json.dumps({"checkpoint_round": invariant.checkpoint_round, "baselines": [b.value for b in invariant.baselines]}, sort_keys=True))
 

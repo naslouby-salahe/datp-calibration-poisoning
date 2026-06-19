@@ -21,26 +21,22 @@ class CliffsDeltaResult:
 def cliffs_delta(x: np.ndarray, y: np.ndarray) -> CliffsDeltaResult:
     """Cliff's delta: (count(x>y) - count(x<y)) / (n_x * n_y).
 
-    Magnitude thresholds follow Romano et al. (2006), Table 1.
+    Vectorized via broadcasting for efficiency and lower cyclomatic
+    complexity.  Magnitude thresholds follow Romano et al. (2006), Table 1.
     """
-    x = np.asarray(x, dtype=np.float64)
-    y = np.asarray(y, dtype=np.float64)
+    x = np.asarray(x, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64).ravel()
     if x.size == 0 or y.size == 0:
         raise ValueError("cliffs_delta: arrays must be non-empty")
     if not np.isfinite(x).all() or not np.isfinite(y).all():
         raise ValueError("cliffs_delta: arrays must contain only finite values")
 
-    n_x = len(x)
-    n_y = len(y)
+    n_x = x.size
+    n_y = y.size
 
-    more = 0
-    less = 0
-    for xi in x:
-        for yj in y:
-            if xi > yj:
-                more += 1
-            elif xi < yj:
-                less += 1
+    # Broadcasting: x[:, None] > y[None, :] yields an (n_x, n_y) bool matrix.
+    more = int(np.sum(x[:, None] > y[None, :]))
+    less = int(np.sum(x[:, None] < y[None, :]))
 
     delta = (more - less) / (n_x * n_y)
 

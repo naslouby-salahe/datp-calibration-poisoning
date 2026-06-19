@@ -23,6 +23,7 @@ from datp.attacks.constants import (
     TRAINING_SEEDS,
 )
 from datp.attacks.bounded_sweep_cell import (
+    SweepCellConfig,
     SweepCellResult,
     lock_mu_flag_threshold,
     run_sweep_cell,
@@ -75,8 +76,11 @@ def _row_for_cell(
     result = run_sweep_cell(
         spec,
         collection,
-        mu_flag_threshold=mu_flag_threshold,
-        auroc_set=auroc_set,
+        config=SweepCellConfig(
+            collection=collection,
+            mu_flag_threshold=mu_flag_threshold,
+            auroc_set=auroc_set,
+        ),
     )
     entry = result.poisoned_metrics.delta_tau[spec.victim_id]
     blast = compute_blast_radius(result.poisoned_metrics, victim_id=spec.victim_id)

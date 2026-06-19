@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar, cast
 
 from datp.core.enums import Baseline, Regime, controlled_baselines_for_regime
 from datp.core.errors import fmt
 from datp.thresholding.metrics_serialization import SweepMetrics
 
 _MODULE = "checkpointing.invariants"
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,42 +63,36 @@ def _read_json_object(path: Path) -> dict[str, object]:
     return payload
 
 
+def _get_required_field(
+    payload: dict[str, object], key: str, expected_type: type[_T], path: Path
+) -> _T:
+    value = payload.get(key)
+    if not isinstance(value, expected_type):
+        raise ValueError(
+            fmt(_MODULE, f"Score manifest lacks {key}", expected_type.__name__, repr(value))
+        )
+    return cast(_T, value)
+
+
+def _get_required_str_list(
+    payload: dict[str, object], key: str, path: Path
+) -> list[str]:
+    value = payload.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(
+            fmt(_MODULE, f"Invalid manifest {key}", "list[str]", repr(value))
+        )
+    return value
+
+
 def load_score_manifest_identity(manifest_path: Path) -> ScoreManifestIdentity:
     payload = _read_json_object(manifest_path)
-    checkpoint_round = payload.get("checkpoint_round")
-    if not isinstance(checkpoint_round, int):
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "Score manifest lacks checkpoint_round",
-                "int",
-                repr(checkpoint_round),
-            )
-        )
-    checkpoint_identity = payload.get("model_checkpoint_hash")
-    if not isinstance(checkpoint_identity, str):
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "Score manifest lacks checkpoint hash",
-                "str",
-                repr(checkpoint_identity),
-            )
-        )
-    clients = payload.get("expected_client_ids")
-    splits = payload.get("expected_splits")
-    if not isinstance(clients, list) or not all(
-        isinstance(item, str) for item in clients
-    ):
-        raise ValueError(
-            fmt(_MODULE, "Invalid manifest clients", "list[str]", repr(clients))
-        )
-    if not isinstance(splits, list) or not all(
-        isinstance(item, str) for item in splits
-    ):
-        raise ValueError(
-            fmt(_MODULE, "Invalid manifest splits", "list[str]", repr(splits))
-        )
+    checkpoint_round = _get_required_field(payload, "checkpoint_round", int, manifest_path)
+    checkpoint_identity = _get_required_field(
+        payload, "model_checkpoint_hash", str, manifest_path
+    )
+    clients = _get_required_str_list(payload, "expected_client_ids", manifest_path)
+    splits = _get_required_str_list(payload, "expected_splits", manifest_path)
     return ScoreManifestIdentity(
         manifest_path=manifest_path,
         checkpoint_round=checkpoint_round,
@@ -265,16 +261,28 @@ def _validate_metrics_file(
     return metrics
 
 
+@dataclass(frozen=True, slots=True)
+class CheckpointValidationConfig:
+    """Fixed metadata for a checkpoint evaluation invariant check.
+
+    Bundles regime, seed, checkpoint round, identity hashes, and coverage
+    floor — the parameters that are shared across all baseline metrics files
+    for one training seed.
+    """
+
+    regime: Regime
+    seed: int
+    checkpoint_round: int
+    score_manifest_path: Path
+    config_identity: str | None
+    split_manifest_identity: str | None
+    min_coverage_ratio: float
+
+
 def validate_checkpoint_evaluation_invariants(
+    config: CheckpointValidationConfig,
     *,
-    regime: Regime,
-    seed: int,
-    checkpoint_round: int,
-    score_manifest_path: Path,
     metrics_paths: tuple[Path, ...],
-    config_identity: str | None,
-    split_manifest_identity: str | None,
-    min_coverage_ratio: float,
 ) -> CheckpointEvaluationInvariant:
     if not metrics_paths:
         raise ValueError(
@@ -285,20 +293,20 @@ def validate_checkpoint_evaluation_invariants(
                 "empty",
             )
         )
-    manifest = load_score_manifest_identity(score_manifest_path)
-    _validate_manifest_round(manifest, checkpoint_round)
+    manifest = load_score_manifest_identity(config.score_manifest_path)
+    _validate_manifest_round(manifest, config.checkpoint_round)
 
     context = _MetricsInvariantContext(
-        regime=regime,
-        seed=seed,
-        checkpoint_round=checkpoint_round,
-        score_manifest_path=score_manifest_path,
-        score_manifest_identity=_hash_file(score_manifest_path),
+        regime=config.regime,
+        seed=config.seed,
+        checkpoint_round=config.checkpoint_round,
+        score_manifest_path=config.score_manifest_path,
+        score_manifest_identity=_hash_file(config.score_manifest_path),
         manifest=manifest,
-        expected_baselines=set(controlled_baselines_for_regime(regime)),
-        config_identity=config_identity,
-        split_manifest_identity=split_manifest_identity,
-        min_coverage_ratio=min_coverage_ratio,
+        expected_baselines=set(controlled_baselines_for_regime(config.regime)),
+        config_identity=config.config_identity,
+        split_manifest_identity=config.split_manifest_identity,
+        min_coverage_ratio=config.min_coverage_ratio,
     )
     seen: list[Baseline] = []
     coverage_values: list[float] = []
@@ -308,9 +316,9 @@ def validate_checkpoint_evaluation_invariants(
         coverage_values.append(metrics.coverage_ratio)
 
     return CheckpointEvaluationInvariant(
-        regime=regime,
-        seed=seed,
-        checkpoint_round=checkpoint_round,
+        regime=config.regime,
+        seed=config.seed,
+        checkpoint_round=config.checkpoint_round,
         baselines=tuple(sorted(seen)),
         score_manifest_identity=context.score_manifest_identity,
         checkpoint_identity=manifest.checkpoint_identity,

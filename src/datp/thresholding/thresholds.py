@@ -72,6 +72,94 @@ def conformal_threshold(errors: np.ndarray, alpha: float) -> float:
     return float(sorted_errors[k - 1])
 
 
+def _derive_b1(
+    client_errors: dict[str, np.ndarray],
+    n_min: int,
+    q: float,
+    run: BaselineRunId,
+) -> ThresholdResult:
+    from datp.thresholding.strategies import b1_global as b1_mod
+
+    return b1_mod.compute(client_errors, n_min, q=q, run=run)
+
+
+def _derive_b2(
+    client_errors: dict[str, np.ndarray],
+    n_min: int,
+    tau_global: float,
+    q: float,
+    run: BaselineRunId,
+) -> ThresholdResult:
+    from datp.thresholding.strategies import b2_personalized as b2_mod
+
+    return b2_mod.compute(client_errors, n_min, tau_global, q=q, run=run)
+
+
+def _derive_b3(
+    client_errors: dict[str, np.ndarray],
+    n_min: int,
+    tau_global: float,
+    q: float,
+    regime: Regime,
+    run: BaselineRunId,
+) -> ThresholdResult:
+    from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
+    from datp.thresholding.strategies import b3_family as b3_mod
+
+    family_map: dict[str, str] = {}
+    missing_family: list[str] = []
+    for cid in client_errors:
+        family = DEVICE_FAMILY_MAP.get(cid)
+        if family is None:
+            missing_family.append(cid)
+        else:
+            family_map[cid] = family
+    if missing_family:
+        raise ValueError(
+            fmt(
+                _MODULE,
+                "Missing family mapping for client(s)",
+                "all client IDs in DEVICE_FAMILY_MAP",
+                f"{len(missing_family)} unmapped: {sorted(missing_family)[:5]}",
+            )
+        )
+    return b3_mod.compute(
+        client_errors, n_min, tau_global, family_map, q=q, regime=regime, run=run
+    )
+
+
+def _derive_b4(
+    client_errors: dict[str, np.ndarray],
+    n_min: int,
+    tau_global: float,
+    q: float,
+    regime: Regime,
+    run: BaselineRunId,
+    threshold_cfg: "ThresholdConfig",
+) -> ThresholdResult:
+    from datp.thresholding.strategies import b4_cluster as b4_mod
+
+    mode = threshold_cfg.b4_regime_a_mode
+    k_for_a = (
+        0  # silhouette selection
+        if regime == Regime.A and mode == B4RegimeAMode.SILHOUETTE
+        else threshold_cfg.b4_k_regime_a
+    )
+    return b4_mod.compute(
+        client_errors,
+        n_min,
+        tau_global,
+        q=q,
+        random_state=threshold_cfg.b4_random_state,
+        k_regime_a=k_for_a,
+        k_candidates=threshold_cfg.b4_k_candidates,
+        n_init=threshold_cfg.b4_n_init,
+        max_iter=threshold_cfg.b4_max_iter,
+        run=run,
+        regime=regime,
+    )
+
+
 def derive_threshold(
     baseline: Baseline,
     client_errors: dict[str, np.ndarray],
@@ -84,69 +172,20 @@ def derive_threshold(
     seed: int = 0,
     alpha: float | None = None,
 ) -> ThresholdResult:
-    # Local imports avoid circular dependency: b1–b4 depend on arithmetic_mean_threshold.
-    from datp.thresholding.strategies import b1_global as b1_mod
-    from datp.thresholding.strategies import b2_personalized as b2_mod
-    from datp.thresholding.strategies import b3_family as b3_mod
-    from datp.thresholding.strategies import b4_cluster as b4_mod
-
     run = BaselineRunId(
         cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
         baseline=baseline,
     )
 
     if baseline == Baseline.B1:
-        return b1_mod.compute(client_errors, n_min, q=q, run=run)
+        return _derive_b1(client_errors, n_min, q, run)
     if baseline == Baseline.B2:
-        return b2_mod.compute(client_errors, n_min, tau_global, q=q, run=run)
+        return _derive_b2(client_errors, n_min, tau_global, q, run)
     if baseline == Baseline.B3:
-        from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
-
-        family_map: dict[str, str] = {}
-        missing_family: list[str] = []
-        for cid in client_errors:
-            family = DEVICE_FAMILY_MAP.get(cid)
-            if family is None:
-                missing_family.append(cid)
-            else:
-                family_map[cid] = family
-        if missing_family:
-            raise ValueError(
-                fmt(
-                    _MODULE,
-                    "Missing family mapping for client(s)",
-                    "all client IDs in DEVICE_FAMILY_MAP",
-                    f"{len(missing_family)} unmapped: {sorted(missing_family)[:5]}",
-                )
-            )
-        return b3_mod.compute(
-            client_errors,
-            n_min,
-            tau_global,
-            family_map,
-            q=q,
-            regime=regime,
-            run=run,
-        )
+        return _derive_b3(client_errors, n_min, tau_global, q, regime, run)
     if baseline == Baseline.B4:
-        mode = threshold_cfg.b4_regime_a_mode
-        k_for_a = (
-            0  # silhouette selection
-            if regime == Regime.A and mode == B4RegimeAMode.SILHOUETTE
-            else threshold_cfg.b4_k_regime_a
-        )
-        return b4_mod.compute(
-            client_errors,
-            n_min,
-            tau_global,
-            q=q,
-            random_state=threshold_cfg.b4_random_state,
-            k_regime_a=k_for_a,
-            k_candidates=threshold_cfg.b4_k_candidates,
-            n_init=threshold_cfg.b4_n_init,
-            max_iter=threshold_cfg.b4_max_iter,
-            run=run,
-            regime=regime,
+        return _derive_b4(
+            client_errors, n_min, tau_global, q, regime, run, threshold_cfg
         )
 
     raise ValueError(

@@ -8,7 +8,7 @@ from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
 from datp.checkpointing.enums import CheckpointArtifactStatus
-from datp.checkpointing.invariants import validate_checkpoint_evaluation_invariants
+from datp.checkpointing.invariants import CheckpointValidationConfig, validate_checkpoint_evaluation_invariants
 from datp.checkpointing.status import checkpoint_artifact_status
 from datp.core.enums import Baseline, Regime
 from datp.core.identity import BaselineRunId, TrainingCellId
@@ -76,14 +76,16 @@ def test_same_round_invariant_passes(tmp_path: Path) -> None:
     b2_path = _write_metric(layout, cell, Baseline.B2, 25, manifest)
 
     invariant = validate_checkpoint_evaluation_invariants(
-        regime=Regime.A,
-        seed=0,
-        checkpoint_round=25,
-        score_manifest_path=manifest,
+        CheckpointValidationConfig(
+            regime=Regime.A,
+            seed=0,
+            checkpoint_round=25,
+            score_manifest_path=manifest,
+            config_identity="config",
+            split_manifest_identity="split",
+            min_coverage_ratio=1.0,
+        ),
         metrics_paths=(b1_path, b2_path),
-        config_identity="config",
-        split_manifest_identity="split",
-        min_coverage_ratio=1.0,
     )
 
     assert invariant.checkpoint_round == 25
@@ -98,14 +100,16 @@ def test_mixed_round_invariant_fails(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Mixed-round"):
         validate_checkpoint_evaluation_invariants(
-            regime=Regime.A,
-            seed=0,
-            checkpoint_round=50,
-            score_manifest_path=manifest,
+            CheckpointValidationConfig(
+                regime=Regime.A,
+                seed=0,
+                checkpoint_round=50,
+                score_manifest_path=manifest,
+                config_identity=None,
+                split_manifest_identity=None,
+                min_coverage_ratio=0.0,
+            ),
             metrics_paths=(b1_path,),
-            config_identity=None,
-            split_manifest_identity=None,
-            min_coverage_ratio=0.0,
         )
 
 
@@ -117,14 +121,16 @@ def test_b3_suppression_outside_regime_a_fails(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="B3 is invalid"):
         validate_checkpoint_evaluation_invariants(
-            regime=Regime.B,
-            seed=0,
-            checkpoint_round=25,
-            score_manifest_path=manifest,
+            CheckpointValidationConfig(
+                regime=Regime.B,
+                seed=0,
+                checkpoint_round=25,
+                score_manifest_path=manifest,
+                config_identity=None,
+                split_manifest_identity=None,
+                min_coverage_ratio=0.0,
+            ),
             metrics_paths=(metric_path,),
-            config_identity=None,
-            split_manifest_identity=None,
-            min_coverage_ratio=0.0,
         )
 
 

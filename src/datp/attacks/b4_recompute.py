@@ -178,6 +178,53 @@ def _agg_thresholds(
     }
 
 
+def _build_cal_dicts(
+    collection: ScoreCollection,
+    poisoned_cal_set: PoisonedCalibrationSet,
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    """Return (clean_full_cal, pois_full_cal) covering all client IDs.
+
+    Eligible clients get their (clean, poisoned) cal from the arguments;
+    pending clients always get their clean cal in both dicts.
+    """
+    clean: dict[str, np.ndarray] = {}
+    pois: dict[str, np.ndarray] = {}
+    for cid in collection.all_ids:
+        if cid in collection.eligible_ids:
+            clean[cid] = collection.for_client(cid).cal
+            pois[cid] = poisoned_cal_set.for_client(cid).cal
+        else:
+            clean[cid] = collection.for_client(cid).cal
+            pois[cid] = collection.for_client(cid).cal
+    return clean, pois
+
+
+def _build_b4_decomposition(
+    eligible_ids: list[str],
+    eff_clean: dict[str, float],
+    tau_agg: dict[str, float],
+    eff_pois: dict[str, float],
+) -> B4Decomposition:
+    """Build the per-client B4 decomposition from the three threshold maps."""
+    entries = []
+    for cid in eligible_ids:
+        tc = eff_clean[cid]
+        ta = tau_agg[cid]
+        tp = eff_pois[cid]
+        entries.append(
+            B4DecompEntry(
+                client_id=cid,
+                tau_clean=tc,
+                tau_agg=ta,
+                tau_pois=tp,
+                delta_tau_agg=ta - tc,
+                delta_tau_churn=(tp - tc) - (ta - tc),
+                delta_tau_total=tp - tc,
+            )
+        )
+    return B4Decomposition(entries)
+
+
 def compute_b4_pair(
     collection: ScoreCollection,
     poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
@@ -200,14 +247,7 @@ def compute_b4_pair(
     eligible_ids = list(collection.eligible_ids)
     eligibility = EligibilityResult(eligible_ids=tuple(eligible_ids), pending_ids=())
 
-    # Build full cal dicts: eligible → from arg; pending → always clean.
-    clean_full_cal = collection.cal_dict()
-    pois_full_cal: dict[str, np.ndarray] = {}
-    for cid in collection.all_ids:
-        if cid in collection.eligible_ids:
-            pois_full_cal[cid] = poisoned_cal_set.for_client(cid).cal
-        else:
-            pois_full_cal[cid] = collection.for_client(cid).cal
+    clean_full_cal, pois_full_cal = _build_cal_dicts(collection, poisoned_cal_set)
 
     # Clean B4 run.
     clean_per_client_taus = compute_client_thresholds(
@@ -257,24 +297,7 @@ def compute_b4_pair(
         random_state,
     )
 
-    # Decomposition.
-    decomposition = []
-    for cid in eligible_ids:
-        tc = eff_clean[cid]
-        ta = tau_agg[cid]
-        tp = eff_pois[cid]
-        d_agg = ta - tc
-        d_total = tp - tc
-        d_churn = d_total - d_agg
-        decomposition.append(B4DecompEntry(
-            client_id=cid,
-            tau_clean=tc,
-            tau_agg=ta,
-            tau_pois=tp,
-            delta_tau_agg=d_agg,
-            delta_tau_churn=d_churn,
-            delta_tau_total=d_total,
-        ))
+    decomposition = _build_b4_decomposition(eligible_ids, eff_clean, tau_agg, eff_pois)
 
     return B4ThresholdPair(
         policy=ThresholdPolicy.B4_CLUSTER,
@@ -282,5 +305,5 @@ def compute_b4_pair(
         tau_global_pois=tau_global_pois,
         thresholds_clean=ClientThresholdsCollection.from_mapping(eff_clean, Baseline.B4),
         thresholds_pois=ClientThresholdsCollection.from_mapping(eff_pois, Baseline.B4),
-        decomposition=B4Decomposition(decomposition),
+        decomposition=decomposition,
     )

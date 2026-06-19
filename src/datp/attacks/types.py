@@ -114,7 +114,7 @@ class MetricEngineInput:
     collection: "ScoreCollection"
     pair: ThresholdPairBase
     mu_flag_threshold: float | None
-    auroc_set: AurocSet
+    auroc_set: AurocSet | None
 
 
 @dataclass(frozen=True, slots=True)

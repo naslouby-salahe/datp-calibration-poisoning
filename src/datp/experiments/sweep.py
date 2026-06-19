@@ -31,6 +31,7 @@ from datp.experiments.executor import (
     SharedTrainingExecutor,
     ThresholdEvaluationExecutor,
 )
+from datp.experiments.models import SharedPipelineContext
 from datp.experiments.stages.prepare_data import (
     PreparedDataRequest,
     ensure_prepared_data,
@@ -344,7 +345,7 @@ def _build_shared_context(
     request: PipelineRequest,
     group_cells: list[BaselineRunId],
     checkpoint_round: int | None,
-) -> object | None:
+) -> SharedPipelineContext | None:
     try:
         return trainer.build_context(request)
     except Exception:
@@ -369,7 +370,7 @@ def _run_shared_cell_evaluation(
     base_dir: Path,
     prepared_dir: Path,
     checkpoint_round: int | None,
-    ctx: object,
+    ctx: SharedPipelineContext,
 ) -> bool:
     t0 = time.monotonic()
     cell_request = PipelineRequest(

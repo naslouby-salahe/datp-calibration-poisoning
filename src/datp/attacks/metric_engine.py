@@ -286,13 +286,17 @@ def compute_metrics(
         collection = inputs.collection
         pair = inputs.pair
         mu_flag_threshold = inputs.mu_flag_threshold
-        auroc_records = inputs.auroc_set
+        if auroc_records is None:
+            auroc_records = inputs.auroc_set
     else:
         collection = inputs
         if pair is None:
             raise TypeError("pair is required when compute_metrics is called with a collection")
         if auroc_records is None:
             auroc_records = compute_auroc_records(collection)
+
+    if auroc_records is None:
+        auroc_records = compute_auroc_records(collection)
 
     delta_tau = compute_delta_tau(collection, pair)
     fleet_fpr = compute_fleet_fpr(collection, pair, mu_flag_threshold)

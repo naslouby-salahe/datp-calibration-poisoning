@@ -16,8 +16,8 @@ from datp.attacks.enums import (
     ThresholdPolicy,
 )
 
-_VICTIMS = ("c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8")
-_VICTIMS_BY_SEED = dict.fromkeys((0, 1, 2, 3, 4), _VICTIMS)
+_VICTIMS: tuple[str, ...] = ("c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8")
+_VICTIMS_BY_SEED: dict[int, tuple[str, ...]] = dict.fromkeys((0, 1, 2, 3, 4), _VICTIMS)
 
 
 def test_matrix_size_is_exactly_1620():

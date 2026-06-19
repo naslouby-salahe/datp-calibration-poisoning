@@ -7,6 +7,7 @@ import math
 import pytest
 
 from datp.attacks.inference import (
+    BootstrapConfig,
     HolmResult,
     InferenceResult,
     PairedDeltas,
@@ -24,7 +25,7 @@ from datp.statistics.bootstrap import BootstrapResult
 # Fixtures
 # ---------------------------------------------------------------------------
 
-SEEDS = (100, 101, 102, 103, 104)
+SEEDS: tuple[int, ...] = (100, 101, 102, 103, 104)
 
 
 def _make_paired(
@@ -44,7 +45,7 @@ def _make_paired(
 
 def _uniform_paired(n_victims: int = 3, delta: float = 0.05) -> PairedDeltas:
     """All victims, all seeds, same positive delta_tau — fully feasible."""
-    victims = {
+    victims: dict[str, dict[int, float]] = {
         f"v{i}": dict.fromkeys(SEEDS, delta)
         for i in range(n_victims)
     }
@@ -243,7 +244,7 @@ class TestBootstrapSeedAggregates:
 
     def test_ci_covers_positive_mean(self) -> None:
         agg = dict.fromkeys(SEEDS, 0.05)
-        result = bootstrap_seed_aggregates(agg, n_bootstrap=1_000, analysis_seed=300)
+        result = bootstrap_seed_aggregates(agg, config=BootstrapConfig(n_bootstrap=1_000, analysis_seed=300))
         assert result.ci_lower > 0.0
         assert result.ci_upper > 0.0
 
@@ -254,16 +255,16 @@ class TestBootstrapSeedAggregates:
 
     def test_seed_filter(self) -> None:
         agg = {s: float(i) * 0.01 for i, s in enumerate(SEEDS)}
-        r1 = bootstrap_seed_aggregates(agg, poisoning_seeds=(100, 101), n_bootstrap=500, analysis_seed=300)
-        r2 = bootstrap_seed_aggregates(agg, poisoning_seeds=SEEDS, n_bootstrap=500, analysis_seed=300)
+        r1 = bootstrap_seed_aggregates(agg, poisoning_seeds=(100, 101), config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
+        r2 = bootstrap_seed_aggregates(agg, poisoning_seeds=SEEDS, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
         # Different input → potentially different CI
         assert isinstance(r1, BootstrapResult)
         assert isinstance(r2, BootstrapResult)
 
     def test_reproducible_with_same_seed(self) -> None:
         agg = {s: 0.05 + 0.01 * i for i, s in enumerate(SEEDS)}
-        r1 = bootstrap_seed_aggregates(agg, n_bootstrap=500, analysis_seed=300)
-        r2 = bootstrap_seed_aggregates(agg, n_bootstrap=500, analysis_seed=300)
+        r1 = bootstrap_seed_aggregates(agg, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
+        r2 = bootstrap_seed_aggregates(agg, config=BootstrapConfig(n_bootstrap=500, analysis_seed=300))
         assert r1.ci_lower == pytest.approx(r2.ci_lower)
         assert r1.ci_upper == pytest.approx(r2.ci_upper)
 
@@ -306,7 +307,7 @@ class TestComputeInference:
             paired,
             poisoning_seeds=SEEDS,
             direction="raise",
-            n_bootstrap=2_000,
+            bootstrap_config=BootstrapConfig(n_bootstrap=2_000),
         )
         assert result.bootstrap_ci.ci_lower > 0.0
 

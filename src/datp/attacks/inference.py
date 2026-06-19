@@ -213,13 +213,20 @@ def holm_adjust(
 # Bootstrap CI (primary evidence)
 # ---------------------------------------------------------------------------
 
+@dataclass(frozen=True, slots=True)
+class BootstrapConfig:
+    """Bootstrap hyperparameters that are constant across inference calls."""
+
+    ci: float = _DEFAULT_CI
+    n_bootstrap: int = _DEFAULT_N_BOOTSTRAP
+    analysis_seed: int = _DEFAULT_ANALYSIS_SEED
+
+
 def bootstrap_seed_aggregates(
     seed_aggregates: dict[int, float],
     *,
     poisoning_seeds: tuple[int, ...] | None = None,
-    ci: float = _DEFAULT_CI,
-    n_bootstrap: int = _DEFAULT_N_BOOTSTRAP,
-    analysis_seed: int = _DEFAULT_ANALYSIS_SEED,
+    config: BootstrapConfig = BootstrapConfig(),
 ) -> BootstrapResult:
     """Percentile bootstrap CI on the 5 seed-level aggregates.
 
@@ -241,7 +248,12 @@ def bootstrap_seed_aggregates(
         )
 
     arr = np.array(finite_values, dtype=np.float64)
-    return bootstrap_ci(arr, n_bootstrap=n_bootstrap, ci=ci, seed=analysis_seed)
+    return bootstrap_ci(
+        arr,
+        n_bootstrap=config.n_bootstrap,
+        ci=config.ci,
+        seed=config.analysis_seed,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -272,9 +284,7 @@ def compute_inference(
     *,
     poisoning_seeds: tuple[int, ...],
     direction: Literal["raise", "lower"],
-    ci: float = _DEFAULT_CI,
-    n_bootstrap: int = _DEFAULT_N_BOOTSTRAP,
-    analysis_seed: int = _DEFAULT_ANALYSIS_SEED,
+    bootstrap_config: BootstrapConfig = BootstrapConfig(),
     include_holm: bool = False,
     holm_p_values: list[float] | None = None,
     holm_alpha: float = 0.05,
@@ -291,9 +301,7 @@ def compute_inference(
     boot = bootstrap_seed_aggregates(
         seed_aggregates,
         poisoning_seeds=poisoning_seeds,
-        ci=ci,
-        n_bootstrap=n_bootstrap,
-        analysis_seed=analysis_seed,
+        config=bootstrap_config,
     )
     sign = sign_test(seed_aggregates, direction=direction)
 
