@@ -64,7 +64,7 @@ def _read_json_object(path: Path) -> dict[str, object]:
 
 
 def _get_required_field(
-    payload: dict[str, object], key: str, expected_type: type[_T], path: Path
+    payload: dict[str, object], key: str, expected_type: type[_T], _path: Path
 ) -> _T:
     value = payload.get(key)
     if not isinstance(value, expected_type):
@@ -80,7 +80,7 @@ def _get_required_field(
 
 
 def _get_required_str_list(
-    payload: dict[str, object], key: str, path: Path
+    payload: dict[str, object], key: str, _path: Path
 ) -> list[str]:
     value = payload.get(key)
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
@@ -208,7 +208,7 @@ def _validate_metrics_provenance(
 
 
 def _check_identity_match(
-    actual: str, expected: str, label: str, path_hint: str
+    actual: str, expected: str, label: str, _path_hint: str
 ) -> None:
     if actual != expected:
         raise ValueError(

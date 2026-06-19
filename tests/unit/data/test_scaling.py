@@ -24,8 +24,12 @@ class TestFitScaler:
 
         assert scaler.mean_ is not None
         assert scaler.scale_ is not None
-        np.testing.assert_allclose(scaler.mean_, train_df.to_numpy().mean(axis=0), atol=1e-10)  # pyright: ignore[reportCallIssue, reportArgumentType]
-        np.testing.assert_allclose(scaler.scale_, train_df.to_numpy().std(axis=0, ddof=0), atol=1e-10)  # pyright: ignore[reportCallIssue, reportArgumentType]
+        np.testing.assert_allclose(
+            scaler.mean_, train_df.to_numpy().mean(axis=0), atol=1e-10
+        )  # pyright: ignore[reportCallIssue, reportArgumentType]
+        np.testing.assert_allclose(
+            scaler.scale_, train_df.to_numpy().std(axis=0, ddof=0), atol=1e-10
+        )  # pyright: ignore[reportCallIssue, reportArgumentType]
 
         # Applying to train should give ~zero mean, ~unit std
         scaled_train = apply_scaler(pl.from_pandas(train_df), scaler)

@@ -116,8 +116,6 @@ def run_smoke_cell(
     training_seed: int = 0,
     poisoning_seed: int = 100,
     scope_idx: int = 0,
-    q: float = THRESHOLD_QUANTILE,
-    b4_seed: int = 0,
 ) -> SmokeCellResult:
     """Run one full smoke cell.
 
@@ -196,7 +194,6 @@ def victim_seed_deltas(
     poisoning_seeds: tuple[int, ...],
     training_seed: int = 0,
     scope_idx: int = 0,
-    q: float = THRESHOLD_QUANTILE,
 ) -> dict[int, float]:
     """Per-seed victim Δτ for one victim across the poisoning-seed pool.
 

@@ -32,9 +32,7 @@ from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.core.seeds import SeedPair
 
 
-def lock_mu_flag_threshold(
-    collection: ScoreCollection, *, q: float = THRESHOLD_QUANTILE
-) -> float:
+def lock_mu_flag_threshold(collection: ScoreCollection) -> float:
     """Lock ``mu_flag_threshold`` from the clean B1 eligible-client mean FPR.
 
     Must be called once per training seed, before any poisoned run for that
