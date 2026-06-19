@@ -136,6 +136,84 @@ git push
 
 ---
 
+## Step 3c — CodeScene analysis after push
+
+**Context:** CodeScene has two deployment models with different trigger mechanisms:
+
+- **Enterprise (self-hosted):** exposes a REST API at
+  `POST $CODESCENE_HOST/api/v2/projects/$CS_PROJECT_ID/run-analysis`
+- **Cloud (codescene.io):** no public REST API; analysis is triggered via the
+  **GitHub App** (webhook on push) or a **GitHub Actions workflow**
+
+### Determine which mode applies
+
+```bash
+set -a && source .env.local 2>/dev/null || true && set +a
+echo "CS_ACCESS_TOKEN : ${CS_ACCESS_TOKEN:+PRESENT (${CS_ACCESS_TOKEN:0:4}****)}"
+echo "CODESCENE_HOST  : ${CODESCENE_HOST:-NOT SET}"
+echo "CS_PROJECT_ID   : ${CS_PROJECT_ID:-NOT SET}"
+```
+
+### Case A — Enterprise: all three vars present
+
+Trigger the analysis and poll for completion (max 10 minutes, every 20 s):
+
+```bash
+# Trigger
+curl -s -X POST \
+  -H "Authorization: Bearer $CS_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  "$CODESCENE_HOST/api/v2/projects/$CS_PROJECT_ID/run-analysis"
+
+# Poll latest analysis until its revision matches HEAD
+HEAD=$(git rev-parse HEAD)
+for i in $(seq 1 30); do
+  sleep 20
+  result=$(curl -s \
+    -H "Authorization: Bearer $CS_ACCESS_TOKEN" \
+    "$CODESCENE_HOST/api/v2/projects/$CS_PROJECT_ID/analyses/latest")
+  rev=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('revision',''))" 2>/dev/null)
+  status=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null)
+  echo "[$i/30] CS analysis: revision=$rev status=$status"
+  [ "$rev" = "$HEAD" ] && [ "$status" = "done" ] && break
+done
+```
+
+Record result: `CS analysis: TRIGGERED | DONE | STALE | FAILED (<reason>)`.
+
+Do **not** claim CS is clean unless the analysis revision matches HEAD and
+status is `done`.
+
+### Case B — Cloud (codescene.io): only CS_ACCESS_TOKEN set, CODESCENE_HOST missing
+
+The cloud product does **not** expose a trigger API. Analysis runs automatically
+when the **CodeScene GitHub App** is installed on the repository. Check:
+
+```bash
+gh api repos/{owner}/{repo}/hooks 2>/dev/null | python3 -c "
+import sys, json
+hooks = json.load(sys.stdin)
+cs = [h for h in hooks if 'codescene' in h.get('config', {}).get('url', '').lower()]
+print('CodeScene webhooks:', len(cs))
+for h in cs:
+    print(' ', h.get('id'), h.get('active'), h['config']['url'][:80])
+"
+```
+
+If **no CodeScene webhook** is found: note in the report —
+> "CS: GitHub App not installed — push does not trigger cloud analysis.
+> Add a GitHub Actions workflow (`.github/workflows/codescene.yml`) to
+> enable on-push analysis. See the CS section of the final report."
+
+If a webhook **is found**: record `CS: webhook active — analysis triggered by push`.
+Wait up to 5 minutes, then re-query the CodeScene cloud UI (no polling API available).
+
+### Case C — CS_ACCESS_TOKEN missing
+
+Skip silently. Record `CS status: SKIPPED — CS_ACCESS_TOKEN not set`.
+
+---
+
 ## Step 4 — SonarCloud re-query after commit
 
 After committing, check whether CI or SonarCloud analysis is expected to run.
@@ -244,7 +322,12 @@ Open issues remaining:  <N> | NOT_CHECKED
 
 --- CS ---
 CS_ACCESS_TOKEN:        PRESENT | MISSING
-CS status:              SKIPPED — no repo-defined CS integration
+CODESCENE_HOST:         PRESENT (<host>) | MISSING
+CS_PROJECT_ID:          PRESENT (<id>) | MISSING
+Mode:                   ENTERPRISE (API) | CLOUD (webhook) | SKIPPED
+Trigger result:         TRIGGERED | DONE | WEBHOOK_ACTIVE | NO_WEBHOOK | STALE | FAILED | SKIPPED
+Analysis revision:      <sha> matches HEAD | MISMATCH | NOT_CHECKED
+GitHub Actions:         EXISTS (.github/workflows/codescene.yml) | MISSING | NOT_CHECKED
 
 --- Issues fixed (all iterations) ---
 <categorized list>
