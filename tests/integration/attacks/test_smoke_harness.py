@@ -52,6 +52,7 @@ from datp.attacks.inference import (
 )
 from datp.attacks.metric_engine import compute_fleet_fpr
 from datp.attacks.run_logger import (
+    ManifestBuildRequest,
     ManifestEmissionError,
     build_manifest,
     emit_manifest,
@@ -360,19 +361,21 @@ def test_invariant_9_manifest_round_trip(collection, tmp_path):
         fraction=_HIGH_FRACTION,
     )
     manifest = build_manifest(
-        dataset="REGIME_SMOKE_SYNTHETIC",
-        scale=ExperimentScale.SMOKE,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
-        objective=AttackerObjective.THRESHOLD_RAISE,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-        training_seed=0,
-        poisoning_seed=100,
-        client_idx=0,
-        scope_idx=0,
-        mu_flag_threshold=cell.mu_flag_threshold,
-        repository="datp-calibration-poisoning",
+        ManifestBuildRequest(
+            dataset="REGIME_SMOKE_SYNTHETIC",
+            scale=ExperimentScale.SMOKE,
+            policy=ThresholdPolicy.B2_PERSONALIZED,
+            objective=AttackerObjective.THRESHOLD_RAISE,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+            training_seed=0,
+            poisoning_seed=100,
+            client_idx=0,
+            scope_idx=0,
+            mu_flag_threshold=cell.mu_flag_threshold,
+            repository="datp-calibration-poisoning",
+        )
     )
     run_dir = tmp_path / "cell"
     emit_manifest(manifest, run_dir)
@@ -392,19 +395,21 @@ def test_invariant_9_manifest_round_trip(collection, tmp_path):
 
 def test_invariant_9_manifest_requires_locked_mu_flag(tmp_path):
     manifest = build_manifest(
-        dataset="REGIME_SMOKE_SYNTHETIC",
-        scale=ExperimentScale.SMOKE,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
-        objective=AttackerObjective.THRESHOLD_RAISE,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-        training_seed=0,
-        poisoning_seed=100,
-        client_idx=0,
-        scope_idx=0,
-        mu_flag_threshold=None,  # not locked
-        repository="datp-calibration-poisoning",
+        ManifestBuildRequest(
+            dataset="REGIME_SMOKE_SYNTHETIC",
+            scale=ExperimentScale.SMOKE,
+            policy=ThresholdPolicy.B2_PERSONALIZED,
+            objective=AttackerObjective.THRESHOLD_RAISE,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+            training_seed=0,
+            poisoning_seed=100,
+            client_idx=0,
+            scope_idx=0,
+            mu_flag_threshold=None,
+            repository="datp-calibration-poisoning",
+        )
     )
     with pytest.raises(ManifestEmissionError):
         emit_manifest(manifest, tmp_path / "cell")
@@ -570,19 +575,21 @@ def test_roadmap_outputs_in_temp_only(collection, tmp_path, monkeypatch):
         fraction=_HIGH_FRACTION,
     )
     manifest = build_manifest(
-        dataset="REGIME_SMOKE_SYNTHETIC",
-        scale=ExperimentScale.SMOKE,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
-        objective=AttackerObjective.THRESHOLD_RAISE,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-        training_seed=0,
-        poisoning_seed=100,
-        client_idx=0,
-        scope_idx=0,
-        mu_flag_threshold=cell.mu_flag_threshold,
-        repository="datp-calibration-poisoning",
+        ManifestBuildRequest(
+            dataset="REGIME_SMOKE_SYNTHETIC",
+            scale=ExperimentScale.SMOKE,
+            policy=ThresholdPolicy.B2_PERSONALIZED,
+            objective=AttackerObjective.THRESHOLD_RAISE,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=_HIGH_FRACTION,
+            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+            training_seed=0,
+            poisoning_seed=100,
+            client_idx=0,
+            scope_idx=0,
+            mu_flag_threshold=cell.mu_flag_threshold,
+            repository="datp-calibration-poisoning",
+        )
     )
     run_dir = tmp_path / "run"
     emit_manifest(manifest, run_dir)

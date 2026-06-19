@@ -222,7 +222,7 @@ def _write_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
             regime=metric.regime, seed=metric.seed, alpha=metric.alpha
         )
         run = BaselineRunId(cell=cell, baseline=metric.baseline)
-        checkpoint_round = metric.checkpoint_round  # type: ignore[assignment]
+        checkpoint_round = metric.checkpoint_round
         if checkpoint_round is None:
             raise RuntimeError("smoke metric lacks checkpoint_round")
         manifest_path = layout.score_cell_for_round(

@@ -46,12 +46,12 @@ def select_pairs(
     blow-up while staying deterministic).
     """
     ordered = _sorted_unique(victim_ids)
-    all_pairs = [tuple(c) for c in combinations(ordered, 2)]
+    all_pairs: list[tuple[str, str]] = [(a, b) for a, b in combinations(ordered, 2)]
     if max_pairs is None or len(all_pairs) <= max_pairs:
-        return tuple(all_pairs)  # type: ignore[return-value]
+        return tuple(all_pairs)
     rng = _pattern_rng(compromise_pattern_seed)
     chosen = rng.choice(len(all_pairs), size=max_pairs, replace=False)
-    return tuple(all_pairs[i] for i in sorted(int(i) for i in chosen))  # type: ignore[return-value]
+    return tuple(all_pairs[i] for i in sorted(int(i) for i in chosen))
 
 
 def select_triples(
@@ -69,7 +69,9 @@ def select_triples(
     if n_triples <= 0:
         raise ValueError(f"n_triples must be positive; got {n_triples}")
     ordered = _sorted_unique(victim_ids)
-    all_triples = [tuple(c) for c in combinations(ordered, 3)]
+    all_triples: list[tuple[str, str, str]] = [
+        (a, b, c) for a, b, c in combinations(ordered, 3)
+    ]
     if len(all_triples) < n_triples:
         raise ValueError(
             f"only {len(all_triples)} triples available from {len(ordered)} "
@@ -77,4 +79,4 @@ def select_triples(
         )
     rng = _pattern_rng(compromise_pattern_seed)
     chosen = rng.choice(len(all_triples), size=n_triples, replace=False)
-    return tuple(all_triples[i] for i in sorted(int(i) for i in chosen))  # type: ignore[return-value]
+    return tuple(all_triples[i] for i in sorted(int(i) for i in chosen))

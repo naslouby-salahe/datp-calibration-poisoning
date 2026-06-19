@@ -33,16 +33,14 @@ def apply_scaler(df: Any, scaler: StandardScaler) -> pl.DataFrame:
     return pl.DataFrame(scaled, schema=columns)
 
 
-def save_scaler(scaler: StandardScaler, path: Path | str) -> None:
-    path = Path(path)
+def save_scaler(scaler: StandardScaler, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(".tmp")
     joblib.dump(scaler, tmp_path)
     tmp_path.rename(path)
 
 
-def load_scaler(path: Path | str) -> StandardScaler:
-    path = Path(path)
+def load_scaler(path: Path) -> StandardScaler:
     if not path.exists():
         raise FileNotFoundError(fmt_missing("data.scaling", str(path)))
     return joblib.load(path)

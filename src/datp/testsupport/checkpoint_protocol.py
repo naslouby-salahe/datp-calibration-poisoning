@@ -7,6 +7,7 @@ from datp.core.enums import (
     ThresholdAggregationMethod,
     ThresholdSource,
 )
+from datp.core.metric_enums import MetricName
 from datp.core.types import MetricsProvenance
 from datp.data.catalog import DatasetID
 from datp.thresholding.metrics_serialization import (
@@ -72,17 +73,17 @@ def _fake_metric(
         ),
     )
     aggregate = {
-        "cv_fpr": cv_fpr,
-        "mean_fpr": worst_fpr - 0.025,
-        "std_fpr": 0.01,
-        "cv_tpr": 0.02,
-        "iqr_fpr": 0.01,
-        "iqr_tpr": 0.01,
-        "max_min_fpr_gap": 0.05,
-        "worst_client_fpr": worst_fpr,
-        "worst_client_id": "c1",
-        "worst_ba": worst_ba,
-        "p10_macro_f1": p10_macro_f1,
+        MetricName.CV_FPR: cv_fpr,
+        MetricName.MEAN_FPR: worst_fpr - 0.025,
+        MetricName.STD_FPR: 0.01,
+        MetricName.CV_TPR: 0.02,
+        MetricName.IQR_FPR: 0.01,
+        MetricName.IQR_TPR: 0.01,
+        MetricName.MAX_MIN_FPR_GAP: 0.05,
+        MetricName.WORST_CLIENT_FPR: worst_fpr,
+        MetricName.WORST_CLIENT_ID: "c1",
+        MetricName.WORST_BA: worst_ba,
+        MetricName.P10_MACRO_F1: p10_macro_f1,
     }
     return SweepMetrics(
         schema_version=METRICS_SCHEMA_VERSION,
@@ -119,7 +120,7 @@ def _fake_metric(
         worst_client_id="c1",
         worst_ba=worst_ba,
         p10_macro_f1=p10_macro_f1,
-        aggregate_metrics=aggregate,  # type: ignore[arg-type]
+        aggregate_metrics=aggregate,
         provenance=MetricsProvenance(
             config_identity="config",
             split_manifest_identity="split",

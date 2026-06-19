@@ -60,48 +60,6 @@ def test_checkpoint_config_rejects_invalid_milestones(
         _checkpoint_config(milestones=milestones, max_rounds=max_rounds)
 
 
-def test_checkpoint_config_rejects_string_enums() -> None:
-    with pytest.raises(TypeError):
-        CheckpointProtocolConfig.model_validate(
-            {
-                "mode": "enabled",
-                "max_rounds": 200,
-                "milestones": (25, 50),
-                "convergence_mode": CheckpointConvergenceMode.LOG_ONLY,
-                "primary_selection_regime": Regime.A,
-                "primary_selection_rule": PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A,
-                "artifact_path_mode": CheckpointArtifactPathMode.ROUND_AWARE,
-            }
-        )
-
-
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("mode", "enabled"),
-        ("convergence_mode", "log_only"),
-        ("primary_selection_regime", "a"),
-        ("primary_selection_rule", "global_lower_tail_tradeoff_from_regime_a"),
-        ("artifact_path_mode", "round_aware"),
-    ],
-)
-def test_checkpoint_config_rejects_string_for_each_enum_field(
-    field: str, value: str
-) -> None:
-    payload = {
-        "mode": CheckpointProtocolMode.ENABLED,
-        "max_rounds": 200,
-        "milestones": (25, 50, 75, 100, 125, 150, 200),
-        "convergence_mode": CheckpointConvergenceMode.LOG_ONLY,
-        "primary_selection_regime": Regime.A,
-        "primary_selection_rule": PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A,
-        "artifact_path_mode": CheckpointArtifactPathMode.ROUND_AWARE,
-    }
-    payload[field] = value
-
-    with pytest.raises(TypeError):
-        CheckpointProtocolConfig.model_validate(payload)
-
 
 def test_round_aware_paths_include_round_and_temp_root(tmp_path: Path) -> None:
     layout = ArtifactLayout(base_dir=tmp_path, regime=Regime.A)

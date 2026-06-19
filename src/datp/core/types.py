@@ -7,6 +7,7 @@ from typing import Any, SupportsIndex, overload
 
 from pydantic import BaseModel, ConfigDict
 
+from datp.core.metric_enums import MetricName
 from datp.core.enums import (
     B0NormalizationMode,
     Baseline,
@@ -385,7 +386,7 @@ class B0Result(BaselineResult):
     p10_macro_f1: float
     auroc: float | None
     pr_auc: float | None
-    aggregate_metrics: dict[str, float | str | None]
+    aggregate_metrics: dict[MetricName, float | str | None]
     provenance: MetricsProvenance
     threshold_mode: ThresholdAggregationMethod
     normalization_scope: NormalizationScope

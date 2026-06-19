@@ -141,6 +141,14 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # means "no alpha sweep" — both are genuine domain sentinels
         ("thresholding/thresholds.py", "_DeriveInput", "seed"),
         ("thresholding/thresholds.py", "_DeriveInput", "alpha"),
+        # ManifestBuildRequest: protocol-locked defaults for injection rule and
+        # reservoir mode (always REPLACE_FIXED_BUDGET and CALIBRATION_ONLY);
+        # local_epochs=1 enforces E=1 lock; checkpoint_round=None is the normal
+        # (non-checkpoint-protocol) case. Callers may override when needed.
+        ("attacks/run_logger.py", "ManifestBuildRequest", "local_epochs"),
+        ("attacks/run_logger.py", "ManifestBuildRequest", "checkpoint_round"),
+        ("attacks/run_logger.py", "ManifestBuildRequest", "injection_rule"),
+        ("attacks/run_logger.py", "ManifestBuildRequest", "reservoir_mode"),
     }
 )
 

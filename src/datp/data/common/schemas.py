@@ -13,11 +13,10 @@ _SCHEMA_MODULE = "data.schema"
 
 
 def validate_feature_artifact(
-    path: Path | str,
+    path: Path,
     expected_columns: Sequence[str],
 ) -> None:
     """Validate column names, order, and numeric types from Parquet metadata only; does not load file contents."""
-    path = Path(path)
     schema = pq.read_schema(path)
 
     actual_columns = schema.names
@@ -46,8 +45,7 @@ def validate_feature_artifact(
             )
 
 
-def validate_score_artifact(path: Path | str) -> None:
-    path = Path(path)
+def validate_score_artifact(path: Path) -> None:
     schema = pq.read_schema(path)
 
     if schema.names != [SCORE_COLUMN]:

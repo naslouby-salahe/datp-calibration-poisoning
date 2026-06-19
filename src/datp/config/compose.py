@@ -10,6 +10,7 @@ from hydra import initialize_config_module
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
+from pydantic_core import ErrorDetails
 
 from datp.artifacts.names import ArtifactFile
 from datp.config.models import DatpConfig
@@ -69,10 +70,10 @@ class ComposeRequest(BaseModel):
 
 
 def _raise_enum_compose_error(
-    err: Any,
-    regime_input: "Regime | str",
-    baseline_input: "Baseline | str",
-    exc: "ValidationError",
+    err: ErrorDetails,
+    regime_input: object,
+    baseline_input: object,
+    exc: ValidationError,
 ) -> None:
     if "regime" in err["loc"]:
         valid_regimes = sorted(r.value for r in Regime)
@@ -97,10 +98,10 @@ def _raise_enum_compose_error(
 
 
 def _raise_compose_error_from_validation(
-    exc: "ValidationError",
-    regime_input: "Regime | str",
-    baseline_input: "Baseline | str",
-) -> "NoReturn":
+    exc: ValidationError,
+    regime_input: object,
+    baseline_input: object,
+) -> NoReturn:
     """Inspect Pydantic ValidationError and raise the appropriate ComposeError."""
     for err in exc.errors():
         if err["type"] == "enum":
@@ -147,7 +148,7 @@ def _validate_resolved_config(cfg: DictConfig) -> DatpConfig:
             )
         )
     try:
-        return DatpConfig.model_validate(resolved, context={"hydra_config": True})
+        return DatpConfig.model_validate(resolved)
     except ValidationError as exc:
         raise ComposeError(str(exc)) from exc
 
@@ -169,19 +170,7 @@ def _build_overrides(
     return overrides
 
 
-def _compose_and_validate(
-    *,
-    regime: Regime | str,
-    baseline: Baseline | str,
-    seed: int,
-    alpha: float | None,
-) -> tuple[DictConfig, DatpConfig]:
-    req = _normalize_request(
-        regime=regime,
-        baseline=baseline,
-        seed=seed,
-        alpha=alpha,
-    )
+def _compose_and_validate(req: ComposeRequest) -> tuple[DictConfig, DatpConfig]:
     cfg = _compose_hydra_config(
         overrides=_build_overrides(
             regime=req.regime,
@@ -222,15 +211,11 @@ def compose_config(
     """Build a validated runtime config from Hydra-composed defaults + overrides.
 
     Accepts ``Regime``/``Baseline`` enum values or string representations
-    (case-insensitive) at the boundary. Strings are normalized to enums
-    internally via :class:`ComposeRequest`.
+    (case-insensitive) at the public boundary. Strings are normalized to enums
+    via :class:`ComposeRequest` before internal processing.
     """
-    _, cfg = _compose_and_validate(
-        regime=regime,
-        baseline=baseline,
-        seed=seed,
-        alpha=alpha,
-    )
+    req = _normalize_request(regime=regime, baseline=baseline, seed=seed, alpha=alpha)
+    _, cfg = _compose_and_validate(req)
     return cfg
 
 

@@ -55,38 +55,20 @@ class ManifestBuildRequest:
     scope_idx: int
     mu_flag_threshold: float | None
     repository: str
-    local_epochs: int
-    checkpoint_round: int | None
-    injection_rule: CalibrationInjectionRule
-    reservoir_mode: str
+    local_epochs: int = 1
+    checkpoint_round: int | None = None
+    injection_rule: CalibrationInjectionRule = (
+        CalibrationInjectionRule.REPLACE_FIXED_BUDGET
+    )
+    reservoir_mode: str = RESERVOIR_MODE
 
 
-def _manifest_request_from_kwargs(
-    legacy_kwargs: dict[str, object],
-) -> ManifestBuildRequest:
-    request_kwargs = {
-        "local_epochs": 1,
-        "checkpoint_round": None,
-        "injection_rule": CalibrationInjectionRule.REPLACE_FIXED_BUDGET,
-        "reservoir_mode": RESERVOIR_MODE,
-        **legacy_kwargs,
-    }
-    return ManifestBuildRequest(**request_kwargs)  # type: ignore[arg-type]
-
-
-def build_manifest(
-    request: ManifestBuildRequest | None = None,
-    **legacy_kwargs: object,
-) -> RunManifest:
+def build_manifest(request: ManifestBuildRequest) -> RunManifest:
     """Build a RunManifest for one experiment cell.
 
     mu_flag_threshold may be None only if you intend to update it before any
     poisoned run. Call emit_manifest only after locking mu_flag_threshold.
     """
-    if request is None:
-        request = _manifest_request_from_kwargs(legacy_kwargs)
-    elif legacy_kwargs:
-        raise TypeError("build_manifest accepts either request or keyword inputs")
 
     record = SeedRecord(
         pair=SeedPair(

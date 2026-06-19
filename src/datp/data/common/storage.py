@@ -11,8 +11,7 @@ from datp.core.errors import fmt
 _PARQUET_SUFFIX = ".parquet"
 
 
-def write_artifact(df: pl.DataFrame, path: Path | str) -> None:
-    path = Path(path)
+def write_artifact(df: pl.DataFrame, path: Path) -> None:
     if path.suffix != _PARQUET_SUFFIX:
         raise ValueError(
             fmt(
@@ -28,8 +27,7 @@ def write_artifact(df: pl.DataFrame, path: Path | str) -> None:
     tmp_path.rename(path)
 
 
-def read_artifact(path: Path | str) -> pl.DataFrame:
-    path = Path(path)
+def read_artifact(path: Path) -> pl.DataFrame:
     if path.suffix != _PARQUET_SUFFIX:
         raise ValueError(
             fmt(
@@ -42,8 +40,7 @@ def read_artifact(path: Path | str) -> pl.DataFrame:
     return pl.read_parquet(path)
 
 
-def assert_no_csv_artifacts(directory: Path | str) -> None:
-    directory = Path(directory)
+def assert_no_csv_artifacts(directory: Path) -> None:
     if not directory.exists():
         return
     csv_files = sorted(directory.rglob("*.csv"))

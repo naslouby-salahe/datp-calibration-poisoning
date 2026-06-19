@@ -78,7 +78,7 @@ class SweepMetrics(BaseModel):
     worst_client_id: str | None
     worst_ba: float
     p10_macro_f1: float
-    aggregate_metrics: dict[str, float | str | None]
+    aggregate_metrics: dict[MetricName, float | str | None]
     provenance: MetricsProvenance
     per_client: tuple[MetricsClientDetail, ...]
 
@@ -145,7 +145,7 @@ def build_metrics_dict(
         worst_client_id=eval_result.worst_client_id,
         worst_ba=eval_result.worst_ba,
         p10_macro_f1=eval_result.p10_macro_f1,
-        aggregate_metrics=aggregate,  # type: ignore[arg-type]
+        aggregate_metrics=aggregate,
         provenance=MetricsProvenance(
             config_identity=config_identity,
             split_manifest_identity=split_manifest_identity,

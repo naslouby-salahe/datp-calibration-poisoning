@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from datp.attacks.run_logger import (
+    ManifestBuildRequest,
     ManifestEmissionError,
     RunLogEntry,
     build_manifest,
@@ -31,20 +32,22 @@ def _build_manifest(
     local_epochs: int = 1,
 ) -> RunManifest:
     return build_manifest(
-        dataset="nbaiot_regime_a",
-        scale=ExperimentScale.SMOKE,
-        policy=ThresholdPolicy.B1_GLOBAL,
-        objective=AttackerObjective.THRESHOLD_RAISE,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=0.40,
-        target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-        training_seed=0,
-        poisoning_seed=100,
-        client_idx=0,
-        scope_idx=0,
-        repository="datp-calibration-poisoning",
-        mu_flag_threshold=mu_flag_threshold,
-        local_epochs=local_epochs,
+        ManifestBuildRequest(
+            dataset="nbaiot_regime_a",
+            scale=ExperimentScale.SMOKE,
+            policy=ThresholdPolicy.B1_GLOBAL,
+            objective=AttackerObjective.THRESHOLD_RAISE,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            fraction=0.40,
+            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+            training_seed=0,
+            poisoning_seed=100,
+            client_idx=0,
+            scope_idx=0,
+            repository="datp-calibration-poisoning",
+            mu_flag_threshold=mu_flag_threshold,
+            local_epochs=local_epochs,
+        )
     )
 
 

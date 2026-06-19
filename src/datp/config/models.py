@@ -6,16 +6,7 @@ scientific parameters downstream.
 
 from __future__ import annotations
 
-import enum
-
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    ValidationInfo,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from datp.checkpointing.enums import (
     CheckpointArtifactPathMode,
@@ -97,14 +88,6 @@ class FederationConfig(BaseModel):
     local_epochs: int
 
 
-def _is_bare_string_value(value: object, info: ValidationInfo) -> bool:
-    return (
-        isinstance(value, str)
-        and not isinstance(value, enum.Enum)
-        and not (info.context or {}).get("hydra_config")
-    )
-
-
 def _validate_milestone_ordering(milestones: tuple[int, ...]) -> None:
     if not milestones:
         raise ValueError("checkpoint milestones must not be empty")
@@ -157,20 +140,6 @@ class CheckpointProtocolConfig(BaseModel):
     primary_selection_regime: Regime
     primary_selection_rule: PrimaryCheckpointSelectionRule
     artifact_path_mode: CheckpointArtifactPathMode
-
-    @field_validator(
-        "mode",
-        "convergence_mode",
-        "primary_selection_regime",
-        "primary_selection_rule",
-        "artifact_path_mode",
-        mode="before",
-    )
-    @classmethod
-    def reject_string_enum_values(cls, value: object, info: ValidationInfo) -> object:
-        if _is_bare_string_value(value, info):
-            raise TypeError("checkpoint protocol enum fields require enum instances")
-        return value
 
     @model_validator(mode="after")
     def validate_checkpoint_protocol(self) -> "CheckpointProtocolConfig":
