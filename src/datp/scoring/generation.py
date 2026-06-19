@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import numpy as np
 import polars as pl
@@ -40,6 +41,55 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 _MODULE = "scoring.generation"
+_SequenceItemT = TypeVar("_SequenceItemT")
+
+
+@dataclass(frozen=True, slots=True)
+class ScoringColumnDtype:
+    column: str
+    dtype: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScoringRecord:
+    client_id: str
+    split: ScoringStage
+    path: str
+    row_count: int
+    columns: tuple[str, ...]
+    dtypes: tuple[ScoringColumnDtype, ...]
+    score_min: float | None
+    score_max: float | None
+    score_nan_count: int
+    file_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScoringManifest:
+    schema_version: str
+    dataset: DatasetID | str
+    regime: Regime | str
+    seed: int | None
+    alpha: float | None
+    model_checkpoint_path: str
+    model_checkpoint_hash: str
+    checkpoint_round: int | None
+    scoring_code_version: str
+    score_column_name: str
+    expected_client_ids: tuple[str, ...]
+    expected_splits: tuple[str, ...]
+    actual_client_ids: tuple[str, ...]
+    actual_splits: tuple[str, ...]
+    records: tuple[ScoringRecord, ...]
+    completion_status: ScoringManifestStatus | str
+    generated_at_utc: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScoringManifestCoverage:
+    missing_pairs: tuple[tuple[str, str], ...]
+    missing_files: tuple[str, ...]
+    invalid_files: tuple[str, ...]
 
 
 def _resolve_within_base(base: Path, candidate: Path) -> Path:
@@ -95,47 +145,44 @@ def compute_reconstruction_errors(
 
 
 def _errors_to_dataframe(errors: np.ndarray) -> pl.DataFrame:
-    return pl.DataFrame({SCORE_COLUMN: errors})
+    return pl.DataFrame([pl.Series(SCORE_COLUMN, errors)])
 
 
 def _score_record(
     path: Path, client_id: str, stage: ScoringStage, errors: np.ndarray
-) -> dict[str, object]:
+) -> ScoringRecord:
     finite = errors[np.isfinite(errors)]
-    return {
-        "client_id": client_id,
-        "split": stage.value,
-        "path": str(path),
-        "row_count": int(errors.size),
-        "columns": [SCORE_COLUMN],
-        "dtypes": {SCORE_COLUMN: "Float32"},
-        "score_min": float(finite.min()) if finite.size else None,
-        "score_max": float(finite.max()) if finite.size else None,
-        "score_nan_count": int(np.isnan(errors).sum()),
-        "file_hash": hash_file(path),
-    }
+    return ScoringRecord(
+        client_id=client_id,
+        split=stage,
+        path=str(path),
+        row_count=int(errors.size),
+        columns=(SCORE_COLUMN,),
+        dtypes=(ScoringColumnDtype(column=SCORE_COLUMN, dtype="Float32"),),
+        score_min=float(finite.min()) if finite.size else None,
+        score_max=float(finite.max()) if finite.size else None,
+        score_nan_count=int(np.isnan(errors).sum()),
+        file_hash=hash_file(path),
+    )
 
 
-def validate_scoring_manifest(score_base: Path) -> dict[str, object]:
-    score_base = Path(score_base)
-    manifest_path = score_base / ArtifactFile.SCORING_MANIFEST
-    if not manifest_path.exists():
-        raise FileNotFoundError(
-            fmt(_MODULE, "Scoring manifest missing", str(manifest_path), "missing file")
-        )
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    records = manifest["records"]
+def _check_manifest_coverage(
+    manifest: ScoringManifest,
+    score_base: Path,
+) -> ScoringManifestCoverage:
+    """Return missing manifest entries and invalid or missing files."""
     expected = {
         (cid, split)
-        for cid in manifest["expected_client_ids"]
-        for split in manifest["expected_splits"]
+        for cid in manifest.expected_client_ids
+        for split in manifest.expected_splits
     }
-    actual = {(str(row["client_id"]), str(row["split"])) for row in records}
+    actual = {(row.client_id, row.split.value) for row in manifest.records}
     missing = sorted(expected - actual)
+
     missing_files: list[str] = []
     invalid_files: list[str] = []
-    for row in records:
-        path = Path(str(row["path"]))
+    for row in manifest.records:
+        path = Path(row.path)
         try:
             resolved_path = _resolve_within_base(score_base, path)
         except ValueError:
@@ -143,36 +190,183 @@ def validate_scoring_manifest(score_base: Path) -> dict[str, object]:
             continue
         if not resolved_path.exists():
             missing_files.append(str(path))
+
     missing_files.sort()
     invalid_files.sort()
-    completion_status = manifest["completion_status"]
+    return ScoringManifestCoverage(
+        missing_pairs=tuple(missing),
+        missing_files=tuple(missing_files),
+        invalid_files=tuple(invalid_files),
+    )
+
+
+def _required(payload: Mapping[str, object], key: str) -> object:
+    if key not in payload:
+        raise KeyError(key)
+    return payload[key]
+
+
+def _required_text(payload: Mapping[str, object], key: str) -> str:
+    return str(_required(payload, key))
+
+
+def _required_int(payload: Mapping[str, object], key: str) -> int:
+    value = _required(payload, key)
+    if isinstance(value, bool):
+        raise TypeError(f"{key} must be an integer, not bool")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    raise TypeError(f"{key} must be convertible to int")
+
+
+def _sequence(
+    value: object, item_type: type[_SequenceItemT]
+) -> tuple[_SequenceItemT, ...]:
+    if isinstance(value, (str, bytes)):
+        raise TypeError("expected a sequence, not text")
+    if not isinstance(value, Sequence):
+        raise TypeError("expected a sequence")
+    if not all(isinstance(item, item_type) for item in value):
+        raise TypeError(f"expected a sequence of {item_type.__name__}")
+    return tuple(value)
+
+
+def _required_sequence(
+    payload: Mapping[str, object], key: str, item_type: type[_SequenceItemT]
+) -> tuple[_SequenceItemT, ...]:
+    return _sequence(_required(payload, key), item_type)
+
+
+def _optional_sequence(
+    payload: Mapping[str, object], key: str, item_type: type[_SequenceItemT]
+) -> tuple[_SequenceItemT, ...]:
+    return _sequence(payload.get(key, ()), item_type)
+
+
+def _optional_text(payload: Mapping[str, object], key: str) -> str:
+    return str(payload.get(key, SCORING_MANIFEST_NOT_PROVIDED))
+
+
+def _optional_int(payload: Mapping[str, object], key: str) -> int | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    return _required_int(payload, key)
+
+
+def _optional_float(payload: Mapping[str, object], key: str) -> float | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise TypeError(f"{key} must be numeric, not bool")
+    if isinstance(value, (int, float, str)):
+        return float(value)
+    raise TypeError(f"{key} must be convertible to float")
+
+
+def _text_tuple(payload: Mapping[str, object], key: str) -> tuple[str, ...]:
+    return tuple(str(item) for item in _required_sequence(payload, key, object))
+
+
+def _dtype_entries(raw: object) -> tuple[ScoringColumnDtype, ...]:
+    if isinstance(raw, Mapping):
+        return tuple(
+            ScoringColumnDtype(column=str(column), dtype=str(dtype))
+            for column, dtype in raw.items()
+        )
+    rows = _sequence(raw, Mapping)
+    return tuple(
+        ScoringColumnDtype(
+            column=_required_text(row, "column"),
+            dtype=_required_text(row, "dtype"),
+        )
+        for row in rows
+    )
+
+
+def _record_from_payload(payload: Mapping[str, object]) -> ScoringRecord:
+    return ScoringRecord(
+        client_id=_required_text(payload, "client_id"),
+        split=ScoringStage(_required_text(payload, "split")),
+        path=_required_text(payload, "path"),
+        row_count=_required_int(payload, "row_count"),
+        columns=_text_tuple(payload, "columns"),
+        dtypes=_dtype_entries(_required(payload, "dtypes")),
+        score_min=_optional_float(payload, "score_min"),
+        score_max=_optional_float(payload, "score_max"),
+        score_nan_count=_required_int(payload, "score_nan_count"),
+        file_hash=_required_text(payload, "file_hash"),
+    )
+
+
+def _manifest_from_payload(payload: Mapping[str, object]) -> ScoringManifest:
+    records = tuple(
+        _record_from_payload(row)
+        for row in _required_sequence(payload, "records", Mapping)
+    )
+    return ScoringManifest(
+        schema_version=_required_text(payload, "schema_version"),
+        dataset=str(payload.get("dataset", SCORING_MANIFEST_NOT_PROVIDED)),
+        regime=str(payload.get("regime", SCORING_MANIFEST_NOT_PROVIDED)),
+        seed=_optional_int(payload, "seed"),
+        alpha=_optional_float(payload, "alpha"),
+        model_checkpoint_path=_optional_text(payload, "model_checkpoint_path"),
+        model_checkpoint_hash=_optional_text(payload, "model_checkpoint_hash"),
+        checkpoint_round=_optional_int(payload, "checkpoint_round"),
+        scoring_code_version=_optional_text(payload, "scoring_code_version"),
+        score_column_name=str(payload.get("score_column_name", SCORE_COLUMN)),
+        expected_client_ids=_text_tuple(payload, "expected_client_ids"),
+        expected_splits=_text_tuple(payload, "expected_splits"),
+        actual_client_ids=tuple(str(item) for item in _optional_sequence(payload, "actual_client_ids", object)),
+        actual_splits=tuple(str(item) for item in _optional_sequence(payload, "actual_splits", object)),
+        records=records,
+        completion_status=_required_text(payload, "completion_status"),
+        generated_at_utc=_optional_text(payload, "generated_at_utc"),
+    )
+
+
+def validate_scoring_manifest(score_base: Path) -> ScoringManifest:
+    score_base = Path(score_base)
+    manifest_path = score_base / ArtifactFile.SCORING_MANIFEST
+    if not manifest_path.exists():
+        raise FileNotFoundError(
+            fmt(_MODULE, "Scoring manifest missing", str(manifest_path), "missing file")
+        )
+    manifest = _manifest_from_payload(
+        cast(Mapping[str, object], json.loads(manifest_path.read_text(encoding="utf-8")))
+    )
+    coverage = _check_manifest_coverage(manifest, score_base)
     if (
-        completion_status != ScoringManifestStatus.COMPLETE
-        or missing
-        or missing_files
-        or invalid_files
+        manifest.completion_status != ScoringManifestStatus.COMPLETE
+        or coverage.missing_pairs
+        or coverage.missing_files
+        or coverage.invalid_files
     ):
         raise ValueError(
             fmt(
                 _MODULE,
                 "Scoring manifest incomplete",
                 "complete manifest with all expected score files",
-                f"status={completion_status}, missing={missing}, missing_files={missing_files}, invalid_files={invalid_files}",
+                f"status={manifest.completion_status}, missing={coverage.missing_pairs}, missing_files={coverage.missing_files}, invalid_files={coverage.invalid_files}",
             )
         )
     return manifest
 
 
 def _score_clients_impl(
-    client_data: dict[str, ClientData],
+    client_data: Mapping[str, ClientData],
     *,
     score_base: Path,
     scoring_batch_size: int,
     get_model: Callable[[str], Autoencoder],
-) -> list[dict[str, object]]:
-    """Shared scoring loop: for each client and each ScoringStage, score with the
-    model returned by *get_model(client_id)* and write a parquet artifact."""
-    records: list[dict[str, object]] = []
+) -> list[ScoringRecord]:
+    """Shared scoring loop: score each client × ScoringStage and write parquet artifacts."""
+    records: list[ScoringRecord] = []
     for cid, splits in client_data.items():
         model = get_model(cid)
         model.eval()
@@ -200,7 +394,7 @@ def _score_one_split(
     stage: ScoringStage,
     score_base: Path,
     batch_size: int,
-) -> dict[str, object]:
+) -> ScoringRecord:
     if data.device != model_device:
         data = data.to(model_device, non_blocking=True)
     errors = compute_reconstruction_errors(model, data, batch_size=batch_size)
@@ -216,42 +410,48 @@ def _score_one_split(
     return _score_record(out_path, cid, stage, errors)
 
 
+@dataclass(frozen=True, slots=True)
+class ScoringManifestContext:
+    """Bundled metadata written into the scoring manifest."""
+
+    dataset: DatasetID
+    regime: Regime | None
+    seed: int | None
+    alpha: float | None
+    checkpoint_path: Path | None
+    checkpoint_round: int | None
+
+
 def _write_scoring_manifest_and_sentinel(
-    records: list[dict[str, object]],
+    records: list[ScoringRecord],
     client_ids: list[str],
     score_base: Path,
-    *,
-    dataset: DatasetID,
-    regime: Regime | None,
-    seed: int | None,
-    alpha: float | None,
-    checkpoint_path: Path | None,
-    checkpoint_round: int | None,
+    ctx: ScoringManifestContext,
 ) -> None:
-    """Shared manifest + sentinel writer for scoring results."""
-    manifest = {
-        "schema_version": SCORING_MANIFEST_SCHEMA_VERSION,
-        "dataset": dataset,
-        "regime": regime.value if regime is not None else SCORING_MANIFEST_NOT_PROVIDED,
-        "seed": seed,
-        "alpha": alpha,
-        "model_checkpoint_path": str(checkpoint_path)
-        if checkpoint_path is not None
+    """Write manifest + sentinel for scoring results."""
+    manifest = ScoringManifest(
+        schema_version=SCORING_MANIFEST_SCHEMA_VERSION,
+        dataset=ctx.dataset,
+        regime=ctx.regime if ctx.regime is not None else SCORING_MANIFEST_NOT_PROVIDED,
+        seed=ctx.seed,
+        alpha=ctx.alpha,
+        model_checkpoint_path=str(ctx.checkpoint_path)
+        if ctx.checkpoint_path is not None
         else SCORING_MANIFEST_NOT_PROVIDED,
-        "model_checkpoint_hash": hash_file(checkpoint_path)
-        if checkpoint_path is not None
+        model_checkpoint_hash=hash_file(ctx.checkpoint_path)
+        if ctx.checkpoint_path is not None
         else SCORING_MANIFEST_NOT_PROVIDED,
-        "checkpoint_round": checkpoint_round,
-        "scoring_code_version": git_commit(),
-        "score_column_name": SCORE_COLUMN,
-        "expected_client_ids": sorted(client_ids),
-        "expected_splits": [stage.value for stage in SCORING_STAGES],
-        "actual_client_ids": sorted({str(row["client_id"]) for row in records}),
-        "actual_splits": sorted({str(row["split"]) for row in records}),
-        "records": records,
-        "completion_status": ScoringManifestStatus.COMPLETE,
-        "generated_at_utc": utc_timestamp(),
-    }
+        checkpoint_round=ctx.checkpoint_round,
+        scoring_code_version=git_commit(),
+        score_column_name=SCORE_COLUMN,
+        expected_client_ids=tuple(sorted(client_ids)),
+        expected_splits=tuple(stage.value for stage in SCORING_STAGES),
+        actual_client_ids=tuple(sorted({record.client_id for record in records})),
+        actual_splits=tuple(sorted({record.split.value for record in records})),
+        records=tuple(records),
+        completion_status=ScoringManifestStatus.COMPLETE,
+        generated_at_utc=utc_timestamp(),
+    )
     write_json_atomic(score_base / ArtifactFile.SCORING_MANIFEST, manifest)
     validate_scoring_manifest(score_base)
 
@@ -262,7 +462,7 @@ def _write_scoring_manifest_and_sentinel(
 
 def score_clients(
     model: Autoencoder,
-    client_data: dict[str, ClientData],
+    client_data: Mapping[str, ClientData],
     *,
     score_base: Path,
     regime: Regime | None,
@@ -288,12 +488,14 @@ def score_clients(
         records,
         sorted(client_data.keys()),
         score_base,
-        dataset=dataset,
-        regime=regime,
-        seed=seed,
-        alpha=alpha,
-        checkpoint_path=checkpoint_path,
-        checkpoint_round=checkpoint_round,
+        ScoringManifestContext(
+            dataset=dataset,
+            regime=regime,
+            seed=seed,
+            alpha=alpha,
+            checkpoint_path=checkpoint_path,
+            checkpoint_round=checkpoint_round,
+        ),
     )
     logger.info("scoring complete", score_base=str(score_base))
 

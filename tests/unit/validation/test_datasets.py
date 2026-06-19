@@ -18,12 +18,22 @@ from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 from datp.data.splits import SPLIT_FILENAME, Split
 from datp.validation.constants import NBAIOT_CONFOUND_SUMMARY
 from datp.validation.datasets import (
+    ClusterAssignments,
     build_ciciot_protocol,
     build_nbaiot_per_device,
     chronological_flags_for,
     compute_b4_cluster_stability,
     confound_summary_for,
 )
+
+
+def _assignments(
+    *items: tuple[int, tuple[tuple[str, int], ...]],
+) -> tuple[ClusterAssignments, ...]:
+    return tuple(
+        ClusterAssignments(seed=seed, assignments=client_assignments)
+        for seed, client_assignments in items
+    )
 
 
 def _write_parquet(path: Path, n_rows: int) -> None:
@@ -164,73 +174,72 @@ class TestBuildNbaiotPerDevice:
 
 
 class TestComputeB4ClusterStability:
-    def test_empty_dict_returns_empty(self) -> None:
-        result = compute_b4_cluster_stability({}, Regime.A, None)
+    def test_empty_assignments_returns_empty(self) -> None:
+        result = compute_b4_cluster_stability((), Regime.A, None)
         assert result == []
 
     def test_single_seed_returns_empty(self) -> None:
         result = compute_b4_cluster_stability(
-            {0: {"c1": 0, "c2": 1, "c3": 0}}, Regime.A, None
+            _assignments((0, (("c1", 0), ("c2", 1), ("c3", 0)))),
+            Regime.A,
+            None,
         )
         assert result == []
 
     def test_two_seeds_produces_one_record(self) -> None:
-        assignments = {
-            0: {"c1": 0, "c2": 1, "c3": 0},
-            1: {"c1": 0, "c2": 1, "c3": 0},
-        }
+        assignments = _assignments(
+            (0, (("c1", 0), ("c2", 1), ("c3", 0))),
+            (1, (("c1", 0), ("c2", 1), ("c3", 0))),
+        )
         result = compute_b4_cluster_stability(assignments, Regime.A, None)
         assert len(result) == 1
         assert result[0].seed_a == 0
         assert result[0].seed_b == 1
 
     def test_ari_is_one_for_identical_assignments(self) -> None:
-        assignments = {
-            0: {"c1": 0, "c2": 1, "c3": 0},
-            1: {"c1": 0, "c2": 1, "c3": 0},
-        }
+        assignments = _assignments(
+            (0, (("c1", 0), ("c2", 1), ("c3", 0))),
+            (1, (("c1", 0), ("c2", 1), ("c3", 0))),
+        )
         result = compute_b4_cluster_stability(assignments, Regime.A, None)
         assert result[0].adjusted_rand_index == pytest.approx(1.0)
 
     def test_regime_and_alpha_stored_in_record(self) -> None:
-        assignments = {
-            0: {"c1": 0, "c2": 1, "c3": 0},
-            1: {"c1": 0, "c2": 0, "c3": 1},
-        }
+        assignments = _assignments(
+            (0, (("c1", 0), ("c2", 1), ("c3", 0))),
+            (1, (("c1", 0), ("c2", 0), ("c3", 1))),
+        )
         result = compute_b4_cluster_stability(assignments, Regime.C, "0.5")
         assert result[0].regime == Regime.C
         assert result[0].alpha == "0.5"
 
     def test_three_seeds_produces_three_pairs(self) -> None:
-        assignments = {
-            0: {"c1": 0, "c2": 1},
-            1: {"c1": 0, "c2": 1},
-            2: {"c1": 1, "c2": 0},
-        }
+        assignments = _assignments(
+            (0, (("c1", 0), ("c2", 1))),
+            (1, (("c1", 0), ("c2", 1))),
+            (2, (("c1", 1), ("c2", 0))),
+        )
         result = compute_b4_cluster_stability(assignments, Regime.B, None)
         assert len(result) == 3
 
     def test_fewer_than_two_common_clients_skipped(self) -> None:
-        assignments = {
-            0: {"c1": 0},
-            1: {"c1": 0},
-        }
+        assignments = _assignments((0, (("c1", 0),)), (1, (("c1", 0),)))
         result = compute_b4_cluster_stability(assignments, Regime.A, None)
         assert result == []
 
     def test_non_overlapping_clients_skipped(self) -> None:
-        assignments = {
-            0: {"c1": 0, "c2": 1},
-            1: {"c3": 0, "c4": 1},
-        }
+        assignments = _assignments(
+            (0, (("c1", 0), ("c2", 1))),
+            (1, (("c3", 0), ("c4", 1))),
+        )
         result = compute_b4_cluster_stability(assignments, Regime.A, None)
         assert result == []
 
     def test_partially_overlapping_clients_uses_common_only(self) -> None:
-        assignments = {
-            0: {"c1": 0, "c2": 1, "only_in_0": 0},
-            1: {"c1": 0, "c2": 1, "only_in_1": 0},
-        }
+        assignments = _assignments(
+            (0, (("c1", 0), ("c2", 1), ("only_in_0", 0))),
+            (1, (("c1", 0), ("c2", 1), ("only_in_1", 0))),
+        )
         result = compute_b4_cluster_stability(assignments, Regime.A, None)
         assert len(result) == 1
         assert result[0].adjusted_rand_index == pytest.approx(1.0)

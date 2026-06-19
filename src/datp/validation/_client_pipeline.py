@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import math
 from collections.abc import Sequence
 from pathlib import Path
@@ -346,60 +347,56 @@ def _build_attack_metric_record(
     )
 
 
-def _compute_client_metric_row(
+@dataclasses.dataclass(frozen=True, slots=True)
+class _RowProcessingCtx:
+    """Shared client-set and coverage context for per-row metric processing."""
+
+    eligible_ids: frozenset[str]
+    pending_ids: frozenset[str]
+    incomplete: frozenset[str]
+    coverage_ratio: str
+
+
+def _emit_missing_confusion_warning(
+    acc: _AuditAccumulator,
+    run_id: str,
+) -> None:
+    if run_id in acc.missing_confusion_warned:
+        return
+    acc.missing_confusion_warned.add(run_id)
+    acc.warnings.append(
+        WarningRecord(
+            severity=AuditSeverity.BLOCKED_PENDING_RUN,
+            code=WarningCode.MISSING_CONFUSION_MATRIX,
+            message=(
+                f"Per-client confusion matrices are missing for {run_id}; "
+                "denominator gates cannot be verified."
+            ),
+            exact_command=BLOCKED_RESUME_COMMAND,
+        )
+    )
+
+
+def _append_denominator_record(
     acc: _AuditAccumulator,
     ctx: _RunContext,
-    threshold_state: _ThresholdState,
-    row: dict[str, Any],
-    eligible_ids: frozenset[str],
-    pending_ids: frozenset[str],
-    incomplete: frozenset[str],
-    coverage_ratio: str,
+    *,
+    client_id: str,
+    n_benign: int,
+    n_attack: int,
+    tp: int,
+    fp: int,
+    tn: int,
+    fn: int,
+    has_confusion: bool,
+    eval_incomplete: bool,
 ) -> None:
-    """Process a single client row: denominator audit, recomputation, client/attack records."""
-    cm = row[PayloadKey.CONFUSION_MATRIX] if PayloadKey.CONFUSION_MATRIX in row else {}
-    tp, fp, tn, fn = (int(cm[k]) if k in cm else 0 for k in tuple(ConfusionKey))
-    client_id = str(row[PayloadKey.CLIENT_ID])
-    n_benign = int(row[PayloadKey.N_BENIGN])
-    n_attack = int(row[PayloadKey.N_ATTACK])
     fpr_den, tpr_den = fp + tn, tp + fn
-    eval_incomplete = client_id in incomplete or n_attack == 0
-    has_confusion = bool(cm)
-
-    if not has_confusion and ctx.run_id not in acc.missing_confusion_warned:
-        acc.missing_confusion_warned.add(ctx.run_id)
-        acc.warnings.append(
-            WarningRecord(
-                severity=AuditSeverity.BLOCKED_PENDING_RUN,
-                code=WarningCode.MISSING_CONFUSION_MATRIX,
-                message=(
-                    f"Per-client confusion matrices are missing for {ctx.run_id}; "
-                    "denominator gates cannot be verified."
-                ),
-                exact_command=BLOCKED_RESUME_COMMAND,
-            )
-        )
-
-    fpr_ok = (
-        has_confusion
-        and fpr_den == n_benign
-        and n_benign > 0
-        and math.isfinite(float(row[MetricName.FPR]))
-    )
-    tpr_ok = (
-        has_confusion
-        and tpr_den == n_attack
-        and n_attack > 0
-        and math.isfinite(float(row[MetricName.TPR]))
-    )
-
+    fpr_ok = has_confusion and fpr_den == n_benign and n_benign > 0
+    tpr_ok = has_confusion and tpr_den == n_attack and n_attack > 0
     fpr_status, tpr_status, macro_f1_status = _compute_denominator_status(
-        has_confusion,
-        eval_incomplete,
-        fpr_ok,
-        tpr_ok,
+        has_confusion, eval_incomplete, fpr_ok, tpr_ok
     )
-
     acc.denominator_records.append(
         MetricDenominatorAuditRecord(
             run_id=ctx.run_id,
@@ -416,6 +413,40 @@ def _compute_client_metric_row(
             tpr_status=tpr_status,
             macro_f1_status=macro_f1_status,
         )
+    )
+
+
+def _compute_client_metric_row(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+    threshold_state: _ThresholdState,
+    row: dict[str, Any],
+    rpc: _RowProcessingCtx,
+) -> None:
+    """Process a single client row: denominator audit, recomputation, client/attack records."""
+    cm = row[PayloadKey.CONFUSION_MATRIX] if PayloadKey.CONFUSION_MATRIX in row else {}
+    tp, fp, tn, fn = (int(cm[k]) if k in cm else 0 for k in tuple(ConfusionKey))
+    client_id = str(row[PayloadKey.CLIENT_ID])
+    n_benign = int(row[PayloadKey.N_BENIGN])
+    n_attack = int(row[PayloadKey.N_ATTACK])
+    eval_incomplete = client_id in rpc.incomplete or n_attack == 0
+    has_confusion = bool(cm)
+
+    if not has_confusion:
+        _emit_missing_confusion_warning(acc, ctx.run_id)
+
+    _append_denominator_record(
+        acc,
+        ctx,
+        client_id=client_id,
+        n_benign=n_benign,
+        n_attack=n_attack,
+        tp=tp,
+        fp=fp,
+        tn=tn,
+        fn=fn,
+        has_confusion=has_confusion,
+        eval_incomplete=eval_incomplete,
     )
 
     if has_confusion:
@@ -462,22 +493,15 @@ def _compute_client_metric_row(
                 fn=fn,
                 auroc=auroc,
                 pr_auc=pr_auc,
-                eligible=client_id in eligible_ids,
-                calibration_pending=client_id in pending_ids,
+                eligible=client_id in rpc.eligible_ids,
+                calibration_pending=client_id in rpc.pending_ids,
                 evaluation_incomplete=eval_incomplete,
-                coverage_ratio=coverage_ratio,
+                coverage_ratio=rpc.coverage_ratio,
             ),
         )
     )
     acc.attack_records.append(
-        _build_attack_metric_record(
-            ctx,
-            client_id,
-            row,
-            eval_incomplete,
-            tp,
-            n_attack,
-        )
+        _build_attack_metric_record(ctx, client_id, row, eval_incomplete, tp, n_attack)
     )
 
 
@@ -541,109 +565,125 @@ def _compute_per_attack_families(
         )
 
 
-def _compute_aggregate_stats(
-    acc: _AuditAccumulator,
-    ctx: _RunContext,
+def _collect_eligible_metric_pairs(
+    normalized_clients: list[dict[str, Any]],
     eligible_ids: frozenset[str],
     incomplete: frozenset[str],
-    coverage_ratio: str,
-) -> None:
-    """Compute companion records, worst clients, and cell panel for a single run."""
+) -> tuple[
+    list[tuple[str, float]],
+    list[tuple[str, float]],
+    list[tuple[str, float]],
+    list[tuple[str, float]],
+]:
+    """Collect (client_id, value) pairs for FPR, TPR, macro_f1, balanced_accuracy."""
     eligible_pairs_fpr = [
         (str(r[PayloadKey.CLIENT_ID]), float(r[MetricName.FPR]))
-        for r in ctx.normalized_clients
+        for r in normalized_clients
         if r[PayloadKey.CLIENT_ID] in eligible_ids and MetricName.FPR in r
     ]
     tprs = [
         (str(r[PayloadKey.CLIENT_ID]), float(r[MetricName.TPR]))
-        for r in ctx.normalized_clients
+        for r in normalized_clients
         if r[PayloadKey.CLIENT_ID] in eligible_ids
         and MetricName.TPR in r
         and str(r[PayloadKey.CLIENT_ID]) not in incomplete
     ]
     macro_f1s = [
         (str(r[PayloadKey.CLIENT_ID]), float(r[MetricName.MACRO_F1]))
-        for r in ctx.normalized_clients
+        for r in normalized_clients
         if r[PayloadKey.CLIENT_ID] in eligible_ids and MetricName.MACRO_F1 in r
     ]
     balanced_accuracies = [
         (str(r[PayloadKey.CLIENT_ID]), float(r[MetricName.BALANCED_ACCURACY]))
-        for r in ctx.normalized_clients
+        for r in normalized_clients
         if r[PayloadKey.CLIENT_ID] in eligible_ids
     ]
+    return eligible_pairs_fpr, tprs, macro_f1s, balanced_accuracies
 
-    eligible_fpr_values = [v for _, v in eligible_pairs_fpr]
-    worst_fpr_id, worst_fpr_value = _argworst(
-        eligible_pairs_fpr,
-        WORST_CLIENT_DIRECTIONS[MetricName.FPR],
-    )
-    worst_tpr_id, worst_tpr_value = _argworst(
-        tprs,
-        WORST_CLIENT_DIRECTIONS[MetricName.TPR],
-    )
-    worst_f1_id, worst_f1_value = _argworst(
-        macro_f1s,
-        WORST_CLIENT_DIRECTIONS[MetricName.MACRO_F1],
-    )
-    worst_ba_id, worst_ba_value = _argworst(
-        balanced_accuracies,
-        WORST_CLIENT_DIRECTIONS[MetricName.BALANCED_ACCURACY],
-    )
 
-    cv_fpr_value = float(ctx.metrics[MetricName.CV_FPR])
-    cv_fpr_record_value = cv_fpr_value if math.isfinite(cv_fpr_value) else None
-    if math.isfinite(cv_fpr_value):
-        mean_fpr_raw = ctx.metrics.get(MetricName.MEAN_FPR)
-        std_fpr_raw = ctx.metrics.get(MetricName.STD_FPR)
-        if mean_fpr_raw is None or std_fpr_raw is None:
-            acc.warnings.append(
-                WarningRecord(
-                    severity=AuditSeverity.FAIL,
-                    code=WarningCode.NAKED_CV_FPR,
-                    message=(
-                        f"{ctx.run_id} contains cv_fpr={cv_fpr_value:.4g} without "
-                        "companion fields mean_fpr/std_fpr. Re-run datp sweep to "
-                        "regenerate metrics artifacts."
-                    ),
-                    exact_command=BLOCKED_RESUME_COMMAND,
-                )
+def _check_naked_cv_fpr(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+    cv_fpr_value: float,
+) -> None:
+    if not math.isfinite(cv_fpr_value):
+        return
+    mean_fpr_raw = ctx.metrics.get(MetricName.MEAN_FPR)
+    std_fpr_raw = ctx.metrics.get(MetricName.STD_FPR)
+    if mean_fpr_raw is None or std_fpr_raw is None:
+        acc.warnings.append(
+            WarningRecord(
+                severity=AuditSeverity.FAIL,
+                code=WarningCode.NAKED_CV_FPR,
+                message=(
+                    f"{ctx.run_id} contains cv_fpr={cv_fpr_value:.4g} without "
+                    "companion fields mean_fpr/std_fpr. Re-run datp sweep to "
+                    "regenerate metrics artifacts."
+                ),
+                exact_command=BLOCKED_RESUME_COMMAND,
             )
-
-    mean_fpr_value = _finite_mean(eligible_fpr_values)
-    std_fpr_value = _std_or_none(eligible_fpr_values)
-    iqr_fpr_value = _iqr_or_none(eligible_fpr_values)
-    macro_f1_p10_value = _percentile_or_none([v for _, v in macro_f1s], 10.0)
-
-    acc.companion_records.append(
-        FPRCompanionRecord(
-            run_id=ctx.run_id,
-            seed=ctx.seed,
-            regime=ctx.regime,
-            baseline=ctx.baseline,
-            alpha=ctx.alpha_text,
-            cv_fpr=cv_fpr_record_value,
-            mean_fpr=mean_fpr_value,
-            std_fpr=std_fpr_value,
-            iqr_fpr=iqr_fpr_value,
-            worst_client_fpr=worst_fpr_value,
-            eligible_count=len(eligible_ids),
-            client_count=ctx.client_count,
-            coverage_ratio=coverage_ratio,
         )
+
+
+def _find_worst_values(
+    eligible_pairs_fpr: list[tuple[str, float]],
+    tprs: list[tuple[str, float]],
+    macro_f1s: list[tuple[str, float]],
+    balanced_accuracies: list[tuple[str, float]],
+) -> _WorstClientSet:
+    """Compute worst (client_id, value) for each metric and bundle with pool sizes."""
+    fpr_id, fpr_val = _argworst(
+        eligible_pairs_fpr, WORST_CLIENT_DIRECTIONS[MetricName.FPR]
     )
+    tpr_id, tpr_val = _argworst(tprs, WORST_CLIENT_DIRECTIONS[MetricName.TPR])
+    f1_id, f1_val = _argworst(macro_f1s, WORST_CLIENT_DIRECTIONS[MetricName.MACRO_F1])
+    ba_id, ba_val = _argworst(
+        balanced_accuracies, WORST_CLIENT_DIRECTIONS[MetricName.BALANCED_ACCURACY]
+    )
+    return _WorstClientSet(
+        fpr_id=fpr_id,
+        fpr_value=fpr_val,
+        fpr_pool=len(eligible_pairs_fpr),
+        tpr_id=tpr_id,
+        tpr_value=tpr_val,
+        tpr_pool=len(tprs),
+        f1_id=f1_id,
+        f1_value=f1_val,
+        f1_pool=len(macro_f1s),
+        ba_id=ba_id,
+        ba_value=ba_val,
+        ba_pool=len(balanced_accuracies),
+    )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _WorstClientSet:
+    """Per-metric worst (client_id, value, pool_size) tuples for a single run."""
+
+    fpr_id: str | None
+    fpr_value: float | None
+    fpr_pool: int
+    tpr_id: str | None
+    tpr_value: float | None
+    tpr_pool: int
+    f1_id: str | None
+    f1_value: float | None
+    f1_pool: int
+    ba_id: str | None
+    ba_value: float | None
+    ba_pool: int
+
+
+def _emit_worst_client_records(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+    worst: _WorstClientSet,
+) -> None:
     for metric_name, (cid, value, pool) in {
-        MetricName.FPR: (worst_fpr_id, worst_fpr_value, len(eligible_pairs_fpr)),
-        MetricName.TPR: (worst_tpr_id, worst_tpr_value, len(tprs)),
-        MetricName.MACRO_F1: (
-            worst_f1_id,
-            worst_f1_value,
-            len(macro_f1s),
-        ),
-        MetricName.BALANCED_ACCURACY: (
-            worst_ba_id,
-            worst_ba_value,
-            len(balanced_accuracies),
-        ),
+        MetricName.FPR: (worst.fpr_id, worst.fpr_value, worst.fpr_pool),
+        MetricName.TPR: (worst.tpr_id, worst.tpr_value, worst.tpr_pool),
+        MetricName.MACRO_F1: (worst.f1_id, worst.f1_value, worst.f1_pool),
+        MetricName.BALANCED_ACCURACY: (worst.ba_id, worst.ba_value, worst.ba_pool),
     }.items():
         acc.worst_client_records.append(
             WorstClientRecord(
@@ -660,6 +700,22 @@ def _compute_aggregate_stats(
             )
         )
 
+
+def _build_cell_panel(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+    *,
+    cv_fpr_record_value: float | None,
+    mean_fpr_value: float | None,
+    std_fpr_value: float | None,
+    iqr_fpr_value: float | None,
+    macro_f1_p10_value: float | None,
+    worst_fpr_value: float | None,
+    worst_tpr_value: float | None,
+    worst_f1_value: float | None,
+    worst_ba_value: float | None,
+    coverage_ratio: str,
+) -> None:
     cv_tpr_raw = ctx.metrics.get(MetricName.CV_TPR)
     cv_tpr_value = (
         float(cv_tpr_raw)
@@ -704,6 +760,66 @@ def _compute_aggregate_stats(
     )
 
 
+def _compute_aggregate_stats(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+    eligible_ids: frozenset[str],
+    incomplete: frozenset[str],
+    coverage_ratio: str,
+) -> None:
+    """Compute companion records, worst clients, and cell panel for a single run."""
+    eligible_pairs_fpr, tprs, macro_f1s, balanced_accuracies = (
+        _collect_eligible_metric_pairs(ctx.normalized_clients, eligible_ids, incomplete)
+    )
+
+    eligible_fpr_values = [v for _, v in eligible_pairs_fpr]
+    cv_fpr_value = float(ctx.metrics[MetricName.CV_FPR])
+    cv_fpr_record_value = cv_fpr_value if math.isfinite(cv_fpr_value) else None
+    _check_naked_cv_fpr(acc, ctx, cv_fpr_value)
+
+    mean_fpr_value = _finite_mean(eligible_fpr_values)
+    std_fpr_value = _std_or_none(eligible_fpr_values)
+    iqr_fpr_value = _iqr_or_none(eligible_fpr_values)
+    macro_f1_p10_value = _percentile_or_none([v for _, v in macro_f1s], 10.0)
+
+    worst = _find_worst_values(eligible_pairs_fpr, tprs, macro_f1s, balanced_accuracies)
+
+    acc.companion_records.append(
+        FPRCompanionRecord(
+            run_id=ctx.run_id,
+            seed=ctx.seed,
+            regime=ctx.regime,
+            baseline=ctx.baseline,
+            alpha=ctx.alpha_text,
+            cv_fpr=cv_fpr_record_value,
+            mean_fpr=mean_fpr_value,
+            std_fpr=std_fpr_value,
+            iqr_fpr=iqr_fpr_value,
+            worst_client_fpr=worst.fpr_value,
+            eligible_count=len(eligible_ids),
+            client_count=ctx.client_count,
+            coverage_ratio=coverage_ratio,
+        )
+    )
+
+    _emit_worst_client_records(acc, ctx, worst)
+
+    _build_cell_panel(
+        acc,
+        ctx,
+        cv_fpr_record_value=cv_fpr_record_value,
+        mean_fpr_value=mean_fpr_value,
+        std_fpr_value=std_fpr_value,
+        iqr_fpr_value=iqr_fpr_value,
+        macro_f1_p10_value=macro_f1_p10_value,
+        worst_fpr_value=worst.fpr_value,
+        worst_tpr_value=worst.tpr_value,
+        worst_f1_value=worst.f1_value,
+        worst_ba_value=worst.ba_value,
+        coverage_ratio=coverage_ratio,
+    )
+
+
 def _process_per_client_metrics(
     acc: _AuditAccumulator,
     ctx: _RunContext,
@@ -715,26 +831,22 @@ def _process_per_client_metrics(
         if ctx.client_count
         else DEFAULT_COVERAGE_RATIO
     )
-    incomplete = ctx.incomplete_ids
-    eligible_ids = ctx.eligible_client_ids
-    pending_ids = ctx.pending_client_ids
+    rpc = _RowProcessingCtx(
+        eligible_ids=ctx.eligible_client_ids,
+        pending_ids=ctx.pending_client_ids,
+        incomplete=ctx.incomplete_ids,
+        coverage_ratio=coverage_ratio,
+    )
 
     for row in ctx.normalized_clients:
-        _compute_client_metric_row(
-            acc,
-            ctx,
-            threshold_state,
-            row,
-            eligible_ids,
-            pending_ids,
-            incomplete,
-            coverage_ratio,
-        )
+        _compute_client_metric_row(acc, ctx, threshold_state, row, rpc)
         client_id = str(row[PayloadKey.CLIENT_ID])
-        eval_incomplete = client_id in incomplete or int(row[PayloadKey.N_ATTACK]) == 0
+        eval_incomplete = (
+            client_id in rpc.incomplete or int(row[PayloadKey.N_ATTACK]) == 0
+        )
         _compute_per_attack_families(acc, ctx, threshold_state, row, eval_incomplete)
 
-    _compute_aggregate_stats(acc, ctx, eligible_ids, incomplete, coverage_ratio)
+    _compute_aggregate_stats(acc, ctx, rpc.eligible_ids, rpc.incomplete, coverage_ratio)
 
 
 def _build_run_manifest(
@@ -900,12 +1012,9 @@ def _process_homogeneity(
     cal_errors: dict[str, np.ndarray],
 ) -> None:
     """Compute CICIoT homogeneity audit for B1 + Regime B."""
-    if not (
-        ctx.baseline == Baseline.B1
-        and ctx.score_root.exists()
-        and ctx.regime == Regime.B
-        and cal_errors
-    ):
+    is_b1_ciciot = ctx.baseline == Baseline.B1 and ctx.regime == Regime.B
+    scores_available = ctx.score_root.exists() and bool(cal_errors)
+    if not (is_b1_ciciot and scores_available):
         return
     payload = compute_ciciot_homogeneity(
         cal_errors,
@@ -932,25 +1041,11 @@ def _process_homogeneity(
     )
 
 
-def _process_run(
-    metrics_path: Path,
-    base_dir: Path,
+def _process_partition_audit(
     acc: _AuditAccumulator,
-    *,
-    git_commit: str,
-    timestamp: str,
-    scoring_hash: str,
-    threshold_hash: str,
-    metrics_hash: str,
-    cfg: DatpConfig,
-    data_root: Path | None = None,
+    ctx: _RunContext,
 ) -> None:
-    """Process a single metrics file and populate the audit accumulator."""
-    ctx = _load_run_context(metrics_path, base_dir, acc, data_root)
-    if ctx is None:
-        return
-
-    # ── Partition audit ──
+    """Build partition audit record or emit missing-manifest warning."""
     if ctx.partition_path.exists():
         acc.partition_audits[f"{ctx.regime}:{ctx.seed}:{ctx.alpha_text}"] = (
             _build_partition_audit(
@@ -977,55 +1072,43 @@ def _process_run(
             )
         )
 
-    # ── Threshold processing ──
-    threshold_state = _process_thresholds(acc, ctx, cfg)
 
-    # ── B0 threshold records (built from metrics, not score artifacts) ──
-    if ctx.baseline == Baseline.B0:
-        tau_key = (
-            PayloadKey.TAU_B0
-            if PayloadKey.TAU_B0 in ctx.metrics
-            else MetricName.TAU_GLOBAL
-        )
-        tau = float(ctx.metrics[tau_key])
-        pending_ids = ctx.pending_client_ids
-        for row in ctx.normalized_clients:
-            acc.threshold_records.append(
-                ThresholdRecord(
-                    run_id=ctx.run_id,
-                    seed=ctx.seed,
-                    regime=ctx.regime,
-                    baseline=ctx.baseline,
-                    alpha=ctx.alpha_text,
-                    client_id=str(row[PayloadKey.CLIENT_ID]),
-                    threshold_value=tau,
-                    threshold_source=ThresholdSource.B0_POOLED,
-                    calibration_pending=str(row[PayloadKey.CLIENT_ID]) in pending_ids,
-                    tau_global=tau,
-                    threshold_aggregation_method=_lookup_threshold_agg(Baseline.B0),
-                    local_tau_i=None,
-                )
-            )
-
-    # ── Per-client metrics ──
-    _process_per_client_metrics(acc, ctx, threshold_state)
-
-    # ── Manifest ──
-    _build_run_manifest(
-        acc,
-        ctx,
-        git_commit=git_commit,
-        timestamp=timestamp,
-        scoring_hash=scoring_hash,
-        threshold_hash=threshold_hash,
-        metrics_hash=metrics_hash,
-        threshold_aggregation_method=threshold_state.threshold_aggregation_method,
+def _process_b0_threshold_records(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+) -> None:
+    """Build per-client ThresholdRecord entries for B0 (pooled tau from metrics payload)."""
+    if ctx.baseline != Baseline.B0:
+        return
+    tau_key = (
+        PayloadKey.TAU_B0 if PayloadKey.TAU_B0 in ctx.metrics else MetricName.TAU_GLOBAL
     )
+    tau = float(ctx.metrics[tau_key])
+    pending_ids = ctx.pending_client_ids
+    for row in ctx.normalized_clients:
+        client_id = str(row[PayloadKey.CLIENT_ID])
+        acc.threshold_records.append(
+            ThresholdRecord(
+                run_id=ctx.run_id,
+                seed=ctx.seed,
+                regime=ctx.regime,
+                baseline=ctx.baseline,
+                alpha=ctx.alpha_text,
+                client_id=client_id,
+                threshold_value=tau,
+                threshold_source=ThresholdSource.B0_POOLED,
+                calibration_pending=client_id in pending_ids,
+                tau_global=tau,
+                threshold_aggregation_method=_lookup_threshold_agg(Baseline.B0),
+                local_tau_i=None,
+            )
+        )
 
-    # ── B0 sanity ──
-    _process_b0_sanity(acc, ctx, cfg)
 
-    # ── Convergence record ──
+def _append_convergence_record(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+) -> None:
     acc.convergence_records.append(
         ConvergenceAuditRecord(
             regime=ctx.regime,
@@ -1039,8 +1122,40 @@ def _process_run(
         )
     )
 
-    # ── Score hashes ──
-    _process_score_hashes(acc, ctx)
 
-    # ── CICIoT homogeneity ──
+def _process_run(
+    metrics_path: Path,
+    base_dir: Path,
+    acc: _AuditAccumulator,
+    *,
+    git_commit: str,
+    timestamp: str,
+    scoring_hash: str,
+    threshold_hash: str,
+    metrics_hash: str,
+    cfg: DatpConfig,
+    data_root: Path | None = None,
+) -> None:
+    """Process a single metrics file and populate the audit accumulator."""
+    ctx = _load_run_context(metrics_path, base_dir, acc, data_root)
+    if ctx is None:
+        return
+
+    _process_partition_audit(acc, ctx)
+    threshold_state = _process_thresholds(acc, ctx, cfg)
+    _process_b0_threshold_records(acc, ctx)
+    _process_per_client_metrics(acc, ctx, threshold_state)
+    _build_run_manifest(
+        acc,
+        ctx,
+        git_commit=git_commit,
+        timestamp=timestamp,
+        scoring_hash=scoring_hash,
+        threshold_hash=threshold_hash,
+        metrics_hash=metrics_hash,
+        threshold_aggregation_method=threshold_state.threshold_aggregation_method,
+    )
+    _process_b0_sanity(acc, ctx, cfg)
+    _append_convergence_record(acc, ctx)
+    _process_score_hashes(acc, ctx)
     _process_homogeneity(acc, ctx, cfg, threshold_state.cal_errors)

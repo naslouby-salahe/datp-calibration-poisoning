@@ -64,14 +64,39 @@ class SyntheticScoreSet:
     def pending_ids(self) -> tuple[str, ...]:
         return tuple(c.client_id for c in self.pending)
 
-    def cal_dict(self) -> dict[str, np.ndarray]:
-        """Return {client_id: cal_scores} for all clients."""
-        return {c.client_id: c.cal for c in self.clients}
+    @property
+    def calibration_scores(self) -> "SyntheticCalibrationScoreSet":
+        return SyntheticCalibrationScoreSet(
+            tuple(
+                SyntheticCalibrationScores(client_id=c.client_id, scores=c.cal)
+                for c in self.clients
+            )
+        )
 
     def client_by_id(self, client_id: str) -> SyntheticClientScores:
         for c in self.clients:
             if c.client_id == client_id:
                 return c
+        raise KeyError(f"No client with id {client_id!r}")
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticCalibrationScores:
+    client_id: str
+    scores: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticCalibrationScoreSet:
+    clients: tuple[SyntheticCalibrationScores, ...]
+
+    def __len__(self) -> int:
+        return len(self.clients)
+
+    def for_client(self, client_id: str) -> np.ndarray:
+        for client in self.clients:
+            if client.client_id == client_id:
+                return client.scores
         raise KeyError(f"No client with id {client_id!r}")
 
 
@@ -118,6 +143,23 @@ def make_synthetic_client(
     )
 
 
+def _make_fixed_cal_client(
+    *,
+    client_id: str,
+    n_cal: int,
+    client_idx: int,
+    training_seed: int,
+    poisoning_seed: int,
+) -> SyntheticClientScores:
+    return make_synthetic_client(
+        client_id=client_id,
+        n_cal=n_cal,
+        client_idx=client_idx,
+        training_seed=training_seed,
+        poisoning_seed=poisoning_seed,
+    )
+
+
 def make_eligible_client(
     *,
     client_id: str = "eligible_0",
@@ -126,7 +168,7 @@ def make_eligible_client(
     poisoning_seed: int = 100,
 ) -> SyntheticClientScores:
     """Shorthand: eligible client with n_cal >= N_MIN."""
-    return make_synthetic_client(
+    return _make_fixed_cal_client(
         client_id=client_id,
         n_cal=N_MIN + 100,
         client_idx=client_idx,
@@ -143,7 +185,7 @@ def make_pending_client(
     poisoning_seed: int = 100,
 ) -> SyntheticClientScores:
     """Shorthand: Calibration-Pending client with n_cal < N_MIN."""
-    return make_synthetic_client(
+    return _make_fixed_cal_client(
         client_id=client_id,
         n_cal=N_MIN - 1,
         client_idx=client_idx,

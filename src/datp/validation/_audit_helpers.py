@@ -173,7 +173,9 @@ def _argworst(
 
 
 def _safe_diff(a: float | None, b: float | None) -> float | None:
-    if a is None or b is None or not math.isfinite(a) or not math.isfinite(b):
+    if a is None or b is None:
+        return None
+    if not math.isfinite(a) or not math.isfinite(b):
         return None
     return float(a - b)
 
@@ -352,6 +354,53 @@ class _ThresholdState:
         )
 
 
+def _resolve_score_root_and_checkpoint(
+    cell: TrainingCellId,
+    layout: ArtifactLayout,
+    checkpoint_round: int | None,
+) -> tuple[Path, Path]:
+    """Return (score_root, checkpoint) for the given cell and optional round."""
+    if checkpoint_round is not None:
+        score_root = layout.score_cell_for_round(cell, checkpoint_round).score_dir
+        checkpoint = (
+            layout.checkpoint_dir_for_round(cell, checkpoint_round)
+            / ArtifactFile.MODEL_CHECKPOINT
+        )
+    else:
+        score_root = layout.score_cell(cell).score_dir
+        checkpoint = layout.checkpoint_dir(cell) / ArtifactFile.MODEL_CHECKPOINT
+    return score_root, checkpoint
+
+
+def _parse_client_id_sets(
+    metrics: dict[str, Any],
+) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    """Return (incomplete_ids, eligible_client_ids, pending_client_ids) from metrics."""
+    incomplete_ids = frozenset(
+        str(cid) for cid in metrics[PayloadKey.EVAL_INCOMPLETE_IDS]
+    )
+    eligible_client_ids = frozenset(
+        str(cid) for cid in metrics[PayloadKey.ELIGIBLE_IDS]
+    )
+    pending_client_ids = frozenset(str(cid) for cid in metrics[PayloadKey.PENDING_IDS])
+    return incomplete_ids, eligible_client_ids, pending_client_ids
+
+
+def _emit_schema_failures(
+    acc: _AuditAccumulator,
+    metrics_path: Path,
+    schema_failures: list[str],
+) -> None:
+    for failure in schema_failures:
+        acc.warnings.append(
+            WarningRecord(
+                severity=AuditSeverity.FAIL,
+                code=WarningCode.SCHEMA_VERSION_MISMATCH,
+                message=f"{metrics_path}: {failure}",
+            )
+        )
+
+
 def _load_run_context(
     metrics_path: Path,
     base_dir: Path,
@@ -369,34 +418,22 @@ def _load_run_context(
     metrics = _load_json(metrics_path)
     schema_failures = validate_metrics_payload(metrics, module="audit.results")
     if schema_failures:
-        for failure in schema_failures:
-            acc.warnings.append(
-                WarningRecord(
-                    severity=AuditSeverity.FAIL,
-                    code=WarningCode.SCHEMA_VERSION_MISMATCH,
-                    message=f"{metrics_path}: {failure}",
-                )
-            )
+        _emit_schema_failures(acc, metrics_path, schema_failures)
         return None
+
     _data_root = data_root if data_root is not None else base_dir
     checkpoint_round: int | None = metrics.get("checkpoint_round")
     cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
     layout = ArtifactLayout(base_dir=base_dir, regime=regime)
-    if checkpoint_round is not None:
-        score_root = layout.score_cell_for_round(cell, checkpoint_round).score_dir
-        checkpoint = (
-            layout.checkpoint_dir_for_round(cell, checkpoint_round)
-            / ArtifactFile.MODEL_CHECKPOINT
-        )
-    else:
-        score_root = layout.score_cell(cell).score_dir
-        checkpoint = layout.checkpoint_dir(cell) / ArtifactFile.MODEL_CHECKPOINT
+    score_root, checkpoint = _resolve_score_root_and_checkpoint(
+        cell, layout, checkpoint_round
+    )
     partition_path = _partition_manifest_path(
         regime, seed, alpha, base_dir, data_root=_data_root
     )
     partition_payload = _manifest_payload(partition_path)
     metadata = partition_payload.get("metadata", {})
-    feature_count = metadata["n_features"] if "n_features" in metadata else None
+    feature_count = metadata.get("n_features")
     normalized_clients = _normalized_per_client(metrics)
     client_count = int(metrics[PayloadKey.CLIENT_COUNT])
     split_hash = _split_hash(partition_path)
@@ -406,13 +443,9 @@ def _load_run_context(
     train_count, calibration_count, test_count = _metric_counts(metrics)
     eligible_count = int(metrics[PayloadKey.ELIGIBLE_COUNT])
     pending_count = int(metrics[PayloadKey.PENDING_COUNT])
-    incomplete_ids = frozenset(
-        str(cid) for cid in metrics[PayloadKey.EVAL_INCOMPLETE_IDS]
+    incomplete_ids, eligible_client_ids, pending_client_ids = _parse_client_id_sets(
+        metrics
     )
-    eligible_client_ids = frozenset(
-        str(cid) for cid in metrics[PayloadKey.ELIGIBLE_IDS]
-    )
-    pending_client_ids = frozenset(str(cid) for cid in metrics[PayloadKey.PENDING_IDS])
     conv = _convergence_payload(checkpoint)
     invariant_key = InvariantKey(regime, seed, alpha_text)
     return _RunContext(

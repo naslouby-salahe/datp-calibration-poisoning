@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import math
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -50,23 +51,49 @@ def _parquet_num_rows(path: Path) -> int | None:
     return int(pq.read_metadata(path).num_rows)
 
 
+def _device_family_subtype(rest: str) -> tuple[str, str] | None:
+    """Return (family, subtype) for a device-relative path, or None if no family matches."""
+    for family in NBAIOT_SPEC.attack_family_dirs:
+        if rest.startswith(f"{family}/"):
+            return family, rest[len(family) + 1 :]
+    return None
+
+
 def _attack_files_by_family(
     file_hash_keys: list[str], device: str
-) -> dict[str, list[str]]:
-    by_family: dict[str, list[str]] = {
-        family: [] for family in NBAIOT_SPEC.attack_family_dirs
-    }
+) -> tuple[AttackFamilyFiles, ...]:
+    return tuple(
+        AttackFamilyFiles(
+            family=family,
+            files=tuple(sorted(_attack_subtypes_for_family(file_hash_keys, device, family))),
+        )
+        for family in NBAIOT_SPEC.attack_family_dirs
+    )
+
+
+def _attack_subtypes_for_family(
+    file_hash_keys: list[str], device: str, target_family: str
+) -> tuple[str, ...]:
     prefix = f"{device}/"
+    subtypes: list[str] = []
     for key in file_hash_keys:
         if not key.startswith(prefix):
             continue
-        rest = key[len(prefix) :]
-        for family in NBAIOT_SPEC.attack_family_dirs:
-            if rest.startswith(f"{family}/"):
-                subtype = rest[len(family) + 1 :]
-                by_family[family].append(subtype)
-                break
-    return {k: sorted(v) for k, v in by_family.items()}
+        match = _device_family_subtype(key[len(prefix) :])
+        if match is None:
+            continue
+        family, subtype = match
+        if family == target_family:
+            subtypes.append(subtype)
+    return tuple(subtypes)
+
+
+def _attack_files_mapping(
+    attack_files: tuple[AttackFamilyFiles, ...],
+) -> AttackFilesMapping:
+    return AttackFilesMapping(
+        tuple((entry.family, list(entry.files)) for entry in attack_files)
+    )
 
 
 def build_nbaiot_per_device(
@@ -104,14 +131,16 @@ def build_nbaiot_per_device(
                 benign_test=benign_test_n,
                 attack_test_total=attack_test_n,
                 benign_class_imbalance_ratio=ratio,
-                attack_files_by_family=_attack_files_by_family(file_hash_keys, device),
+                attack_files_by_family=_attack_files_mapping(
+                    _attack_files_by_family(file_hash_keys, device)
+                ),
             )
         )
     return out
 
 
 def _feature_list_hash(feature_list: list[str]) -> str:
-    return hash_jsonable({"features": feature_list})
+    return hash_jsonable((("features", tuple(feature_list)),))
 
 
 def build_ciciot_protocol() -> CICIoTProtocolAudit:
@@ -157,8 +186,85 @@ class HomogeneitySummary:
     verdict: HomogeneityVerdict
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class AttackFamilyFiles:
+    family: str
+    files: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class AttackFilesMapping(Mapping[str, list[str]]):
+    entries: tuple[tuple[str, list[str]], ...]
+
+    def __getitem__(self, key: str) -> list[str]:
+        for family, files in self.entries:
+            if family == key:
+                return files
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (family for family, _ in self.entries)
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ClientDeviceMixture:
+    client_id: str
+    proportions: tuple[tuple[str, float], ...]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DeviceProportionMapping(Mapping[str, float]):
+    entries: tuple[tuple[str, float], ...]
+
+    def __getitem__(self, key: str) -> float:
+        for device, proportion in self.entries:
+            if device == key:
+                return proportion
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (device for device, _ in self.entries)
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DeviceMixtureMapping(Mapping[str, DeviceProportionMapping]):
+    entries: tuple[tuple[str, DeviceProportionMapping], ...]
+
+    def __getitem__(self, key: str) -> DeviceProportionMapping:
+        for client_id, proportions in self.entries:
+            if client_id == key:
+                return proportions
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (client_id for client_id, _ in self.entries)
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ClientSummaryClassification:
+    n_eligible: int
+    n_pending: int
+    pending_ids: tuple[str, ...]
+    device_mixture: tuple[ClientDeviceMixture, ...]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ClusterAssignments:
+    seed: int
+    assignments: tuple[tuple[str, int], ...]
+
+
 def compute_ciciot_homogeneity(
-    cal_errors_by_client: dict[str, "np.ndarray"],
+    cal_errors_by_client: Mapping[str, "np.ndarray"],
     *,
     n_bins: int,
     threshold: float,
@@ -206,8 +312,8 @@ class _AlphaAuditMetrics:
     n_clients: int
     n_eligible: int
     n_pending: int
-    device_mixture: dict[str, dict[str, float]]
-    pending_client_ids: list[str]
+    device_mixture: tuple[ClientDeviceMixture, ...]
+    pending_client_ids: tuple[str, ...]
     js_divergence_mean: float | None
     device_mixture_js_summary: JSSummary | None
 
@@ -219,53 +325,94 @@ def _load_alpha_audit_data(prepared_dir: Path) -> RegimeCManifestMetadata | None
     if not manifest_path.exists():
         return None
     try:
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return RegimeCManifestMetadata.model_validate(payload["metadata"])
+        payload = cast(
+            Mapping[str, object],
+            json.loads(manifest_path.read_text(encoding="utf-8")),
+        )
+        return RegimeCManifestMetadata.model_validate(payload.get("metadata"))
     except (KeyError, ValueError):
         return None
 
 
-def _compute_alpha_metrics(metadata: RegimeCManifestMetadata) -> _AlphaAuditMetrics:
-    n_clients = metadata.n_clients
+def _classify_client_summaries(
+    client_summaries: list[object],
+) -> ClientSummaryClassification:
+    """Partition client summaries into eligible vs pending counts and collect device mixtures."""
     n_eligible = 0
     n_pending = 0
-    device_mixture: dict[str, dict[str, float]] = {}
-    pending_client_ids: list[str] = []
-
-    for cs in metadata.client_summaries:
-        if cs.calibration_pending:
+    pending_ids: list[str] = []
+    device_mixture: list[ClientDeviceMixture] = []
+    for cs in client_summaries:  # type: ignore[attr-defined]
+        if cs.calibration_pending:  # type: ignore[union-attr]
             n_pending += 1
-            pending_client_ids.append(cs.client_id)
+            pending_ids.append(cs.client_id)  # type: ignore[union-attr]
         else:
             n_eligible += 1
-        device_mixture[cs.client_id] = dict(cs.device_mixture_proportions)
-
-    js_mean = metadata.js_divergence
-
-    device_mixture_js_summary: JSSummary | None = None
-    if len(device_mixture) >= 2:
-        all_devices = sorted({d for m in device_mixture.values() for d in m})
-        if all_devices:
-            mixture_vectors = [
-                np.array(
-                    [
-                        device_mixture[cid][d] if d in device_mixture[cid] else 0.0
-                        for d in all_devices
-                    ],
-                    dtype=np.float64,
-                )
-                for cid in sorted(device_mixture.keys())
-            ]
-            device_mixture_js_summary = pairwise_js_from_distributions(mixture_vectors)
-
-    return _AlphaAuditMetrics(
-        n_clients=n_clients,
+        device_mixture.append(
+            ClientDeviceMixture(
+                client_id=cs.client_id,  # type: ignore[union-attr]
+                proportions=tuple(
+                    sorted(cs.device_mixture_proportions.items())  # type: ignore[union-attr]
+                ),
+            )
+        )
+    return ClientSummaryClassification(
         n_eligible=n_eligible,
         n_pending=n_pending,
-        device_mixture=device_mixture,
-        pending_client_ids=pending_client_ids,
-        js_divergence_mean=js_mean,
-        device_mixture_js_summary=device_mixture_js_summary,
+        pending_ids=tuple(pending_ids),
+        device_mixture=tuple(device_mixture),
+    )
+
+
+def _device_mixture_js(
+    device_mixture: tuple[ClientDeviceMixture, ...],
+) -> JSSummary | None:
+    if len(device_mixture) < 2:
+        return None
+    all_devices = sorted({device for mixture in device_mixture for device, _ in mixture.proportions})
+    if not all_devices:
+        return None
+    mixture_vectors = [
+        np.array(
+            [_mixture_value(mixture, device) for device in all_devices],
+            dtype=np.float64,
+        )
+        for mixture in sorted(device_mixture, key=lambda item: item.client_id)
+    ]
+    return pairwise_js_from_distributions(mixture_vectors)
+
+
+def _mixture_value(mixture: ClientDeviceMixture, device: str) -> float:
+    for candidate, value in mixture.proportions:
+        if candidate == device:
+            return value
+    return 0.0
+
+
+def _device_mixture_mapping(
+    device_mixture: tuple[ClientDeviceMixture, ...],
+) -> DeviceMixtureMapping:
+    return DeviceMixtureMapping(
+        tuple(
+            (
+                mixture.client_id,
+                DeviceProportionMapping(mixture.proportions),
+            )
+            for mixture in device_mixture
+        )
+    )
+
+
+def _compute_alpha_metrics(metadata: RegimeCManifestMetadata) -> _AlphaAuditMetrics:
+    classification = _classify_client_summaries(metadata.client_summaries)
+    return _AlphaAuditMetrics(
+        n_clients=metadata.n_clients,
+        n_eligible=classification.n_eligible,
+        n_pending=classification.n_pending,
+        device_mixture=classification.device_mixture,
+        pending_client_ids=classification.pending_ids,
+        js_divergence_mean=metadata.js_divergence,
+        device_mixture_js_summary=_device_mixture_js(classification.device_mixture),
     )
 
 
@@ -288,8 +435,8 @@ def _build_alpha_record(
         n_calibration_pending=metrics.n_pending,
         coverage_ratio=coverage,
         js_divergence_mean=metrics.js_divergence_mean,
-        device_mixture_proportions=metrics.device_mixture,
-        pending_client_ids=metrics.pending_client_ids,
+        device_mixture_proportions=_device_mixture_mapping(metrics.device_mixture),
+        pending_client_ids=list(metrics.pending_client_ids),
         device_mixture_js_mean=dmjs.mean if dmjs is not None else None,
         device_mixture_js_std=dmjs.std if dmjs is not None else None,
         device_mixture_js_p50=dmjs.p50 if dmjs is not None else None,
@@ -310,16 +457,6 @@ def build_regime_c_alpha_audit(
     return _build_alpha_record(alpha, seed, metrics)
 
 
-_SEVERITY_FIELD: dict[SeverityVariable, str] = {
-    SeverityVariable.DEVICE_MIXTURE_JS_MEAN: "device_mixture_js_mean",
-    SeverityVariable.RECON_ERROR_JS_MEAN: "recon_error_js_mean",
-}
-
-_OUTCOME_FIELD: dict[OutcomeVariable, str] = {
-    OutcomeVariable.DELTA_B1_B2: "delta_b1_b2",
-}
-
-
 def _try_extract_severity(
     record: RegimeCAlphaAuditRecord,
     sev_var: SeverityVariable,
@@ -329,8 +466,7 @@ def _try_extract_severity(
         if math.isinf(alpha_numeric) or math.isnan(alpha_numeric):
             return None
         return alpha_numeric
-    field = _SEVERITY_FIELD[sev_var]
-    raw = getattr(record, field)
+    raw = _severity_value(record, sev_var)
     if raw is None:
         return None
     val = float(raw)
@@ -343,14 +479,33 @@ def _try_extract_outcome(
     record: RegimeCAlphaAuditRecord,
     outcome_var: OutcomeVariable,
 ) -> float | None:
-    field = _OUTCOME_FIELD[outcome_var]
-    raw = getattr(record, field)
+    raw = _outcome_value(record, outcome_var)
     if raw is None:
         return None
     val = float(raw)
     if math.isnan(val):
         return None
     return val
+
+
+def _severity_value(
+    record: RegimeCAlphaAuditRecord, sev_var: SeverityVariable
+) -> float | None:
+    match sev_var:
+        case SeverityVariable.DEVICE_MIXTURE_JS_MEAN:
+            return record.device_mixture_js_mean
+        case SeverityVariable.RECON_ERROR_JS_MEAN:
+            return record.recon_error_js_mean
+        case SeverityVariable.ALPHA_NUMERIC:
+            raise ValueError("alpha numeric is derived from the alpha label")
+
+
+def _outcome_value(
+    record: RegimeCAlphaAuditRecord, outcome_var: OutcomeVariable
+) -> float | None:
+    match outcome_var:
+        case OutcomeVariable.DELTA_B1_B2:
+            return record.delta_b1_b2
 
 
 def _build_severity_pairs(
@@ -371,33 +526,36 @@ def _build_severity_pairs(
     return pairs
 
 
-def _build_severity_record(
-    sev_var: SeverityVariable,
-    outcome_var: OutcomeVariable,
-    n_cells: int,
-    *,
-    rho: float | None,
-    p_value: float | None,
-    sig_alpha: float,
-) -> RegimeCSeverityTrendRecord:
-    if rho is None:
+@dataclasses.dataclass(frozen=True, slots=True)
+class _SeverityTestResult:
+    sev_var: SeverityVariable
+    outcome_var: OutcomeVariable
+    n_cells: int
+    rho: float | None
+    p_value: float | None
+    sig_alpha: float
+
+
+def _build_severity_record(result: _SeverityTestResult) -> RegimeCSeverityTrendRecord:
+    if result.rho is None:
         return RegimeCSeverityTrendRecord(
-            severity_variable=sev_var,
-            comparison=outcome_var,
-            n_cells=n_cells,
+            severity_variable=result.sev_var,
+            comparison=result.outcome_var,
+            n_cells=result.n_cells,
             spearman_rho=None,
             p_value=None,
             status=SeverityTrendStatus.INSUFFICIENT_DATA,
         )
+    significant = result.p_value is not None and result.p_value < result.sig_alpha
     return RegimeCSeverityTrendRecord(
-        severity_variable=sev_var,
-        comparison=outcome_var,
-        n_cells=n_cells,
-        spearman_rho=rho,
-        p_value=p_value,
+        severity_variable=result.sev_var,
+        comparison=result.outcome_var,
+        n_cells=result.n_cells,
+        spearman_rho=result.rho,
+        p_value=result.p_value,
         status=(
             SeverityTrendStatus.SIGNIFICANT
-            if p_value is not None and p_value < sig_alpha
+            if significant
             else SeverityTrendStatus.NOT_SIGNIFICANT
         ),
     )
@@ -426,12 +584,9 @@ def compute_regime_c_severity_trend(
         if n_cells < 3:
             results.append(
                 _build_severity_record(
-                    sev_var,
-                    outcome_var,
-                    n_cells,
-                    rho=None,
-                    p_value=None,
-                    sig_alpha=sig_alpha,
+                    _SeverityTestResult(
+                        sev_var, outcome_var, n_cells, None, None, sig_alpha
+                    )
                 )
             )
             continue
@@ -441,12 +596,9 @@ def compute_regime_c_severity_trend(
         sr = spearman_correlation(x, y, significance_alpha=sig_alpha)
         results.append(
             _build_severity_record(
-                sev_var,
-                outcome_var,
-                n_cells,
-                rho=sr.rho,
-                p_value=sr.p_value,
-                sig_alpha=sig_alpha,
+                _SeverityTestResult(
+                    sev_var, outcome_var, n_cells, sr.rho, sr.p_value, sig_alpha
+                )
             )
         )
 
@@ -454,23 +606,25 @@ def compute_regime_c_severity_trend(
 
 
 def compute_b4_cluster_stability(
-    cluster_assignments_by_seed: dict[int, dict[str, int]],
+    cluster_assignments_by_seed: tuple[ClusterAssignments, ...],
     regime: Regime,
     alpha: str | None,
 ) -> list[B4ClusterStabilityRecord]:
     from sklearn.metrics import adjusted_rand_score  # type: ignore[import-untyped]  # noqa: PLC0415
 
-    seeds = sorted(cluster_assignments_by_seed.keys())
+    seeds = sorted({item.seed for item in cluster_assignments_by_seed})
     records: list[B4ClusterStabilityRecord] = []
     for i, seed_a in enumerate(seeds):
         for seed_b in seeds[i + 1 :]:
-            assigns_a = cluster_assignments_by_seed[seed_a]
-            assigns_b = cluster_assignments_by_seed[seed_b]
-            common = sorted(set(assigns_a) & set(assigns_b))
+            assigns_a = _assignments_for_seed(cluster_assignments_by_seed, seed_a)
+            assigns_b = _assignments_for_seed(cluster_assignments_by_seed, seed_b)
+            client_ids_a = {client_id for client_id, _ in assigns_a}
+            client_ids_b = {client_id for client_id, _ in assigns_b}
+            common = sorted(client_ids_a & client_ids_b)
             if len(common) < 2:
                 continue
-            labels_a = [assigns_a[c] for c in common]
-            labels_b = [assigns_b[c] for c in common]
+            labels_a = [_assignment_for_client(assigns_a, client_id) for client_id in common]
+            labels_b = [_assignment_for_client(assigns_b, client_id) for client_id in common]
             ari = float(adjusted_rand_score(labels_a, labels_b))
             records.append(
                 B4ClusterStabilityRecord(
@@ -482,3 +636,21 @@ def compute_b4_cluster_stability(
                 )
             )
     return records
+
+
+def _assignments_for_seed(
+    cluster_assignments_by_seed: tuple[ClusterAssignments, ...], seed: int
+) -> tuple[tuple[str, int], ...]:
+    for item in cluster_assignments_by_seed:
+        if item.seed == seed:
+            return tuple(sorted(item.assignments))
+    raise KeyError(seed)
+
+
+def _assignment_for_client(
+    assignments: tuple[tuple[str, int], ...], client_id: str
+) -> int:
+    for candidate, cluster in assignments:
+        if candidate == client_id:
+            return cluster
+    raise KeyError(client_id)

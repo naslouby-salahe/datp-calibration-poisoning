@@ -30,6 +30,7 @@ from datp.data.datasets.ciciot2023.spec import (
 from datp.data.manifests import create_manifest
 from datp.data.sampling import apply_ciciot_cap
 from datp.data.scaling import apply_scaler, fit_scaler
+from sklearn.preprocessing import StandardScaler
 from datp.data.splits import Split
 
 logger = get_logger(__name__)
@@ -138,6 +139,76 @@ def validate_schema(raw_dir: Path) -> None:
     )
 
 
+def _split_benign_features(
+    benign_features: pl.DataFrame,
+    features: list[str],
+    seed: int,
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    n_benign = len(benign_features)
+    if n_benign < 3:
+        return (
+            benign_features,
+            create_empty_feature_frame(features),
+            create_empty_feature_frame(features),
+        )
+    n_train = round(n_benign * 0.70)
+    n_cal = round(n_benign * CAL_FRACTION)
+    shuffled = benign_features.sample(fraction=1.0, seed=seed, with_replacement=False)
+    return (
+        shuffled.slice(0, n_train),
+        shuffled.slice(n_train, n_cal),
+        shuffled.slice(n_train + n_cal),
+    )
+
+
+def _scale_ciciot_splits(
+    train_df: pl.DataFrame,
+    cal_df: pl.DataFrame,
+    test_benign_df: pl.DataFrame,
+    attack_features: pl.DataFrame,
+    features: list[str],
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame, StandardScaler]:
+    if len(train_df) > 0:
+        scaler = fit_scaler(train_df)
+        return (
+            apply_scaler(train_df, scaler),
+            apply_scaler(cal_df, scaler),
+            apply_scaler(test_benign_df, scaler),
+            apply_scaler(attack_features, scaler),
+            scaler,
+        )
+    scaler = fit_scaler(pl.DataFrame(np.zeros((1, len(features))), schema=features))
+    empty = create_empty_feature_frame(features)
+    return empty, empty, empty, empty, scaler
+
+
+def _resolve_attack_labels(
+    client_id: str,
+    attack_capped: pl.DataFrame,
+) -> tuple[pl.DataFrame, list[str]]:
+    if len(attack_capped) == 0:
+        return pl.DataFrame({LABEL_COLUMN: pl.Series([], dtype=pl.Utf8)}), []
+    attack_labels_series = attack_capped[LABEL_COLUMN]
+    unknown = [
+        lbl
+        for lbl in attack_labels_series.unique().to_list()
+        if lbl != BENIGN_LABEL and attack_family(lbl) is None
+    ]
+    if unknown:
+        raise ValueError(
+            fmt(
+                _CICIOT_MODULE,
+                f"Unknown attack labels in {client_id}",
+                "labels mappable to a known attack family",
+                str(sorted(unknown)),
+            )
+        )
+    return (
+        pl.DataFrame({LABEL_COLUMN: attack_labels_series}),
+        sorted(attack_labels_series.unique().to_list()),
+    )
+
+
 def _prepare_client(
     client_id: str,
     csv_path: Path,
@@ -181,44 +252,20 @@ def _prepare_client(
     attack_capped = df_capped.filter(pl.col(LABEL_COLUMN) != BENIGN_LABEL)
 
     evaluation_incomplete = len(attack_capped) == 0
-
     if evaluation_incomplete:
-        logger.warning(
-            "client has zero attack records after cap",
-            client=client_id,
-        )
+        logger.warning("client has zero attack records after cap", client=client_id)
 
     benign_features = benign_capped.select(features)
     attack_features = attack_capped.select(features)
 
-    n_benign = len(benign_features)
-
-    if n_benign < 3:
-        train_df = benign_features
-        cal_df = create_empty_feature_frame(features)
-        test_benign_df = create_empty_feature_frame(features)
-    else:
-        n_train = round(n_benign * 0.70)
-        n_cal = round(n_benign * CAL_FRACTION)
-        shuffled = benign_features.sample(
-            fraction=1.0, seed=seed, with_replacement=False
+    train_df, cal_df, test_benign_df = _split_benign_features(
+        benign_features, features, seed
+    )
+    train_scaled, cal_scaled, test_benign_scaled, test_attack_scaled, scaler = (
+        _scale_ciciot_splits(
+            train_df, cal_df, test_benign_df, attack_features, features
         )
-        train_df = shuffled.slice(0, n_train)
-        cal_df = shuffled.slice(n_train, n_cal)
-        test_benign_df = shuffled.slice(n_train + n_cal)
-
-    if len(train_df) > 0:
-        scaler = fit_scaler(train_df)
-        train_scaled = apply_scaler(train_df, scaler)
-        cal_scaled = apply_scaler(cal_df, scaler)
-        test_benign_scaled = apply_scaler(test_benign_df, scaler)
-        test_attack_scaled = apply_scaler(attack_features, scaler)
-    else:
-        scaler = fit_scaler(pl.DataFrame(np.zeros((1, len(features))), schema=features))
-        train_scaled = create_empty_feature_frame(features)
-        cal_scaled = create_empty_feature_frame(features)
-        test_benign_scaled = create_empty_feature_frame(features)
-        test_attack_scaled = create_empty_feature_frame(features)
+    )
 
     write_client_splits(
         client_dir=client_out,
@@ -232,28 +279,7 @@ def _prepare_client(
         scaler=scaler,
     )
 
-    if len(attack_capped) > 0:
-        attack_labels_series = attack_capped[LABEL_COLUMN]
-        unknown = [
-            lbl
-            for lbl in attack_labels_series.unique().to_list()
-            if lbl != BENIGN_LABEL and attack_family(lbl) is None
-        ]
-        if unknown:
-            raise ValueError(
-                fmt(
-                    _CICIOT_MODULE,
-                    f"Unknown attack labels in {client_id}",
-                    "labels mappable to a known attack family",
-                    str(sorted(unknown)),
-                )
-            )
-        labels_df = pl.DataFrame({LABEL_COLUMN: attack_labels_series})
-        attack_categories = sorted(attack_labels_series.unique().to_list())
-    else:
-        labels_df = pl.DataFrame({LABEL_COLUMN: pl.Series([], dtype=pl.Utf8)})
-        attack_categories = []
-
+    labels_df, attack_categories = _resolve_attack_labels(client_id, attack_capped)
     labels_path = client_out / TEST_ATTACK_LABELS_ARTIFACT
     labels_df.write_parquet(str(labels_path))
 

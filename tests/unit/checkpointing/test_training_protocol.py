@@ -8,7 +8,7 @@ from datp.checkpointing.enums import CheckpointConvergenceMode
 from datp.config.compose import BASE_CONFIG
 from datp.core.enums import B4RegimeAMode
 from datp.federated.convergence import ConvergenceMonitor
-from datp.federated.strategies import DatpFedAvg
+from datp.federated.strategies import DatpFedAvg, FedAvgConfig
 
 
 def test_convergence_log_only_does_not_stop_training() -> None:
@@ -37,15 +37,19 @@ def test_strategy_log_only_mode_does_not_enter_stopped_state() -> None:
         window=2,
     )
     strategy = DatpFedAvg(
-        convergence_monitor=monitor,
-        round_timeout_s=300.0,
-        fraction_fit=1.0,
-        fraction_evaluate=1.0,
-        min_fit_clients=1,
-        min_evaluate_clients=1,
-        min_available_clients=1,
-        initial_parameters=ndarrays_to_parameters([np.zeros((2, 2), dtype=np.float32)]),
-        convergence_mode=CheckpointConvergenceMode.LOG_ONLY,
+        FedAvgConfig(
+            convergence_monitor=monitor,
+            round_timeout_s=300.0,
+            fraction_fit=1.0,
+            fraction_evaluate=1.0,
+            min_fit_clients=1,
+            min_evaluate_clients=1,
+            min_available_clients=1,
+            initial_parameters=ndarrays_to_parameters(
+                [np.zeros((2, 2), dtype=np.float32)]
+            ),
+            convergence_mode=CheckpointConvergenceMode.LOG_ONLY,
+        )
     )
     proxy = MagicMock()
     result = MagicMock()

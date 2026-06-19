@@ -162,44 +162,60 @@ class ResultTable:
         return path
 
 
-def _build_table_row(
+def _mean_std(values: list[float]) -> tuple[float, float]:
+    """Return (mean, sample std) for a list; std is 0.0 for a single element."""
+    return float(np.mean(values)), float(np.std(values, ddof=1)) if len(
+        values
+    ) > 1 else 0.0
+
+
+def _validate_coverage_stability(
     baseline: Baseline,
     results: list[EvaluationResult],
-) -> TableRow:
-    cv_fprs = [r.cv_fpr for r in results]
-    cv_tprs = [r.cv_tpr for r in results]
-    worst_bas = [r.worst_ba for r in results]
-    macro_f1s = [r.p10_macro_f1 for r in results]
-
-    eligible_count = len(results[0].eligible_ids)
-    pending_count = len(results[0].pending_ids)
-    coverage = results[0].coverage_ratio
+    expected_eligible: int,
+    expected_pending: int,
+) -> None:
+    """Raise if any result has non-finite coverage or mismatched eligible/pending counts."""
     for result in results:
         if not np.isfinite(result.coverage_ratio):
             raise ValueError(
                 f"[reporting] Coverage ratio missing. Expected: finite coverage for {baseline}. Got: {result.coverage_ratio}."
             )
         if (
-            len(result.eligible_ids) != eligible_count
-            or len(result.pending_ids) != pending_count
+            len(result.eligible_ids) != expected_eligible
+            or len(result.pending_ids) != expected_pending
         ):
             raise ValueError(
                 f"[reporting] Coverage count mismatch. Expected: stable eligible/pending counts for {baseline}. Got: seed={result.seed} eligible={len(result.eligible_ids)} pending={len(result.pending_ids)}."
             )
 
+
+def _build_table_row(
+    baseline: Baseline,
+    results: list[EvaluationResult],
+) -> TableRow:
+    eligible_count = len(results[0].eligible_ids)
+    pending_count = len(results[0].pending_ids)
+    _validate_coverage_stability(baseline, results, eligible_count, pending_count)
+
+    cv_fpr_mean, cv_fpr_std = _mean_std([r.cv_fpr for r in results])
+    cv_tpr_mean, cv_tpr_std = _mean_std([r.cv_tpr for r in results])
+    worst_ba_mean, worst_ba_std = _mean_std([r.worst_ba for r in results])
+    macro_f1_mean, macro_f1_std = _mean_std([r.p10_macro_f1 for r in results])
+
     return TableRow(
         baseline=baseline,
-        cv_fpr_mean=float(np.mean(cv_fprs)),
-        cv_fpr_std=float(np.std(cv_fprs, ddof=1)) if len(cv_fprs) > 1 else 0.0,
-        cv_tpr_mean=float(np.mean(cv_tprs)),
-        cv_tpr_std=float(np.std(cv_tprs, ddof=1)) if len(cv_tprs) > 1 else 0.0,
-        worst_ba_mean=float(np.mean(worst_bas)),
-        worst_ba_std=float(np.std(worst_bas, ddof=1)) if len(worst_bas) > 1 else 0.0,
-        macro_f1_mean=float(np.mean(macro_f1s)),
-        macro_f1_std=float(np.std(macro_f1s, ddof=1)) if len(macro_f1s) > 1 else 0.0,
+        cv_fpr_mean=cv_fpr_mean,
+        cv_fpr_std=cv_fpr_std,
+        cv_tpr_mean=cv_tpr_mean,
+        cv_tpr_std=cv_tpr_std,
+        worst_ba_mean=worst_ba_mean,
+        worst_ba_std=worst_ba_std,
+        macro_f1_mean=macro_f1_mean,
+        macro_f1_std=macro_f1_std,
         eligible_count=eligible_count,
         pending_count=pending_count,
-        coverage_ratio=coverage,
+        coverage_ratio=results[0].coverage_ratio,
     )
 
 

@@ -28,18 +28,23 @@ def completed_metric_paths(base_dir: Path) -> list[Path]:
     )
 
 
+def _parse_seed(parts: tuple[str, ...], seed_idx: int) -> int:
+    """Extract seed integer from a ``seed_N`` path segment."""
+    seed_segment = parts[seed_idx]
+    if not seed_segment.startswith(PathToken.SEED_PREFIX):
+        raise ValueError(
+            f"Expected seed segment with prefix {PathToken.SEED_PREFIX!r}, got {seed_segment!r}"
+        )
+    return int(seed_segment.removeprefix(PathToken.SEED_PREFIX))
+
+
 def parse_metric_path(base_dir: Path, path: Path) -> BaselineRunId:
     """Parse ``<results_root>/<regime>/<baseline>/seed_N[/alpha_a]/metrics.json`` into a ``BaselineRunId``."""
     rel = path.relative_to(base_dir / ArtifactDir.RESULTS)
     parts = rel.parts
     regime = Regime(parts[0])
     baseline = Baseline(parts[1])
-    seed_segment = parts[2]
-    if not seed_segment.startswith(PathToken.SEED_PREFIX):
-        raise ValueError(
-            f"Expected seed segment with prefix {PathToken.SEED_PREFIX!r}, got {seed_segment!r}"
-        )
-    seed = int(seed_segment.removeprefix(PathToken.SEED_PREFIX))
+    seed = _parse_seed(parts, seed_idx=2)
     alpha = parse_alpha_dir(parts[3]) if len(parts) > 4 else None
     return BaselineRunId(
         cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
@@ -91,12 +96,7 @@ def parse_score_cell_dir(scores_root: Path, cell_dir: Path) -> ScoreCellLocation
     rel = cell_dir.relative_to(scores_root)
     parts = rel.parts
     regime = Regime(parts[0])
-    seed_segment = parts[1]
-    if not seed_segment.startswith(PathToken.SEED_PREFIX):
-        raise ValueError(
-            f"Expected seed segment with prefix {PathToken.SEED_PREFIX!r}, got {seed_segment!r}"
-        )
-    seed = int(seed_segment.removeprefix(PathToken.SEED_PREFIX))
+    seed = _parse_seed(parts, seed_idx=1)
     alpha = parse_alpha_dir(parts[2]) if len(parts) > 2 else None
     return ScoreCellLocation(
         cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),

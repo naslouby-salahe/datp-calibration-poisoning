@@ -1,16 +1,118 @@
 from __future__ import annotations
 
 import contextlib
+import enum
 import math
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, Protocol
+from typing import Generator, Generic, Protocol, TypeVar
 
+from datp.artifacts.names import ArtifactDir
+from datp.core.enums import Baseline
 from datp.core.logging import get_logger
+from datp.core.metric_enums import MetricName
 
 logger = get_logger(__name__)
 
 _TRACKING_ENABLED = False
 _MLFLOW: _MlflowModule | None = None
+_PayloadItemT = TypeVar("_PayloadItemT")
+TrackingValue = str | int | float | bool | enum.Enum | None
+
+
+class TrackingMetricKey(enum.StrEnum):
+    TRAIN_LOSS = "train_loss"
+    VAL_LOSS = "val_loss"
+    BEST_VAL_LOSS = "best_val_loss"
+    TAU = "tau"
+    TAU_GLOBAL = "tau_global"
+    N_CLIENTS = "n_clients"
+    EPOCHS_RUN = "epochs_run"
+    CALIBRATION_PENDING_COUNT = "calibration_pending_count"
+    SWEEP_TOTAL = "sweep_total"
+    SWEEP_COMPLETED = "sweep_completed"
+    SWEEP_SKIPPED = "sweep_skipped"
+    SWEEP_FAILED = "sweep_failed"
+    SWEEP_ELAPSED_S = "sweep_elapsed_s"
+    CONVERGED_ROUND = "converged_round"
+    TOTAL_ROUNDS = "total_rounds"
+    ELIGIBLE = "eligible"
+    PENDING = "pending"
+
+
+class TrackingParamKey(enum.StrEnum):
+    BASELINE = "baseline"
+    REGIME = "regime"
+    SEED = "seed"
+    ALPHA = "alpha"
+    EPOCHS = "epochs"
+    PATIENCE = "patience"
+    LEARNING_RATE = "learning_rate"
+    BATCH_SIZE = "batch_size"
+    Q = "q"
+    N_MIN = "n_min"
+    NORMALIZATION_MODE = "normalization_mode"
+    ROUNDS_MAX = "rounds_max"
+    LABEL = "label"
+
+
+class TrackingTagKey(enum.StrEnum):
+    BASELINE = "baseline"
+    PIPELINE = "pipeline"
+
+
+@dataclass(frozen=True, slots=True)
+class BaselineTrackingMetricKey:
+    baseline: Baseline
+    key: TrackingMetricKey
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingMetric:
+    key: TrackingMetricKey | MetricName | BaselineTrackingMetricKey
+    value: float | int
+
+    @classmethod
+    def for_baseline(
+        cls,
+        baseline: Baseline,
+        key: TrackingMetricKey,
+        value: float | int,
+    ) -> "TrackingMetric":
+        return cls(key=BaselineTrackingMetricKey(baseline=baseline, key=key), value=value)
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingParam:
+    key: TrackingParamKey
+    value: TrackingValue
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingTag:
+    key: TrackingTagKey
+    value: TrackingValue
+
+
+@dataclass(frozen=True, slots=True)
+class _TrackingPayload(Generic[_PayloadItemT]):
+    payload: tuple[_PayloadItemT, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingMetrics(_TrackingPayload[TrackingMetric]):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingParams(_TrackingPayload[TrackingParam]):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingTags(_TrackingPayload[TrackingTag]):
+    pass
 
 
 class _MlflowRun(Protocol):
@@ -28,10 +130,10 @@ class _MlflowModule(Protocol):
     def start_run(self, *, run_name: str, nested: bool) -> _MlflowRun: ...
     def active_run(self) -> _MlflowRun | None: ...
     def log_metrics(
-        self, metrics: dict[str, float], step: int | None = ...
+        self, metrics: Mapping[str, float], step: int | None = ...
     ) -> None: ...
-    def log_params(self, params: dict[str, str]) -> None: ...
-    def set_tags(self, tags: dict[str, str]) -> None: ...
+    def log_params(self, params: Mapping[str, str]) -> None: ...
+    def set_tags(self, tags: Mapping[str, str]) -> None: ...
     def log_artifact(
         self, local_path: str, artifact_path: str | None = ...
     ) -> None: ...
@@ -76,8 +178,8 @@ def init_tracking(
 def tracking_run(
     *,
     run_name: str,
-    params: dict[str, str] | None,
-    tags: dict[str, str] | None,
+    params: TrackingParams | None,
+    tags: TrackingTags | None,
 ) -> Generator[None, None, None]:
     if not _TRACKING_ENABLED:
         yield
@@ -90,18 +192,22 @@ def tracking_run(
 
     nested = mlflow.active_run() is not None
     with mlflow.start_run(run_name=run_name, nested=nested):
-        if tags:
-            mlflow.set_tags(tags)
-        if params:
-            mlflow.log_params(params)
+        if tags is not None:
+            tag_payload = _tags_to_mapping(tags)
+            if tag_payload:
+                mlflow.set_tags(tag_payload)
+        if params is not None:
+            param_payload = _params_to_mapping(params)
+            if param_payload:
+                mlflow.log_params(param_payload)
         yield
 
 
 def log_metrics(
-    metrics: dict[str, float | int],
+    metrics: TrackingMetrics,
     *,
     step: int | None,
-    prefix: str | None,
+    prefix: str | enum.Enum | None,
 ) -> None:
     if not _TRACKING_ENABLED:
         return
@@ -110,36 +216,69 @@ def log_metrics(
         return
 
     payload: dict[str, float] = {}
-    for key, value in metrics.items():
+    for metric in metrics.payload:
+        key = _metric_key_to_str(metric.key)
+        value = metric.value
         if not isinstance(value, (int, float)):
             continue
         numeric_value = float(value)
         if not math.isfinite(numeric_value):
             continue
-        metric_key = f"{prefix}.{key}" if prefix else key
+        metric_key = f"{_tracking_value_to_str(prefix)}.{key}" if prefix else key
         payload[metric_key] = numeric_value
 
     if payload:
         mlflow.log_metrics(payload, step=step)
 
 
-def log_params(params: dict[str, str]) -> None:
+def log_params(params: TrackingParams) -> None:
     if not _TRACKING_ENABLED:
         return
     mlflow = _import_mlflow()
     if mlflow is None:
         return
-    mlflow.log_params(params)
+    payload = _params_to_mapping(params)
+    if payload:
+        mlflow.log_params(payload)
 
 
 def log_artifact(
     path: str | Path,
     *,
-    artifact_path: str | None,
+    artifact_path: str | ArtifactDir | None,
 ) -> None:
     if not _TRACKING_ENABLED:
         return
     mlflow = _import_mlflow()
     if mlflow is None:
         return
-    mlflow.log_artifact(str(path), artifact_path=artifact_path)
+    mlflow.log_artifact(
+        str(path),
+        artifact_path=None
+        if artifact_path is None
+        else _tracking_value_to_str(artifact_path),
+    )
+
+
+def _params_to_mapping(params: TrackingParams) -> dict[str, str]:
+    return {item.key.value: _tracking_value_to_str(item.value) for item in params.payload}
+
+
+def _tags_to_mapping(tags: TrackingTags) -> dict[str, str]:
+    return {item.key.value: _tracking_value_to_str(item.value) for item in tags.payload}
+
+
+def _metric_key_to_str(
+    key: TrackingMetricKey | MetricName | BaselineTrackingMetricKey,
+) -> str:
+    if isinstance(key, BaselineTrackingMetricKey):
+        return f"{key.baseline.value}_{key.key.value}"
+    return key.value
+
+
+def _tracking_value_to_str(value: TrackingValue) -> str:
+    if value is None:
+        return "none"
+    if isinstance(value, enum.Enum):
+        return str(value.value)
+    return str(value)

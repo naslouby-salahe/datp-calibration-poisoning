@@ -163,6 +163,134 @@ def run_diagnostic(request: DiagnosticRequest) -> None:
         )
 
 
+def _build_pipeline_request(
+    cfg: DatpConfig,
+    prepared_dir: Path,
+    output_dir: Path,
+    regime: Regime,
+    seed: int,
+    alpha: float | None,
+) -> PipelineRequest:
+    key = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
+    return PipelineRequest(
+        key=key,
+        baseline=Baseline.B1,
+        cfg=cfg,
+        base_dir=output_dir,
+        prepared_dir=prepared_dir,
+        checkpoint_round=None,
+    )
+
+
+def _derive_b1_b2_thresholds(
+    cfg: DatpConfig,
+    ctx: object,
+    regime: Regime,
+    seed: int,
+    alpha: float | None,
+) -> tuple[object, object]:
+    n_min = cfg.threshold.n_min
+    q = cfg.threshold.q
+    b1_result = derive_threshold(
+        _DeriveInput(
+            baseline=Baseline.B1,
+            client_errors=ctx.client_errors,  # type: ignore[attr-defined]
+            n_min=n_min,
+            q=q,
+            tau_global=ctx.tau_global,  # type: ignore[attr-defined]
+            regime=regime,
+            threshold_cfg=cfg.threshold,
+            seed=seed,
+            alpha=alpha,
+        )
+    )
+    b2_result = derive_threshold(
+        _DeriveInput(
+            baseline=Baseline.B2,
+            client_errors=ctx.client_errors,  # type: ignore[attr-defined]
+            n_min=n_min,
+            q=q,
+            tau_global=b1_result.tau_global,
+            regime=regime,
+            threshold_cfg=cfg.threshold,
+            seed=seed,
+            alpha=alpha,
+        )
+    )
+    return b1_result, b2_result
+
+
+def _evaluate_b1_b2(
+    cfg: DatpConfig,
+    ctx: object,
+    b1_result: object,
+    b2_result: object,
+    output_dir: Path,
+    regime: Regime,
+    seed: int,
+    alpha: float | None,
+) -> tuple[EvaluationResult, EvaluationResult]:
+    key = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
+    score_root = (
+        ArtifactLayout(base_dir=output_dir, regime=regime).score_cell(key).score_dir
+    )
+    b1_eval = evaluate_baseline(
+        b1_result.client_thresholds,  # type: ignore[attr-defined]
+        score_root,
+        regime,
+        seed,
+        alpha,
+        score_provider=ctx.score_provider,  # type: ignore[attr-defined]
+    )
+    b2_eval = evaluate_baseline(
+        b2_result.client_thresholds,  # type: ignore[attr-defined]
+        score_root,
+        regime,
+        seed,
+        alpha,
+        score_provider=ctx.score_provider,  # type: ignore[attr-defined]
+    )
+    return b1_eval, b2_eval
+
+
+def _build_diagnostic_metrics(
+    b1_eval: EvaluationResult,
+    b2_eval: EvaluationResult,
+    b1_result: object,
+    b2_result: object,
+    regime: Regime,
+    seed: int,
+    alpha: float | None,
+    diagnostic_tag: str,
+) -> DiagnosticMetrics:
+    inline = DIAGNOSTIC_INLINE
+    return DiagnosticMetrics(
+        regime=regime,
+        seed=seed,
+        alpha=alpha,
+        b1=build_metrics_dict(
+            b1_eval,
+            b1_result,  # type: ignore[arg-type]
+            config_identity=inline.config,
+            split_manifest_identity=inline.split_manifest,
+            model_checkpoint_identity=inline.model_checkpoint,
+            score_artifact_identity=inline.score_artifact,
+            checkpoint_round=None,
+        ),
+        b2=build_metrics_dict(
+            b2_eval,
+            b2_result,  # type: ignore[arg-type]
+            config_identity=inline.config,
+            split_manifest_identity=inline.split_manifest,
+            model_checkpoint_identity=inline.model_checkpoint,
+            score_artifact_identity=inline.score_artifact,
+            checkpoint_round=None,
+        ),
+        delta_cv_fpr=b1_eval.cv_fpr - b2_eval.cv_fpr,
+        diagnostic_tag=diagnostic_tag,
+    )
+
+
 def _run_b1_b2_evaluation(
     *,
     cfg: DatpConfig,
@@ -173,14 +301,8 @@ def _run_b1_b2_evaluation(
     alpha: float | None,
     diagnostic_tag: str,
 ) -> tuple[EvaluationResult, EvaluationResult, DiagnosticMetrics]:
-    key = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
-    request = PipelineRequest(
-        key=key,
-        baseline=Baseline.B1,
-        cfg=cfg,
-        base_dir=output_dir,
-        prepared_dir=prepared_dir,
-        checkpoint_round=None,
+    request = _build_pipeline_request(
+        cfg, prepared_dir, output_dir, regime, seed, alpha
     )
 
     with step_context(DiagnosticStep.SET_SEEDS):
@@ -191,89 +313,18 @@ def _run_b1_b2_evaluation(
             step_fn=None, checkpoint_status_fn=None
         ).build_context(request)
 
-    n_min = cfg.threshold.n_min
-    q = cfg.threshold.q
-
     with step_context(DiagnosticStep.DERIVE_THRESHOLDS):
-        b1_result = derive_threshold(
-            _DeriveInput(
-                baseline=Baseline.B1,
-                client_errors=ctx.client_errors,
-                n_min=n_min,
-                q=q,
-                tau_global=ctx.tau_global,
-                regime=regime,
-                threshold_cfg=cfg.threshold,
-                seed=seed,
-                alpha=alpha,
-            )
-        )
-        tau_global = b1_result.tau_global
-        b2_result = derive_threshold(
-            _DeriveInput(
-                baseline=Baseline.B2,
-                client_errors=ctx.client_errors,
-                n_min=n_min,
-                q=q,
-                tau_global=tau_global,
-                regime=regime,
-                threshold_cfg=cfg.threshold,
-                seed=seed,
-                alpha=alpha,
-            )
-        )
+        b1_result, b2_result = _derive_b1_b2_thresholds(cfg, ctx, regime, seed, alpha)
 
     with step_context(DiagnosticStep.EVALUATE):
-        score_root = (
-            ArtifactLayout(base_dir=output_dir, regime=regime).score_cell(key).score_dir
-        )
-        b1_eval = evaluate_baseline(
-            b1_result.client_thresholds,
-            score_root,
-            regime,
-            seed,
-            alpha,
-            score_provider=ctx.score_provider,
-        )
-        b2_eval = evaluate_baseline(
-            b2_result.client_thresholds,
-            score_root,
-            regime,
-            seed,
-            alpha,
-            score_provider=ctx.score_provider,
+        b1_eval, b2_eval = _evaluate_b1_b2(
+            cfg, ctx, b1_result, b2_result, output_dir, regime, seed, alpha
         )
 
-    inline = DIAGNOSTIC_INLINE
-    return (
-        b1_eval,
-        b2_eval,
-        DiagnosticMetrics(
-            regime=regime,
-            seed=seed,
-            alpha=alpha,
-            b1=build_metrics_dict(
-                b1_eval,
-                b1_result,
-                config_identity=inline.config,
-                split_manifest_identity=inline.split_manifest,
-                model_checkpoint_identity=inline.model_checkpoint,
-                score_artifact_identity=inline.score_artifact,
-                checkpoint_round=None,
-            ),
-            b2=build_metrics_dict(
-                b2_eval,
-                b2_result,
-                config_identity=inline.config,
-                split_manifest_identity=inline.split_manifest,
-                model_checkpoint_identity=inline.model_checkpoint,
-                score_artifact_identity=inline.score_artifact,
-                checkpoint_round=None,
-            ),
-            delta_cv_fpr=b1_eval.cv_fpr - b2_eval.cv_fpr,
-            diagnostic_tag=diagnostic_tag,
-        ),
+    diagnostics = _build_diagnostic_metrics(
+        b1_eval, b2_eval, b1_result, b2_result, regime, seed, alpha, diagnostic_tag
     )
+    return b1_eval, b2_eval, diagnostics
 
 
 def make_regime_a_extras(phase3_dir: Path | None) -> ExtrasFn:

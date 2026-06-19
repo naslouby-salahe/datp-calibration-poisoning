@@ -304,25 +304,14 @@ def _aggregate_dispersion(
     )
 
 
-def build_evaluation_result(
-    *,
-    baseline: Baseline,
-    regime: Regime,
-    seed: int,
-    alpha: float | None,
+def _validate_client_records(
     clients: tuple[ClientEvaluationRecord, ...],
     eligible_ids: tuple[str, ...],
     pending_ids: tuple[str, ...],
-    incomplete_ids: tuple[str, ...] | None,
-) -> EvaluationResult:
+) -> None:
     if not clients:
         raise ValueError(
-            fmt(
-                _MODULE,
-                "clients are empty",
-                "at least one client",
-                "empty tuple",
-            )
+            fmt(_MODULE, "clients are empty", "at least one client", "empty tuple")
         )
     client_ids = [cr.client_id for cr in clients]
     if len(client_ids) != len(set(client_ids)):
@@ -334,7 +323,6 @@ def build_evaluation_result(
                 str(client_ids),
             )
         )
-
     known = set(client_ids)
     unknown_eligible = sorted(set(eligible_ids) - known)
     unknown_pending = sorted(set(pending_ids) - known)
@@ -358,6 +346,19 @@ def build_evaluation_result(
             )
         )
 
+
+def build_evaluation_result(
+    *,
+    baseline: Baseline,
+    regime: Regime,
+    seed: int,
+    alpha: float | None,
+    clients: tuple[ClientEvaluationRecord, ...],
+    eligible_ids: tuple[str, ...],
+    pending_ids: tuple[str, ...],
+    incomplete_ids: tuple[str, ...] | None,
+) -> EvaluationResult:
+    _validate_client_records(clients, eligible_ids, pending_ids)
     incomplete = () if incomplete_ids is None else incomplete_ids
     dispersion = _aggregate_dispersion(clients, eligible_ids, incomplete)
     run = BaselineRunId(
@@ -376,26 +377,21 @@ def build_evaluation_result(
     )
 
 
-def _validate_client_thresholds(client_thresholds: Sequence[ClientThreshold]) -> None:
-    if not client_thresholds:
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "client_thresholds is empty",
-                "at least one entry",
-                "empty list",
-            )
-        )
+def _find_duplicate_ids(ids: list[str]) -> list[str]:
+    seen: set[str] = set()
+    dupes: list[str] = []
+    for cid in ids:
+        if cid in seen:
+            dupes.append(cid)
+        else:
+            seen.add(cid)
+    return dupes
 
+
+def _check_threshold_uniqueness(client_thresholds: Sequence[ClientThreshold]) -> None:
     client_ids = [ct.client_id for ct in client_thresholds]
     if len(client_ids) != len(set(client_ids)):
-        seen: set[str] = set()
-        dupes: list[str] = []
-        for cid in client_ids:
-            if cid in seen:
-                dupes.append(cid)
-            else:
-                seen.add(cid)
+        dupes = _find_duplicate_ids(client_ids)
         raise ValueError(
             fmt(
                 _MODULE,
@@ -405,6 +401,10 @@ def _validate_client_thresholds(client_thresholds: Sequence[ClientThreshold]) ->
             )
         )
 
+
+def _check_threshold_strategy_uniformity(
+    client_thresholds: Sequence[ClientThreshold],
+) -> None:
     strategies = {ct.strategy for ct in client_thresholds}
     if len(strategies) > 1:
         raise ValueError(
@@ -415,6 +415,20 @@ def _validate_client_thresholds(client_thresholds: Sequence[ClientThreshold]) ->
                 str([s.value for s in strategies]),
             )
         )
+
+
+def _validate_client_thresholds(client_thresholds: Sequence[ClientThreshold]) -> None:
+    if not client_thresholds:
+        raise ValueError(
+            fmt(
+                _MODULE,
+                "client_thresholds is empty",
+                "at least one entry",
+                "empty list",
+            )
+        )
+    _check_threshold_uniqueness(client_thresholds)
+    _check_threshold_strategy_uniformity(client_thresholds)
 
 
 def evaluate_baseline(

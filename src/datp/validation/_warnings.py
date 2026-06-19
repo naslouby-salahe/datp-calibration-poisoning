@@ -79,7 +79,7 @@ def emit_worst_client_stability_warnings(
         )
     for key, entries in sorted(grouped.items()):
         if len(entries) < WORST_CLIENT_STABLE_MIN_SEEDS:
-            continue
+            continue  # not enough seeds to draw a stability conclusion
         _emit_worst_client_group_warning(key, entries, warnings)
 
 
@@ -164,16 +164,11 @@ def emit_flat_cv_tpr_warnings(
         _check_flat_cv_tpr_group(key, values, warnings)
 
 
-def check_b2_utility_tradeoff(
-    cell_key: tuple[Regime, int, str | None],
-    b1: "_CellPanel",
-    b2: "_CellPanel",
-    warnings: list[WarningRecord],
-) -> None:
-    """Warn when B2 improves CV(FPR) but worsens utility metrics relative to B1."""
-    if b1.cv_fpr is None or b2.cv_fpr is None or b2.cv_fpr >= b1.cv_fpr:
-        return
-    regime, seed, alpha_text = cell_key
+def _b2_cv_fpr_improves(b1: "_CellPanel", b2: "_CellPanel") -> bool:
+    return b1.cv_fpr is not None and b2.cv_fpr is not None and b2.cv_fpr < b1.cv_fpr
+
+
+def _collect_worsened_metrics(b1: "_CellPanel", b2: "_CellPanel") -> list[MetricName]:
     worsened: list[MetricName] = []
     if _is_worsened(b1.macro_f1_mean, b2.macro_f1_mean):
         worsened.append(MetricName.MACRO_F1)
@@ -183,11 +178,26 @@ def check_b2_utility_tradeoff(
         worsened.append(MetricName.AUROC)
     if _is_worsened(b1.cv_tpr, b2.cv_tpr):
         worsened.append(MetricName.CV_TPR)
-    if worsened:
-        warnings.append(
-            WarningRecord(
-                severity=AuditSeverity.WARNING,
-                code=WarningCode.B2_UTILITY_TRADEOFF,
-                message=f"{regime}_seed{seed}_alpha{alpha_text} B2 improves CV(FPR) but worsens {', '.join(worsened)} relative to B1.",
-            )
+    return worsened
+
+
+def check_b2_utility_tradeoff(
+    cell_key: tuple[Regime, int, str | None],
+    b1: "_CellPanel",
+    b2: "_CellPanel",
+    warnings: list[WarningRecord],
+) -> None:
+    """Warn when B2 improves CV(FPR) but worsens utility metrics relative to B1."""
+    if not _b2_cv_fpr_improves(b1, b2):
+        return
+    regime, seed, alpha_text = cell_key
+    worsened = _collect_worsened_metrics(b1, b2)
+    if not worsened:
+        return
+    warnings.append(
+        WarningRecord(
+            severity=AuditSeverity.WARNING,
+            code=WarningCode.B2_UTILITY_TRADEOFF,
+            message=f"{regime}_seed{seed}_alpha{alpha_text} B2 improves CV(FPR) but worsens {', '.join(worsened)} relative to B1.",
         )
+    )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 AUDIT_DIR = "audit"
 AUDIT_SCHEMA_VERSION = "1.0"
 DATA_AUDIT_DIR = "data_audit"
@@ -42,7 +44,9 @@ _AUDIT_RESULTS_COMMAND = "make audit-results"
 FLAT_CV_TPR_EPSILON = 1e-6
 WORST_CLIENT_STABLE_MIN_SEEDS = 3
 DEFAULT_COVERAGE_RATIO = "0/0"
-FINGERPRINT_METHOD_BENIGN_RECON_ERROR_HISTOGRAM = "benign_recon_error_histogram"
+FINGERPRINT_METHOD_BENIGN_RECON_ERROR_HISTOGRAM: Literal[
+    "benign_recon_error_histogram"
+] = "benign_recon_error_histogram"
 
 NBAIOT_CONFOUND_SUMMARY = (
     "N-BaIoT natural per-device partition mixes device-specific benign "

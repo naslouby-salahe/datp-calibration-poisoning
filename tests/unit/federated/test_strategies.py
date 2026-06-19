@@ -14,7 +14,7 @@ from datp.artifacts.names import ArtifactFile
 from datp.checkpointing.enums import CheckpointConvergenceMode
 from datp.federated.checkpoints import load_params_snapshot
 from datp.federated.convergence import ConvergenceMonitor
-from datp.federated.strategies import DatpFedAvg
+from datp.federated.strategies import DatpFedAvg, FedAvgConfig
 
 
 def _make_strategy(
@@ -29,17 +29,19 @@ def _make_strategy(
     )
     params = np.zeros((2, 2), dtype=np.float32)
     return DatpFedAvg(
-        convergence_monitor=monitor,
-        round_timeout_s=300.0,
-        fraction_fit=1.0,
-        fraction_evaluate=1.0,
-        min_fit_clients=1,
-        min_evaluate_clients=1,
-        min_available_clients=1,
-        initial_parameters=ndarrays_to_parameters([params]),
-        checkpoint_milestones=milestones,
-        convergence_mode=CheckpointConvergenceMode.LOG_ONLY,
-        checkpoint_disk_dirs=checkpoint_disk_dirs,
+        FedAvgConfig(
+            convergence_monitor=monitor,
+            round_timeout_s=300.0,
+            fraction_fit=1.0,
+            fraction_evaluate=1.0,
+            min_fit_clients=1,
+            min_evaluate_clients=1,
+            min_available_clients=1,
+            initial_parameters=ndarrays_to_parameters([params]),
+            checkpoint_milestones=milestones,
+            convergence_mode=CheckpointConvergenceMode.LOG_ONLY,
+            checkpoint_disk_dirs=checkpoint_disk_dirs,
+        )
     )
 
 

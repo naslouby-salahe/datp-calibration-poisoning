@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import enum
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from datp.artifacts.io import write_csv as _write_csv
@@ -62,6 +65,7 @@ from datp.validation.constants import (
     WORST_CLIENT_TRACKING_CSV,
 )
 from datp.validation.datasets import (
+    ClusterAssignments,
     build_regime_c_alpha_audit,
     compute_b4_cluster_stability,
     compute_regime_c_severity_trend,
@@ -106,13 +110,64 @@ _METRICS_SOURCE_FILES = (
 )
 
 
+class AuditOutputName(enum.StrEnum):
+    BASELINE_INVARIANTS = "baseline_invariants"
+    RUN_MANIFEST = "run_manifest"
+    SEED_DELTAS = "seed_deltas"
+    PER_CLIENT_METRICS = "per_client_metrics"
+    PER_ATTACK_METRICS = "per_attack_metrics"
+    THRESHOLD_VALUES = "threshold_values"
+    RECONSTRUCTION_ERROR_SUMMARY = "reconstruction_error_summary"
+    CLUSTER_ASSIGNMENTS = "cluster_assignments"
+    DATASET_PARTITION_AUDIT = "dataset_partition_audit"
+    CONVERGENCE_AUDIT = "convergence_audit"
+    METRIC_DENOMINATOR_AUDIT = "metric_denominator_audit"
+    METRIC_RECOMPUTATION_AUDIT = "metric_recomputation_audit"
+    FPR_COMPANION_METRICS = "fpr_companion_metrics"
+    WORST_CLIENT_TRACKING = "worst_client_tracking"
+    REGIME_C_ALPHA_AUDIT = "regime_c_alpha_audit"
+    REGIME_C_SEVERITY_TREND = "regime_c_severity_trend"
+    B4_CLUSTER_STABILITY = "b4_cluster_stability"
+    WARNINGS = "warnings"
+    AUDIT_SUMMARY = "audit_summary"
+
+
+@dataclass(frozen=True, slots=True)
+class AuditOutputPath:
+    name: AuditOutputName
+    path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class AuditOutputPaths:
+    paths: tuple[AuditOutputPath, ...]
+
+    def __contains__(self, name: object) -> bool:
+        return any(item.name == name or item.name.value == name for item in self.paths)
+
+    def items(self) -> tuple[tuple[str, Path], ...]:
+        return tuple((item.name.value, item.path) for item in self.paths)
+
+    def path_for(self, name: AuditOutputName) -> Path:
+        for item in self.paths:
+            if item.name == name:
+                return item.path
+        raise KeyError(name)
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetPartitionAuditPayload:
+    schema_version: str
+    partitions: tuple[object, ...]
+
+
 def _build_seed_delta_record(
     regime: Regime,
     seed: int,
     alpha_text: str | None,
-    b1: "_CellPanel",
-    b2: "_CellPanel",
-    b4: "_CellPanel",
+    b1: _CellPanel,
+    b2: _CellPanel,
+    b4: _CellPanel,
 ) -> SeedDeltaRecord:
     return SeedDeltaRecord(
         regime=regime,
@@ -186,7 +241,7 @@ def _build_seed_delta_record(
 
 
 def _build_seed_deltas(
-    cell_panel: dict[tuple[Regime, int, str | None, Baseline], _CellPanel],
+    cell_panel: Mapping[tuple[Regime, int, str | None, Baseline], _CellPanel],
     warnings: list[WarningRecord],
 ) -> list[SeedDeltaRecord]:
     # Side effect: emits B2_UTILITY_TRADEOFF warnings.
@@ -256,7 +311,7 @@ def _emit_structural_warnings(
 
 def _compute_regime_c_cv_fpr(
     rec: RegimeCAlphaAuditRecord,
-    cell_panel: dict[tuple[Regime, int, str | None, Baseline], _CellPanel],
+    cell_panel: Mapping[tuple[Regime, int, str | None, Baseline], _CellPanel],
 ) -> tuple[float | None, float | None, float | None]:
     """Look up B1, B2, B4 CV(FPR) values from cell_panel for a Regime C record."""
     from datp.core.identity import AlphaLabel
@@ -280,49 +335,92 @@ def _compute_regime_c_cv_fpr(
 
 def _enrich_regime_c_records_with_cv(
     records: list[RegimeCAlphaAuditRecord],
-    cell_panel: dict[tuple[Regime, int, str | None, Baseline], _CellPanel],
+    cell_panel: Mapping[tuple[Regime, int, str | None, Baseline], _CellPanel],
 ) -> list[RegimeCAlphaAuditRecord]:
     enriched: list[RegimeCAlphaAuditRecord] = []
     for rec in records:
         b1_cv, b2_cv, b4_cv = _compute_regime_c_cv_fpr(rec, cell_panel)
-        enriched.append(
-            rec.model_copy(
-                update={
-                    "b1_cv_fpr": b1_cv,
-                    "b2_cv_fpr": b2_cv,
-                    "b4_cv_fpr": b4_cv,
-                    "delta_b1_b2": _safe_diff(b1_cv, b2_cv),
-                    "delta_b1_b4": _safe_diff(b1_cv, b4_cv),
-                    "eligible_only_cv_fpr": b1_cv,
-                }
-            )
-        )
+        enriched.append(_copy_regime_c_record_with_cv(rec, b1_cv, b2_cv, b4_cv))
     return enriched
+
+
+def _copy_regime_c_record_with_cv(
+    rec: RegimeCAlphaAuditRecord,
+    b1_cv: float | None,
+    b2_cv: float | None,
+    b4_cv: float | None,
+) -> RegimeCAlphaAuditRecord:
+    return RegimeCAlphaAuditRecord(
+        alpha=rec.alpha,
+        seed=rec.seed,
+        n_clients=rec.n_clients,
+        n_eligible=rec.n_eligible,
+        n_calibration_pending=rec.n_calibration_pending,
+        coverage_ratio=rec.coverage_ratio,
+        js_divergence_mean=rec.js_divergence_mean,
+        device_mixture_proportions=rec.device_mixture_proportions,
+        pending_client_ids=rec.pending_client_ids,
+        device_mixture_js_mean=rec.device_mixture_js_mean,
+        device_mixture_js_std=rec.device_mixture_js_std,
+        device_mixture_js_p50=rec.device_mixture_js_p50,
+        device_mixture_js_p95=rec.device_mixture_js_p95,
+        device_mixture_js_max=rec.device_mixture_js_max,
+        recon_error_js_mean=rec.recon_error_js_mean,
+        recon_error_js_std=rec.recon_error_js_std,
+        recon_error_js_p50=rec.recon_error_js_p50,
+        recon_error_js_p95=rec.recon_error_js_p95,
+        recon_error_js_max=rec.recon_error_js_max,
+        b1_cv_fpr=b1_cv,
+        b2_cv_fpr=b2_cv,
+        b4_cv_fpr=b4_cv,
+        delta_b1_b2=_safe_diff(b1_cv, b2_cv),
+        delta_b1_b4=_safe_diff(b1_cv, b4_cv),
+        eligible_only_cv_fpr=b1_cv,
+        scope_note=rec.scope_note,
+    )
 
 
 def _b4_stability_from_cluster_records(
     cluster_records: list[ClusterAssignmentRecord],
 ) -> list[B4ClusterStabilityRecord]:
-    from collections import defaultdict as _dd
-
-    by_regime_alpha: dict[tuple[Regime, str | None], dict[int, dict[str, int]]] = _dd(
-        lambda: _dd(dict)
+    keyed_assignments = tuple(
+        (
+            rec.regime,
+            rec.alpha,
+            rec.seed,
+            rec.client_id,
+            _cluster_id_to_int(rec.cluster_id),
+        )
+        for rec in cluster_records
     )
-    for rec in cluster_records:
-        try:
-            cluster_int = (
-                int(rec.cluster_id.split("_")[-1])
-                if "_" in rec.cluster_id
-                else int(rec.cluster_id)
-            )
-        except (ValueError, IndexError):
-            cluster_int = hash(rec.cluster_id)
-        by_regime_alpha[(rec.regime, rec.alpha)][rec.seed][rec.client_id] = cluster_int
-
     stability: list[B4ClusterStabilityRecord] = []
-    for (regime, alpha), by_seed in by_regime_alpha.items():
-        stability.extend(compute_b4_cluster_stability(dict(by_seed), regime, alpha))
+    regime_alpha_keys = sorted({(row[0], row[1]) for row in keyed_assignments})
+    for regime, alpha in regime_alpha_keys:
+        seed_keys = sorted(
+            {row[2] for row in keyed_assignments if row[0] == regime and row[1] == alpha}
+        )
+        assignments = tuple(
+            ClusterAssignments(
+                seed=seed,
+                assignments=tuple(
+                    sorted(
+                        (row[3], row[4])
+                        for row in keyed_assignments
+                        if row[0] == regime and row[1] == alpha and row[2] == seed
+                    )
+                ),
+            )
+            for seed in seed_keys
+        )
+        stability.extend(compute_b4_cluster_stability(assignments, regime, alpha))
     return stability
+
+
+def _cluster_id_to_int(cluster_id: str) -> int:
+    try:
+        return int(cluster_id.split("_")[-1]) if "_" in cluster_id else int(cluster_id)
+    except (ValueError, IndexError):
+        return hash(cluster_id)
 
 
 def _collect_regime_c_alpha_records(
@@ -362,31 +460,26 @@ def _collect_regime_c_alpha_records(
             )
 
 
-def run_results_audit(
-    base_dir: Path, audit_dir: Path, cfg: DatpConfig, data_root: Path | None = None
-) -> dict[str, Path]:
-    base_dir = Path(base_dir)
-    audit_dir = Path(audit_dir)
-    audit_dir.mkdir(parents=True, exist_ok=True)
-
-    git_commit = current_git_commit()
-    timestamp = utc_timestamp()
+def _compute_source_hashes() -> tuple[str, str, str]:
     scoring_hash = source_hash(list(_SCORING_SOURCE_FILES))
     threshold_hash = source_hash(list(_THRESHOLD_SOURCE_FILES))
     metrics_hash = source_hash(list(_METRICS_SOURCE_FILES))
+    return scoring_hash, threshold_hash, metrics_hash
 
-    acc = _AuditAccumulator()
-    metric_paths = _completed_metric_paths(base_dir)
-    if not metric_paths:
-        acc.warnings.append(
-            WarningRecord(
-                severity=AuditSeverity.BLOCKED_PENDING_RUN,
-                code=WarningCode.NO_COMPLETED_RESULTS,
-                message="No completed metrics.json artifacts were found.",
-                exact_command=BLOCKED_RESUME_COMMAND,
-            )
-        )
 
+def _process_all_runs(
+    metric_paths: list[Path],
+    base_dir: Path,
+    acc: _AuditAccumulator,
+    *,
+    git_commit: str,
+    timestamp: str,
+    scoring_hash: str,
+    threshold_hash: str,
+    metrics_hash: str,
+    cfg: DatpConfig,
+    data_root: Path | None,
+) -> None:
     for metrics_path in metric_paths:
         _process_run(
             metrics_path,
@@ -401,38 +494,15 @@ def run_results_audit(
             data_root=data_root,
         )
 
-    _collect_regime_c_alpha_records(metric_paths, base_dir, data_root, acc)
 
-    acc.regime_c_alpha_records = _enrich_regime_c_records_with_cv(
-        acc.regime_c_alpha_records, acc.cell_panel
-    )
-
-    severity_trend_records: list[RegimeCSeverityTrendRecord] = (
-        compute_regime_c_severity_trend(
-            acc.regime_c_alpha_records,
-            significance_alpha=float(cfg.statistics.significance_alpha),
-        )
-    )
-
-    b4_stability_records: list[B4ClusterStabilityRecord] = (
-        _b4_stability_from_cluster_records(acc.cluster_records)
-    )
-
-    invariant_results = build_invariant_results(
-        acc.invariant_inputs, acc.score_hashes_by_cell
-    )
-
-    seed_deltas = _build_seed_deltas(acc.cell_panel, acc.warnings)
-
-    _emit_structural_warnings(acc, seed_deltas)
-    _emit_worst_client_stability_warnings(acc.worst_client_records, acc.warnings)
-    _emit_flat_cv_tpr_warnings(acc.cell_panel, acc.warnings)
-    _emit_ciciot_homogeneity_warnings(
-        acc.homogeneity_records,
-        acc.warnings,
-        homogeneity_threshold=cfg.quality_gates.ciciot_homogeneity_threshold,
-    )
-
+def _write_audit_artifacts(
+    audit_dir: Path,
+    acc: _AuditAccumulator,
+    seed_deltas: list[SeedDeltaRecord],
+    severity_trend_records: list[RegimeCSeverityTrendRecord],
+    b4_stability_records: list[B4ClusterStabilityRecord],
+    invariant_results: list[BaselineInvariantResult],
+) -> None:
     _write_csv(audit_dir / RUN_MANIFEST_CSV, acc.manifest_records)
     _write_csv(audit_dir / FPR_COMPANION_METRICS_CSV, acc.companion_records)
     _write_csv(audit_dir / WORST_CLIENT_TRACKING_CSV, acc.worst_client_records)
@@ -451,16 +521,14 @@ def run_results_audit(
     _write_csv(audit_dir / METRIC_RECOMPUTATION_AUDIT_CSV, acc.recomputation_records)
     _write_json(
         audit_dir / BASELINE_INVARIANTS_JSON,
-        [row.model_dump(mode="json") for row in invariant_results],
+        invariant_results,
     )
     _write_json(
         audit_dir / DATASET_PARTITION_AUDIT_JSON,
-        {
-            "schema_version": AUDIT_SCHEMA_VERSION,
-            "partitions": [
-                row.model_dump(mode="json") for row in acc.partition_audits.values()
-            ],
-        },
+        DatasetPartitionAuditPayload(
+            schema_version=AUDIT_SCHEMA_VERSION,
+            partitions=tuple(acc.partition_audits.values()),
+        ),
     )
     _write_warnings(audit_dir / WARNINGS_MD, acc.warnings)
     _write_summary(
@@ -470,27 +538,103 @@ def run_results_audit(
         acc.warnings,
     )
 
-    return {
-        "baseline_invariants": audit_dir / BASELINE_INVARIANTS_JSON,
-        "run_manifest": audit_dir / RUN_MANIFEST_CSV,
-        "seed_deltas": audit_dir / SEED_DELTAS_CSV,
-        "per_client_metrics": audit_dir / PER_CLIENT_METRICS_CSV,
-        "per_attack_metrics": audit_dir / PER_ATTACK_METRICS_CSV,
-        "threshold_values": audit_dir / THRESHOLD_VALUES_CSV,
-        "reconstruction_error_summary": audit_dir / RECONSTRUCTION_ERROR_SUMMARY_CSV,
-        "cluster_assignments": audit_dir / CLUSTER_ASSIGNMENTS_CSV,
-        "dataset_partition_audit": audit_dir / DATASET_PARTITION_AUDIT_JSON,
-        "convergence_audit": audit_dir / CONVERGENCE_AUDIT_CSV,
-        "metric_denominator_audit": audit_dir / METRIC_DENOMINATOR_AUDIT_CSV,
-        "metric_recomputation_audit": audit_dir / METRIC_RECOMPUTATION_AUDIT_CSV,
-        "fpr_companion_metrics": audit_dir / FPR_COMPANION_METRICS_CSV,
-        "worst_client_tracking": audit_dir / WORST_CLIENT_TRACKING_CSV,
-        "regime_c_alpha_audit": audit_dir / REGIME_C_ALPHA_AUDIT_CSV,
-        "regime_c_severity_trend": audit_dir / REGIME_C_SEVERITY_TREND_CSV,
-        "b4_cluster_stability": audit_dir / B4_CLUSTER_STABILITY_CSV,
-        "warnings": audit_dir / WARNINGS_MD,
-        "audit_summary": audit_dir / AUDIT_SUMMARY_MD,
-    }
+
+def _audit_output_paths(audit_dir: Path) -> AuditOutputPaths:
+    return AuditOutputPaths(
+        paths=(
+            AuditOutputPath(AuditOutputName.BASELINE_INVARIANTS, audit_dir / BASELINE_INVARIANTS_JSON),
+            AuditOutputPath(AuditOutputName.RUN_MANIFEST, audit_dir / RUN_MANIFEST_CSV),
+            AuditOutputPath(AuditOutputName.SEED_DELTAS, audit_dir / SEED_DELTAS_CSV),
+            AuditOutputPath(AuditOutputName.PER_CLIENT_METRICS, audit_dir / PER_CLIENT_METRICS_CSV),
+            AuditOutputPath(AuditOutputName.PER_ATTACK_METRICS, audit_dir / PER_ATTACK_METRICS_CSV),
+            AuditOutputPath(AuditOutputName.THRESHOLD_VALUES, audit_dir / THRESHOLD_VALUES_CSV),
+            AuditOutputPath(AuditOutputName.RECONSTRUCTION_ERROR_SUMMARY, audit_dir / RECONSTRUCTION_ERROR_SUMMARY_CSV),
+            AuditOutputPath(AuditOutputName.CLUSTER_ASSIGNMENTS, audit_dir / CLUSTER_ASSIGNMENTS_CSV),
+            AuditOutputPath(AuditOutputName.DATASET_PARTITION_AUDIT, audit_dir / DATASET_PARTITION_AUDIT_JSON),
+            AuditOutputPath(AuditOutputName.CONVERGENCE_AUDIT, audit_dir / CONVERGENCE_AUDIT_CSV),
+            AuditOutputPath(AuditOutputName.METRIC_DENOMINATOR_AUDIT, audit_dir / METRIC_DENOMINATOR_AUDIT_CSV),
+            AuditOutputPath(AuditOutputName.METRIC_RECOMPUTATION_AUDIT, audit_dir / METRIC_RECOMPUTATION_AUDIT_CSV),
+            AuditOutputPath(AuditOutputName.FPR_COMPANION_METRICS, audit_dir / FPR_COMPANION_METRICS_CSV),
+            AuditOutputPath(AuditOutputName.WORST_CLIENT_TRACKING, audit_dir / WORST_CLIENT_TRACKING_CSV),
+            AuditOutputPath(AuditOutputName.REGIME_C_ALPHA_AUDIT, audit_dir / REGIME_C_ALPHA_AUDIT_CSV),
+            AuditOutputPath(AuditOutputName.REGIME_C_SEVERITY_TREND, audit_dir / REGIME_C_SEVERITY_TREND_CSV),
+            AuditOutputPath(AuditOutputName.B4_CLUSTER_STABILITY, audit_dir / B4_CLUSTER_STABILITY_CSV),
+            AuditOutputPath(AuditOutputName.WARNINGS, audit_dir / WARNINGS_MD),
+            AuditOutputPath(AuditOutputName.AUDIT_SUMMARY, audit_dir / AUDIT_SUMMARY_MD),
+        )
+    )
+
+
+def run_results_audit(
+    base_dir: Path, audit_dir: Path, cfg: DatpConfig, data_root: Path | None = None
+) -> AuditOutputPaths:
+    base_dir = Path(base_dir)
+    audit_dir = Path(audit_dir)
+    audit_dir.mkdir(parents=True, exist_ok=True)
+
+    git_commit = current_git_commit()
+    timestamp = utc_timestamp()
+    scoring_hash, threshold_hash, metrics_hash = _compute_source_hashes()
+
+    acc = _AuditAccumulator()
+    metric_paths = _completed_metric_paths(base_dir)
+    if not metric_paths:
+        acc.warnings.append(
+            WarningRecord(
+                severity=AuditSeverity.BLOCKED_PENDING_RUN,
+                code=WarningCode.NO_COMPLETED_RESULTS,
+                message="No completed metrics.json artifacts were found.",
+                exact_command=BLOCKED_RESUME_COMMAND,
+            )
+        )
+
+    _process_all_runs(
+        metric_paths,
+        base_dir,
+        acc,
+        git_commit=git_commit,
+        timestamp=timestamp,
+        scoring_hash=scoring_hash,
+        threshold_hash=threshold_hash,
+        metrics_hash=metrics_hash,
+        cfg=cfg,
+        data_root=data_root,
+    )
+
+    _collect_regime_c_alpha_records(metric_paths, base_dir, data_root, acc)
+
+    acc.regime_c_alpha_records = _enrich_regime_c_records_with_cv(
+        acc.regime_c_alpha_records, acc.cell_panel
+    )
+
+    severity_trend_records = compute_regime_c_severity_trend(
+        acc.regime_c_alpha_records,
+        significance_alpha=float(cfg.statistics.significance_alpha),
+    )
+    b4_stability_records = _b4_stability_from_cluster_records(acc.cluster_records)
+    invariant_results = build_invariant_results(
+        acc.invariant_inputs, acc.score_hashes_by_cell
+    )
+    seed_deltas = _build_seed_deltas(acc.cell_panel, acc.warnings)
+
+    _emit_structural_warnings(acc, seed_deltas)
+    _emit_worst_client_stability_warnings(acc.worst_client_records, acc.warnings)
+    _emit_flat_cv_tpr_warnings(acc.cell_panel, acc.warnings)
+    _emit_ciciot_homogeneity_warnings(
+        acc.homogeneity_records,
+        acc.warnings,
+        homogeneity_threshold=cfg.quality_gates.ciciot_homogeneity_threshold,
+    )
+
+    _write_audit_artifacts(
+        audit_dir,
+        acc,
+        seed_deltas,
+        severity_trend_records,
+        b4_stability_records,
+        invariant_results,
+    )
+    return _audit_output_paths(audit_dir)
 
 
 def _write_warnings(path: Path, warnings: list[WarningRecord]) -> None:

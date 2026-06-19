@@ -120,11 +120,23 @@ class CellReproductionResult(BaseModel):
 def _abs_diff(expected: float | None, actual: float | None) -> float | None:
     if expected is None or actual is None:
         return None
-    if (isinstance(expected, float) and math.isnan(expected)) or (
+    either_nan = (isinstance(expected, float) and math.isnan(expected)) or (
         isinstance(actual, float) and math.isnan(actual)
-    ):
+    )
+    if either_nan:
         return None
     return abs(float(expected) - float(actual))
+
+
+def _both_nan(expected: float | None, actual: float | None) -> bool:
+    return (
+        expected is not None
+        and actual is not None
+        and isinstance(expected, float)
+        and isinstance(actual, float)
+        and math.isnan(expected)
+        and math.isnan(actual)
+    )
 
 
 def _scalar_check(
@@ -134,15 +146,7 @@ def _scalar_check(
     tolerance: float,
     code: MetricCheckCode = MetricCheckCode.SCALAR_WITHIN_TOLERANCE,
 ) -> ValidationCheck:
-    both_nan = (
-        expected is not None
-        and actual is not None
-        and isinstance(expected, float)
-        and isinstance(actual, float)
-        and math.isnan(expected)
-        and math.isnan(actual)
-    )
-    if both_nan:
+    if _both_nan(expected, actual):
         return ValidationCheck(
             code=code,
             status=AuditStatus.PASS,
@@ -394,15 +398,11 @@ def _stored_scalar(stored: dict[str, Any], field: str) -> Any:
     return aggregate.get(field)
 
 
-def _build_baseline_checks(
-    *,
+def _scalar_checks_for_baseline(
     stored: dict[str, Any],
     evaluation: EvaluationResult,
     threshold_result: ThresholdResult,
-    client_thresholds_actual: dict[str, float],
 ) -> list[ValidationCheck]:
-    checks: list[ValidationCheck] = []
-
     actual_scalars = {
         MetricName.CV_FPR: evaluation.cv_fpr,
         MetricName.CV_TPR: evaluation.cv_tpr,
@@ -416,16 +416,15 @@ def _build_baseline_checks(
         MetricName.P10_MACRO_F1: evaluation.p10_macro_f1,
         MetricName.TAU_GLOBAL: float(threshold_result.tau_global),
     }
-    for field in _SCALAR_METRIC_FIELDS:
-        checks.append(
-            _scalar_check(
-                field=field,
-                expected=_stored_scalar(stored, field),
-                actual=actual_scalars[field],
-                tolerance=SCALAR_METRIC_TOLERANCE,
-            )
+    checks = [
+        _scalar_check(
+            field=field,
+            expected=_stored_scalar(stored, field),
+            actual=actual_scalars[field],
+            tolerance=SCALAR_METRIC_TOLERANCE,
         )
-
+        for field in _SCALAR_METRIC_FIELDS
+    ]
     checks.append(
         _scalar_check(
             field=PayloadKey.COVERAGE_RATIO,
@@ -435,51 +434,53 @@ def _build_baseline_checks(
             code=MetricCheckCode.COVERAGE_RATIO_WITHIN_TOLERANCE,
         )
     )
+    return checks
 
-    checks.append(
+
+def _count_and_id_checks(
+    stored: dict[str, Any],
+    evaluation: EvaluationResult,
+) -> list[ValidationCheck]:
+    return [
         _exact_match_check(
             MetricCheckCode.ELIGIBLE_COUNT_EXACT,
             PayloadKey.ELIGIBLE_COUNT,
             int(stored[PayloadKey.ELIGIBLE_COUNT]),
             int(evaluation.eligible_count),
-        )
-    )
-    checks.append(
+        ),
         _exact_match_check(
             MetricCheckCode.PENDING_COUNT_EXACT,
             PayloadKey.PENDING_COUNT,
             int(stored[PayloadKey.PENDING_COUNT]),
             int(len(evaluation.pending_ids)),
-        )
-    )
-    checks.append(
+        ),
         _exact_match_check(
             MetricCheckCode.CLIENT_COUNT_EXACT,
             PayloadKey.CLIENT_COUNT,
             int(stored[PayloadKey.CLIENT_COUNT]),
             int(evaluation.client_count),
-        )
-    )
-    checks.append(
+        ),
         _id_set_check(
             MetricCheckCode.ELIGIBLE_IDS_EXACT,
             PayloadKey.ELIGIBLE_IDS,
             list(map(str, stored[PayloadKey.ELIGIBLE_IDS])),
             list(map(str, evaluation.eligible_ids)),
-        )
-    )
-    checks.append(
+        ),
         _id_set_check(
             MetricCheckCode.PENDING_IDS_EXACT,
             PayloadKey.PENDING_IDS,
             list(map(str, stored[PayloadKey.PENDING_IDS])),
             list(map(str, evaluation.pending_ids)),
-        )
-    )
+        ),
+    ]
 
-    stored_per_client = _stored_per_client_map(stored)
+
+def _per_client_checks(
+    stored_per_client: dict[str, dict[str, Any]],
+    evaluation: EvaluationResult,
+    client_thresholds_actual: dict[str, float],
+) -> list[ValidationCheck]:
     actual_per_client = {cr.client_id: cr for cr in evaluation.clients}
-
     expected_confusion = {
         cid: {k: int(row[PayloadKey.CONFUSION_MATRIX][k]) for k in _CONFUSION_KEYS}
         for cid, row in stored_per_client.items()
@@ -494,21 +495,33 @@ def _build_baseline_checks(
         }
         for cid, cr in actual_per_client.items()
     }
-    checks.append(_confusion_check(expected_confusion, actual_confusion))
-
     expected_thresholds = {
         cid: float(row[PayloadKey.THRESHOLD_VALUE])
         for cid, row in stored_per_client.items()
         if row.get(PayloadKey.THRESHOLD_VALUE) is not None
     }
-    checks.append(
+    return [
+        _confusion_check(expected_confusion, actual_confusion),
         _thresholds_check(
-            expected_thresholds,
-            client_thresholds_actual,
-            SCALAR_METRIC_TOLERANCE,
+            expected_thresholds, client_thresholds_actual, SCALAR_METRIC_TOLERANCE
+        ),
+    ]
+
+
+def _build_baseline_checks(
+    *,
+    stored: dict[str, Any],
+    evaluation: EvaluationResult,
+    threshold_result: ThresholdResult,
+    client_thresholds_actual: dict[str, float],
+) -> list[ValidationCheck]:
+    checks = _scalar_checks_for_baseline(stored, evaluation, threshold_result)
+    checks.extend(_count_and_id_checks(stored, evaluation))
+    checks.extend(
+        _per_client_checks(
+            _stored_per_client_map(stored), evaluation, client_thresholds_actual
         )
     )
-
     return checks
 
 
@@ -591,6 +604,59 @@ def _select_stored_summary(stored: dict[str, Any]) -> dict[str, Any]:
     return {k: stored.get(k) for k in keys}
 
 
+def _reproduce_one_baseline(
+    baseline: Baseline,
+    cell: TrainingCellId,
+    layout: ArtifactLayout,
+    cal_errors: dict[str, np.ndarray],
+    score_provider: ScoreProvider,
+    cfg: DatpConfig,
+    tau_global_b1: float,
+) -> BaselineReproductionResult | None:
+    """Reproduce a single baseline for a cell; returns None when metrics artifact is absent."""
+    run = BaselineRunId(cell=cell, baseline=baseline)
+    metrics_path = layout.baseline_run(run).result_dir / ArtifactFile.METRICS
+    if not metrics_path.exists():
+        return None
+    stored = _read_metrics_json(metrics_path)
+    threshold_result = derive_threshold(
+        _DeriveInput(
+            baseline=baseline,
+            client_errors=cal_errors,
+            n_min=cfg.threshold.n_min,
+            q=cfg.threshold.q,
+            tau_global=tau_global_b1,
+            regime=cell.regime,
+            threshold_cfg=cfg.threshold,
+            seed=cell.seed,
+            alpha=cell.alpha,
+        )
+    )
+    evaluation, client_thresholds = _evaluate(
+        threshold_result,
+        score_provider,
+        cell.regime,
+        cell.seed,
+        cell.alpha,
+    )
+    checks = _build_baseline_checks(
+        stored=stored,
+        evaluation=evaluation,
+        threshold_result=threshold_result,
+        client_thresholds_actual=client_thresholds,
+    )
+    return BaselineReproductionResult(
+        baseline=baseline,
+        status=_overall_status(checks),
+        metrics_path=str(metrics_path),
+        recomputed=_serialize_recomputed(
+            evaluation, threshold_result, client_thresholds
+        ),
+        stored=_select_stored_summary(stored),
+        checks=checks,
+    )
+
+
 def reproduce_cell_metrics(
     cell_dir: Path,
     base_dir: Path,
@@ -632,53 +698,14 @@ def reproduce_cell_metrics(
 
     baseline_results: list[BaselineReproductionResult] = []
     missing_baselines: list[Baseline] = []
-    candidate_baselines = controlled_baselines_for_regime(regime)
-
-    for baseline in candidate_baselines:
-        run = BaselineRunId(cell=cell, baseline=baseline)
-        metrics_path = layout.baseline_run(run).result_dir / ArtifactFile.METRICS
-        if not metrics_path.exists():
+    for baseline in controlled_baselines_for_regime(regime):
+        result = _reproduce_one_baseline(
+            baseline, cell, layout, cal_errors, score_provider, cfg, tau_global_b1
+        )
+        if result is None:
             missing_baselines.append(baseline)
-            continue
-        stored = _read_metrics_json(metrics_path)
-        threshold_result = derive_threshold(
-            _DeriveInput(
-                baseline=baseline,
-                client_errors=cal_errors,
-                n_min=cfg.threshold.n_min,
-                q=cfg.threshold.q,
-                tau_global=tau_global_b1,
-                regime=regime,
-                threshold_cfg=cfg.threshold,
-                seed=seed,
-                alpha=alpha,
-            )
-        )
-        evaluation, client_thresholds = _evaluate(
-            threshold_result,
-            score_provider,
-            regime,
-            seed,
-            alpha,
-        )
-        checks = _build_baseline_checks(
-            stored=stored,
-            evaluation=evaluation,
-            threshold_result=threshold_result,
-            client_thresholds_actual=client_thresholds,
-        )
-        baseline_results.append(
-            BaselineReproductionResult(
-                baseline=baseline,
-                status=_overall_status(checks),
-                metrics_path=str(metrics_path),
-                recomputed=_serialize_recomputed(
-                    evaluation, threshold_result, client_thresholds
-                ),
-                stored=_select_stored_summary(stored),
-                checks=checks,
-            )
-        )
+        else:
+            baseline_results.append(result)
 
     overall = _aggregate_overall(
         [br.status for br in baseline_results], missing_baselines
@@ -697,11 +724,12 @@ def _aggregate_overall(
 ) -> AuditStatus:
     if AuditStatus.FAIL in statuses:
         return AuditStatus.FAIL
-    if (
-        missing_baselines
+    any_incomplete = (
+        bool(missing_baselines)
         or AuditStatus.MISSING in statuses
         or AuditStatus.PARTIAL in statuses
-    ):
+    )
+    if any_incomplete:
         return AuditStatus.PARTIAL
     if not statuses:
         return AuditStatus.MISSING

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -156,7 +157,7 @@ class NBaIoTDeviceCounts(AuditModel):
     benign_test: int | None
     attack_test_total: int | None
     benign_class_imbalance_ratio: float | None
-    attack_files_by_family: dict[str, list[str]] = Field(default_factory=dict)
+    attack_files_by_family: Mapping[str, list[str]] = Field(default_factory=dict)
 
 
 class CICIoTProtocolAudit(AuditModel):
@@ -399,7 +400,7 @@ class RegimeCAlphaAuditRecord(AuditModel):
     n_calibration_pending: int
     coverage_ratio: str
     js_divergence_mean: float | None
-    device_mixture_proportions: dict[str, dict[str, float]] = Field(
+    device_mixture_proportions: Mapping[str, Mapping[str, float]] = Field(
         default_factory=dict
     )
     pending_client_ids: list[str] = Field(default_factory=list)

@@ -14,7 +14,12 @@ from datp.core.errors import fmt
 from datp.core.identity import BaselineRunId
 from datp.core.logging import get_logger
 from datp.core.provenance import MISSING_MANIFEST_HASH, hash_file, hash_jsonable
-from datp.core.tracking import log_metrics
+from datp.core.tracking import (
+    TrackingMetric,
+    TrackingMetricKey,
+    TrackingMetrics,
+    log_metrics,
+)
 from datp.evaluation.metrics import evaluate_baseline
 from datp.experiments.enums import SweepStep
 from datp.experiments.models import PipelineRequest, SharedPipelineContext
@@ -183,11 +188,25 @@ class ThresholdEvaluationExecutor:
             logger.info("results written", path=str(res_dir / ArtifactFile.METRICS))
 
             log_metrics(
-                {
-                    f"{baseline}_eligible": float(threshold_result.eligible_count),
-                    f"{baseline}_pending": float(threshold_result.pending_count),
-                    f"{baseline}_tau_global": threshold_result.tau_global,
-                },
+                TrackingMetrics(
+                    (
+                        TrackingMetric.for_baseline(
+                            baseline,
+                            TrackingMetricKey.ELIGIBLE,
+                            threshold_result.eligible_count,
+                        ),
+                        TrackingMetric.for_baseline(
+                            baseline,
+                            TrackingMetricKey.PENDING,
+                            threshold_result.pending_count,
+                        ),
+                        TrackingMetric.for_baseline(
+                            baseline,
+                            TrackingMetricKey.TAU_GLOBAL,
+                            threshold_result.tau_global,
+                        ),
+                    )
+                ),
                 step=None,
                 prefix=None,
             )

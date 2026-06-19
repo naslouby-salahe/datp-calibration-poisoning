@@ -79,6 +79,14 @@ def seed_segment(seed: int) -> str:
     return f"{PathToken.SEED_PREFIX}{seed}"
 
 
+def _format_label(prefix_parts: list[str], alpha: float | None) -> str:
+    parts = list(prefix_parts)
+    lbl = alpha_label(alpha)
+    if lbl is not None:
+        parts.append(f"alpha={lbl}")
+    return " ".join(parts)
+
+
 def make_run_id(regime: Regime, seed: int, alpha: float | None = None) -> str:
     ts_ms = int(time.time() * 1000)
     parts = [regime.value, f"seed{seed}"]
@@ -98,11 +106,10 @@ class TrainingCellId:
     alpha: float | None
 
     def label(self) -> str:
-        parts = [f"regime={self.regime}", f"seed={self.seed}"]
-        lbl = alpha_label(self.alpha)
-        if lbl is not None:
-            parts.append(f"alpha={lbl}")
-        return " ".join(parts)
+        return _format_label(
+            prefix_parts=[f"regime={self.regime}", f"seed={self.seed}"],
+            alpha=self.alpha,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,15 +139,14 @@ class BaselineRunId:
         return self.cell
 
     def label(self) -> str:
-        parts = [
-            f"regime={self.regime}",
-            f"baseline={self.baseline}",
-            f"seed={self.seed}",
-        ]
-        lbl = alpha_label(self.alpha)
-        if lbl is not None:
-            parts.append(f"alpha={lbl}")
-        return " ".join(parts)
+        return _format_label(
+            prefix_parts=[
+                f"regime={self.regime}",
+                f"baseline={self.baseline}",
+                f"seed={self.seed}",
+            ],
+            alpha=self.alpha,
+        )
 
     def tracking_name(self) -> str:
         suffix = f"_alpha{alpha_label(self.alpha)}" if self.alpha is not None else ""

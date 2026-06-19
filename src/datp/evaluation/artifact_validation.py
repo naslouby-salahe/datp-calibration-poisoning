@@ -92,9 +92,10 @@ def client_rows(
 ) -> list[tuple[str, Mapping[str, Any]]]:
     raw = payload[PayloadKey.PER_CLIENT]
     if isinstance(raw, Mapping):
-        return [(str(cid), row) for cid, row in raw.items()]
+        return [(str(cid), row) for cid, row in raw.items()]  # type: ignore[misc]
     # list-of-dicts format: each row has "client_id"
-    return [(str(row[PayloadKey.CLIENT_ID]), row) for row in raw]  # type: ignore[union-attr]
+    rows: list[Any] = list(raw)  # type: ignore[arg-type]
+    return [(str(row[PayloadKey.CLIENT_ID]), row) for row in rows]
 
 
 def _missing_payload_fields(payload: Mapping[str, object]) -> list[str]:

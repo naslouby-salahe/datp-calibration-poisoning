@@ -149,6 +149,25 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/run_logger.py", "ManifestBuildRequest", "checkpoint_round"),
         ("attacks/run_logger.py", "ManifestBuildRequest", "injection_rule"),
         ("attacks/run_logger.py", "ManifestBuildRequest", "reservoir_mode"),
+        # _ResultPathKey/_LoadResultsParams: alpha=None is the domain sentinel for
+        # Regime A/B (non-alpha-sweep); Regime C callers always supply a label.
+        ("reporting/build.py", "_ResultPathKey", "alpha"),
+        ("reporting/build.py", "_LoadResultsParams", "alpha"),
+        # ClientFactoryConfig: optional overrides — None means "use the protocol default";
+        # prepared_dir/seed are optional per-cell, model_cls/client_cls are standard
+        # protocol classes, extra_kwargs is an opt-in extension point for non-standard clients
+        ("federated/factories.py", "ClientFactoryConfig", "prepared_dir"),
+        ("federated/factories.py", "ClientFactoryConfig", "model_cls"),
+        ("federated/factories.py", "ClientFactoryConfig", "client_cls"),
+        ("federated/factories.py", "ClientFactoryConfig", "extra_kwargs"),
+        ("federated/factories.py", "ClientFactoryConfig", "seed"),
+        # FedAvgConfig: optional FL training parameters — initial_parameters=None means
+        # random init (standard FedAvg protocol); checkpoint_milestones=()/None mean no
+        # checkpoint-protocol run; convergence_mode is the canonical EARLY_STOP default
+        ("federated/strategies.py", "FedAvgConfig", "initial_parameters"),
+        ("federated/strategies.py", "FedAvgConfig", "checkpoint_milestones"),
+        ("federated/strategies.py", "FedAvgConfig", "convergence_mode"),
+        ("federated/strategies.py", "FedAvgConfig", "checkpoint_disk_dirs"),
     }
 )
 

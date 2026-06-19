@@ -78,7 +78,7 @@ def test_validate_scoring_manifest_passes_with_valid_manifest(tmp_path: Path) ->
         [Split.CAL.value, Split.TEST_BENIGN.value, Split.TEST_ATTACK.value],
     )
     result = validate_scoring_manifest(sb)
-    assert result["completion_status"] == ScoringManifestStatus.COMPLETE
+    assert result.completion_status == ScoringManifestStatus.COMPLETE
 
 
 def test_sentinel_alone_is_not_sufficient(tmp_path: Path) -> None:
@@ -258,15 +258,16 @@ class TestScoreRecord:
         errors = np.array([0.1, 0.2, np.nan], dtype=np.float32)
         record = _score_record(path, "c0", ScoringStage.CAL, errors)
 
-        assert record["client_id"] == "c0"
-        assert record["split"] == Split.CAL.value
-        assert record["row_count"] == 3
-        assert record["columns"] == [SCORE_COLUMN]
-        assert record["dtypes"] == {SCORE_COLUMN: "Float32"}
-        assert record["score_min"] == pytest.approx(0.1)
-        assert record["score_max"] == pytest.approx(0.2)
-        assert record["score_nan_count"] == 1
-        assert record["file_hash"] != "MISSING"
+        assert record.client_id == "c0"
+        assert record.split == ScoringStage.CAL
+        assert record.row_count == 3
+        assert record.columns == (SCORE_COLUMN,)
+        assert record.dtypes[0].column == SCORE_COLUMN
+        assert record.dtypes[0].dtype == "Float32"
+        assert record.score_min == pytest.approx(0.1)
+        assert record.score_max == pytest.approx(0.2)
+        assert record.score_nan_count == 1
+        assert record.file_hash != "MISSING"
 
     def test_score_record_all_nan(self, tmp_path: Path) -> None:
         from datp.scoring.generation import _score_record
@@ -276,10 +277,10 @@ class TestScoreRecord:
         errors = np.array([np.nan, np.nan], dtype=np.float32)
         record = _score_record(path, "c1", ScoringStage.TEST_BENIGN, errors)
 
-        assert record["score_min"] is None
-        assert record["score_max"] is None
-        assert record["score_nan_count"] == 2
-        assert record["row_count"] == 2
+        assert record.score_min is None
+        assert record.score_max is None
+        assert record.score_nan_count == 2
+        assert record.row_count == 2
 
 
 class TestScoringStageClientDataAttr:
@@ -343,8 +344,8 @@ class TestScoreClients:
             pf = score_base / stage.value / f"c0{PathToken.PARQUET_EXT}"
             assert pf.exists(), f"Missing {pf}"
         manifest = validate_scoring_manifest(score_base)
-        assert manifest["completion_status"] == ScoringManifestStatus.COMPLETE
-        assert manifest["expected_client_ids"] == ["c0"]
+        assert manifest.completion_status == ScoringManifestStatus.COMPLETE
+        assert manifest.expected_client_ids == ("c0",)
 
     def test_score_clients_empty_client_data(self, tmp_path: Path) -> None:
         from datp.data.catalog import DatasetID
@@ -371,5 +372,5 @@ class TestScoreClients:
         )
 
         manifest = validate_scoring_manifest(score_base)
-        assert manifest["expected_client_ids"] == []
-        assert manifest["records"] == []
+        assert manifest.expected_client_ids == ()
+        assert manifest.records == ()

@@ -60,7 +60,6 @@ def test_checkpoint_config_rejects_invalid_milestones(
         _checkpoint_config(milestones=milestones, max_rounds=max_rounds)
 
 
-
 def test_round_aware_paths_include_round_and_temp_root(tmp_path: Path) -> None:
     layout = ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
     cell = TrainingCellId(regime=Regime.A, seed=7, alpha=None)

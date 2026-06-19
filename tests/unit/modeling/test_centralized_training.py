@@ -10,6 +10,7 @@ from datp.core.enums import Activation, DeviceType
 from datp.modeling.autoencoder import Autoencoder
 from datp.modeling.centralized_training import (
     _AELightningModule,
+    _AEModuleConfig,
     _metric_value,
     _quiet_lightning_console_logging,
     _should_log_epoch_progress,
@@ -88,10 +89,12 @@ class TestAELightningModule:
         model = self._dummy_model()
         lm = _AELightningModule(
             model=model,
-            lr=0.001,
-            max_epochs=10,
-            tracking_namespace=None,
-            training_progress_interval=5,
+            config=_AEModuleConfig(
+                lr=0.001,
+                max_epochs=10,
+                tracking_namespace=None,
+                training_progress_interval=5,
+            ),
         )
         assert lm.model is model
         assert lm.lr == pytest.approx(0.001)
@@ -102,10 +105,12 @@ class TestAELightningModule:
         model = self._dummy_model()
         lm = _AELightningModule(
             model=model,
-            lr=0.001,
-            max_epochs=10,
-            tracking_namespace=None,
-            training_progress_interval=5,
+            config=_AEModuleConfig(
+                lr=0.001,
+                max_epochs=10,
+                tracking_namespace=None,
+                training_progress_interval=5,
+            ),
         )
         x = torch.randn(4, 8)
         out = lm(x)
@@ -115,10 +120,12 @@ class TestAELightningModule:
         model = self._dummy_model()
         lm = _AELightningModule(
             model=model,
-            lr=0.001,
-            max_epochs=10,
-            tracking_namespace=None,
-            training_progress_interval=5,
+            config=_AEModuleConfig(
+                lr=0.001,
+                max_epochs=10,
+                tracking_namespace=None,
+                training_progress_interval=5,
+            ),
         )
         opt = lm.configure_optimizers()
         assert isinstance(opt, torch.optim.Adam)

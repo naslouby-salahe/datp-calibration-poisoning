@@ -26,7 +26,17 @@ from datp.core.enums import DeviceType, Regime
 from datp.core.errors import fmt
 from datp.core.logging import get_logger
 from datp.core.seeds import set_seeds
-from datp.core.tracking import log_artifact, log_metrics, log_params
+from datp.core.tracking import (
+    TrackingMetric,
+    TrackingMetricKey,
+    TrackingMetrics,
+    TrackingParam,
+    TrackingParamKey,
+    TrackingParams,
+    log_artifact,
+    log_metrics,
+    log_params,
+)
 from datp.data.regimes.catalog import dataset_for_regime
 from datp.federated.catalog import TrainingClientCatalog
 from datp.federated.checkpoints import (
@@ -86,11 +96,7 @@ def _checkpoint_protocol_enabled(
 
 @dataclass(frozen=True, slots=True)
 class SimClientConfig:
-    """Per-simulation client and scoring options.
-
-    Groups the four optional client-override parameters so run_fl_simulation
-    stays within the 13-argument quality limit.
-    """
+    """Per-simulation client and scoring options."""
 
     client_cls: type[DatpClient] = DatpClient
     client_extra_kwargs: dict[str, object] | None = None
@@ -108,6 +114,36 @@ class TrainingResult:
     checkpoint_dir: Path
     score_dir: Path
     loss_history: list[float]
+
+
+@dataclass(frozen=True, slots=True)
+class _CheckpointSaveContext:
+    """Bundled parameters for checkpoint artifact saving helpers."""
+
+    model: nn.Module
+    param_module: nn.Module
+    strategy: DatpFedAvg
+    monitor: ConvergenceMonitor
+    cfg: DatpConfig
+    lifecycle: RunLifecycle
+    total_rounds: int
+
+
+@dataclass(frozen=True, slots=True)
+class _CheckpointProtocolContext:
+    """Bundled parameters for checkpoint-protocol scoring."""
+
+    model: Autoencoder
+    param_module: nn.Module
+    strategy: DatpFedAvg
+    checkpoint_cfg: CheckpointProtocolConfig
+    ckpt_dir_by_round: dict[int, Path]
+    scoring_data: dict[str, ClientData]
+    score_base: Path
+    regime: Regime
+    seed: int
+    alpha: float | None
+    cfg: DatpConfig
 
 
 def validate_regime(cfg: DatpConfig) -> Regime:
@@ -191,18 +227,17 @@ def _execute_flower_simulation(
     logger.info("ray shutdown after FL simulation", label=label)
 
 
-def _save_training_artifacts(
-    model: nn.Module,
-    param_module: nn.Module,
-    strategy: DatpFedAvg,
-    ckpt_dir: Path,
-    monitor: ConvergenceMonitor,
-    cfg: DatpConfig,
-    lifecycle: RunLifecycle,
-    total_rounds: int,
-) -> None:
+def _convergence_snapshot(monitor: ConvergenceMonitor) -> ConvergenceSnapshot:
+    return ConvergenceSnapshot(
+        loss_history=monitor.loss_history,
+        converged_round=monitor.converged_round,
+        criterion_value=monitor.latest_relative_change,
+    )
+
+
+def _save_training_artifacts(ctx: _CheckpointSaveContext, ckpt_dir: Path) -> None:
     """Restore aggregated parameters, save checkpoint and convergence artifacts."""
-    final_params = strategy.latest_parameters
+    final_params = ctx.strategy.latest_parameters
     if final_params is None:
         raise RuntimeError(
             fmt(
@@ -213,68 +248,57 @@ def _save_training_artifacts(
                 "None",
             )
         )
-    set_parameters(param_module, final_params)
-
-    save_checkpoint(model, ckpt_dir)
+    set_parameters(ctx.param_module, final_params)
+    save_checkpoint(ctx.model, ckpt_dir)
     save_convergence_artifacts(
-        ckpt_dir,
-        ConvergenceSnapshot(
-            loss_history=monitor.loss_history,
-            converged_round=monitor.converged_round,
-            criterion_value=monitor.latest_relative_change,
-        ),
-        cfg.federation.convergence,
+        ckpt_dir, _convergence_snapshot(ctx.monitor), ctx.cfg.federation.convergence
     )
-    lifecycle.last_completed_round = total_rounds
+    ctx.lifecycle.last_completed_round = ctx.total_rounds
+
+
+def _resolve_params_for_round(
+    checkpoint_round: int,
+    strategy: DatpFedAvg,
+    ckpt_dir_by_round: dict[int, Path],
+) -> NDArrays:
+    """Return params snapshot for a checkpoint round: in-memory preferred, disk fallback."""
+    in_memory = strategy.parameter_snapshots
+    if checkpoint_round in in_memory:
+        return in_memory[checkpoint_round]
+    disk_params = load_params_snapshot(ckpt_dir_by_round[checkpoint_round])
+    if disk_params is None:
+        raise RuntimeError(
+            fmt(
+                _MODULE,
+                "Missing checkpoint milestone parameter snapshots (neither in memory nor on disk)",
+                str(sorted(ckpt_dir_by_round)),
+                str(checkpoint_round),
+            )
+        )
+    logger.info(
+        "crash recovery: loaded params snapshot from disk",
+        round=checkpoint_round,
+        path=str(ckpt_dir_by_round[checkpoint_round]),
+    )
+    return disk_params
 
 
 def _save_checkpoint_protocol_artifacts(
-    model: nn.Module,
-    param_module: nn.Module,
-    strategy: DatpFedAvg,
+    ctx: _CheckpointSaveContext,
     ckpt_dir_by_round: dict[int, Path],
-    monitor: ConvergenceMonitor,
-    cfg: DatpConfig,
-    lifecycle: RunLifecycle,
-    total_rounds: int,
 ) -> None:
-    in_memory = strategy.parameter_snapshots
-    # Build params_by_round: prefer in-memory snapshot; fall back to disk snapshot
-    # saved during training for crash recovery.
-    params_by_round: dict[int, list] = {}
-    for checkpoint_round, ckpt_dir in ckpt_dir_by_round.items():
-        if checkpoint_round in in_memory:
-            params_by_round[checkpoint_round] = in_memory[checkpoint_round]
-        else:
-            disk_params = load_params_snapshot(ckpt_dir)
-            if disk_params is None:
-                raise RuntimeError(
-                    fmt(
-                        _MODULE,
-                        "Missing checkpoint milestone parameter snapshots (neither in memory nor on disk)",
-                        str(sorted(ckpt_dir_by_round)),
-                        str(checkpoint_round),
-                    )
-                )
-            logger.info(
-                "crash recovery: loaded params snapshot from disk",
-                round=checkpoint_round,
-                path=str(ckpt_dir),
-            )
-            params_by_round[checkpoint_round] = disk_params
-    for checkpoint_round, ckpt_dir in sorted(ckpt_dir_by_round.items()):
-        set_parameters(param_module, params_by_round[checkpoint_round])
-        save_checkpoint(model, ckpt_dir)
-        save_convergence_artifacts(
-            ckpt_dir,
-            ConvergenceSnapshot(
-                loss_history=monitor.loss_history,
-                converged_round=monitor.converged_round,
-                criterion_value=monitor.latest_relative_change,
-            ),
-            cfg.federation.convergence,
+    params_by_round: dict[int, NDArrays] = {
+        checkpoint_round: _resolve_params_for_round(
+            checkpoint_round, ctx.strategy, ckpt_dir_by_round
         )
-    lifecycle.last_completed_round = total_rounds
+        for checkpoint_round in ckpt_dir_by_round
+    }
+    snapshot = _convergence_snapshot(ctx.monitor)
+    for checkpoint_round, ckpt_dir in sorted(ckpt_dir_by_round.items()):
+        set_parameters(ctx.param_module, params_by_round[checkpoint_round])
+        save_checkpoint(ctx.model, ckpt_dir)
+        save_convergence_artifacts(ckpt_dir, snapshot, ctx.cfg.federation.convergence)
+    ctx.lifecycle.last_completed_round = ctx.total_rounds
 
 
 def load_scoring_data(
@@ -338,48 +362,37 @@ def _params_for_checkpoint_round(
     return round_params
 
 
-def _score_checkpoint_protocol_rounds(
-    *,
-    model: Autoencoder,
-    param_module: nn.Module,
-    strategy: DatpFedAvg,
-    checkpoint_cfg: CheckpointProtocolConfig,
-    ckpt_dir_by_round: dict[int, Path],
-    scoring_data: dict[str, ClientData],
-    score_base: Path,
-    regime: Regime,
-    seed: int,
-    alpha: float | None,
-    cfg: DatpConfig,
-) -> None:
+def _score_checkpoint_protocol_rounds(ctx: _CheckpointProtocolContext) -> None:
     from datp.artifacts.layout import ArtifactLayout
     from datp.core.identity import TrainingCellId
 
     score_layout = ArtifactLayout(
-        base_dir=_artifact_root_from_path(score_base, ArtifactDir.SCORES),
-        regime=regime,
+        base_dir=_artifact_root_from_path(ctx.score_base, ArtifactDir.SCORES),
+        regime=ctx.regime,
     )
-    score_cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
-    for checkpoint_round in checkpoint_cfg.milestones:
+    score_cell = TrainingCellId(regime=ctx.regime, seed=ctx.seed, alpha=ctx.alpha)
+    for checkpoint_round in ctx.checkpoint_cfg.milestones:
         round_params = _params_for_checkpoint_round(
-            checkpoint_round, strategy, ckpt_dir_by_round
+            checkpoint_round, ctx.strategy, ctx.ckpt_dir_by_round
         )
-        set_parameters(param_module, round_params)
+        set_parameters(ctx.param_module, round_params)
         round_score_base = score_layout.score_cell_for_round(
             score_cell, checkpoint_round
         ).score_dir
-        round_ckpt = ckpt_dir_by_round[checkpoint_round] / ArtifactFile.MODEL_CHECKPOINT
+        round_ckpt = (
+            ctx.ckpt_dir_by_round[checkpoint_round] / ArtifactFile.MODEL_CHECKPOINT
+        )
         score_clients(
-            model=model,
-            client_data=scoring_data,
+            model=ctx.model,
+            client_data=ctx.scoring_data,
             score_base=round_score_base,
-            regime=regime,
-            seed=seed,
-            alpha=alpha,
-            dataset=dataset_for_regime(regime),
+            regime=ctx.regime,
+            seed=ctx.seed,
+            alpha=ctx.alpha,
+            dataset=dataset_for_regime(ctx.regime),
             checkpoint_path=round_ckpt,
             checkpoint_round=checkpoint_round,
-            scoring_batch_size=cfg.machine.scoring_batch_size,
+            scoring_batch_size=ctx.cfg.machine.scoring_batch_size,
         )
 
 
@@ -472,45 +485,38 @@ def run_fl_simulation(
             converged_round=converged_round,
         )
 
+        save_ctx = _CheckpointSaveContext(
+            model=model,
+            param_module=param_module,
+            strategy=strategy,
+            monitor=monitor,
+            cfg=cfg,
+            lifecycle=lifecycle,
+            total_rounds=total_rounds,
+        )
         if protocol_enabled:
-            _save_checkpoint_protocol_artifacts(
-                model,
-                param_module,
-                strategy,
-                ckpt_dir_by_round,
-                monitor,
-                cfg,
-                lifecycle,
-                total_rounds,
-            )
+            _save_checkpoint_protocol_artifacts(save_ctx, ckpt_dir_by_round)
         else:
-            _save_training_artifacts(
-                model,
-                param_module,
-                strategy,
-                ckpt_dir,
-                monitor,
-                cfg,
-                lifecycle,
-                total_rounds,
-            )
+            _save_training_artifacts(save_ctx, ckpt_dir)
 
     if client_config.score_after:
         scoring_data = load_scoring_data(client_data, prepared_dir)
         if protocol_enabled:
             assert checkpoint_cfg is not None
             _score_checkpoint_protocol_rounds(
-                model=model,
-                param_module=param_module,
-                strategy=strategy,
-                checkpoint_cfg=checkpoint_cfg,
-                ckpt_dir_by_round=ckpt_dir_by_round,
-                scoring_data=scoring_data,
-                score_base=score_base,
-                regime=regime,
-                seed=seed,
-                alpha=alpha,
-                cfg=cfg,
+                _CheckpointProtocolContext(
+                    model=model,
+                    param_module=param_module,
+                    strategy=strategy,
+                    checkpoint_cfg=checkpoint_cfg,
+                    ckpt_dir_by_round=ckpt_dir_by_round,
+                    scoring_data=scoring_data,
+                    score_base=score_base,
+                    regime=regime,
+                    seed=seed,
+                    alpha=alpha,
+                    cfg=cfg,
+                )
             )
         else:
             score_clients(
@@ -527,20 +533,27 @@ def run_fl_simulation(
             )
 
     log_params(
-        {
-            "regime": str(regime),
-            "seed": str(seed),
-            "rounds_max": str(effective_rounds_max),
-            "label": label,
-        }
+        TrackingParams(
+            (
+                TrackingParam(TrackingParamKey.REGIME, regime),
+                TrackingParam(TrackingParamKey.SEED, seed),
+                TrackingParam(TrackingParamKey.ROUNDS_MAX, effective_rounds_max),
+                TrackingParam(TrackingParamKey.LABEL, label),
+            )
+        )
     )
     log_metrics(
-        {
-            "converged_round": float(converged_round)
-            if converged_round is not None
-            else float(total_rounds),
-            "total_rounds": float(total_rounds),
-        },
+        TrackingMetrics(
+            (
+                TrackingMetric(
+                    TrackingMetricKey.CONVERGED_ROUND,
+                    float(converged_round)
+                    if converged_round is not None
+                    else float(total_rounds),
+                ),
+                TrackingMetric(TrackingMetricKey.TOTAL_ROUNDS, total_rounds),
+            )
+        ),
         step=None,
         prefix=None,
     )

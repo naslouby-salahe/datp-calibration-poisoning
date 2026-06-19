@@ -450,7 +450,7 @@ class TestStallDetection:
         import structlog.testing
         from flwr.common import ndarrays_to_parameters
 
-        from datp.federated.strategies import DatpFedAvg
+        from datp.federated.strategies import DatpFedAvg, FedAvgConfig
 
         monitor = ConvergenceMonitor(
             rounds_initial=1,
@@ -459,16 +459,18 @@ class TestStallDetection:
             window=2,
         )
         strategy = DatpFedAvg(
-            convergence_monitor=monitor,
-            round_timeout_s=0.001,
-            fraction_fit=1.0,
-            fraction_evaluate=1.0,
-            min_fit_clients=1,
-            min_evaluate_clients=1,
-            min_available_clients=1,
-            initial_parameters=ndarrays_to_parameters(
-                [np.zeros((4, 3), dtype=np.float32)]
-            ),
+            FedAvgConfig(
+                convergence_monitor=monitor,
+                round_timeout_s=0.001,
+                fraction_fit=1.0,
+                fraction_evaluate=1.0,
+                min_fit_clients=1,
+                min_evaluate_clients=1,
+                min_available_clients=1,
+                initial_parameters=ndarrays_to_parameters(
+                    [np.zeros((4, 3), dtype=np.float32)]
+                ),
+            )
         )
         strategy._round_start_time = time.monotonic() - 1.0
 
@@ -495,19 +497,21 @@ class TestAggregateEvaluateGuards:
         import numpy as np
         from flwr.common import ndarrays_to_parameters
 
-        from datp.federated.strategies import DatpFedAvg
+        from datp.federated.strategies import DatpFedAvg, FedAvgConfig
 
         return DatpFedAvg(
-            convergence_monitor=monitor,
-            round_timeout_s=300.0,
-            fraction_fit=1.0,
-            fraction_evaluate=1.0,
-            min_fit_clients=1,
-            min_evaluate_clients=1,
-            min_available_clients=1,
-            initial_parameters=ndarrays_to_parameters(
-                [np.zeros((2, 2), dtype=np.float32)]
-            ),
+            FedAvgConfig(
+                convergence_monitor=monitor,
+                round_timeout_s=300.0,
+                fraction_fit=1.0,
+                fraction_evaluate=1.0,
+                min_fit_clients=1,
+                min_evaluate_clients=1,
+                min_available_clients=1,
+                initial_parameters=ndarrays_to_parameters(
+                    [np.zeros((2, 2), dtype=np.float32)]
+                ),
+            )
         )
 
     def test_no_results_returns_none_and_does_not_record(self) -> None:
@@ -579,7 +583,7 @@ class TestConvergenceScheduling:
         import numpy as np
         from flwr.common import ndarrays_to_parameters
 
-        from datp.federated.strategies import DatpFedAvg
+        from datp.federated.strategies import DatpFedAvg, FedAvgConfig
 
         monitor = ConvergenceMonitor(
             rounds_initial=1,
@@ -588,16 +592,18 @@ class TestConvergenceScheduling:
             window=2,
         )
         strategy = DatpFedAvg(
-            convergence_monitor=monitor,
-            round_timeout_s=300.0,
-            fraction_fit=1.0,
-            fraction_evaluate=1.0,
-            min_fit_clients=1,
-            min_evaluate_clients=1,
-            min_available_clients=1,
-            initial_parameters=ndarrays_to_parameters(
-                [np.zeros((2, 2), dtype=np.float32)]
-            ),
+            FedAvgConfig(
+                convergence_monitor=monitor,
+                round_timeout_s=300.0,
+                fraction_fit=1.0,
+                fraction_evaluate=1.0,
+                min_fit_clients=1,
+                min_evaluate_clients=1,
+                min_available_clients=1,
+                initial_parameters=ndarrays_to_parameters(
+                    [np.zeros((2, 2), dtype=np.float32)]
+                ),
+            )
         )
 
         mock_proxy = MagicMock()

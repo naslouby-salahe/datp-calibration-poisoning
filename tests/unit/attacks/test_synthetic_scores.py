@@ -117,12 +117,12 @@ class TestStandardScoreSet:
         ss = make_standard_score_set()
         assert all(c.startswith("pending_") for c in ss.pending_ids)
 
-    def test_cal_dict(self) -> None:
+    def test_calibration_scores(self) -> None:
         ss = make_standard_score_set()
-        cal = ss.cal_dict()
+        cal = ss.calibration_scores
         assert len(cal) == 10
-        for arr in cal.values():
-            assert isinstance(arr, np.ndarray)
+        for client in cal.clients:
+            assert isinstance(client.scores, np.ndarray)
 
     def test_client_by_id(self) -> None:
         ss = make_standard_score_set()

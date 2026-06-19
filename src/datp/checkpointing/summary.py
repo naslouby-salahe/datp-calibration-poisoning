@@ -66,23 +66,39 @@ class GlobalCheckpointSelection:
     summaries: tuple[CheckpointBaselineSummary, ...]
 
 
+def _aggregate_fpr_stats(items: list[SweepMetrics]) -> tuple[float, float, float]:
+    mean_fpr = _mean(m.mean_fpr for m in items)
+    cv_fpr = _mean(m.cv_fpr for m in items)
+    worst_client_fpr = _max(m.worst_client_fpr for m in items)
+    return mean_fpr, cv_fpr, worst_client_fpr
+
+
+def _aggregate_tpr_stats(items: list[SweepMetrics]) -> tuple[float, float, float]:
+    mean_tpr = _mean(_mean_client_tpr(m) for m in items)
+    cv_tpr = _mean(m.cv_tpr for m in items)
+    worst_client_tpr = _min(_worst_client_tpr(m) for m in items)
+    return mean_tpr, cv_tpr, worst_client_tpr
+
+
 def _build_baseline_summary(
     regime: Regime,
     baseline: Baseline,
     checkpoint_round: int,
     items: list[SweepMetrics],
 ) -> CheckpointBaselineSummary:
+    mean_fpr, cv_fpr, worst_client_fpr = _aggregate_fpr_stats(items)
+    mean_tpr, cv_tpr, worst_client_tpr = _aggregate_tpr_stats(items)
     return CheckpointBaselineSummary(
         regime=regime,
         baseline=baseline,
         checkpoint_round=checkpoint_round,
         seed_count=len(items),
-        mean_fpr=_mean(m.mean_fpr for m in items),
-        cv_fpr=_mean(m.cv_fpr for m in items),
-        worst_client_fpr=_max(m.worst_client_fpr for m in items),
-        mean_tpr=_mean(_mean_client_tpr(m) for m in items),
-        cv_tpr=_mean(m.cv_tpr for m in items),
-        worst_client_tpr=_min(_worst_client_tpr(m) for m in items),
+        mean_fpr=mean_fpr,
+        cv_fpr=cv_fpr,
+        worst_client_fpr=worst_client_fpr,
+        mean_tpr=mean_tpr,
+        cv_tpr=cv_tpr,
+        worst_client_tpr=worst_client_tpr,
         macro_f1=_mean(_mean_client_macro_f1(m) for m in items),
         p10_macro_f1=_mean(m.p10_macro_f1 for m in items),
         worst_client_balanced_accuracy=_min(m.worst_ba for m in items),
@@ -127,12 +143,7 @@ def _eligible_rounds(
     return rounds
 
 
-def select_global_primary_checkpoint(
-    *,
-    metrics: tuple[SweepMetrics, ...],
-    n_bootstrap: int,
-    bootstrap_seed: int,
-) -> GlobalCheckpointSelection:
+def _validate_regime_a_metrics(metrics: tuple[SweepMetrics, ...]) -> None:
     if not metrics:
         raise ValueError(
             fmt(_MODULE, "No checkpoint metrics supplied", "Regime A metrics", "empty")
@@ -146,6 +157,15 @@ def select_global_primary_checkpoint(
                 "mixed regimes",
             )
         )
+
+
+def select_global_primary_checkpoint(
+    *,
+    metrics: tuple[SweepMetrics, ...],
+    n_bootstrap: int,
+    bootstrap_seed: int,
+) -> GlobalCheckpointSelection:
+    _validate_regime_a_metrics(metrics)
     summaries = summarize_checkpoint_metrics(metrics)
     b2_by_round = {
         summary.checkpoint_round: summary

@@ -68,6 +68,116 @@ def ensure_fl_checkpoint(
         )
 
 
+def _protocol_enabled(request: PipelineRequest) -> bool:
+    checkpoint_cfg = request.cfg.checkpoint_protocol
+    return (
+        isinstance(checkpoint_cfg, CheckpointProtocolConfig) and checkpoint_cfg.enabled
+    )
+
+
+def _score_only_recovery(
+    request: PipelineRequest,
+    ckpt_dir: Path,
+    ckpt_file: Path,
+) -> None:
+    """Score-only recovery when checkpoint exists but scoring was interrupted."""
+    import torch
+
+    from datp.data.regimes.catalog import dataset_for_regime
+    from datp.federated.data_loading import ALL_SPLITS, load_client_data
+    from datp.scoring.generation import load_model_from_checkpoint, score_clients
+
+    key = request.key
+    score_base = (
+        ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
+        .score_cell(key)
+        .score_dir
+    )
+    scoring_data = load_client_data(
+        request.prepared_dir, device=torch.device(DeviceType.CPU), splits=ALL_SPLITS
+    )
+    model = load_model_from_checkpoint(
+        request.cfg,
+        ckpt_dir=ckpt_dir,
+        require_cuda=request.cfg.machine.require_cuda,
+    )
+    score_clients(
+        model=model,
+        client_data=scoring_data,
+        score_base=score_base,
+        regime=key.regime,
+        seed=key.seed,
+        alpha=key.alpha,
+        dataset=dataset_for_regime(key.regime),
+        checkpoint_path=ckpt_file,
+        checkpoint_round=request.checkpoint_round,
+        scoring_batch_size=request.cfg.machine.scoring_batch_size,
+    )
+
+
+def _handle_non_protocol_checkpoint(
+    request: PipelineRequest,
+    ckpt_dir: Path,
+    ckpt_file: Path,
+) -> None:
+    """Validate scoring completeness for an existing checkpoint; run score-only recovery if scoring was interrupted."""
+    from datp.scoring.generation import validate_scoring_manifest
+
+    key = request.key
+    score_base = (
+        ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
+        .score_cell(key)
+        .score_dir
+    )
+    try:
+        validate_scoring_manifest(score_base)
+        logger.info(
+            "checkpoint exists, skipping training",
+            regime=key.regime,
+            seed=key.seed,
+            alpha=key.alpha,
+        )
+        return
+    except (FileNotFoundError, ValueError):
+        pass
+    logger.info(
+        "checkpoint exists but scoring incomplete; running score-only recovery",
+        regime=key.regime,
+        seed=key.seed,
+        alpha=key.alpha,
+    )
+    _score_only_recovery(request, ckpt_dir, ckpt_file)
+
+
+def _run_fl_training(
+    request: PipelineRequest,
+    label: str,
+    step_fn: Callable[[SweepStep, str], None] | None,
+) -> None:
+    import torch
+
+    from datp.federated.data_loading import TRAINING_SPLITS, load_client_data
+    from datp.federated.protocols.fedavg import run_fl_training
+
+    if step_fn is not None:
+        step_fn(SweepStep.TRAIN_FL, label)
+
+    key = request.key
+    client_data = load_client_data(
+        request.prepared_dir,
+        device=torch.device(DeviceType.CPU),
+        splits=TRAINING_SPLITS,
+    )
+    run_fl_training(
+        request.cfg,
+        client_data,
+        key.seed,
+        key.alpha,
+        base_dir=request.base_dir,
+        prepared_dir=request.prepared_dir,
+    )
+
+
 def _ensure_fl_checkpoint_locked(
     *,
     request: PipelineRequest,
@@ -78,20 +188,8 @@ def _ensure_fl_checkpoint_locked(
     step_fn: Callable[[SweepStep, str], None] | None,
     checkpoint_status_fn: Callable[[bool, Path], None] | None,
 ) -> None:
-    import torch
-
-    from datp.federated.data_loading import (
-        ALL_SPLITS,
-        TRAINING_SPLITS,
-        load_client_data,
-    )
-    from datp.federated.protocols.fedavg import run_fl_training
-
     key = request.key
-    checkpoint_cfg = request.cfg.checkpoint_protocol
-    protocol_enabled = (
-        isinstance(checkpoint_cfg, CheckpointProtocolConfig) and checkpoint_cfg.enabled
-    )
+    protocol_enabled = _protocol_enabled(request)
 
     if checkpoint_status_fn is not None:
         checkpoint_status_fn(ckpt_file.exists(), ckpt_file)
@@ -110,75 +208,10 @@ def _ensure_fl_checkpoint_locked(
         return
 
     if not protocol_enabled and ckpt_file.exists():
-        from datp.scoring.generation import (
-            load_model_from_checkpoint,
-            score_clients,
-            validate_scoring_manifest,
-        )
+        _handle_non_protocol_checkpoint(request, ckpt_dir, ckpt_file)
+        return  # scoring validated or recovered; skip training
 
-        score_base = (
-            ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
-            .score_cell(key)
-            .score_dir
-        )
-        try:
-            validate_scoring_manifest(score_base)
-            logger.info(
-                "checkpoint exists, skipping training",
-                regime=key.regime,
-                seed=key.seed,
-                alpha=key.alpha,
-            )
-            return
-        except (FileNotFoundError, ValueError):
-            pass
-        # Checkpoint exists but scoring was interrupted — run scoring only.
-        logger.info(
-            "checkpoint exists but scoring incomplete; running score-only recovery",
-            regime=key.regime,
-            seed=key.seed,
-            alpha=key.alpha,
-        )
-        scoring_data = load_client_data(
-            request.prepared_dir, device=torch.device(DeviceType.CPU), splits=ALL_SPLITS
-        )
-        model = load_model_from_checkpoint(
-            request.cfg,
-            ckpt_dir=ckpt_dir,
-            require_cuda=request.cfg.machine.require_cuda,
-        )
-        from datp.data.regimes.catalog import dataset_for_regime
-
-        score_clients(
-            model=model,
-            client_data=scoring_data,
-            score_base=score_base,
-            regime=key.regime,
-            seed=key.seed,
-            alpha=key.alpha,
-            dataset=dataset_for_regime(key.regime),
-            checkpoint_path=ckpt_file,
-            checkpoint_round=request.checkpoint_round,
-            scoring_batch_size=request.cfg.machine.scoring_batch_size,
-        )
-        return
-
-    if step_fn is not None:
-        step_fn(SweepStep.TRAIN_FL, label)
-
-    client_data = load_client_data(
-        request.prepared_dir,
-        device=torch.device(DeviceType.CPU),
-        splits=TRAINING_SPLITS,
-    )
-    run_fl_training(
-        request.cfg,
-        client_data,
-        key.seed,
-        key.alpha,
-        base_dir=request.base_dir,
-        prepared_dir=request.prepared_dir,
-    )
+    _run_fl_training(request, label, step_fn)
 
 
 def _require_milestones(request: PipelineRequest) -> tuple[int, ...]:
@@ -224,7 +257,11 @@ def _recover_checkpoint_protocol_scores(
 
     from datp.data.regimes.catalog import dataset_for_regime
     from datp.federated.data_loading import ALL_SPLITS, load_client_data
-    from datp.scoring.generation import load_model_from_checkpoint, score_clients
+    from datp.scoring.generation import (
+        load_model_from_checkpoint,
+        score_clients,
+        validate_scoring_manifest,
+    )
 
     key = request.key
     scoring_data = load_client_data(
@@ -233,8 +270,6 @@ def _recover_checkpoint_protocol_scores(
     for checkpoint_round in _require_milestones(request):
         score_base = layout.score_cell_for_round(key, checkpoint_round).score_dir
         try:
-            from datp.scoring.generation import validate_scoring_manifest
-
             validate_scoring_manifest(score_base)
             continue
         except (FileNotFoundError, ValueError):

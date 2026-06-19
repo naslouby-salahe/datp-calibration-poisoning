@@ -20,6 +20,7 @@ from datp.data.datasets.nbaiot.spec import (
 )
 from datp.data.manifests import create_manifest
 from datp.data.scaling import apply_scaler, fit_scaler
+from sklearn.preprocessing import StandardScaler
 from datp.data.splits import Split
 from datp.data.catalog import SplitPolicyRole
 
@@ -35,6 +36,20 @@ def _raw_nbaiot_files(raw_dir: Path) -> list[Path]:
         for attack_family_dir in ATTACK_FAMILY_DIRS:
             files.extend(sorted((device_dir / attack_family_dir).glob("*.csv")))
     return [path for path in files if path.exists()]
+
+
+def _assert_contiguous(
+    indices: dict[SplitPolicyRole, tuple[int, int]],
+    predecessor: SplitPolicyRole,
+    successor: SplitPolicyRole,
+    label: str,
+) -> None:
+    if indices[successor][0] != indices[predecessor][1]:
+        raise ValueError(
+            fmt(
+                _NBAIOT_MODULE, f"{label} alignment error", f"{label} contiguous", "gap"
+            )
+        )
 
 
 def _compute_split_indices(n: int) -> dict[str, tuple[int, int]]:
@@ -60,22 +75,12 @@ def _compute_split_indices(n: int) -> dict[str, tuple[int, int]]:
         SplitPolicyRole.TEST_BENIGN: (test_start, test_end),
     }
 
-    if indices[SplitPolicyRole.GAP1][0] != indices[SplitPolicyRole.TRAIN][1]:
-        raise ValueError(
-            fmt(_NBAIOT_MODULE, "Gap1 alignment error", "gap1 following train", "gap")
-        )
-    if indices[SplitPolicyRole.CAL][0] != indices[SplitPolicyRole.GAP1][1]:
-        raise ValueError(
-            fmt(_NBAIOT_MODULE, "Cal alignment error", "cal following gap1", "gap")
-        )
-    if indices[SplitPolicyRole.GAP2][0] != indices[SplitPolicyRole.CAL][1]:
-        raise ValueError(
-            fmt(_NBAIOT_MODULE, "Gap2 alignment error", "gap2 following cal", "gap")
-        )
-    if indices[SplitPolicyRole.TEST_BENIGN][0] != indices[SplitPolicyRole.GAP2][1]:
-        raise ValueError(
-            fmt(_NBAIOT_MODULE, "Test alignment error", "test following gap2", "gap")
-        )
+    _assert_contiguous(indices, SplitPolicyRole.TRAIN, SplitPolicyRole.GAP1, "Gap1")
+    _assert_contiguous(indices, SplitPolicyRole.GAP1, SplitPolicyRole.CAL, "Cal")
+    _assert_contiguous(indices, SplitPolicyRole.CAL, SplitPolicyRole.GAP2, "Gap2")
+    _assert_contiguous(
+        indices, SplitPolicyRole.GAP2, SplitPolicyRole.TEST_BENIGN, "Test"
+    )
     return {role.value: bounds for role, bounds in indices.items()}
 
 
@@ -97,6 +102,46 @@ def _load_attack_csvs(device_dir: Path) -> tuple[pl.DataFrame, list[str]]:
     if attack_frames:
         return pl.concat(attack_frames), sorted(set(attack_classes))
     return pl.DataFrame(), []
+
+
+def _scale_device_splits(
+    *,
+    train_df: pl.DataFrame,
+    cal_df: pl.DataFrame,
+    test_benign_df: pl.DataFrame,
+    attack_df_raw: pl.DataFrame,
+    feature_cols: list[str],
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame, StandardScaler]:
+    scaler = fit_scaler(train_df)
+    train_scaled = apply_scaler(train_df, scaler)
+    cal_scaled = apply_scaler(cal_df, scaler)
+    test_benign_scaled = apply_scaler(test_benign_df, scaler)
+    test_attack_scaled = (
+        apply_scaler(attack_df_raw, scaler)
+        if len(attack_df_raw) > 0
+        else create_empty_feature_frame(feature_cols)
+    )
+    return train_scaled, cal_scaled, test_benign_scaled, test_attack_scaled, scaler
+
+
+def _maybe_subsample_benign_test(
+    test_benign_scaled: pl.DataFrame,
+    test_attack_scaled: pl.DataFrame,
+    *,
+    seed: int,
+    device_id: str,
+) -> pl.DataFrame:
+    if len(test_attack_scaled) == 0:
+        return test_benign_scaled
+    n_attack = len(test_attack_scaled)
+    if len(test_benign_scaled) <= n_attack:
+        return test_benign_scaled
+    logger.info(
+        "balanced-test sensitivity: subsampled benign test to match attack count",
+        device=device_id,
+        n=n_attack,
+    )
+    return test_benign_scaled.sample(n=n_attack, seed=seed, with_replacement=False)
 
 
 def _prepare_device(
@@ -150,28 +195,20 @@ def _prepare_device(
             "device eligible", device=device_id, cal_count=cal_count, n_min=n_min
         )
 
-    scaler = fit_scaler(train_df)
+    train_scaled, cal_scaled, test_benign_scaled, test_attack_scaled, scaler = (
+        _scale_device_splits(
+            train_df=train_df,
+            cal_df=cal_df,
+            test_benign_df=test_benign_df,
+            attack_df_raw=attack_df_raw,
+            feature_cols=feature_cols,
+        )
+    )
 
-    train_scaled = apply_scaler(train_df, scaler)
-    cal_scaled = apply_scaler(cal_df, scaler)
-    test_benign_scaled = apply_scaler(test_benign_df, scaler)
-
-    if len(attack_df_raw) > 0:
-        test_attack_scaled = apply_scaler(attack_df_raw, scaler)
-    else:
-        test_attack_scaled = create_empty_feature_frame(feature_cols)
-
-    if balanced_test and len(test_attack_scaled) > 0:
-        n_attack = len(test_attack_scaled)
-        if len(test_benign_scaled) > n_attack:
-            test_benign_scaled = test_benign_scaled.sample(
-                n=n_attack, seed=seed, with_replacement=False
-            )
-            logger.info(
-                "balanced-test sensitivity: subsampled benign test to match attack count",
-                device=device_id,
-                n=n_attack,
-            )
+    if balanced_test:
+        test_benign_scaled = _maybe_subsample_benign_test(
+            test_benign_scaled, test_attack_scaled, seed=seed, device_id=device_id
+        )
 
     write_client_splits(
         client_dir=device_out,

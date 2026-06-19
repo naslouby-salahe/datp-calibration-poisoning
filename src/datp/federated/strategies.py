@@ -99,40 +99,43 @@ def _build_participation_failure_report(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class FedAvgConfig:
+    """Constructor parameters for DatpFedAvg."""
+
+    convergence_monitor: ConvergenceMonitor
+    round_timeout_s: float
+    fraction_fit: float
+    fraction_evaluate: float
+    min_fit_clients: int
+    min_evaluate_clients: int
+    min_available_clients: int
+    initial_parameters: Parameters | None = None
+    checkpoint_milestones: tuple[int, ...] = ()
+    convergence_mode: CheckpointConvergenceMode = CheckpointConvergenceMode.EARLY_STOP
+    checkpoint_disk_dirs: dict[int, Path] | None = None
+
+
 class DatpFedAvg(FedAvg):
-    def __init__(
-        self,
-        *,
-        convergence_monitor: ConvergenceMonitor,
-        round_timeout_s: float,
-        fraction_fit: float,
-        fraction_evaluate: float,
-        min_fit_clients: int,
-        min_evaluate_clients: int,
-        min_available_clients: int,
-        initial_parameters: Parameters | None = None,
-        checkpoint_milestones: tuple[int, ...] = (),
-        convergence_mode: CheckpointConvergenceMode = CheckpointConvergenceMode.EARLY_STOP,
-        checkpoint_disk_dirs: dict[int, Path] | None = None,
-    ) -> None:
+    def __init__(self, config: FedAvgConfig) -> None:
         super().__init__(
-            fraction_fit=fraction_fit,
-            fraction_evaluate=fraction_evaluate,
-            min_fit_clients=min_fit_clients,
-            min_evaluate_clients=min_evaluate_clients,
-            min_available_clients=min_available_clients,
-            initial_parameters=initial_parameters,
+            fraction_fit=config.fraction_fit,
+            fraction_evaluate=config.fraction_evaluate,
+            min_fit_clients=config.min_fit_clients,
+            min_evaluate_clients=config.min_evaluate_clients,
+            min_available_clients=config.min_available_clients,
+            initial_parameters=config.initial_parameters,
             fit_metrics_aggregation_fn=lambda _: {},
         )
-        self._monitor = convergence_monitor
-        self._round_timeout_s = round_timeout_s
+        self._monitor = config.convergence_monitor
+        self._round_timeout_s = config.round_timeout_s
         self._round_start_time: float | None = None
         self._stopped = False
         self._latest_parameters: NDArrays | None = None
-        self._checkpoint_milestones = frozenset(checkpoint_milestones)
+        self._checkpoint_milestones = frozenset(config.checkpoint_milestones)
         self._parameter_snapshots: dict[int, NDArrays] = {}
-        self._convergence_mode = convergence_mode
-        self._checkpoint_disk_dirs: dict[int, Path] = checkpoint_disk_dirs or {}
+        self._convergence_mode = config.convergence_mode
+        self._checkpoint_disk_dirs: dict[int, Path] = config.checkpoint_disk_dirs or {}
 
     @property
     def convergence_monitor(self) -> ConvergenceMonitor:
@@ -150,43 +153,62 @@ class DatpFedAvg(FedAvg):
     def parameter_snapshots(self) -> dict[int, NDArrays]:
         return self._parameter_snapshots.copy()
 
+    def _raise_if_failures(
+        self,
+        stage: str,
+        server_round: int,
+        results: list[tuple[ClientProxy, Any]],
+        failures: list[tuple[ClientProxy, Any] | BaseException],
+    ) -> None:
+        if not failures:
+            return
+        report = _build_participation_failure_report(
+            stage=stage,
+            server_round=server_round,
+            results=results,
+            failures=failures,
+        )
+        logger.error(
+            "full participation violated",
+            round=server_round,
+            stage=stage,
+            successful=len(report.successful_ids),
+            failed=len(report.failed_ids),
+            failed_ids=list(report.failed_ids),
+            reasons=list(report.reasons),
+        )
+        raise RuntimeError(report.message)
+
+    def _check_stopped(self, stage: str, server_round: int) -> bool:
+        if self._stopped:
+            logger.info(f"convergence reached, skipping {stage}", round=server_round)
+            return True
+        return False
+
     def aggregate_fit(
         self,
         server_round: int,
         results: list[tuple[ClientProxy, Any]],
         failures: list[tuple[ClientProxy, Any] | BaseException],
     ) -> tuple[Parameters | None, dict[str, Scalar]]:
-        if failures:
-            report = _build_participation_failure_report(
-                stage="fit",
-                server_round=server_round,
-                results=results,
-                failures=failures,
-            )
-            logger.error(
-                "full participation violated",
-                round=server_round,
-                stage="fit",
-                successful=len(report.successful_ids),
-                failed=len(report.failed_ids),
-                failed_ids=list(report.failed_ids),
-                reasons=list(report.reasons),
-            )
-            raise RuntimeError(report.message)
+        self._raise_if_failures("fit", server_round, results, failures)
         aggregated = super().aggregate_fit(server_round, results, failures)
-        if aggregated is not None:
-            params, _ = aggregated
-            if params is not None:
-                self._latest_parameters = parameters_to_ndarrays(params)
-                if server_round in self._checkpoint_milestones:
-                    self._parameter_snapshots[server_round] = [
-                        ndarray.copy() for ndarray in self._latest_parameters
-                    ]
-                    if server_round in self._checkpoint_disk_dirs:
-                        save_params_snapshot(
-                            self._parameter_snapshots[server_round],
-                            self._checkpoint_disk_dirs[server_round],
-                        )
+        if aggregated is None:
+            return aggregated
+        params, _ = aggregated
+        if params is None:
+            return aggregated
+        self._latest_parameters = parameters_to_ndarrays(params)
+        if server_round not in self._checkpoint_milestones:
+            return aggregated
+        self._parameter_snapshots[server_round] = [
+            ndarray.copy() for ndarray in self._latest_parameters
+        ]
+        if server_round in self._checkpoint_disk_dirs:
+            save_params_snapshot(
+                self._parameter_snapshots[server_round],
+                self._checkpoint_disk_dirs[server_round],
+            )
         return aggregated
 
     def configure_fit(
@@ -195,10 +217,8 @@ class DatpFedAvg(FedAvg):
         parameters: Parameters,
         client_manager: Any,
     ) -> list[tuple[ClientProxy, FitIns]]:
-        if self._stopped:
-            logger.info("convergence reached, skipping fit", round=server_round)
+        if self._check_stopped("fit", server_round):
             return []
-
         self._round_start_time = time.monotonic()
         return super().configure_fit(server_round, parameters, client_manager)
 
@@ -208,56 +228,34 @@ class DatpFedAvg(FedAvg):
         parameters: Parameters,
         client_manager: Any,
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
-        if self._stopped:
-            logger.info("convergence reached, skipping evaluate", round=server_round)
+        if self._check_stopped("evaluate", server_round):
             return []
-
         return super().configure_evaluate(server_round, parameters, client_manager)
 
-    def aggregate_evaluate(
+    def _record_round_timing(self, server_round: int) -> None:
+        if self._round_start_time is None:
+            return
+        elapsed = time.monotonic() - self._round_start_time
+        rss_mb = _get_rss_mb()
+        logger.info(
+            "round complete",
+            round=server_round,
+            elapsed_s=round(elapsed, 1),
+            rss_mb=round(rss_mb, 0),
+        )
+        if elapsed > self._round_timeout_s:
+            logger.warning(
+                "round exceeded timeout",
+                round=server_round,
+                elapsed_s=round(elapsed, 1),
+                timeout_s=self._round_timeout_s,
+            )
+
+    def _compute_weighted_loss(
         self,
         server_round: int,
         results: list[tuple[ClientProxy, Any]],
-        failures: list[tuple[ClientProxy, Any] | BaseException],
-    ) -> tuple[float | None, dict[str, Scalar]]:
-        if failures:
-            report = _build_participation_failure_report(
-                stage="evaluate",
-                server_round=server_round,
-                results=results,
-                failures=failures,
-            )
-            logger.error(
-                "full participation violated",
-                round=server_round,
-                stage="evaluate",
-                successful=len(report.successful_ids),
-                failed=len(report.failed_ids),
-                failed_ids=list(report.failed_ids),
-                reasons=list(report.reasons),
-            )
-            raise RuntimeError(report.message)
-        if not results:
-            logger.warning("no evaluate results received", round=server_round)
-            return None, {}
-
-        if self._round_start_time is not None:
-            elapsed = time.monotonic() - self._round_start_time
-            rss_mb = _get_rss_mb()
-            logger.info(
-                "round complete",
-                round=server_round,
-                elapsed_s=round(elapsed, 1),
-                rss_mb=round(rss_mb, 0),
-            )
-            if elapsed > self._round_timeout_s:
-                logger.warning(
-                    "round exceeded timeout",
-                    round=server_round,
-                    elapsed_s=round(elapsed, 1),
-                    timeout_s=self._round_timeout_s,
-                )
-
+    ) -> float | None:
         total_examples = 0
         weighted_loss_sum = 0.0
         for _, evaluate_res in results:
@@ -265,12 +263,27 @@ class DatpFedAvg(FedAvg):
             loss = evaluate_res.loss
             weighted_loss_sum += loss * num_examples
             total_examples += num_examples
-
         if total_examples == 0:
             logger.warning("total_examples=0 in aggregate_evaluate", round=server_round)
+            return None
+        return weighted_loss_sum / total_examples
+
+    def aggregate_evaluate(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, Any]],
+        failures: list[tuple[ClientProxy, Any] | BaseException],
+    ) -> tuple[float | None, dict[str, Scalar]]:
+        self._raise_if_failures("evaluate", server_round, results, failures)
+        if not results:
+            logger.warning("no evaluate results received", round=server_round)
             return None, {}
 
-        weighted_loss = weighted_loss_sum / total_examples
+        self._record_round_timing(server_round)
+
+        weighted_loss = self._compute_weighted_loss(server_round, results)
+        if weighted_loss is None:
+            return None, {}
 
         self._monitor.record(server_round, weighted_loss)
 
@@ -306,7 +319,6 @@ class DatpFedAvg(FedAvg):
             relative_threshold=conv.relative_threshold,
             window=conv.window,
         )
-        round_timeout_s = cfg.federation.convergence.round_timeout_s
         checkpoint_cfg = cfg.checkpoint_protocol
         checkpoint_milestones = (
             checkpoint_cfg.milestones
@@ -322,15 +334,17 @@ class DatpFedAvg(FedAvg):
         )
 
         return cls(
-            convergence_monitor=monitor,
-            round_timeout_s=round_timeout_s,
-            fraction_fit=1.0,
-            fraction_evaluate=1.0,
-            min_fit_clients=num_clients,
-            min_evaluate_clients=num_clients,
-            min_available_clients=num_clients,
-            initial_parameters=initial_parameters,
-            checkpoint_milestones=checkpoint_milestones,
-            convergence_mode=convergence_mode,
-            checkpoint_disk_dirs=checkpoint_disk_dirs,
+            FedAvgConfig(
+                convergence_monitor=monitor,
+                round_timeout_s=conv.round_timeout_s,
+                fraction_fit=1.0,
+                fraction_evaluate=1.0,
+                min_fit_clients=num_clients,
+                min_evaluate_clients=num_clients,
+                min_available_clients=num_clients,
+                initial_parameters=initial_parameters,
+                checkpoint_milestones=checkpoint_milestones,
+                convergence_mode=convergence_mode,
+                checkpoint_disk_dirs=checkpoint_disk_dirs,
+            )
         )

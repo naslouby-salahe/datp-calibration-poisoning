@@ -57,6 +57,14 @@ class SpilloverRecord:
     n_non_victims: int
 
 
+def _is_directionally_significant(
+    delta_tau: float, delta_tau_scale: float, objective: AttackerObjective
+) -> bool:
+    if objective == AttackerObjective.THRESHOLD_RAISE:
+        return delta_tau > delta_tau_scale
+    return delta_tau < -delta_tau_scale
+
+
 def compute_asr(
     result: MetricResult,
     *,
@@ -70,16 +78,11 @@ def compute_asr(
     For THRESHOLD_LOWER: count clients with Δτ < -delta_tau_scale.
     """
     entries = result.delta_tau
-    n_significant = 0
     n_total = len(entries)
-
-    for entry in entries.values():
-        if objective == AttackerObjective.THRESHOLD_RAISE:
-            if entry.delta_tau > entry.delta_tau_scale:
-                n_significant += 1
-        else:
-            if entry.delta_tau < -entry.delta_tau_scale:
-                n_significant += 1
+    n_significant = sum(
+        _is_directionally_significant(entry.delta_tau, entry.delta_tau_scale, objective)
+        for entry in entries.values()
+    )
 
     asr = n_significant / n_total if n_total > 0 else 0.0
     return AsrRecord(

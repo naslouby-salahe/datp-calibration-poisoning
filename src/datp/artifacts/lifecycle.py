@@ -83,13 +83,12 @@ class RunLifecycle:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> bool:
+    ) -> None:
         in_progress_path = self.run_dir / ArtifactFile.RUN_IN_PROGRESS
         if exc_type is None:
             self._complete_run(in_progress_path)
         else:
             self._handle_abort(in_progress_path, exc_type, exc_val, exc_tb)
-        return False
 
     def _write_aborted(
         self,

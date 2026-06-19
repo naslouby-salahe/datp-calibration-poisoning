@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -42,14 +43,46 @@ def build_model(
 
 
 def _seed_worker(base_seed: int | None, partition_id: int) -> None:
-    """Seed the Ray worker process so worker-side randomness (e.g. torch.randperm
-    in the local training loop) is reproducible across runs.
+    """Seed the Ray worker process for reproducible worker-side randomness.
 
     Mixing the partition id avoids identical shuffles across partitions.
     """
     if base_seed is None:
         return
     set_seeds(base_seed ^ partition_id)
+
+
+@dataclass(frozen=True, slots=True)
+class ClientFactoryConfig:
+    """Bundled options for make_client_fn."""
+
+    client_ids: list[str]
+    cfg: DatpConfig
+    device: torch.device
+    prepared_dir: Path | None = None
+    model_cls: type[Autoencoder] = Autoencoder
+    client_cls: type[DatpClient] = DatpClient
+    extra_kwargs: dict[str, Any] | None = None
+    seed: int | None = None
+
+
+def _instantiate_client(
+    factory_cfg: ClientFactoryConfig,
+    client_id: str,
+    train_data: torch.Tensor,
+    val_data: torch.Tensor,
+) -> Client:
+    model = build_model(factory_cfg.cfg, factory_cfg.model_cls)
+    model.to(factory_cfg.device)
+    extra = factory_cfg.extra_kwargs or {}
+    return factory_cfg.client_cls(
+        cid=client_id,
+        model=model,
+        train_data=train_data,
+        val_data=val_data,
+        cfg=factory_cfg.cfg,
+        **extra,
+    ).to_client()
 
 
 def make_client_fn(
@@ -80,7 +113,16 @@ def make_client_fn(
             entry (mixed with partition-id) so worker-side randomness (e.g.
             torch.randperm in batch shuffling) is reproducible across runs.
     """
-    _extra = extra_kwargs or {}
+    factory_cfg = ClientFactoryConfig(
+        client_ids=client_ids,
+        cfg=cfg,
+        device=device,
+        prepared_dir=prepared_dir,
+        model_cls=model_cls,
+        client_cls=client_cls,
+        extra_kwargs=extra_kwargs,
+        seed=seed,
+    )
 
     if prepared_dir is not None:
         client_dir_map: dict[str, Path] = {
@@ -99,38 +141,25 @@ def make_client_fn(
 
         def _prepared_client_fn(context: Context) -> Client:
             idx = int(context.node_config["partition-id"])
-            _seed_worker(seed, idx)
-            client_id = client_ids[idx]
+            _seed_worker(factory_cfg.seed, idx)
+            client_id = factory_cfg.client_ids[idx]
             train_t, cal_t = load_single_client_training_data(
-                client_dir_map[client_id], device
+                client_dir_map[client_id], factory_cfg.device
             )
-            model = build_model(cfg, model_cls)
-            model.to(device)
-            return client_cls(
-                cid=client_id,
-                model=model,
-                train_data=train_t,
-                val_data=cal_t,
-                cfg=cfg,
-                **_extra,
-            ).to_client()
+            return _instantiate_client(factory_cfg, client_id, train_t, cal_t)
 
         return _prepared_client_fn
 
     def client_fn(context: Context) -> Client:
         idx = int(context.node_config["partition-id"])
-        _seed_worker(seed, idx)
-        client_id = client_ids[idx]
+        _seed_worker(factory_cfg.seed, idx)
+        client_id = factory_cfg.client_ids[idx]
         splits = client_data[client_id]
-        model = build_model(cfg, model_cls)
-        model.to(device)
-        return client_cls(
-            cid=client_id,
-            model=model,
-            train_data=splits.train.to(device, non_blocking=True),
-            val_data=splits.val.to(device, non_blocking=True),
-            cfg=cfg,
-            **_extra,
-        ).to_client()
+        return _instantiate_client(
+            factory_cfg,
+            client_id,
+            splits.train.to(factory_cfg.device, non_blocking=True),
+            splits.val.to(factory_cfg.device, non_blocking=True),
+        )
 
     return client_fn

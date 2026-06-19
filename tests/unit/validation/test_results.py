@@ -245,7 +245,9 @@ def test_results_audit_generates_core_artifacts(tmp_path: Path) -> None:
     _write_minimal_outputs(outputs)
     paths = run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
 
-    assert paths["run_manifest"].is_file()
+    from datp.validation.results import AuditOutputName
+
+    assert paths.path_for(AuditOutputName.RUN_MANIFEST).is_file()
     assert (audit_dir / BASELINE_INVARIANTS_JSON).is_file()
     assert (audit_dir / RUN_MANIFEST_CSV).is_file()
     assert (audit_dir / RECONSTRUCTION_ERROR_SUMMARY_CSV).is_file()

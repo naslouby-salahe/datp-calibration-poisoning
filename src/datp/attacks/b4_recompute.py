@@ -225,6 +225,38 @@ def _build_b4_decomposition(
     return B4Decomposition(entries)
 
 
+def _eligible_taus_and_global(
+    cal_dict: dict[str, np.ndarray],
+    eligible_ids: list[str],
+    q: float,
+) -> tuple[ClientThresholdsCollection, float]:
+    eligibility = EligibilityResult(eligible_ids=tuple(eligible_ids), pending_ids=())
+    per_client_taus = compute_client_thresholds(
+        CalibrationErrorSet.from_mapping({cid: cal_dict[cid] for cid in eligible_ids}),
+        eligibility,
+        q=q,
+    )
+    tau_global = compute_tau_global(per_client_taus)
+    return per_client_taus, tau_global
+
+
+def _b4_run_with_hyperparams(
+    cal_dict: dict[str, np.ndarray],
+    q: float,
+    tau_global: float,
+    *,
+    n_min: int,
+    seed: int,
+    k: int,
+    n_init: int,
+    max_iter: int,
+    random_state: int,
+) -> tuple[dict[str, float], B4Metadata]:
+    return _run_b4(
+        cal_dict, q, tau_global, n_min, seed, k, n_init, max_iter, random_state
+    )
+
+
 def compute_b4_pair(
     collection: ScoreCollection,
     poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
@@ -245,42 +277,26 @@ def compute_b4_pair(
     if not isinstance(poisoned_cal_set, PoisonedCalibrationSet):
         poisoned_cal_set = PoisonedCalibrationSet.from_mapping(poisoned_cal_set)
     eligible_ids = list(collection.eligible_ids)
-    eligibility = EligibilityResult(eligible_ids=tuple(eligible_ids), pending_ids=())
 
     clean_full_cal, pois_full_cal = _build_cal_dicts(collection, poisoned_cal_set)
 
-    # Clean B4 run.
-    clean_per_client_taus = compute_client_thresholds(
-        CalibrationErrorSet.from_mapping(
-            {cid: clean_full_cal[cid] for cid in eligible_ids}
-        ),
-        eligibility,
-        q=q,
-    )
-    tau_global_clean = compute_tau_global(clean_per_client_taus)
-    eff_clean, clean_meta = _run_b4(
-        clean_full_cal,
-        q,
-        tau_global_clean,
-        n_min,
-        seed,
-        k,
-        n_init,
-        max_iter,
-        random_state,
+    hyperparams = {
+        "n_min": n_min,
+        "seed": seed,
+        "k": k,
+        "n_init": n_init,
+        "max_iter": max_iter,
+        "random_state": random_state,
+    }
+
+    _, tau_global_clean = _eligible_taus_and_global(clean_full_cal, eligible_ids, q)
+    eff_clean, clean_meta = _b4_run_with_hyperparams(
+        clean_full_cal, q, tau_global_clean, **hyperparams
     )
 
-    # Poisoned per-client taus (no re-clustering yet).
-    pois_per_client_taus = compute_client_thresholds(
-        CalibrationErrorSet.from_mapping(
-            {cid: pois_full_cal[cid] for cid in eligible_ids}
-        ),
-        eligibility,
-        q=q,
+    pois_per_client_taus, tau_global_pois = _eligible_taus_and_global(
+        pois_full_cal, eligible_ids, q
     )
-    tau_global_pois = compute_tau_global(pois_per_client_taus)
-
-    # Agg component: frozen clean assignments + poisoned per-client taus.
     client_to_clean_cluster = _client_to_cluster_key(clean_meta)
     tau_agg = _agg_thresholds(
         eligible_ids=eligible_ids,
@@ -288,17 +304,8 @@ def compute_b4_pair(
         client_to_clean_cluster=client_to_clean_cluster,
     )
 
-    # Full poisoned B4 run (refit scaler, re-run k-means).
-    eff_pois, _ = _run_b4(
-        pois_full_cal,
-        q,
-        tau_global_pois,
-        n_min,
-        seed,
-        k,
-        n_init,
-        max_iter,
-        random_state,
+    eff_pois, _ = _b4_run_with_hyperparams(
+        pois_full_cal, q, tau_global_pois, **hyperparams
     )
 
     decomposition = _build_b4_decomposition(eligible_ids, eff_clean, tau_agg, eff_pois)

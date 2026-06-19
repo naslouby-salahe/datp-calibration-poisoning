@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -44,9 +42,9 @@ def test_artifacts_written(tmp_path) -> None:
                 f"Missing score artifact: {expected} (client={cid}, stage={stage})"
             )
     manifest = validate_scoring_manifest(layout.score_cell(cell).score_dir)
-    assert manifest["completion_status"] == ScoringManifestStatus.COMPLETE
-    assert manifest["expected_client_ids"] == client_ids
-    assert len(cast(list, manifest["records"])) == len(client_ids) * len(_STAGES)
+    assert manifest.completion_status == ScoringManifestStatus.COMPLETE
+    assert manifest.expected_client_ids == tuple(client_ids)
+    assert len(manifest.records) == len(client_ids) * len(_STAGES)
 
 
 @pytest.mark.integration

@@ -12,19 +12,29 @@ from pydantic import BaseModel
 from datp.artifacts.names import ArtifactFile
 
 
+def _serialize_dataclass(data: Any) -> dict[str, Any]:
+    return {
+        f.name: serialize_json_payload(getattr(data, f.name))
+        for f in dataclasses.fields(data)
+    }
+
+
+def _serialize_sequence(
+    data: list[Any] | tuple[Any, ...],
+) -> list[Any] | tuple[Any, ...]:
+    converted = [serialize_json_payload(item) for item in data]
+    return type(data)(converted)
+
+
 def serialize_json_payload(data: Any) -> Any:
     if isinstance(data, BaseModel):
         return data.model_dump(mode="json")
     if dataclasses.is_dataclass(data) and not isinstance(data, type):
-        return {
-            f.name: serialize_json_payload(getattr(data, f.name))
-            for f in dataclasses.fields(data)
-        }
+        return _serialize_dataclass(data)
     if isinstance(data, dict):
         return {k: serialize_json_payload(v) for k, v in data.items()}
     if isinstance(data, (list, tuple)):
-        converted = [serialize_json_payload(item) for item in data]
-        return type(data)(converted)
+        return _serialize_sequence(data)
     return data
 
 

@@ -21,7 +21,17 @@ from datp.core.enums import (
 from datp.core.identity import BaselineRunId, TrainingCellId
 from datp.core.logging import get_logger
 from datp.core.seeds import set_seeds
-from datp.core.tracking import init_tracking, log_metrics, tracking_run
+from datp.core.tracking import (
+    TrackingMetric,
+    TrackingMetricKey,
+    TrackingMetrics,
+    TrackingParam,
+    TrackingParamKey,
+    TrackingParams,
+    init_tracking,
+    log_metrics,
+    tracking_run,
+)
 from datp.data.paths import prepared_root_for_regime
 from datp.experiments import console
 from datp.experiments.enums import SweepStep
@@ -42,6 +52,18 @@ logger = get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
+class _GroupContext:
+    key: TrainingCellId
+    group_cells: list[BaselineRunId]
+    pre_composed_configs: dict[BaselineRunId, DatpConfig]
+    base_dir: Path
+    result: SweepResult
+    group_idx: int
+    total_groups: int
+    data_root: Path
+
+
+@dataclass(frozen=True, slots=True)
 class _RegimeSpec:
     regime: Regime
     has_alpha: bool
@@ -54,22 +76,31 @@ _REGIME_SPEC: list[_RegimeSpec] = [
 ]
 
 
+def _alpha_list_for_spec(spec: _RegimeSpec) -> list[float | None]:
+    if spec.has_alpha:
+        return list(BASE_CONFIG.experiment.regime_c_alphas)
+    return [None]
+
+
+def _cells_for_spec(spec: _RegimeSpec, seeds: list[int]) -> list[BaselineRunId]:
+    cells: list[BaselineRunId] = []
+    for baseline in sorted(REGIME_BASELINES[spec.regime]):
+        for alpha in _alpha_list_for_spec(spec):
+            for seed in seeds:
+                cells.append(
+                    BaselineRunId(
+                        cell=TrainingCellId(regime=spec.regime, seed=seed, alpha=alpha),
+                        baseline=baseline,
+                    )
+                )
+    return cells
+
+
 def build_experiment_matrix() -> list[BaselineRunId]:
     seeds = list(BASE_CONFIG.experiment.seeds)
-    regime_c_alphas = BASE_CONFIG.experiment.regime_c_alphas
     cells: list[BaselineRunId] = []
     for spec in _REGIME_SPEC:
-        regime = spec.regime
-        alphas: list[float | None] = list(regime_c_alphas) if spec.has_alpha else [None]
-        for baseline in sorted(REGIME_BASELINES[regime]):
-            for alpha in alphas:
-                for seed in seeds:
-                    cells.append(
-                        BaselineRunId(
-                            cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
-                            baseline=baseline,
-                        )
-                    )
+        cells.extend(_cells_for_spec(spec, seeds))
     return cells
 
 
@@ -130,33 +161,39 @@ def run_sweep(
         with tracking_run(
             run_name=f"{key.regime}_seed{key.seed}"
             + (f"_alpha{key.alpha}" if key.alpha is not None else ""),
-            params={
-                "regime": key.regime.value,
-                "seed": str(key.seed),
-                "alpha": str(key.alpha) if key.alpha is not None else "none",
-            },
+            params=TrackingParams(
+                (
+                    TrackingParam(TrackingParamKey.REGIME, key.regime),
+                    TrackingParam(TrackingParamKey.SEED, key.seed),
+                    TrackingParam(TrackingParamKey.ALPHA, key.alpha),
+                )
+            ),
             tags=None,
         ):
             _process_group(
-                key,
-                group_cells,
-                pre_composed_configs,
-                base_dir,
-                result,
-                group_idx,
-                total_groups,
-                data_root=_data_root,
+                _GroupContext(
+                    key=key,
+                    group_cells=group_cells,
+                    pre_composed_configs=pre_composed_configs,
+                    base_dir=base_dir,
+                    result=result,
+                    group_idx=group_idx,
+                    total_groups=total_groups,
+                    data_root=_data_root,
+                )
             )
 
     total_elapsed = time.monotonic() - t_start
     log_metrics(
-        {
-            "sweep_total": float(result.total),
-            "sweep_completed": float(result.completed),
-            "sweep_skipped": float(result.skipped),
-            "sweep_failed": float(result.failed),
-            "sweep_elapsed_s": total_elapsed,
-        },
+        TrackingMetrics(
+            (
+                TrackingMetric(TrackingMetricKey.SWEEP_TOTAL, result.total),
+                TrackingMetric(TrackingMetricKey.SWEEP_COMPLETED, result.completed),
+                TrackingMetric(TrackingMetricKey.SWEEP_SKIPPED, result.skipped),
+                TrackingMetric(TrackingMetricKey.SWEEP_FAILED, result.failed),
+                TrackingMetric(TrackingMetricKey.SWEEP_ELAPSED_S, total_elapsed),
+            )
+        ),
         step=None,
         prefix=None,
     )
@@ -166,15 +203,13 @@ def run_sweep(
 
 def _cell_is_done(cell: BaselineRunId, base_dir: Path) -> bool:
     ckpt_proto = BASE_CONFIG.checkpoint_protocol
-    if (
-        ckpt_proto is not None
-        and ckpt_proto.enabled
-        and cell.baseline not in ISOLATED_BASELINES
-    ):
+    checkpoint_protocol_active = ckpt_proto is not None and ckpt_proto.enabled
+    cell_uses_checkpoint_path = cell.baseline not in ISOLATED_BASELINES
+    if checkpoint_protocol_active and cell_uses_checkpoint_path:
         layout = ArtifactLayout(base_dir=base_dir, regime=cell.regime)
         return all(
             layout.baseline_run_for_round(cell, checkpoint_round).metrics_path.exists()
-            for checkpoint_round in ckpt_proto.milestones
+            for checkpoint_round in ckpt_proto.milestones  # type: ignore[union-attr]
         )
     return results_exist(
         cell.baseline, cell.regime, cell.seed, cell.alpha, base_dir=base_dir
@@ -187,19 +222,21 @@ def _account_skip(cell: BaselineRunId, result: SweepResult) -> None:
     console.print_baseline_result(cell.baseline, BaselineRunStatus.SKIPPED, 0.0)
 
 
-def _process_group(
-    key: TrainingCellId,
-    group_cells: list[BaselineRunId],
-    pre_composed_configs: dict[BaselineRunId, DatpConfig],
-    base_dir: Path,
-    result: SweepResult,
-    group_idx: int,
-    total_groups: int,
-    data_root: Path | None = None,
-) -> None:
-    _data_root = data_root if data_root is not None else base_dir
+def _process_group(ctx: _GroupContext) -> None:
+    key = ctx.key
+    group_cells = ctx.group_cells
+    pre_composed_configs = ctx.pre_composed_configs
+    base_dir = ctx.base_dir
+    result = ctx.result
+    data_root = ctx.data_root
+
     console.print_group_header(
-        key.regime, key.seed, key.alpha, len(group_cells), group_idx, total_groups
+        key.regime,
+        key.seed,
+        key.alpha,
+        len(group_cells),
+        ctx.group_idx,
+        ctx.total_groups,
     )
 
     pending_cells = [cell for cell in group_cells if not _cell_is_done(cell, base_dir)]
@@ -216,7 +253,7 @@ def _process_group(
         group_cells,
         base_dir,
         result,
-        data_root=_data_root,
+        data_root=data_root,
     ):
         return
 
@@ -234,14 +271,14 @@ def _process_group(
                 base_dir,
                 result,
                 isolated_executor,
-                data_root=_data_root,
+                data_root=data_root,
             )
         else:
             pending_fl.append(cell)
 
     if pending_fl:
         completed, failed = _run_shared_fl_group(
-            pending_fl, pre_composed_configs, base_dir, data_root=_data_root
+            pending_fl, pre_composed_configs, base_dir, data_root=data_root
         )
         result.completed += completed
         result.failed += failed
@@ -441,36 +478,63 @@ def _run_shared_fl_group(
     completed = 0
     failed = 0
     for checkpoint_round in checkpoint_rounds:
-        context_request = PipelineRequest(
+        round_completed, round_failed = _run_checkpoint_round(
+            trainer=trainer,
+            evaluator=evaluator,
+            group_cells=group_cells,
+            pre_composed_configs=pre_composed_configs,
             key=key,
-            baseline=Baseline.B1,
             cfg=cfg,
             base_dir=base_dir,
             prepared_dir=prepared_dir,
             checkpoint_round=checkpoint_round,
         )
-        ctx = _build_shared_context(
-            trainer, context_request, group_cells, checkpoint_round
-        )
-        if ctx is None:
-            failed += len(group_cells)
-            continue
-        for cell in group_cells:
-            cell_cfg = pre_composed_configs[cell]
-            if _run_shared_cell_evaluation(
-                evaluator,
-                cell,
-                cell_cfg,
-                key=key,
-                base_dir=base_dir,
-                prepared_dir=prepared_dir,
-                checkpoint_round=checkpoint_round,
-                ctx=ctx,
-            ):
-                completed += 1
-            else:
-                failed += 1
+        completed += round_completed
+        failed += round_failed
 
+    return completed, failed
+
+
+def _run_checkpoint_round(
+    *,
+    trainer: SharedTrainingExecutor,
+    evaluator: ThresholdEvaluationExecutor,
+    group_cells: list[BaselineRunId],
+    pre_composed_configs: dict[BaselineRunId, DatpConfig],
+    key: TrainingCellId,
+    cfg: DatpConfig,
+    base_dir: Path,
+    prepared_dir: Path,
+    checkpoint_round: int | None,
+) -> tuple[int, int]:
+    context_request = PipelineRequest(
+        key=key,
+        baseline=Baseline.B1,
+        cfg=cfg,
+        base_dir=base_dir,
+        prepared_dir=prepared_dir,
+        checkpoint_round=checkpoint_round,
+    )
+    ctx = _build_shared_context(trainer, context_request, group_cells, checkpoint_round)
+    if ctx is None:
+        return 0, len(group_cells)
+    completed = 0
+    failed = 0
+    for cell in group_cells:
+        cell_cfg = pre_composed_configs[cell]
+        if _run_shared_cell_evaluation(
+            evaluator,
+            cell,
+            cell_cfg,
+            key=key,
+            base_dir=base_dir,
+            prepared_dir=prepared_dir,
+            checkpoint_round=checkpoint_round,
+            ctx=ctx,
+        ):
+            completed += 1
+        else:
+            failed += 1
     return completed, failed
 
 
