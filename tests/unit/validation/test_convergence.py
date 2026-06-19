@@ -49,7 +49,7 @@ class TestConvergencePayload:
             curve_path=curve_path,
         )
         assert p.convergence_round == 5
-        assert p.convergence_criterion_value == 0.01
+        assert p.convergence_criterion_value == pytest.approx(0.01)
         assert p.convergence_status == ConvergenceStatus.CONVERGED
         assert p.curve_path == curve_path
 
@@ -117,7 +117,7 @@ class TestConvergencePayloadWithSummary:
 
         result = convergence_payload(checkpoint)
         assert result.convergence_round == 8
-        assert result.convergence_criterion_value == 0.02
+        assert result.convergence_criterion_value == pytest.approx(0.02)
         assert result.convergence_status == ConvergenceStatus.CONVERGED
         assert result.curve_path is not None
         assert str(ckpt_dir / ArtifactFile.CONVERGENCE_CURVE) == result.curve_path

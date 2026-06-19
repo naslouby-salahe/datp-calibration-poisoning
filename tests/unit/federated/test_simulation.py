@@ -19,6 +19,7 @@ from datp.federated.simulation import (
 )
 from datp.federated.runtime import RayClientResourceRequest
 from datp.federated.types import ClientData
+from datp.modeling.autoencoder import Autoencoder
 
 # ---------------------------------------------------------------------------
 # validate_regime
@@ -244,7 +245,7 @@ class TestClientDataNotMutated:
                 client_data=original_data,
                 seed=0,
                 alpha=None,
-                model_cls=None, # type: ignore[arg-type]
+                model_cls=Autoencoder,
                 ckpt_dir=tmp_path,
                 score_base=tmp_path,
                 label="test",

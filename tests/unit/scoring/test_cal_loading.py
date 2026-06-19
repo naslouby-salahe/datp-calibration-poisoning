@@ -7,29 +7,7 @@ import pytest
 
 from datp.core.enums import Regime, ScoringStage
 from datp.scoring.cal_loading import load_main_cal_errors
-from datp.scoring.loading import load_parquets_from_dir
-from tests.fixtures.scoring_loading import assert_loads_client_score_parquets
 from tests.unit.conftest import _write_score_artifact
-
-# ── load_parquets_from_dir ────────────────────────────────────────────────
-
-
-class TestLoadParquetsFromDir:
-    def test_loads_all_parquets(self, tmp_path: Path) -> None:
-        assert_loads_client_score_parquets(tmp_path)
-
-    def test_empty_directory_when_allow_empty_true(self, tmp_path: Path) -> None:
-        result = load_parquets_from_dir(tmp_path, allow_empty=True)
-        assert result == {}
-
-    def test_empty_directory_when_allow_empty_false(self, tmp_path: Path) -> None:
-        with pytest.raises(FileNotFoundError, match="No parquet score artifacts"):
-            load_parquets_from_dir(tmp_path, allow_empty=False)
-
-    def test_missing_directory(self, tmp_path: Path) -> None:
-        missing = tmp_path / "nonexistent"
-        with pytest.raises(FileNotFoundError, match="score directory"):
-            load_parquets_from_dir(missing)
 
 
 # ── load_main_cal_errors ──────────────────────────────────────────────────

@@ -118,6 +118,7 @@ class TestCheckpointProtocolCompletion:
         protocol = BASE_CONFIG.checkpoint_protocol
         if protocol is None:
             pytest.skip("checkpoint protocol not configured in base YAML")
+            return
         run = BaselineRunId(
             cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None),
             baseline=Baseline.B1,

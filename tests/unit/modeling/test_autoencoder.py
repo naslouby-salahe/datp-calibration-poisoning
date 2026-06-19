@@ -107,6 +107,15 @@ class TestActivation:
         acts = [m for m in model.encoder.modules() if isinstance(m, torch.nn.ELU)]
         assert len(acts) > 0
 
+    def test_unknown_activation_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unknown activation"):
+            Autoencoder(
+                NBAIOT_INPUT_DIM,
+                NBAIOT_HIDDEN,
+                activation="swish_42",  # type: ignore[arg-type]
+                use_bn=False,
+            )
+
     def test_empty_hidden_dims_raises(self) -> None:
         with pytest.raises(ValueError, match="non-empty"):
             Autoencoder(NBAIOT_INPUT_DIM, [], activation=Activation.RELU, use_bn=False)

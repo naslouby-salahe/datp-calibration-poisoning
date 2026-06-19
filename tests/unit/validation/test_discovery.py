@@ -42,7 +42,7 @@ def test_parse_score_cell_dir_with_alpha(tmp_path: Path) -> None:
     cell_dir = scores_root / "c" / "seed_7" / "alpha_0.5"
     location = parse_score_cell_dir(scores_root, cell_dir)
     assert location.cell == TrainingCellId(regime=Regime.C, seed=7, alpha=0.5)
-    assert location.alpha == 0.5
+    assert location.alpha == pytest.approx(0.5)
 
 
 def test_parse_score_cell_dir_alpha_iid(tmp_path: Path) -> None:
@@ -92,7 +92,7 @@ def test_iter_score_cells_with_alpha(tmp_path: Path) -> None:
     assert len(cells) == 1
     assert cells[0].regime == Regime.C
     assert cells[0].seed == 1
-    assert cells[0].alpha == 0.1
+    assert cells[0].alpha == pytest.approx(0.1)
 
 
 def test_iter_score_cells_mixed(tmp_path: Path) -> None:
@@ -137,7 +137,7 @@ def test_parse_metric_path_with_alpha(tmp_path: Path) -> None:
     assert run_id.regime == Regime.C
     assert run_id.baseline == Baseline.B2
     assert run_id.seed == 7
-    assert run_id.alpha == 0.5
+    assert run_id.alpha == pytest.approx(0.5)
 
 
 def test_parse_metric_path_invalid_seed_raises(tmp_path: Path) -> None:

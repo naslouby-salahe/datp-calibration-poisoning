@@ -54,20 +54,20 @@ def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResul
 
 
 def _manifest(**overrides: object) -> BoundedSweepManifest:
-    base: dict[str, object] = dict(
-        generated_at_utc="2026-06-16T00:00:00+00:00",
-        provenance=ProvenanceRecord(
+    base: dict[str, object] = {
+        "generated_at_utc": "2026-06-16T00:00:00+00:00",
+        "provenance": ProvenanceRecord(
             local_epochs=1, repository="datp-calibration-poisoning"
         ),
-        policies=(ThresholdPolicy.B1_GLOBAL,),
-        sources=(PoisoningSourceStrategy.RANDOM_BENIGN,),
-        fractions=(0.0,),
-        training_seeds=(0,),
-        poisoning_seeds=(100,),
-        mu_flag_threshold_by_training_seed={0: 0.005},
-        n_cells=1,
-        results=(_row(),),
-    )
+        "policies": (ThresholdPolicy.B1_GLOBAL,),
+        "sources": (PoisoningSourceStrategy.RANDOM_BENIGN,),
+        "fractions": (0.0,),
+        "training_seeds": (0,),
+        "poisoning_seeds": (100,),
+        "mu_flag_threshold_by_training_seed": {0: 0.005},
+        "n_cells": 1,
+        "results": (_row(),),
+    }
     base.update(overrides)
     return BoundedSweepManifest(**base) # type: ignore[arg-type]
 

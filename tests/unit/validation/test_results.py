@@ -241,19 +241,9 @@ def test_manifest_schema_validation() -> None:
 def test_results_audit_generates_core_artifacts(tmp_path: Path) -> None:
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
-    manifest_path = Path("data/processed/nbaiot") / ArtifactFile.MANIFEST
-    original = (
-        manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else None
-    )
 
-    try:
-        _write_minimal_outputs(outputs)
-        paths = run_results_audit(
-            base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG
-        )
-    finally:
-        if original is not None:
-            manifest_path.write_text(original, encoding="utf-8")
+    _write_minimal_outputs(outputs)
+    paths = run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
 
     assert paths["run_manifest"].is_file()
     assert (audit_dir / BASELINE_INVARIANTS_JSON).is_file()
@@ -285,19 +275,9 @@ def test_results_audit_generates_severity_trend_and_cluster_stability(
 ) -> None:
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
-    manifest_path = Path("data/processed/nbaiot") / ArtifactFile.MANIFEST
-    original = (
-        manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else None
-    )
 
-    try:
-        _write_minimal_outputs(outputs)
-        paths = run_results_audit(
-            base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG
-        )
-    finally:
-        if original is not None:
-            manifest_path.write_text(original, encoding="utf-8")
+    _write_minimal_outputs(outputs)
+    paths = run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
 
     assert "regime_c_severity_trend" in paths
     assert "b4_cluster_stability" in paths
@@ -383,16 +363,9 @@ def test_results_audit_generates_seed_deltas(tmp_path: Path) -> None:
 
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
-    manifest_path = Path("data/processed/nbaiot") / ArtifactFile.MANIFEST
-    original = (
-        manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else None
-    )
-    try:
-        _write_minimal_outputs(outputs)
-        run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
-    finally:
-        if original is not None:
-            manifest_path.write_text(original, encoding="utf-8")
+
+    _write_minimal_outputs(outputs)
+    run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
     csv_path = audit_dir / SEED_DELTAS_CSV
     assert csv_path.is_file()
     df = pd.read_csv(csv_path)
@@ -409,18 +382,9 @@ def test_results_audit_generates_regime_c_alpha_csv(tmp_path: Path) -> None:
 
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
-    manifest_path = Path("data/processed/nbaiot/manifest.json")
-    original = (
-        manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else None
-    )
-    try:
-        _write_minimal_outputs(outputs)
-        paths = run_results_audit(
-            base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG
-        )
-    finally:
-        if original is not None:
-            manifest_path.write_text(original, encoding="utf-8")
+
+    _write_minimal_outputs(outputs)
+    paths = run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
     # File must exist even when empty (no Regime C runs in fixture)
     assert (audit_dir / REGIME_C_ALPHA_AUDIT_CSV).is_file()
     assert "regime_c_alpha_audit" in paths
@@ -518,16 +482,9 @@ def test_results_audit_fpr_companion_has_required_columns(tmp_path: Path) -> Non
 
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
-    manifest_path = Path("data/processed/nbaiot/manifest.json")
-    original = (
-        manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else None
-    )
-    try:
-        _write_minimal_outputs(outputs)
-        run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
-    finally:
-        if original is not None:
-            manifest_path.write_text(original, encoding="utf-8")
+
+    _write_minimal_outputs(outputs)
+    run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
     df = pd.read_csv(audit_dir / FPR_COMPANION_METRICS_CSV)
     for col in (
         "cv_fpr",
@@ -545,18 +502,9 @@ def test_results_audit_generates_metric_recomputation_csv(tmp_path: Path) -> Non
 
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
-    manifest_path = Path("data/processed/nbaiot") / ArtifactFile.MANIFEST
-    original = (
-        manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else None
-    )
-    try:
-        _write_minimal_outputs(outputs)
-        paths = run_results_audit(
-            base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG
-        )
-    finally:
-        if original is not None:
-            manifest_path.write_text(original, encoding="utf-8")
+
+    _write_minimal_outputs(outputs)
+    paths = run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
     assert (audit_dir / METRIC_RECOMPUTATION_AUDIT_CSV).is_file()
     assert "metric_recomputation_audit" in paths
     df = pd.read_csv(audit_dir / METRIC_RECOMPUTATION_AUDIT_CSV)
@@ -695,25 +643,17 @@ def test_naked_cv_fpr_emits_fail_warning(tmp_path: Path) -> None:
 
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
-    manifest_path = Path("data/processed/nbaiot") / ArtifactFile.MANIFEST
-    original = (
-        manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else None
-    )
 
-    try:
-        _write_minimal_outputs(outputs)
-        # Overwrite b1 metrics to strip companion fields
-        result_dir = outputs / "results/a" / Baseline.B1.value / "seed_0"
-        payload = json.loads((result_dir / ArtifactFile.METRICS).read_text("utf-8"))
-        del payload["mean_fpr"]
-        del payload["std_fpr"]
-        (result_dir / ArtifactFile.METRICS).write_text(
-            json.dumps(payload), encoding="utf-8"
-        )
-        run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
-    finally:
-        if original is not None:
-            manifest_path.write_text(original, encoding="utf-8")
+    _write_minimal_outputs(outputs)
+    # Overwrite b1 metrics to strip companion fields
+    result_dir = outputs / "results/a" / Baseline.B1.value / "seed_0"
+    payload = json.loads((result_dir / ArtifactFile.METRICS).read_text("utf-8"))
+    del payload["mean_fpr"]
+    del payload["std_fpr"]
+    (result_dir / ArtifactFile.METRICS).write_text(
+        json.dumps(payload), encoding="utf-8"
+    )
+    run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
 
     warnings_text = (audit_dir / WARNINGS_MD).read_text(encoding="utf-8")
     assert WarningCode.NAKED_CV_FPR in warnings_text, (
