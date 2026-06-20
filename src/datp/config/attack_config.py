@@ -208,15 +208,6 @@ class CalibrationPoisoningConfig(BaseModel):
                 raise ValueError(f"fraction {f} is outside [0.0, 1.0]")
         return v
 
-    @field_validator("injection_rule")
-    @classmethod
-    def only_replace_fixed_budget(
-        cls, v: CalibrationInjectionRule
-    ) -> CalibrationInjectionRule:
-        if v != CalibrationInjectionRule.REPLACE_FIXED_BUDGET:
-            raise ValueError(f"injection_rule must be REPLACE_FIXED_BUDGET; got {v}")
-        return v
-
     @model_validator(mode="after")
     def bounded_scale_requires_single_client(self) -> "CalibrationPoisoningConfig":
         if (
