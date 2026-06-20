@@ -261,8 +261,12 @@ class TestConfigFractionValidation:
             _valid_config(fractions=())
 
     def test_bounded_scale_rejects_005_fraction(self) -> None:
-        with pytest.raises(ValidationError, match="outside locked grid"):
+        with pytest.raises(ValidationError, match="requires exactly fractions"):
             _valid_config(scale=ExperimentScale.BOUNDED, fractions=(0.0, 0.05, 0.10))
+
+    def test_bounded_scale_rejects_partial_fraction_subset(self) -> None:
+        with pytest.raises(ValidationError, match="requires exactly fractions"):
+            _valid_config(scale=ExperimentScale.BOUNDED, fractions=(0.10, 0.20, 0.40))
 
 
 # ── Injection rule ──────────────────────────────────────────────────────

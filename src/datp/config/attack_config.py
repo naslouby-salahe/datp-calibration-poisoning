@@ -136,7 +136,7 @@ class CalibrationPoisoningConfig(BaseModel):
     # Protocol lock: E=1 only; E=5 explicitly rejected.
     local_epochs: int = 1
 
-    # Sweep dimensions — derived from config, not from module-level constants.
+    # Sweep dimensions — runner reads these fields, not module-level constants.
     policies: tuple[ThresholdPolicy, ...] = DEFAULT_POLICIES
     sources: tuple[PoisoningSourceStrategy, ...] = BOUNDED_SWEEP_SOURCES
 
@@ -251,11 +251,10 @@ class CalibrationPoisoningConfig(BaseModel):
     @model_validator(mode="after")
     def bounded_scale_requires_locked_fractions(self) -> "CalibrationPoisoningConfig":
         if self.scale == ExperimentScale.BOUNDED:
-            invalid = frozenset(self.fractions) - BOUNDED_SWEEP_FRACTION_SET
-            if invalid:
+            if frozenset(self.fractions) != BOUNDED_SWEEP_FRACTION_SET:
                 raise ValueError(
-                    f"BOUNDED scale fractions outside locked grid "
-                    f"{sorted(BOUNDED_SWEEP_FRACTION_SET)}: {sorted(invalid)}"
+                    f"BOUNDED scale requires exactly fractions {sorted(BOUNDED_SWEEP_FRACTION_SET)}; "
+                    f"got {sorted(self.fractions)}"
                 )
         return self
 
