@@ -63,6 +63,7 @@ from datp.data.scaling import apply_scaler, fit_scaler
 from datp.data.splits import Split
 from datp.evaluation.metrics import (
     ClientEvaluationRecord,
+    EvaluationResult,
     build_evaluation_result,
     compute_client_record,
 )
@@ -144,6 +145,21 @@ class _B0PooledData:
     cal_tensor: torch.Tensor
     client_cal_counts: dict[str, int]
     global_scaler: StandardScaler | None
+
+
+@dataclass(frozen=True, slots=True)
+class _B0ResultContext:
+    """Aggregated inputs for B0Result assembly — collapses the 10-argument signature."""
+
+    request: B0RunRequest
+    normalization_mode: B0NormalizationMode
+    tau_b0: float
+    per_client: dict[str, ClientEvalResult]
+    full_client_records: dict[str, ClientEvaluationRecord]
+    cal_pending_clients: list[str]
+    all_test_errors: list[np.ndarray]
+    b0_ckpt_hash: str
+    prepared_dir: Path
 
 
 def _load_and_pool_b0_data(
@@ -315,18 +331,9 @@ def _evaluate_b0_clients(
     return per_client, full_client_records, all_test_errors
 
 
-def _build_b0_result(
-    request: B0RunRequest,
-    normalization_mode: B0NormalizationMode,
-    tau_b0: float,
-    pooled: _B0PooledData,
-    per_client: dict[str, ClientEvalResult],
-    full_client_records: dict[str, ClientEvaluationRecord],
-    cal_pending_clients: list[str],
+def _compute_b0_ranking(
     all_test_errors: list[np.ndarray],
-    b0_ckpt_hash: str,
-    prepared_dir: Path,
-) -> B0Result:
+) -> tuple[float | None, float | None]:
     benign_arrays = all_test_errors[0::2]
     attack_arrays = all_test_errors[1::2]
     pooled_benign = (
@@ -340,53 +347,109 @@ def _build_b0_result(
         else np.empty(0, dtype=np.float64)
     )
     ranking = compute_binary_ranking_metrics(pooled_benign, pooled_attack)
-    auroc = ranking.auroc
-    pr_auc = ranking.pr_auc
+    return ranking.auroc, ranking.pr_auc
+
+
+def _build_b0_provenance(
+    request: B0RunRequest, b0_ckpt_hash: str, prepared_dir: Path
+) -> MetricsProvenance:
+    manifest_path = prepared_dir / ArtifactFile.MANIFEST
+    split_identity = (
+        hash_file(manifest_path) if manifest_path.exists() else MISSING_MANIFEST_HASH
+    )
+    config_id = hash_jsonable(
+        dataclasses.asdict(
+            B0ConfigIdentity(
+                input_dim=request.input_dim,
+                hidden_dims=request.hidden_dims,
+                n_min=request.n_min,
+                q=request.q,
+                epochs=request.epochs,
+                lr=request.lr,
+                batch_size=request.batch_size,
+            )
+        )
+    )
+    return MetricsProvenance(
+        config_identity=config_id,
+        split_manifest_identity=split_identity,
+        model_checkpoint_identity=b0_ckpt_hash,
+        score_artifact_identity=NOT_APPLICABLE_B0_DIRECT_EVAL,
+        metric_code_version=source_hash([Path(__file__)]),
+        threshold_code_version=git_commit(),
+        package_version=git_commit(),
+        generated_at_utc=utc_timestamp(),
+    )
+
+
+def _build_b0_canonical_eval(ctx: _B0ResultContext) -> EvaluationResult:
+    pending_set = set(ctx.cal_pending_clients)
+    return build_evaluation_result(
+        baseline=Baseline.B0,
+        regime=ctx.request.regime,
+        seed=ctx.request.seed,
+        alpha=None,
+        clients=tuple(ctx.full_client_records.values()),
+        eligible_ids=tuple(cid for cid in ctx.per_client if cid not in pending_set),
+        pending_ids=tuple(ctx.cal_pending_clients),
+        incomplete_ids=tuple(
+            cid for cid, m in ctx.per_client.items() if m.n_attack == 0
+        ),
+    )
+
+
+def _build_b0_aggregate_metrics(
+    canonical_eval: EvaluationResult,
+) -> dict[MetricName, float | str | None]:
+    return {
+        MetricName.CV_FPR: canonical_eval.cv_fpr,
+        MetricName.MEAN_FPR: canonical_eval.mean_fpr,
+        MetricName.STD_FPR: canonical_eval.std_fpr,
+        MetricName.CV_TPR: canonical_eval.cv_tpr,
+        MetricName.IQR_FPR: canonical_eval.iqr_fpr,
+        MetricName.IQR_TPR: canonical_eval.iqr_tpr,
+        MetricName.MAX_MIN_FPR_GAP: canonical_eval.max_min_fpr_gap,
+        MetricName.WORST_CLIENT_FPR: canonical_eval.worst_client_fpr,
+        MetricName.WORST_CLIENT_ID: canonical_eval.worst_client_id,
+        MetricName.WORST_BA: canonical_eval.worst_ba,
+        MetricName.P10_MACRO_F1: canonical_eval.p10_macro_f1,
+    }
+
+
+def _build_b0_result(ctx: _B0ResultContext) -> B0Result:
+    auroc, pr_auc = _compute_b0_ranking(ctx.all_test_errors)
     logger.info(
         "b0 pooled auroc",
         baseline=Baseline.B0,
         auroc=auroc,
-        normalization_mode=normalization_mode.value,
+        normalization_mode=ctx.normalization_mode.value,
     )
-
-    canonical_eval = build_evaluation_result(
-        baseline=Baseline.B0,
-        regime=request.regime,
-        seed=request.seed,
-        alpha=None,
-        clients=tuple(full_client_records.values()),
-        eligible_ids=tuple(
-            cid for cid in per_client if cid not in set(cal_pending_clients)
-        ),
-        pending_ids=tuple(cal_pending_clients),
-        incomplete_ids=tuple(
-            cid for cid, metrics in per_client.items() if metrics.n_attack == 0
-        ),
-    )
-
-    norm_scope = _NORMALIZATION_SCOPE[normalization_mode]
-    n_clients = len(per_client)
+    canonical_eval = _build_b0_canonical_eval(ctx)
+    provenance = _build_b0_provenance(ctx.request, ctx.b0_ckpt_hash, ctx.prepared_dir)
+    aggregate_metrics = _build_b0_aggregate_metrics(canonical_eval)
+    norm_scope = _NORMALIZATION_SCOPE[ctx.normalization_mode]
+    req = ctx.request
     return B0Result(
         schema_version=METRICS_SCHEMA_VERSION,
         metric_schema_version=METRIC_SCHEMA_VERSION,
         threshold_schema_version=THRESHOLD_SCHEMA_VERSION,
-        run_id=f"{request.regime.value}_{Baseline.B0.value}_seed{request.seed}",
+        run_id=f"{req.regime.value}_{Baseline.B0.value}_seed{req.seed}",
         run_kind=RunKind.CENTRALIZED_REFERENCE,
         baseline=Baseline.B0,
-        regime=request.regime,
-        seed=request.seed,
-        dataset=dataset_for_regime(request.regime),
-        tau_b0=tau_b0,
-        tau_global=tau_b0,
+        regime=req.regime,
+        seed=req.seed,
+        dataset=dataset_for_regime(req.regime),
+        tau_b0=ctx.tau_b0,
+        tau_global=ctx.tau_b0,
         threshold_scope=THRESHOLD_AGGREGATION_BY_BASELINE[Baseline.B0],
         threshold_strategy_name=Baseline.B0.value,
-        q=request.q,
-        n_min=request.n_min,
+        q=req.q,
+        n_min=req.n_min,
         eligible_ids=canonical_eval.eligible_ids,
         pending_ids=canonical_eval.pending_ids,
         eval_incomplete_ids=canonical_eval.eval_incomplete_ids,
         eligible_count=canonical_eval.eligible_count,
-        pending_count=len(cal_pending_clients),
+        pending_count=len(ctx.cal_pending_clients),
         eval_incomplete_count=len(canonical_eval.eval_incomplete_ids),
         client_count=canonical_eval.client_count,
         coverage_ratio=canonical_eval.coverage_ratio,
@@ -403,50 +466,126 @@ def _build_b0_result(
         p10_macro_f1=canonical_eval.p10_macro_f1,
         auroc=auroc,
         pr_auc=pr_auc,
-        aggregate_metrics={
-            MetricName.CV_FPR: canonical_eval.cv_fpr,
-            MetricName.MEAN_FPR: canonical_eval.mean_fpr,
-            MetricName.STD_FPR: canonical_eval.std_fpr,
-            MetricName.CV_TPR: canonical_eval.cv_tpr,
-            MetricName.IQR_FPR: canonical_eval.iqr_fpr,
-            MetricName.IQR_TPR: canonical_eval.iqr_tpr,
-            MetricName.MAX_MIN_FPR_GAP: canonical_eval.max_min_fpr_gap,
-            MetricName.WORST_CLIENT_FPR: canonical_eval.worst_client_fpr,
-            MetricName.WORST_CLIENT_ID: canonical_eval.worst_client_id,
-            MetricName.WORST_BA: canonical_eval.worst_ba,
-            MetricName.P10_MACRO_F1: canonical_eval.p10_macro_f1,
-        },
-        provenance=MetricsProvenance(
-            config_identity=hash_jsonable(
-                dataclasses.asdict(
-                    B0ConfigIdentity(
-                        input_dim=request.input_dim,
-                        hidden_dims=request.hidden_dims,
-                        n_min=request.n_min,
-                        q=request.q,
-                        epochs=request.epochs,
-                        lr=request.lr,
-                        batch_size=request.batch_size,
-                    )
-                )
-            ),
-            split_manifest_identity=hash_file(prepared_dir / ArtifactFile.MANIFEST)
-            if (prepared_dir / ArtifactFile.MANIFEST).exists()
-            else MISSING_MANIFEST_HASH,
-            model_checkpoint_identity=b0_ckpt_hash,
-            score_artifact_identity=NOT_APPLICABLE_B0_DIRECT_EVAL,
-            metric_code_version=source_hash([Path(__file__)]),
-            threshold_code_version=git_commit(),
-            package_version=git_commit(),
-            generated_at_utc=utc_timestamp(),
-        ),
+        aggregate_metrics=aggregate_metrics,
+        provenance=provenance,
         threshold_mode=THRESHOLD_AGGREGATION_BY_BASELINE[Baseline.B0],
-        n_clients=n_clients,
-        calibration_pending_clients=tuple(cal_pending_clients),
-        per_client=per_client,
+        n_clients=len(ctx.per_client),
+        calibration_pending_clients=tuple(ctx.cal_pending_clients),
+        per_client=ctx.per_client,
         normalization_scope=norm_scope,
-        normalization_mode=normalization_mode,
+        normalization_mode=ctx.normalization_mode,
     )
+
+
+def _b0_tracking_params(
+    request: B0RunRequest, normalization_mode: B0NormalizationMode
+) -> TrackingParams:
+    return TrackingParams(
+        (
+            TrackingParam(TrackingParamKey.BASELINE, Baseline.B0),
+            TrackingParam(TrackingParamKey.REGIME, request.regime),
+            TrackingParam(TrackingParamKey.SEED, request.seed),
+            TrackingParam(TrackingParamKey.EPOCHS, request.epochs),
+            TrackingParam(TrackingParamKey.PATIENCE, request.patience),
+            TrackingParam(TrackingParamKey.LEARNING_RATE, request.lr),
+            TrackingParam(TrackingParamKey.BATCH_SIZE, request.batch_size),
+            TrackingParam(TrackingParamKey.Q, request.q),
+            TrackingParam(TrackingParamKey.N_MIN, request.n_min),
+            TrackingParam(TrackingParamKey.NORMALIZATION_MODE, normalization_mode),
+        )
+    )
+
+
+def _log_b0_completion_metrics(
+    result: B0Result,
+    tau_b0: float,
+    n_clients: int,
+    epochs_run: int,
+    n_pending: int,
+) -> None:
+    auroc = result.auroc
+    pr_auc = result.pr_auc
+    log_metrics(
+        TrackingMetrics(
+            (
+                TrackingMetric(TrackingMetricKey.TAU, tau_b0),
+                TrackingMetric(MetricName.AUROC, math.nan if auroc is None else auroc),
+                TrackingMetric(
+                    MetricName.PR_AUC, math.nan if pr_auc is None else pr_auc
+                ),
+                TrackingMetric(TrackingMetricKey.N_CLIENTS, n_clients),
+                TrackingMetric(TrackingMetricKey.EPOCHS_RUN, epochs_run),
+                TrackingMetric(TrackingMetricKey.CALIBRATION_PENDING_COUNT, n_pending),
+            )
+        ),
+        step=None,
+        prefix=Baseline.B0,
+    )
+
+
+def _run_b0_training_and_eval(
+    request: B0RunRequest,
+    normalization_mode: B0NormalizationMode,
+) -> B0Result:
+    set_seeds(request.seed)
+    device = resolve_device(require_cuda=True)
+    client_dirs = discover_client_dirs(request.prepared_dir)
+    logger.info(
+        "found clients",
+        baseline=Baseline.B0,
+        n_clients=len(client_dirs),
+        path=str(request.prepared_dir),
+    )
+
+    pooled = _load_and_pool_b0_data(request, normalization_mode, device, client_dirs)
+    model, epochs_run = _train_b0_model(request, pooled, device)
+    tau_b0, n_cal_errors = _compute_b0_threshold(
+        model, pooled.cal_tensor, request.q, device
+    )
+    logger.info(
+        "b0 threshold computed",
+        baseline=Baseline.B0,
+        tau_b0=tau_b0,
+        q=request.q,
+        n_cal=n_cal_errors,
+    )
+
+    output_dir = Path(request.output_dir)
+    _ckpt_path, b0_ckpt_hash = _save_b0_checkpoint(model, output_dir)
+
+    cal_pending_clients = [
+        cid for cid, count in pooled.client_cal_counts.items() if count < request.n_min
+    ]
+    per_client, full_client_records, all_test_errors = _evaluate_b0_clients(
+        model, tau_b0, pooled, set(cal_pending_clients), client_dirs, device
+    )
+
+    result = _build_b0_result(
+        _B0ResultContext(
+            request=request,
+            normalization_mode=normalization_mode,
+            tau_b0=tau_b0,
+            per_client=per_client,
+            full_client_records=full_client_records,
+            cal_pending_clients=cal_pending_clients,
+            all_test_errors=all_test_errors,
+            b0_ckpt_hash=b0_ckpt_hash,
+            prepared_dir=request.prepared_dir,
+        )
+    )
+
+    metrics_path = write_metrics_atomic(output_dir, result)
+    logger.info(
+        "b0 results written",
+        baseline=Baseline.B0,
+        path=str(metrics_path),
+        epochs_run=epochs_run,
+    )
+    _log_b0_completion_metrics(
+        result, tau_b0, len(client_dirs), epochs_run, len(cal_pending_clients)
+    )
+    log_artifact(metrics_path, artifact_path=ArtifactDir.RESULTS)
+    return result
 
 
 def _run_b0_impl(
@@ -458,23 +597,7 @@ def _run_b0_impl(
     run_name = f"{Baseline.B0.value}_{normalization_mode.value}_{request.regime.value}_seed{request.seed}"
     with tracking_run(
         run_name=run_name,
-        params=TrackingParams(
-            (
-                TrackingParam(TrackingParamKey.BASELINE, Baseline.B0),
-                TrackingParam(TrackingParamKey.REGIME, request.regime),
-                TrackingParam(TrackingParamKey.SEED, request.seed),
-                TrackingParam(TrackingParamKey.EPOCHS, request.epochs),
-                TrackingParam(TrackingParamKey.PATIENCE, request.patience),
-                TrackingParam(TrackingParamKey.LEARNING_RATE, request.lr),
-                TrackingParam(TrackingParamKey.BATCH_SIZE, request.batch_size),
-                TrackingParam(TrackingParamKey.Q, request.q),
-                TrackingParam(TrackingParamKey.N_MIN, request.n_min),
-                TrackingParam(
-                    TrackingParamKey.NORMALIZATION_MODE,
-                    normalization_mode,
-                ),
-            )
-        ),
+        params=_b0_tracking_params(request, normalization_mode),
         tags=TrackingTags(
             (
                 TrackingTag(TrackingTagKey.BASELINE, Baseline.B0),
@@ -482,94 +605,7 @@ def _run_b0_impl(
             )
         ),
     ):
-        set_seeds(request.seed)
-        device = resolve_device(require_cuda=True)
-        client_dirs = discover_client_dirs(request.prepared_dir)
-        logger.info(
-            "found clients",
-            baseline=Baseline.B0,
-            n_clients=len(client_dirs),
-            path=str(request.prepared_dir),
-        )
-
-        pooled = _load_and_pool_b0_data(
-            request, normalization_mode, device, client_dirs
-        )
-        model, epochs_run = _train_b0_model(request, pooled, device)
-        tau_b0, n_cal_errors = _compute_b0_threshold(
-            model, pooled.cal_tensor, request.q, device
-        )
-        logger.info(
-            "b0 threshold computed",
-            baseline=Baseline.B0,
-            tau_b0=tau_b0,
-            q=request.q,
-            n_cal=n_cal_errors,
-        )
-
-        output_dir = Path(request.output_dir)
-        _ckpt_path, b0_ckpt_hash = _save_b0_checkpoint(model, output_dir)
-
-        cal_pending_clients = [
-            cid
-            for cid, cal_count in pooled.client_cal_counts.items()
-            if cal_count < request.n_min
-        ]
-        pending_set = set(cal_pending_clients)
-
-        per_client, full_client_records, all_test_errors = _evaluate_b0_clients(
-            model, tau_b0, pooled, pending_set, client_dirs, device
-        )
-
-        result = _build_b0_result(
-            request=request,
-            normalization_mode=normalization_mode,
-            tau_b0=tau_b0,
-            pooled=pooled,
-            per_client=per_client,
-            full_client_records=full_client_records,
-            cal_pending_clients=cal_pending_clients,
-            all_test_errors=all_test_errors,
-            b0_ckpt_hash=b0_ckpt_hash,
-            prepared_dir=request.prepared_dir,
-        )
-
-        metrics_path = write_metrics_atomic(output_dir, result)
-        logger.info(
-            "b0 results written",
-            baseline=Baseline.B0,
-            path=str(metrics_path),
-            epochs_run=epochs_run,
-        )
-
-        auroc = result.auroc
-        pr_auc = result.pr_auc
-        log_metrics(
-            TrackingMetrics(
-                (
-                    TrackingMetric(TrackingMetricKey.TAU, tau_b0),
-                    TrackingMetric(
-                        MetricName.AUROC,
-                        math.nan if auroc is None else auroc,
-                    ),
-                    TrackingMetric(
-                        MetricName.PR_AUC,
-                        math.nan if pr_auc is None else pr_auc,
-                    ),
-                    TrackingMetric(TrackingMetricKey.N_CLIENTS, len(client_dirs)),
-                    TrackingMetric(TrackingMetricKey.EPOCHS_RUN, epochs_run),
-                    TrackingMetric(
-                        TrackingMetricKey.CALIBRATION_PENDING_COUNT,
-                        len(cal_pending_clients),
-                    ),
-                )
-            ),
-            step=None,
-            prefix=Baseline.B0,
-        )
-        log_artifact(metrics_path, artifact_path=ArtifactDir.RESULTS)
-
-        return result
+        return _run_b0_training_and_eval(request, normalization_mode)
 
 
 def run_b0(request: B0RunRequest) -> B0Result:

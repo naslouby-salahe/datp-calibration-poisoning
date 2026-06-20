@@ -194,22 +194,21 @@ class DatpFedAvg(FedAvg):
         self._raise_if_failures("fit", server_round, results, failures)
         aggregated = super().aggregate_fit(server_round, results, failures)
         if aggregated is None:
-            return aggregated
-        params, _ = aggregated
+            return None, {}
+        params, fit_metrics = aggregated
         if params is None:
-            return aggregated
+            return None, fit_metrics
         self._latest_parameters = parameters_to_ndarrays(params)
-        if server_round not in self._checkpoint_milestones:
-            return aggregated
-        self._parameter_snapshots[server_round] = [
-            ndarray.copy() for ndarray in self._latest_parameters
-        ]
-        if server_round in self._checkpoint_disk_dirs:
-            save_params_snapshot(
-                self._parameter_snapshots[server_round],
-                self._checkpoint_disk_dirs[server_round],
-            )
-        return aggregated
+        if server_round in self._checkpoint_milestones:
+            self._parameter_snapshots[server_round] = [
+                ndarray.copy() for ndarray in self._latest_parameters
+            ]
+            if server_round in self._checkpoint_disk_dirs:
+                save_params_snapshot(
+                    self._parameter_snapshots[server_round],
+                    self._checkpoint_disk_dirs[server_round],
+                )
+        return params, fit_metrics
 
     def configure_fit(
         self,
