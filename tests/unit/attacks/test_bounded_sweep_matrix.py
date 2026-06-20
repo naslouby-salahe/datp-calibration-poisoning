@@ -46,6 +46,16 @@ def _full_config(**overrides: object) -> CalibrationPoisoningConfig:
     return CalibrationPoisoningConfig(**defaults)  # type: ignore[arg-type]
 
 
+def test_bounded_enumerator_rejects_full_config():
+    with pytest.raises(ValueError, match="ExperimentScale.BOUNDED"):
+        enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _full_config())
+
+
+def test_full_enumerator_rejects_bounded_config():
+    with pytest.raises(ValueError, match="ExperimentScale.FULL"):
+        enumerate_full_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
+
+
 def test_matrix_size_is_exactly_1620():
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
     assert len(cells) == 5 * 9 * 3 * 3 * 4
@@ -167,8 +177,7 @@ def test_enumerator_uses_config_seeds_not_constants():
     config = _full_config(seeds=single_seed_pool)
     cells = enumerate_full_sweep_matrix(_VICTIMS_BY_SEED, config)
     # 1 seed × 9 victims × 3 policies × 3 sources × 5 fractions
-    from datp.attacks.constants import FULL_SWEEP_FRACTIONS
-    expected = 1 * len(_VICTIMS) * 3 * 3 * len(FULL_SWEEP_FRACTIONS)
+    expected = 1 * len(_VICTIMS) * len(config.policies) * len(config.sources) * len(config.fractions)
     assert len(cells) == expected
     pairs = {(c.training_seed, c.poisoning_seed) for c in cells}
     assert pairs == {(0, 100)}
