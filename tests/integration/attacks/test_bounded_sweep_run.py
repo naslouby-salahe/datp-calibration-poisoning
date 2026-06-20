@@ -12,11 +12,11 @@ import math
 import pytest
 import torch
 
-from datp.attacks.constants import POISONING_SEEDS, TRAINING_SEEDS
 from datp.attacks.bounded_sweep_run import (
     run_nbaiot_bounded_sweep,
     write_nbaiot_bounded_sweep_manifest,
 )
+from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import ConvergenceConfig, DatpConfig, FederationConfig
 from datp.core.device import resolve_device
@@ -30,6 +30,7 @@ _N_TRAIN = 200
 _N_CAL = 150
 _N_TEST = 50
 _N_CLIENTS = 4  # B4_CLUSTER's locked K=3 requires eligible_count > k
+_CONFIG = CalibrationPoisoningConfig.for_bounded_mvp()
 
 
 def _make_client_data(seed: int) -> dict[str, ClientData]:
@@ -76,7 +77,7 @@ def _make_cfg() -> DatpConfig:
 @pytest.mark.integration
 def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
     cfg = _make_cfg()
-    for training_seed in TRAINING_SEEDS:
+    for training_seed in _CONFIG.seeds.training:
         set_seeds(training_seed)
         client_data = _make_client_data(training_seed)
         run_fl_training(
@@ -87,13 +88,13 @@ def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
             base_dir=tmp_path,
         )
 
-    manifest = run_nbaiot_bounded_sweep(base_dir=tmp_path)
+    manifest = run_nbaiot_bounded_sweep(base_dir=tmp_path, config=_CONFIG)
 
-    assert manifest.n_cells == len(TRAINING_SEEDS) * _N_CLIENTS * 3 * 3 * 4
+    assert manifest.n_cells == len(_CONFIG.seeds.training) * _N_CLIENTS * 3 * 3 * 4
     assert len(manifest.results) == manifest.n_cells
-    assert set(manifest.mu_flag_threshold_by_training_seed) == set(TRAINING_SEEDS)
-    assert tuple(sorted(manifest.training_seeds)) == tuple(sorted(TRAINING_SEEDS))
-    assert tuple(sorted(manifest.poisoning_seeds)) == tuple(sorted(POISONING_SEEDS))
+    assert set(manifest.mu_flag_threshold_by_training_seed) == set(_CONFIG.seeds.training)
+    assert tuple(sorted(manifest.training_seeds)) == tuple(sorted(_CONFIG.seeds.training))
+    assert tuple(sorted(manifest.poisoning_seeds)) == tuple(sorted(_CONFIG.seeds.poisoning))
     assert manifest.provenance.local_epochs == 1
 
     # Calibration-channel-only invariant: every cell's test scores were untouched.
@@ -106,11 +107,36 @@ def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
     assert zero_fraction_rows
     assert all(r.delta_tau == pytest.approx(0.0) for r in zero_fraction_rows)
 
+    # Victim downstream metrics are present on every row.
+    for row in manifest.results:
+        assert hasattr(row, "victim_tpr_clean")
+        assert hasattr(row, "victim_delta_tpr")
+        assert hasattr(row, "victim_ba_clean")
+        assert hasattr(row, "victim_delta_ba")
+        assert hasattr(row, "victim_macro_f1_clean")
+        assert hasattr(row, "victim_delta_macro_f1")
+
+    # f=0.0 rows: clean == poisoned thresholds → all victim downstream deltas are zero.
+    for row in zero_fraction_rows:
+        assert row.victim_delta_tpr == pytest.approx(0.0), (
+            f"victim_delta_tpr non-zero for f=0 row: {row.victim_delta_tpr}"
+        )
+        assert row.victim_delta_ba == pytest.approx(0.0), (
+            f"victim_delta_ba non-zero for f=0 row: {row.victim_delta_ba}"
+        )
+        if not math.isnan(row.victim_delta_macro_f1):
+            assert row.victim_delta_macro_f1 == pytest.approx(0.0)
+
+    # Manifest provenance matches config dimensions
+    assert set(manifest.policies) == set(_CONFIG.policies)
+    assert set(manifest.sources) == set(_CONFIG.sources)
+    assert set(manifest.fractions) == set(_CONFIG.fractions)
+
 
 @pytest.mark.integration
 def test_write_nbaiot_bounded_sweep_manifest_writes_canonical_path(tmp_path) -> None:
     cfg = _make_cfg()
-    for training_seed in TRAINING_SEEDS:
+    for training_seed in _CONFIG.seeds.training:
         set_seeds(training_seed)
         client_data = _make_client_data(training_seed)
         run_fl_training(
@@ -125,3 +151,14 @@ def test_write_nbaiot_bounded_sweep_manifest_writes_canonical_path(tmp_path) -> 
 
     assert out_path.name == "nbaiot_bounded_sweep_manifest.json"
     assert out_path.exists()
+
+
+def test_run_nbaiot_bounded_sweep_config_is_required() -> None:
+    """config must be a required parameter with no default fallback."""
+    import inspect
+    sig = inspect.signature(run_nbaiot_bounded_sweep)
+    config_param = sig.parameters["config"]
+    assert config_param.default is inspect.Parameter.empty, (
+        "run_nbaiot_bounded_sweep must not have a default config — "
+        "callers must construct and pass CalibrationPoisoningConfig explicitly"
+    )
