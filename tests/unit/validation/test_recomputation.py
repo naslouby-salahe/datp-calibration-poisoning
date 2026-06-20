@@ -12,24 +12,24 @@ from datp.validation.enums import DenominatorStatus
 
 
 def _base_params(**overrides: object) -> RecomputationParams:
-    defaults: dict = dict(
-        run_id="a_b1_seed0",
-        seed=0,
-        regime=Regime.A,
-        baseline=Baseline.B1,
-        alpha=None,
-        client_id="c1",
-        tp=10,
-        fp=0,
-        tn=10,
-        fn=0,
-        n_benign=10,
-        n_attack=10,
-        saved_fpr=0.0,
-        saved_tpr=1.0,
-        saved_balanced_accuracy=1.0,
-        saved_macro_f1=1.0,
-    )
+    defaults: dict = {
+        "run_id": "a_b1_seed0",
+        "seed": 0,
+        "regime": Regime.A,
+        "baseline": Baseline.B1,
+        "alpha": None,
+        "client_id": "c1",
+        "tp": 10,
+        "fp": 0,
+        "tn": 10,
+        "fn": 0,
+        "n_benign": 10,
+        "n_attack": 10,
+        "saved_fpr": 0.0,
+        "saved_tpr": 1.0,
+        "saved_balanced_accuracy": 1.0,
+        "saved_macro_f1": 1.0,
+    }
     defaults.update(overrides)
     return RecomputationParams(**defaults)
 
