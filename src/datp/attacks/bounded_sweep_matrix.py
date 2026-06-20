@@ -14,19 +14,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
 
-from datp.attacks.constants import (
-    BOUNDED_SWEEP_FRACTIONS,
-    BOUNDED_SWEEP_SOURCES,
-    DEFAULT_POLICIES,
-    FULL_SWEEP_FRACTIONS,
-    POISONING_SEEDS,
-    TRAINING_SEEDS,
-)
 from datp.attacks.enums import (
     PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.core.seeds import SeedPair
 
 
@@ -56,18 +49,18 @@ class SweepCellSpec:
 
 def _enumerate_single_victim_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
-    fractions: Sequence[float],
+    config: CalibrationPoisoningConfig,
 ) -> tuple[SweepCellSpec, ...]:
-    """Enumerate the single-victim matrix over a given fraction grid.
+    """Enumerate the single-victim matrix driven by config.
 
     ``victims_by_training_seed`` maps each training seed to its eligible
     victim ids for that seed's collection (training and poisoning seeds are
-    paired 1:1 by position in ``TRAINING_SEEDS``/``POISONING_SEEDS``).
+    paired 1:1 by position in ``config.seeds.training``/``config.seeds.poisoning``).
     Raises ``KeyError`` if a locked training seed has no victim list.
     """
     cells: list[SweepCellSpec] = []
     for training_seed, poisoning_seed in zip(
-        TRAINING_SEEDS, POISONING_SEEDS, strict=True
+        config.seeds.training, config.seeds.poisoning, strict=True
     ):
         victims = victims_by_training_seed.get(training_seed)
         if victims is None:
@@ -82,7 +75,7 @@ def _enumerate_single_victim_matrix(
                 fraction=fraction,
             )
             for victim_id, policy, source, fraction in product(
-                victims, DEFAULT_POLICIES, BOUNDED_SWEEP_SOURCES, fractions
+                victims, config.policies, config.sources, config.fractions
             )
         )
     return tuple(cells)
@@ -90,21 +83,19 @@ def _enumerate_single_victim_matrix(
 
 def enumerate_bounded_sweep_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
+    config: CalibrationPoisoningConfig,
 ) -> tuple[SweepCellSpec, ...]:
     """Enumerate the locked bounded matrix (fractions {0, 0.10, 0.20, 0.40})."""
-    return _enumerate_single_victim_matrix(
-        victims_by_training_seed, BOUNDED_SWEEP_FRACTIONS
-    )
+    return _enumerate_single_victim_matrix(victims_by_training_seed, config)
 
 
 def enumerate_full_sweep_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
+    config: CalibrationPoisoningConfig,
 ) -> tuple[SweepCellSpec, ...]:
     """Enumerate the full-scope matrix (fractions {0, 0.05, 0.10, 0.20, 0.40}).
 
     Identical to the bounded matrix except the fraction grid adds 0.05.
     Execution remains gated behind the full-scope run authorization.
     """
-    return _enumerate_single_victim_matrix(
-        victims_by_training_seed, FULL_SWEEP_FRACTIONS
-    )
+    return _enumerate_single_victim_matrix(victims_by_training_seed, config)
