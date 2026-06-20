@@ -8,7 +8,7 @@ on:
 
 jobs:
   codescene:
-    name: CodeScene delta analysis
+    name: CodeScene code health
     runs-on: ubuntu-latest
 
     steps:
@@ -30,18 +30,13 @@ jobs:
           chmod +x "$HOME/.local/bin/cs"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Delta analysis (push)
+      - name: Full codebase analysis (push to main)
         if: github.event_name == 'push'
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         run: |
-          BEFORE="${{ github.event.before }}"
-          AFTER="${{ github.sha }}"
-          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            cs delta HEAD~1 HEAD
-          else
-            cs delta "$BEFORE" "$AFTER"
-          fi
+          FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
+          cs delta "$FIRST_COMMIT" HEAD
 
       - name: Delta analysis (pull_request)
         if: github.event_name == 'pull_request'
