@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Mapping
 
 import polars as pl
+from sklearn.preprocessing import StandardScaler
 
 from datp.artifacts.constants import SCALER_FILE
 from datp.data.catalog import DatasetSpec
@@ -25,7 +26,7 @@ def write_client_splits(
     client_dir: Path,
     splits: Mapping[Split, pl.DataFrame],
     spec: DatasetSpec,
-    scaler: Any | None = None,
+    scaler: StandardScaler | None = None,
 ) -> None:
     client_dir.mkdir(parents=True, exist_ok=True)
 

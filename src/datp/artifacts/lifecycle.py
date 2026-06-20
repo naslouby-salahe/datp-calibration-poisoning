@@ -4,13 +4,16 @@ import contextlib
 import traceback
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING
 
 from datp.artifacts.names import ArtifactFile, RunState
 from datp.core.enums import Baseline
 
+if TYPE_CHECKING:
+    from datp.core.logging import _LoggerProtocol
 
-def _get_logger() -> Any:
+
+def _get_logger() -> "_LoggerProtocol":
     """Lazy import to avoid circular dependency with logging setup."""
     from datp.core.logging import get_logger
 

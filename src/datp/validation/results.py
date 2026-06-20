@@ -397,7 +397,11 @@ def _b4_stability_from_cluster_records(
     regime_alpha_keys = sorted({(row[0], row[1]) for row in keyed_assignments})
     for regime, alpha in regime_alpha_keys:
         seed_keys = sorted(
-            {row[2] for row in keyed_assignments if row[0] == regime and row[1] == alpha}
+            {
+                row[2]
+                for row in keyed_assignments
+                if row[0] == regime and row[1] == alpha
+            }
         )
         assignments = tuple(
             ClusterAssignments(
@@ -542,25 +546,67 @@ def _write_audit_artifacts(
 def _audit_output_paths(audit_dir: Path) -> AuditOutputPaths:
     return AuditOutputPaths(
         paths=(
-            AuditOutputPath(AuditOutputName.BASELINE_INVARIANTS, audit_dir / BASELINE_INVARIANTS_JSON),
+            AuditOutputPath(
+                AuditOutputName.BASELINE_INVARIANTS,
+                audit_dir / BASELINE_INVARIANTS_JSON,
+            ),
             AuditOutputPath(AuditOutputName.RUN_MANIFEST, audit_dir / RUN_MANIFEST_CSV),
             AuditOutputPath(AuditOutputName.SEED_DELTAS, audit_dir / SEED_DELTAS_CSV),
-            AuditOutputPath(AuditOutputName.PER_CLIENT_METRICS, audit_dir / PER_CLIENT_METRICS_CSV),
-            AuditOutputPath(AuditOutputName.PER_ATTACK_METRICS, audit_dir / PER_ATTACK_METRICS_CSV),
-            AuditOutputPath(AuditOutputName.THRESHOLD_VALUES, audit_dir / THRESHOLD_VALUES_CSV),
-            AuditOutputPath(AuditOutputName.RECONSTRUCTION_ERROR_SUMMARY, audit_dir / RECONSTRUCTION_ERROR_SUMMARY_CSV),
-            AuditOutputPath(AuditOutputName.CLUSTER_ASSIGNMENTS, audit_dir / CLUSTER_ASSIGNMENTS_CSV),
-            AuditOutputPath(AuditOutputName.DATASET_PARTITION_AUDIT, audit_dir / DATASET_PARTITION_AUDIT_JSON),
-            AuditOutputPath(AuditOutputName.CONVERGENCE_AUDIT, audit_dir / CONVERGENCE_AUDIT_CSV),
-            AuditOutputPath(AuditOutputName.METRIC_DENOMINATOR_AUDIT, audit_dir / METRIC_DENOMINATOR_AUDIT_CSV),
-            AuditOutputPath(AuditOutputName.METRIC_RECOMPUTATION_AUDIT, audit_dir / METRIC_RECOMPUTATION_AUDIT_CSV),
-            AuditOutputPath(AuditOutputName.FPR_COMPANION_METRICS, audit_dir / FPR_COMPANION_METRICS_CSV),
-            AuditOutputPath(AuditOutputName.WORST_CLIENT_TRACKING, audit_dir / WORST_CLIENT_TRACKING_CSV),
-            AuditOutputPath(AuditOutputName.REGIME_C_ALPHA_AUDIT, audit_dir / REGIME_C_ALPHA_AUDIT_CSV),
-            AuditOutputPath(AuditOutputName.REGIME_C_SEVERITY_TREND, audit_dir / REGIME_C_SEVERITY_TREND_CSV),
-            AuditOutputPath(AuditOutputName.B4_CLUSTER_STABILITY, audit_dir / B4_CLUSTER_STABILITY_CSV),
+            AuditOutputPath(
+                AuditOutputName.PER_CLIENT_METRICS, audit_dir / PER_CLIENT_METRICS_CSV
+            ),
+            AuditOutputPath(
+                AuditOutputName.PER_ATTACK_METRICS, audit_dir / PER_ATTACK_METRICS_CSV
+            ),
+            AuditOutputPath(
+                AuditOutputName.THRESHOLD_VALUES, audit_dir / THRESHOLD_VALUES_CSV
+            ),
+            AuditOutputPath(
+                AuditOutputName.RECONSTRUCTION_ERROR_SUMMARY,
+                audit_dir / RECONSTRUCTION_ERROR_SUMMARY_CSV,
+            ),
+            AuditOutputPath(
+                AuditOutputName.CLUSTER_ASSIGNMENTS, audit_dir / CLUSTER_ASSIGNMENTS_CSV
+            ),
+            AuditOutputPath(
+                AuditOutputName.DATASET_PARTITION_AUDIT,
+                audit_dir / DATASET_PARTITION_AUDIT_JSON,
+            ),
+            AuditOutputPath(
+                AuditOutputName.CONVERGENCE_AUDIT, audit_dir / CONVERGENCE_AUDIT_CSV
+            ),
+            AuditOutputPath(
+                AuditOutputName.METRIC_DENOMINATOR_AUDIT,
+                audit_dir / METRIC_DENOMINATOR_AUDIT_CSV,
+            ),
+            AuditOutputPath(
+                AuditOutputName.METRIC_RECOMPUTATION_AUDIT,
+                audit_dir / METRIC_RECOMPUTATION_AUDIT_CSV,
+            ),
+            AuditOutputPath(
+                AuditOutputName.FPR_COMPANION_METRICS,
+                audit_dir / FPR_COMPANION_METRICS_CSV,
+            ),
+            AuditOutputPath(
+                AuditOutputName.WORST_CLIENT_TRACKING,
+                audit_dir / WORST_CLIENT_TRACKING_CSV,
+            ),
+            AuditOutputPath(
+                AuditOutputName.REGIME_C_ALPHA_AUDIT,
+                audit_dir / REGIME_C_ALPHA_AUDIT_CSV,
+            ),
+            AuditOutputPath(
+                AuditOutputName.REGIME_C_SEVERITY_TREND,
+                audit_dir / REGIME_C_SEVERITY_TREND_CSV,
+            ),
+            AuditOutputPath(
+                AuditOutputName.B4_CLUSTER_STABILITY,
+                audit_dir / B4_CLUSTER_STABILITY_CSV,
+            ),
             AuditOutputPath(AuditOutputName.WARNINGS, audit_dir / WARNINGS_MD),
-            AuditOutputPath(AuditOutputName.AUDIT_SUMMARY, audit_dir / AUDIT_SUMMARY_MD),
+            AuditOutputPath(
+                AuditOutputName.AUDIT_SUMMARY, audit_dir / AUDIT_SUMMARY_MD
+            ),
         )
     )
 

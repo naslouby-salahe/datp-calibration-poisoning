@@ -221,7 +221,6 @@ def _derive_b1_b2_thresholds(
 
 
 def _evaluate_b1_b2(
-    cfg: DatpConfig,
     ctx: object,
     b1_result: object,
     b2_result: object,
@@ -318,7 +317,7 @@ def _run_b1_b2_evaluation(
 
     with step_context(DiagnosticStep.EVALUATE):
         b1_eval, b2_eval = _evaluate_b1_b2(
-            cfg, ctx, b1_result, b2_result, output_dir, regime, seed, alpha
+            ctx, b1_result, b2_result, output_dir, regime, seed, alpha
         )
 
     diagnostics = _build_diagnostic_metrics(

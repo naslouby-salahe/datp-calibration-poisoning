@@ -51,7 +51,7 @@ def save_confusion_matrices(eval_result: EvaluationResult, base_dir: Path) -> Pa
         with open(fd, "w", encoding="utf-8") as f:
             f.write(text)
         Path(tmp).replace(out_path)
-    except Exception:
+    except OSError:
         Path(tmp).unlink(missing_ok=True)
         raise
 

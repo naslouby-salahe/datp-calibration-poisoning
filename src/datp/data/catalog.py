@@ -80,12 +80,6 @@ def _get_datasets() -> Mapping[DatasetID, DatasetSpec]:
     return _DATASETS
 
 
-def __getattr__(name: str) -> object:
-    if name == "DATASETS":
-        return _get_datasets()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
 def dataset_spec(dataset_id: DatasetID) -> DatasetSpec:
     return _get_datasets()[dataset_id]
 

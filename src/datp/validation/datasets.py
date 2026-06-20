@@ -65,7 +65,9 @@ def _attack_files_by_family(
     return tuple(
         AttackFamilyFiles(
             family=family,
-            files=tuple(sorted(_attack_subtypes_for_family(file_hash_keys, device, family))),
+            files=tuple(
+                sorted(_attack_subtypes_for_family(file_hash_keys, device, family))
+            ),
         )
         for family in NBAIOT_SPEC.attack_family_dirs
     )
@@ -369,7 +371,9 @@ def _device_mixture_js(
 ) -> JSSummary | None:
     if len(device_mixture) < 2:
         return None
-    all_devices = sorted({device for mixture in device_mixture for device, _ in mixture.proportions})
+    all_devices = sorted(
+        {device for mixture in device_mixture for device, _ in mixture.proportions}
+    )
     if not all_devices:
         return None
     mixture_vectors = [
@@ -623,8 +627,12 @@ def compute_b4_cluster_stability(
             common = sorted(client_ids_a & client_ids_b)
             if len(common) < 2:
                 continue
-            labels_a = [_assignment_for_client(assigns_a, client_id) for client_id in common]
-            labels_b = [_assignment_for_client(assigns_b, client_id) for client_id in common]
+            labels_a = [
+                _assignment_for_client(assigns_a, client_id) for client_id in common
+            ]
+            labels_b = [
+                _assignment_for_client(assigns_b, client_id) for client_id in common
+            ]
             ari = float(adjusted_rand_score(labels_a, labels_b))
             records.append(
                 B4ClusterStabilityRecord(

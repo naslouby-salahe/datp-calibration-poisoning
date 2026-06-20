@@ -80,7 +80,9 @@ class TrackingMetric:
         key: TrackingMetricKey,
         value: float | int,
     ) -> "TrackingMetric":
-        return cls(key=BaselineTrackingMetricKey(baseline=baseline, key=key), value=value)
+        return cls(
+            key=BaselineTrackingMetricKey(baseline=baseline, key=key), value=value
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,7 +263,9 @@ def log_artifact(
 
 
 def _params_to_mapping(params: TrackingParams) -> dict[str, str]:
-    return {item.key.value: _tracking_value_to_str(item.value) for item in params.payload}
+    return {
+        item.key.value: _tracking_value_to_str(item.value) for item in params.payload
+    }
 
 
 def _tags_to_mapping(tags: TrackingTags) -> dict[str, str]:

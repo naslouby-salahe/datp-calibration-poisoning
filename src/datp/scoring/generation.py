@@ -322,8 +322,13 @@ def _manifest_from_payload(payload: Mapping[str, object]) -> ScoringManifest:
         score_column_name=str(payload.get("score_column_name", SCORE_COLUMN)),
         expected_client_ids=_text_tuple(payload, "expected_client_ids"),
         expected_splits=_text_tuple(payload, "expected_splits"),
-        actual_client_ids=tuple(str(item) for item in _optional_sequence(payload, "actual_client_ids", object)),
-        actual_splits=tuple(str(item) for item in _optional_sequence(payload, "actual_splits", object)),
+        actual_client_ids=tuple(
+            str(item)
+            for item in _optional_sequence(payload, "actual_client_ids", object)
+        ),
+        actual_splits=tuple(
+            str(item) for item in _optional_sequence(payload, "actual_splits", object)
+        ),
         records=records,
         completion_status=_required_text(payload, "completion_status"),
         generated_at_utc=_optional_text(payload, "generated_at_utc"),
@@ -338,7 +343,9 @@ def validate_scoring_manifest(score_base: Path) -> ScoringManifest:
             fmt(_MODULE, "Scoring manifest missing", str(manifest_path), "missing file")
         )
     manifest = _manifest_from_payload(
-        cast(Mapping[str, object], json.loads(manifest_path.read_text(encoding="utf-8")))
+        cast(
+            Mapping[str, object], json.loads(manifest_path.read_text(encoding="utf-8"))
+        )
     )
     coverage = _check_manifest_coverage(manifest, score_base)
     if (

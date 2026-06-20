@@ -253,9 +253,7 @@ class TestLogParams:
                 )
             )
 
-        mock_mlflow.log_params.assert_called_once_with(
-            {"seed": "1", "alpha": "none"}
-        )
+        mock_mlflow.log_params.assert_called_once_with({"seed": "1", "alpha": "none"})
 
 
 class TestLogArtifact:
