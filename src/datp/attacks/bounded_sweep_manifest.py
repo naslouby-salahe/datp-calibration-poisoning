@@ -70,6 +70,21 @@ class BoundedSweepResultRow(BaseModel):
     n_spillover: int
     n_non_victims: int
 
+    # Victim downstream detection metrics (clean vs poisoned effective threshold).
+    # Attack samples are positive; prediction rule is score > threshold.
+    # delta = poisoned - clean. NaN when required test arrays are empty.
+    victim_tpr_clean: float
+    victim_tpr_poisoned: float
+    victim_delta_tpr: float
+
+    victim_ba_clean: float
+    victim_ba_poisoned: float
+    victim_delta_ba: float
+
+    victim_macro_f1_clean: float
+    victim_macro_f1_poisoned: float
+    victim_delta_macro_f1: float
+
     @field_validator("cv_fpr", "mean_fpr", mode="before")
     @classmethod
     def _undefined_null_to_nan(cls, value: object) -> object:

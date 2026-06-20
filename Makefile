@@ -84,11 +84,15 @@ test-e2e:  ## Run end-to-end tests (tiny real-data subsets)
 # ═══════════════════════════════════════════════════════════════════════════
 # Type checking / linting
 # ═══════════════════════════════════════════════════════════════════════════
-.PHONY: typecheck lint
+.PHONY: typecheck typecheck-attacks lint
 
-typecheck:  ## Run pyright type checking on baselines + evaluation
+typecheck:  ## Run pyright type checking on the entire src/
 	@command -v pyright >/dev/null 2>&1 || { echo "pyright not installed — run: pip install pyright"; exit 1; }
-	pyright src/datp/experiments/baselines/ src/datp/evaluation/
+	pyright src/
+
+typecheck-attacks:  ## Run pyright type checking on attacks only
+	@command -v pyright >/dev/null 2>&1 || { echo "pyright not installed — run: pip install pyright"; exit 1; }
+	pyright src/datp/attacks/
 
 lint:  ## Run ruff linter (if installed)
 	@command -v ruff >/dev/null 2>&1 || { echo "ruff not installed — run: pip install ruff"; exit 1; }

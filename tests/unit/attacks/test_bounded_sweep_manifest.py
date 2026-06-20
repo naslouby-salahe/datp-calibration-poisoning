@@ -50,6 +50,16 @@ def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResul
         n_blast_significant=0,
         n_spillover=0,
         n_non_victims=8,
+        # fraction=0.0 → clean == poisoned thresholds → all deltas are zero
+        victim_tpr_clean=0.95,
+        victim_tpr_poisoned=0.95,
+        victim_delta_tpr=0.0,
+        victim_ba_clean=0.9,
+        victim_ba_poisoned=0.9,
+        victim_delta_ba=0.0,
+        victim_macro_f1_clean=0.92,
+        victim_macro_f1_poisoned=0.92,
+        victim_delta_macro_f1=0.0,
     )
 
 
@@ -109,3 +119,56 @@ def test_manifest_is_frozen():
     manifest = _manifest()
     with pytest.raises(ValidationError):
         manifest.n_cells = 99  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Victim downstream metric fields
+# ---------------------------------------------------------------------------
+
+
+def test_result_row_has_victim_tpr_fields():
+    row = _row()
+    assert hasattr(row, "victim_tpr_clean")
+    assert hasattr(row, "victim_tpr_poisoned")
+    assert hasattr(row, "victim_delta_tpr")
+
+
+def test_result_row_has_victim_ba_fields():
+    row = _row()
+    assert hasattr(row, "victim_ba_clean")
+    assert hasattr(row, "victim_ba_poisoned")
+    assert hasattr(row, "victim_delta_ba")
+
+
+def test_result_row_has_victim_macro_f1_fields():
+    row = _row()
+    assert hasattr(row, "victim_macro_f1_clean")
+    assert hasattr(row, "victim_macro_f1_poisoned")
+    assert hasattr(row, "victim_delta_macro_f1")
+
+
+def test_victim_tpr_fields_are_floats():
+    row = _row()
+    assert isinstance(row.victim_tpr_clean, float)
+    assert isinstance(row.victim_tpr_poisoned, float)
+    assert isinstance(row.victim_delta_tpr, float)
+
+
+def test_victim_downstream_zero_fraction_deltas_are_zero():
+    """For f=0 row the clean and poisoned thresholds are identical → deltas must be 0."""
+    row = _row()  # fraction=0.0 row with identical clean/poisoned thresholds
+    assert math.isclose(row.fraction, 0.0)
+    assert row.victim_delta_tpr == pytest.approx(0.0)
+    assert row.victim_delta_ba == pytest.approx(0.0)
+    if not math.isnan(row.victim_delta_macro_f1):
+        assert row.victim_delta_macro_f1 == pytest.approx(0.0)
+
+
+def test_manifest_round_trips_victim_fields():
+    manifest = _manifest()
+    restored = BoundedSweepManifest.model_validate_json(manifest.model_dump_json())
+    row = manifest.results[0]
+    r_row = restored.results[0]
+    assert row.victim_tpr_clean == pytest.approx(r_row.victim_tpr_clean)
+    assert row.victim_ba_clean == pytest.approx(r_row.victim_ba_clean)
+    assert row.victim_delta_tpr == pytest.approx(r_row.victim_delta_tpr)

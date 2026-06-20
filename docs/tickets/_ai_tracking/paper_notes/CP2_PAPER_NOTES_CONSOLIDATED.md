@@ -957,3 +957,83 @@ read-only feasibility/drift audits were completed; **no Phase-F experiment ran.*
 - `_ai_tracking/decisions/CP2_FALLBACK_REGISTER.md` (FB4 detail)
 - `src/datp/attacks/{compromise_patterns,defenses}.py`,
   `src/datp/attacks/{poison_enums,bounded_sweep_matrix,cell_runner,guardrails}.py`
+
+---
+
+## PRE-T056 gate — Victim downstream metrics added to bounded sweep manifest
+
+### Claim enabled
+
+- **RAISE narrative — victim detection loss claim (claim-critical):** Every
+  `BoundedSweepResultRow` now carries `victim_tpr_clean`, `victim_tpr_poisoned`,
+  `victim_delta_tpr`, `victim_ba_clean`, `victim_ba_poisoned`, `victim_delta_ba`,
+  `victim_macro_f1_clean`, `victim_macro_f1_poisoned`, `victim_delta_macro_f1`.
+  When CP2-T056 executes the bounded sweep, CP2-T057 can directly analyze whether
+  a threshold-raise translates into a detection-rate drop (negative `victim_delta_tpr`)
+  without rerunning the pipeline.
+- Label polarity confirmed unambiguous: `test_attack` arrays = positive class
+  (malicious/anomalous); `test_benign` arrays = negative class. Prediction rule:
+  score > threshold → predicted malicious. This is consistent with the existing
+  `recompute_binary_metrics` convention in `evaluation/metrics.py` and the AUROC
+  computation in `evaluation/ranking.py`.
+
+### Metrics: formulas locked
+
+- `TPR = TP / (TP + FN)` where TP = `sum(test_attack > threshold)`.
+- `FPR = FP / (FP + TN)` where FP = `sum(test_benign > threshold)`.
+- `TNR = 1 - FPR`.
+- `BA = (TPR + TNR) / 2`.
+- `macro_F1 = (F1_positive + F1_negative) / 2` (binary, as in `recompute_binary_metrics`).
+- delta = poisoned − clean for all metrics.
+- NaN when the required array is empty.
+- All formulas are implemented via `recompute_binary_metrics` from `evaluation/metrics.py`
+  — no custom float arithmetic, no ε.
+
+### Important scope note (LOWER narrative)
+
+- LOWER cells also carry these fields and they can be inspected (e.g., whether a
+  threshold-lower incidentally improves victim TPR). However, the **primary** LOWER
+  endpoint is `cv_fpr`, `mean_fpr`, `worst_client_fpr`, and dispersion — those are
+  unchanged. `victim_delta_tpr` is a measurement addition for completeness, not a
+  LOWER-primary claim.
+
+### Invariant: f=0 rows have delta=0
+
+- When fraction=0.0, the attack is a no-op (injection replaces 0 positions). The
+  clean and poisoned effective thresholds are identical, so `victim_delta_tpr=0`,
+  `victim_delta_ba=0`, and `victim_delta_macro_f1=0` (or NaN if arrays are empty).
+  This is verified by the integration test.
+
+### Do-not-claim
+
+- Do NOT claim victim detection loss from the threshold-raise alone without `victim_delta_tpr`
+  evidence. The CP2-T047 open gap (T047 flag "(2)") is now closeable by CP2-T057 using
+  `victim_delta_tpr` from the manifest. Do not pre-empt that analysis here.
+- Do NOT use victim downstream metrics as a LOWER primary claim (they are supplemental there).
+
+### Reviewer-risk relevance
+
+- Reviewers asking "but does the threshold-raise actually reduce attack detection?" can now
+  be answered with empirical `victim_delta_tpr` values from the manifest rather than
+  requiring an extra pipeline run.
+- Balanced accuracy and macro F1 provide interpretability across different base-rate regimes.
+
+### Limitation to disclose
+
+- Metrics are computed from the unchanged test arrays at each effective threshold. If the
+  test set's attack fraction differs substantially across policies (it does not in N-BaIoT,
+  which uses fixed splits), BA would need to be reported alongside base rates.
+
+### Evidence path
+
+- `src/datp/attacks/metric_engine.py`: `VictimDownstreamMetrics` dataclass +
+  `compute_victim_downstream_metrics` function (reuses `recompute_binary_metrics`).
+- `src/datp/attacks/bounded_sweep_manifest.py`: 9 new fields on `BoundedSweepResultRow`.
+- `src/datp/attacks/bounded_sweep_run.py`: wired into `_row_for_cell`; clean threshold
+  from `DeltaTauEntry.tau_clean`, poisoned from `DeltaTauEntry.tau_pois`.
+- `tests/unit/attacks/test_victim_downstream_metrics.py`: 15 tests pass (correctness,
+  direction invariants, zero-fraction invariant, no-mutation, edge cases).
+- `tests/unit/attacks/test_bounded_sweep_manifest.py`: 12 tests pass (6 new schema tests).
+- `tests/integration/attacks/test_bounded_sweep_run.py`: 2 integration tests pass
+  including zero-fraction delta assertions.
+- `pyright src/datp/attacks/` → 0 errors; `ruff check src/ tests/` → clean.
