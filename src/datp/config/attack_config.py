@@ -21,13 +21,15 @@ from datp.artifacts.poison_names import (
 from datp.attacks.constants import (
     ANALYSIS_SEEDS,
     B4_RANDOM_STATE,
+    BOUNDED_SWEEP_FRACTION_SET,
     BOUNDED_SWEEP_FRACTIONS,
+    BOUNDED_SWEEP_SOURCES,
     COMPROMISE_PATTERN_SEED,
+    DEFAULT_POLICIES,
     POISONING_SEEDS,
     TRAINING_SEEDS,
 )
 from datp.attacks.enums import (
-    AttackerObjective,
     CalibrationInjectionRule,
     PoisoningDefense,
     PoisoningKnowledge,
@@ -36,6 +38,9 @@ from datp.attacks.enums import (
     ThresholdPolicy,
 )
 from datp.experiments.enums import ExperimentScale
+
+_DEFAULT_POLICY_SET: frozenset[ThresholdPolicy] = frozenset(DEFAULT_POLICIES)
+_BOUNDED_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(BOUNDED_SWEEP_SOURCES)
 
 
 class SeedPools(BaseModel):
@@ -105,19 +110,25 @@ class B4ClusterConfig(BaseModel):
             raise ValueError(f"B4 k must be 3 for Regime A (N-BaIoT); got {v}")
         return v
 
+    @field_validator("random_state")
+    @classmethod
+    def random_state_must_be_42(cls, v: int) -> int:
+        if v != 42:
+            raise ValueError(f"B4 random_state must be 42 for Regime A; got {v}")
+        return v
+
 
 class CalibrationPoisoningConfig(BaseModel):
-    """Typed experiment config — covers all scientific parameters.
+    """Typed sweep config — single source of truth for all scientific parameters.
 
-    Enforces E=1 (rejects E=5), REPLACE_FIXED_BUDGET injection rule,
-    victim-local reservoirs, and the locked fraction/seed grids.
+    Covers all sweep dimensions: policies, sources, fractions, and seeds.
+    Enforces E=1, REPLACE_FIXED_BUDGET injection rule, victim-local reservoirs,
+    and the locked fraction/seed/policy/source grids for each scale.
 
-    Canonical home for the single-condition lock validators. The bounded sweep
-    runner currently enumerates the per-cell matrix from the module-level locked
-    constants directly rather than constructing this model per cell; wiring this
-    model into the runner as the per-cell construction path is deferred. The
-    validators here remain the authoritative encoding of the scientific locks and
-    are exercised by the config test suite.
+    Objectives (THRESHOLD_RAISE, THRESHOLD_LOWER) are encoded through source
+    strategy semantics: HIGH_SCORE_BENIGN → THRESHOLD_RAISE,
+    LOW_SCORE_BENIGN → THRESHOLD_LOWER, RANDOM_BENIGN → None.
+    They are not a separate enumeration dimension.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -125,10 +136,10 @@ class CalibrationPoisoningConfig(BaseModel):
     # Protocol lock: E=1 only; E=5 explicitly rejected.
     local_epochs: int = 1
 
-    # Experiment design
-    policy: ThresholdPolicy
-    objective: AttackerObjective
-    source: PoisoningSourceStrategy
+    # Sweep dimensions — derived from config, not from module-level constants.
+    policies: tuple[ThresholdPolicy, ...] = DEFAULT_POLICIES
+    sources: tuple[PoisoningSourceStrategy, ...] = BOUNDED_SWEEP_SOURCES
+
     injection_rule: CalibrationInjectionRule = (
         CalibrationInjectionRule.REPLACE_FIXED_BUDGET
     )
@@ -169,6 +180,24 @@ class CalibrationPoisoningConfig(BaseModel):
             )
         return v
 
+    @field_validator("policies")
+    @classmethod
+    def policies_must_not_be_empty(
+        cls, v: tuple[ThresholdPolicy, ...]
+    ) -> tuple[ThresholdPolicy, ...]:
+        if not v:
+            raise ValueError("policies must not be empty")
+        return v
+
+    @field_validator("sources")
+    @classmethod
+    def sources_must_not_be_empty(
+        cls, v: tuple[PoisoningSourceStrategy, ...]
+    ) -> tuple[PoisoningSourceStrategy, ...]:
+        if not v:
+            raise ValueError("sources must not be empty")
+        return v
+
     @field_validator("fractions")
     @classmethod
     def validate_fractions(cls, v: tuple[float, ...]) -> tuple[float, ...]:
@@ -196,3 +225,49 @@ class CalibrationPoisoningConfig(BaseModel):
         ):
             raise ValueError("BOUNDED scale requires SINGLE_CLIENT target scope")
         return self
+
+    @model_validator(mode="after")
+    def bounded_scale_requires_all_default_policies(
+        self,
+    ) -> "CalibrationPoisoningConfig":
+        if self.scale == ExperimentScale.BOUNDED:
+            if frozenset(self.policies) != _DEFAULT_POLICY_SET:
+                raise ValueError(
+                    f"BOUNDED scale requires exactly policies {_DEFAULT_POLICY_SET}; "
+                    f"got {set(self.policies)}"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def bounded_scale_requires_bounded_sources(self) -> "CalibrationPoisoningConfig":
+        if self.scale == ExperimentScale.BOUNDED:
+            if frozenset(self.sources) != _BOUNDED_SOURCE_SET:
+                raise ValueError(
+                    f"BOUNDED scale requires exactly sources {_BOUNDED_SOURCE_SET}; "
+                    f"got {set(self.sources)}"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def bounded_scale_requires_locked_fractions(self) -> "CalibrationPoisoningConfig":
+        if self.scale == ExperimentScale.BOUNDED:
+            invalid = frozenset(self.fractions) - BOUNDED_SWEEP_FRACTION_SET
+            if invalid:
+                raise ValueError(
+                    f"BOUNDED scale fractions outside locked grid "
+                    f"{sorted(BOUNDED_SWEEP_FRACTION_SET)}: {sorted(invalid)}"
+                )
+        return self
+
+    @classmethod
+    def for_bounded_mvp(cls) -> "CalibrationPoisoningConfig":
+        """Canonical bounded sweep config — enforces all locked grid parameters."""
+        return cls(
+            policies=DEFAULT_POLICIES,
+            sources=BOUNDED_SWEEP_SOURCES,
+            knowledge=PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
+            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
+            scale=ExperimentScale.BOUNDED,
+            fractions=BOUNDED_SWEEP_FRACTIONS,
+            seeds=SeedPools(),
+        )
