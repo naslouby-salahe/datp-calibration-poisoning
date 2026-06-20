@@ -1,0 +1,48 @@
+name: CP2 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-type:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install uv && uv sync --dev
+
+      - name: Ruff
+        run: uv run python -m ruff check src/ tests/
+
+      - name: Pyright (attacks + config)
+        run: uv run pyright src/datp/attacks/ src/datp/config/
+
+  unit-tests:
+    name: Unit tests (CP2 critical paths)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install uv && uv sync --dev
+
+      - name: Run CP2 critical unit tests
+        run: >
+          uv run python -m pytest
+          tests/unit/config/
+          tests/unit/attacks/
+          tests/unit/app/cli/test_poison_cli.py
+          -q --tb=short
