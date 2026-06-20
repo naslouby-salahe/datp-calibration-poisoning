@@ -76,3 +76,40 @@ class TestStages:
     def test_stages_output_contains_blocked(self) -> None:
         result = _runner.invoke(app, ["poison", "stages"])
         assert "BLOCKED" in result.output
+
+
+class TestDryRunBoundedWiring:
+    def test_dry_run_bounded_shows_config_policies(self) -> None:
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_bounded"])
+        assert result.exit_code == 0
+        output = result.output.lower()
+        assert "b1_global" in output
+        assert "b2_personalized" in output
+        assert "b4_cluster" in output
+
+    def test_dry_run_bounded_shows_config_sources(self) -> None:
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_bounded"])
+        assert result.exit_code == 0
+        output = result.output.lower()
+        assert "random_benign" in output
+        assert "high_score_benign" in output
+        assert "low_score_benign" in output
+
+    def test_dry_run_bounded_shows_cells_per_victim(self) -> None:
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_bounded"])
+        assert result.exit_code == 0
+        assert "180" in result.output
+
+    def test_dry_run_bounded_notes_objective_encoding(self) -> None:
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_bounded"])
+        assert result.exit_code == 0
+        output = result.output.lower()
+        assert "threshold_raise" in output
+        assert "threshold_lower" in output
+
+    def test_dry_run_non_bounded_stage_still_works(self) -> None:
+        result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_full"])
+        assert result.exit_code == 0
+        # Non-bounded stages must not show config_ lines
+        assert "config_policies" not in result.output
+        assert "cells/victim" not in result.output

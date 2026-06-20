@@ -71,6 +71,27 @@ def dry_run(
     _stdout.print(f" allow_run : {cfg.allow_run}")
     _stdout.print(f" gate : {cfg.gate or 'none'}")
     _stdout.print(f" description: {cfg.description}")
+    if stage == ExperimentStage.NBAIOT_BOUNDED:
+        from datp.config.attack_config import CalibrationPoisoningConfig
+
+        config = CalibrationPoisoningConfig.for_bounded_mvp()
+        cells_per_victim = (
+            len(config.policies)
+            * len(config.sources)
+            * len(config.fractions)
+            * len(config.seeds)
+        )
+        _stdout.print(f" config_policies  : {[p.value for p in config.policies]}")
+        _stdout.print(f" config_sources   : {[s.value for s in config.sources]}")
+        _stdout.print(f" config_fractions : {list(config.fractions)}")
+        _stdout.print(f" config_seeds     : {len(config.seeds)} training seeds")
+        _stdout.print(f" cells/victim     : {cells_per_victim}")
+        _stdout.print(
+            " [dim]objectives encoded through sources: "
+            "HIGH_SCORE_BENIGN→THRESHOLD_RAISE, "
+            "LOW_SCORE_BENIGN→THRESHOLD_LOWER, "
+            "RANDOM_BENIGN→none[/dim]"
+        )
     if not cfg.allow_run:
         _stderr.print(f"[yellow]{_EXECUTION_GATE_NOTICE}[/yellow]")
         if cfg.gate:
