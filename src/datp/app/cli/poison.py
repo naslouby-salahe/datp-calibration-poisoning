@@ -14,6 +14,7 @@ import typer
 from rich.console import Console
 
 from datp.attacks.bounded_sweep_run import write_nbaiot_bounded_sweep_manifest
+from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.stages import (
     ExperimentStage,
     ExperimentStageConfig,
@@ -72,8 +73,6 @@ def dry_run(
     _stdout.print(f" gate : {cfg.gate or 'none'}")
     _stdout.print(f" description: {cfg.description}")
     if stage == ExperimentStage.NBAIOT_BOUNDED:
-        from datp.config.attack_config import CalibrationPoisoningConfig
-
         config = CalibrationPoisoningConfig.for_bounded_mvp()
         cells_per_victim = (
             len(config.policies)
@@ -84,7 +83,7 @@ def dry_run(
         _stdout.print(f" config_policies  : {[p.value for p in config.policies]}")
         _stdout.print(f" config_sources   : {[s.value for s in config.sources]}")
         _stdout.print(f" config_fractions : {list(config.fractions)}")
-        _stdout.print(f" config_seeds     : {len(config.seeds)} training seeds")
+        _stdout.print(f" config_seeds     : {len(config.seeds)} seed triplets")
         _stdout.print(f" cells/victim     : {cells_per_victim}")
         _stdout.print(
             " [dim]objectives encoded through sources: "
