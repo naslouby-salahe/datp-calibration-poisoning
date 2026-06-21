@@ -6,7 +6,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.data.catalog import DatasetID
 from datp.data.datasets.ciciot2023.spec import (
     CAP_ATTACK_RESERVE,
@@ -22,7 +22,7 @@ from datp.validation.datasets import (
     build_ciciot_protocol,
     build_nbaiot_per_device,
     chronological_flags_for,
-    compute_b4_cluster_stability,
+    compute_cluster_stability,
     confound_summary_for,
 )
 
@@ -42,27 +42,14 @@ def _write_parquet(path: Path, n_rows: int) -> None:
 
 
 class TestConfoundSummaryFor:
-    def test_regime_a_returns_nbaiot_summary(self) -> None:
-        result = confound_summary_for(Regime.A)
+    def test_nbaiot_main_returns_nbaiot_summary(self) -> None:
+        result = confound_summary_for(ExperimentStage.NBAIOT_MAIN)
         assert result == NBAIOT_CONFOUND_SUMMARY
-
-    def test_regime_c_returns_nbaiot_summary(self) -> None:
-        result = confound_summary_for(Regime.C)
-        assert result == NBAIOT_CONFOUND_SUMMARY
-
-    def test_regime_b_returns_none(self) -> None:
-        assert confound_summary_for(Regime.B) is None
 
 
 class TestChronologicalFlagsFor:
-    def test_regime_a_is_chronological(self) -> None:
-        assert chronological_flags_for(Regime.A) == (True, True)
-
-    def test_regime_c_is_chronological(self) -> None:
-        assert chronological_flags_for(Regime.C) == (True, True)
-
-    def test_regime_b_is_not_chronological(self) -> None:
-        assert chronological_flags_for(Regime.B) == (False, False)
+    def test_nbaiot_main_is_chronological(self) -> None:
+        assert chronological_flags_for(ExperimentStage.NBAIOT_MAIN) == (True, True)
 
 
 class TestBuildCiciotProtocol:
@@ -173,16 +160,15 @@ class TestBuildNbaiotPerDevice:
         assert target.benign_class_imbalance_ratio is None
 
 
-class TestComputeB4ClusterStability:
+class TestComputeClusterThresholdClusterStability:
     def test_empty_assignments_returns_empty(self) -> None:
-        result = compute_b4_cluster_stability((), Regime.A, None)
+        result = compute_cluster_stability((), ExperimentStage.NBAIOT_MAIN)
         assert result == []
 
     def test_single_seed_returns_empty(self) -> None:
-        result = compute_b4_cluster_stability(
+        result = compute_cluster_stability(
             _assignments((0, (("c1", 0), ("c2", 1), ("c3", 0)))),
-            Regime.A,
-            None,
+            ExperimentStage.NBAIOT_MAIN,
         )
         assert result == []
 
@@ -191,7 +177,7 @@ class TestComputeB4ClusterStability:
             (0, (("c1", 0), ("c2", 1), ("c3", 0))),
             (1, (("c1", 0), ("c2", 1), ("c3", 0))),
         )
-        result = compute_b4_cluster_stability(assignments, Regime.A, None)
+        result = compute_cluster_stability(assignments, ExperimentStage.NBAIOT_MAIN)
         assert len(result) == 1
         assert result[0].seed_a == 0
         assert result[0].seed_b == 1
@@ -201,17 +187,16 @@ class TestComputeB4ClusterStability:
             (0, (("c1", 0), ("c2", 1), ("c3", 0))),
             (1, (("c1", 0), ("c2", 1), ("c3", 0))),
         )
-        result = compute_b4_cluster_stability(assignments, Regime.A, None)
+        result = compute_cluster_stability(assignments, ExperimentStage.NBAIOT_MAIN)
         assert result[0].adjusted_rand_index == pytest.approx(1.0)
 
-    def test_regime_and_alpha_stored_in_record(self) -> None:
+    def test_stage_stored_in_record(self) -> None:
         assignments = _assignments(
             (0, (("c1", 0), ("c2", 1), ("c3", 0))),
             (1, (("c1", 0), ("c2", 0), ("c3", 1))),
         )
-        result = compute_b4_cluster_stability(assignments, Regime.C, "0.5")
-        assert result[0].regime == Regime.C
-        assert result[0].alpha == "0.5"
+        result = compute_cluster_stability(assignments, ExperimentStage.NBAIOT_MAIN)
+        assert result[0].stage == ExperimentStage.NBAIOT_MAIN
 
     def test_three_seeds_produces_three_pairs(self) -> None:
         assignments = _assignments(
@@ -219,12 +204,12 @@ class TestComputeB4ClusterStability:
             (1, (("c1", 0), ("c2", 1))),
             (2, (("c1", 1), ("c2", 0))),
         )
-        result = compute_b4_cluster_stability(assignments, Regime.B, None)
+        result = compute_cluster_stability(assignments, ExperimentStage.NBAIOT_MAIN)
         assert len(result) == 3
 
     def test_fewer_than_two_common_clients_skipped(self) -> None:
         assignments = _assignments((0, (("c1", 0),)), (1, (("c1", 0),)))
-        result = compute_b4_cluster_stability(assignments, Regime.A, None)
+        result = compute_cluster_stability(assignments, ExperimentStage.NBAIOT_MAIN)
         assert result == []
 
     def test_non_overlapping_clients_skipped(self) -> None:
@@ -232,7 +217,7 @@ class TestComputeB4ClusterStability:
             (0, (("c1", 0), ("c2", 1))),
             (1, (("c3", 0), ("c4", 1))),
         )
-        result = compute_b4_cluster_stability(assignments, Regime.A, None)
+        result = compute_cluster_stability(assignments, ExperimentStage.NBAIOT_MAIN)
         assert result == []
 
     def test_partially_overlapping_clients_uses_common_only(self) -> None:
@@ -240,6 +225,6 @@ class TestComputeB4ClusterStability:
             (0, (("c1", 0), ("c2", 1), ("only_in_0", 0))),
             (1, (("c1", 0), ("c2", 1), ("only_in_1", 0))),
         )
-        result = compute_b4_cluster_stability(assignments, Regime.A, None)
+        result = compute_cluster_stability(assignments, ExperimentStage.NBAIOT_MAIN)
         assert len(result) == 1
         assert result[0].adjusted_rand_index == pytest.approx(1.0)

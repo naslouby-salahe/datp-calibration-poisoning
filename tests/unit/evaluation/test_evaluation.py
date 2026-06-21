@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import dataclasses
 import subprocess
@@ -7,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import ClientThreshold, ThresholdMetadata, ThresholdResult
 from datp.evaluation.metric_filtering import _filter_eligible_metrics
 from datp.evaluation.metrics import (
@@ -19,6 +20,8 @@ from datp.evaluation.metrics import (
 )
 from datp.thresholding.metrics_serialization import build_metrics_dict
 from tests.unit.evaluation._builders import _make_client_record, _make_eval_result
+
+_STAGE = ExperimentStage.NBAIOT_MAIN
 
 
 # ── Eligibility / filtering ───────────────────────────────────────────────────
@@ -46,7 +49,7 @@ def test_eval_incomplete_excluded_from_attack_metrics() -> None:
             client_id="c3",
             threshold=0.5,
             calibration_pending=False,
-            strategy=Baseline.B1,
+            strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         ),
         evaluation_incomplete=True,
     )
@@ -109,13 +112,13 @@ def test_metrics_serialization_contains_eligibility_threshold_and_provenance_fie
     from datp.evaluation.metrics import compute_client_record as _ccr
 
     ct_eligible = ClientThreshold(
-        client_id="c1", threshold=0.5, calibration_pending=False, strategy=Baseline.B1
+        client_id="c1", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
     )
     c1_rec = _ccr(
         "c1", np.array([0.01, 0.02, 0.07]), np.array([0.08, 0.09, 0.10]), ct_eligible
     )
     ct_pending = ClientThreshold(
-        client_id="c2", threshold=0.5, calibration_pending=True, strategy=Baseline.B1
+        client_id="c2", threshold=0.5, calibration_pending=True, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
     )
     c2_rec = ClientEvaluationRecord(
         client_id="c2",
@@ -126,11 +129,12 @@ def test_metrics_serialization_contains_eligibility_threshold_and_provenance_fie
         threshold=ct_pending,
         evaluation_incomplete=c1_rec.evaluation_incomplete,
     )
+    cell = TrainingCellId(stage=_STAGE, seed=0)
+    run = PolicyRunId(cell=cell, policy=ThresholdPolicy.GLOBAL_THRESHOLD)
     ev = build_evaluation_result(
-        baseline=Baseline.B1,
-        regime=Regime.A,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
+        stage=_STAGE,
         seed=0,
-        alpha=None,
         clients=(c1_rec, c2_rec),
         eligible_ids=("c1",),
         pending_ids=("c2",),
@@ -139,26 +143,23 @@ def test_metrics_serialization_contains_eligibility_threshold_and_provenance_fie
     metrics = build_metrics_dict(
         ev,
         ThresholdResult(
-            run=BaselineRunId(
-                cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None),
-                baseline=Baseline.B1,
-            ),
+            run=run,
             tau_global=0.5,
             client_thresholds=(
                 ClientThreshold(
                     client_id="c1",
                     threshold=0.5,
                     calibration_pending=False,
-                    strategy=Baseline.B1,
+                    strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
                 ),
                 ClientThreshold(
                     client_id="c2",
                     threshold=0.5,
                     calibration_pending=True,
-                    strategy=Baseline.B1,
+                    strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
                 ),
             ),
-            metadata=ThresholdMetadata(b3=None, b4=None),
+            metadata=ThresholdMetadata(cluster=None),
         ),
         config_identity="test",
         split_manifest_identity="test",
@@ -205,17 +206,16 @@ def test_build_evaluation_result_rejects_undefined_eligible_fpr() -> None:
             client_id="attack_only",
             threshold=0.5,
             calibration_pending=False,
-            strategy=Baseline.B1,
+            strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         ),
         evaluation_incomplete=False,
     )
 
     with pytest.raises(ValueError, match="Undefined eligible-client FPR"):
         build_evaluation_result(
-            baseline=Baseline.B1,
-            regime=Regime.A,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
+            stage=_STAGE,
             seed=0,
-            alpha=None,
             clients=(client,),
             eligible_ids=("attack_only",),
             pending_ids=(),
@@ -228,10 +228,9 @@ def test_build_evaluation_result_rejects_mixed_eligibility_status() -> None:
 
     with pytest.raises(ValueError, match="mixed eligibility"):
         build_evaluation_result(
-            baseline=Baseline.B1,
-            regime=Regime.A,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
+            stage=_STAGE,
             seed=0,
-            alpha=None,
             clients=(client,),
             eligible_ids=("c1",),
             pending_ids=("c1",),

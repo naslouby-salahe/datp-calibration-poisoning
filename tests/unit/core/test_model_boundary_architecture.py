@@ -20,13 +20,13 @@ class TestCanonicalIdentityTypes:
         assert TrainingCellId.__dataclass_params__.frozen  # type: ignore[attr-defined]
 
     def test_baseline_run_id_is_frozen_dataclass(self) -> None:
-        from datp.core.identity import BaselineRunId
+        from datp.core.identity import PolicyRunId
 
-        assert dataclasses.is_dataclass(BaselineRunId)
-        assert BaselineRunId.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        assert dataclasses.is_dataclass(PolicyRunId)
+        assert PolicyRunId.__dataclass_params__.frozen  # type: ignore[attr-defined]
 
     def test_score_cell_id_is_frozen_dataclass(self) -> None:
-        """Score identity uses TrainingCellId (same type as training identity — scores are shared across B1-B4)."""
+        """Score identity uses TrainingCellId (same type as training identity — scores are shared across all threshold policies)."""
         from datp.core.identity import TrainingCellId
 
         assert dataclasses.is_dataclass(TrainingCellId)
@@ -35,26 +35,26 @@ class TestCanonicalIdentityTypes:
     def test_experiment_key_absent(self) -> None:
         module = importlib.import_module("datp.core.identity")
         assert not hasattr(module, "ExperimentKey"), (
-            "ExperimentKey must not exist — use TrainingCellId/BaselineRunId instead"
+            "ExperimentKey must not exist — use TrainingCellId/PolicyRunId instead"
         )
 
     def test_run_identity_absent(self) -> None:
         module = importlib.import_module("datp.core.identity")
         assert not hasattr(module, "RunIdentity"), (
-            "RunIdentity must not exist — use BaselineRunId instead"
+            "RunIdentity must not exist — use PolicyRunId instead"
         )
 
 
 class TestThresholdResultStructure:
     def test_threshold_result_has_run_field(self) -> None:
-        from datp.core.identity import BaselineRunId
+        from datp.core.identity import PolicyRunId
         from datp.core.types import ThresholdResult
 
         fields = {f.name: f for f in dataclasses.fields(ThresholdResult)}
         assert "run" in fields, "ThresholdResult must have a run field"
         hints = typing.get_type_hints(ThresholdResult)
-        assert hints["run"] is BaselineRunId, (
-            f"ThresholdResult.run must be BaselineRunId, got {hints['run']}"
+        assert hints["run"] is PolicyRunId, (
+            f"ThresholdResult.run must be PolicyRunId, got {hints['run']}"
         )
 
     def test_threshold_result_no_strategy_field(self) -> None:
@@ -62,7 +62,7 @@ class TestThresholdResultStructure:
 
         field_names = {f.name for f in dataclasses.fields(ThresholdResult)}
         assert "strategy" not in field_names, (
-            "ThresholdResult must not have a strategy field — strategy is encoded in run.baseline"
+            "ThresholdResult must not have a strategy field — strategy is encoded in run.policy"
         )
 
     def test_threshold_result_no_loose_identity(self) -> None:
@@ -81,13 +81,12 @@ class TestThresholdResultStructure:
             "ThresholdMetadata must exist in datp.core.types"
         )
 
-    def test_threshold_metadata_has_b3_b4(self) -> None:
+    def test_threshold_metadata_has_cluster(self) -> None:
         from datp.core.types import ThresholdMetadata
 
         assert dataclasses.is_dataclass(ThresholdMetadata)
         field_names = {f.name for f in dataclasses.fields(ThresholdMetadata)}
-        assert "b3" in field_names, "ThresholdMetadata must have b3 field"
-        assert "b4" in field_names, "ThresholdMetadata must have b4 field"
+        assert "cluster" in field_names, "ThresholdMetadata must have cluster field"
 
     def test_threshold_result_eligible_count_is_property(self) -> None:
         from datp.core.types import ThresholdResult
@@ -197,7 +196,7 @@ class TestArtifactPathContracts:
 
         assert dataclasses.is_dataclass(ArtifactLayout)
         field_names = {f.name for f in dataclasses.fields(ArtifactLayout)}
-        for required in ("base_dir", "regime"):
+        for required in ("base_dir", "stage"):
             assert required in field_names, (
                 f"ArtifactLayout must have {required!r} field"
             )
@@ -205,39 +204,39 @@ class TestArtifactPathContracts:
     def test_artifact_layout_exposes_path_methods(self) -> None:
         from datp.artifacts.layout import ArtifactLayout
 
-        for method in ("score_cell", "baseline_run", "checkpoint_dir", "score_file"):
+        for method in ("score_cell", "policy_run", "checkpoint_dir", "score_file"):
             assert callable(getattr(ArtifactLayout, method, None)), (
                 f"ArtifactLayout must expose {method!r}"
             )
 
     def test_baseline_run_paths_has_run(self) -> None:
-        from datp.artifacts.layout import BaselineRunPaths
-        from datp.core.identity import BaselineRunId
+        from datp.artifacts.layout import PolicyRunPaths
+        from datp.core.identity import PolicyRunId
 
-        assert dataclasses.is_dataclass(BaselineRunPaths)
-        field_names = {f.name for f in dataclasses.fields(BaselineRunPaths)}
-        assert "run" in field_names, "BaselineRunPaths must have run field"
-        hints = typing.get_type_hints(BaselineRunPaths)
-        assert hints["run"] is BaselineRunId, (
-            f"BaselineRunPaths.run must be BaselineRunId, got {hints['run']}"
+        assert dataclasses.is_dataclass(PolicyRunPaths)
+        field_names = {f.name for f in dataclasses.fields(PolicyRunPaths)}
+        assert "run" in field_names, "PolicyRunPaths must have run field"
+        hints = typing.get_type_hints(PolicyRunPaths)
+        assert hints["run"] is PolicyRunId, (
+            f"PolicyRunPaths.run must be PolicyRunId, got {hints['run']}"
         )
 
     def test_baseline_run_paths_has_metrics_path(self) -> None:
-        from datp.artifacts.layout import BaselineRunPaths
+        from datp.artifacts.layout import PolicyRunPaths
 
-        field_names = {f.name for f in dataclasses.fields(BaselineRunPaths)}
+        field_names = {f.name for f in dataclasses.fields(PolicyRunPaths)}
         assert "metrics_path" in field_names, (
-            "BaselineRunPaths must have metrics_path field"
+            "PolicyRunPaths must have metrics_path field"
         )
 
     def test_baseline_run_paths_has_result_dir_and_log_dir(self) -> None:
-        from datp.artifacts.layout import BaselineRunPaths
+        from datp.artifacts.layout import PolicyRunPaths
 
-        field_names = {f.name for f in dataclasses.fields(BaselineRunPaths)}
+        field_names = {f.name for f in dataclasses.fields(PolicyRunPaths)}
         assert "result_dir" in field_names, (
-            "BaselineRunPaths must have result_dir field"
+            "PolicyRunPaths must have result_dir field"
         )
-        assert "log_dir" in field_names, "BaselineRunPaths must have log_dir field"
+        assert "log_dir" in field_names, "PolicyRunPaths must have log_dir field"
 
     def test_score_cell_paths_has_cell(self) -> None:
         from datp.artifacts.layout import ScoreCellPaths
@@ -296,27 +295,27 @@ class TestDatasetPartitionContracts:
             "AuditClient is a boundary schema and must be a Pydantic model"
         )
 
-    def test_regime_c_client_summary_is_pydantic(self) -> None:
+    def test_ciciot_client_summary_is_pydantic(self) -> None:
         from pydantic import BaseModel
 
-        from datp.data.contracts import RegimeCClientSummary
+        from datp.data.contracts import CiciotClientSummary
 
-        assert issubclass(RegimeCClientSummary, BaseModel), (
-            "RegimeCClientSummary is a boundary schema and must be a Pydantic model"
+        assert issubclass(CiciotClientSummary, BaseModel), (
+            "CiciotClientSummary is a boundary schema and must be a Pydantic model"
         )
 
 
 class TestEvaluationResultArchitecture:
     def test_evaluation_result_has_run(self) -> None:
-        from datp.core.identity import BaselineRunId
+        from datp.core.identity import PolicyRunId
         from datp.evaluation.metrics import EvaluationResult
 
         assert dataclasses.is_dataclass(EvaluationResult)
         field_names = {f.name for f in dataclasses.fields(EvaluationResult)}
         assert "run" in field_names, "EvaluationResult must have run field"
         hints = typing.get_type_hints(EvaluationResult)
-        assert hints["run"] is BaselineRunId, (
-            f"EvaluationResult.run must be BaselineRunId, got {hints['run']}"
+        assert hints["run"] is PolicyRunId, (
+            f"EvaluationResult.run must be PolicyRunId, got {hints['run']}"
         )
 
     def test_evaluation_result_has_clients_as_tuple(self) -> None:
@@ -357,13 +356,13 @@ class TestEvaluationResultArchitecture:
 
 
 class TestCLIAccumulatorsAllowlisted:
-    def test_regime_report_is_private(self) -> None:
+    def test_stage_report_is_private(self) -> None:
         module = importlib.import_module("datp.app.cli.status")
-        assert hasattr(module, "_RegimeReport"), (
-            "_RegimeReport must exist as a private CLI accumulator in datp.app.cli.status"
+        assert hasattr(module, "_StageReport"), (
+            "_StageReport must exist as a private CLI accumulator in datp.app.cli.status"
         )
-        assert not hasattr(module, "RegimeReport"), (
-            "RegimeReport (without underscore) must not be exported — keep it private as _RegimeReport"
+        assert not hasattr(module, "StageReport"), (
+            "StageReport (without underscore) must not be exported — keep it private as _StageReport"
         )
 
     def test_status_report_is_private(self) -> None:

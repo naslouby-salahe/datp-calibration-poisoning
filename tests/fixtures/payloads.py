@@ -5,7 +5,7 @@ import json
 from datp.core.metric_enums import PayloadKey
 
 
-def valid_metrics_dict(baseline: str = "b1", regime: str = "a", seed: int = 0) -> dict:
+def valid_metrics_dict(policy: str = "global_threshold", stage: str = "nbaiot_main", seed: int = 0) -> dict:
     client = {
         PayloadKey.CLIENT_ID: "c1",
         "fpr": 0.0,
@@ -24,21 +24,20 @@ def valid_metrics_dict(baseline: str = "b1", regime: str = "a", seed: int = 0) -
         PayloadKey.CALIBRATION_PENDING: False,
         PayloadKey.EVALUATION_INCOMPLETE: False,
         PayloadKey.THRESHOLD_VALUE: 0.5,
-        PayloadKey.THRESHOLD_SOURCE: baseline,
+        PayloadKey.THRESHOLD_SOURCE: policy,
     }
     return {
         PayloadKey.SCHEMA_VERSION: "2",
         PayloadKey.METRIC_SCHEMA_VERSION: "2",
         PayloadKey.THRESHOLD_SCHEMA_VERSION: "1",
-        PayloadKey.RUN_ID: f"{regime}_{baseline}_seed{seed}",
+        PayloadKey.RUN_ID: f"{stage}_{policy}_seed{seed}",
         PayloadKey.RUN_KIND: "main",
         PayloadKey.DATASET: "nbaiot",
-        PayloadKey.BASELINE: baseline,
-        PayloadKey.REGIME: regime,
+        PayloadKey.POLICY: policy,
+        PayloadKey.STAGE: stage,
         PayloadKey.SEED: seed,
-        PayloadKey.ALPHA: None,
         PayloadKey.THRESHOLD_SCOPE: "eligible_client_arithmetic_mean",
-        PayloadKey.THRESHOLD_STRATEGY_NAME: baseline,
+        PayloadKey.THRESHOLD_STRATEGY_NAME: policy,
         "tau_global": 0.5,
         PayloadKey.PER_CLIENT: {client[PayloadKey.CLIENT_ID]: client},
         PayloadKey.ELIGIBLE_IDS: ["c1"],
@@ -73,5 +72,5 @@ def valid_metrics_dict(baseline: str = "b1", regime: str = "a", seed: int = 0) -
     }
 
 
-def valid_metrics_json(baseline: str = "b1", regime: str = "a", seed: int = 0) -> str:
-    return json.dumps(valid_metrics_dict(baseline, regime, seed))
+def valid_metrics_json(policy: str = "global_threshold", stage: str = "nbaiot_main", seed: int = 0) -> str:
+    return json.dumps(valid_metrics_dict(policy, stage, seed))

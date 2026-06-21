@@ -5,7 +5,7 @@ import torch
 from datp.checkpointing.enums import CheckpointProtocolMode
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import ConvergenceConfig, DatpConfig, FederationConfig
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.federated.types import ClientData
 
 N_FEATURES = 10
@@ -32,7 +32,7 @@ def make_client_data(n_clients: int, seed: int = SEED) -> dict[str, ClientData]:
 
 
 def make_fl_cfg(
-    regime: Regime = Regime.A,
+    stage: ExperimentStage = ExperimentStage.NBAIOT_MAIN,
     n_features: int = N_FEATURES,
     rounds: int = 2,
     encoder_dims: list[int] | None = None,
@@ -45,7 +45,7 @@ def make_fl_cfg(
     )
     return BASE_CONFIG.model_copy(
         update={
-            "regime": regime,
+            "stage": stage,
             "model": BASE_CONFIG.model.model_copy(
                 update={
                     "input_dim": n_features,

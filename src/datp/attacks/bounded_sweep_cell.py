@@ -3,13 +3,14 @@
 Orchestrates the real-data bounded matrix on ``REGIME_A_NBAIOT`` using the same
 tested primitives as the synthetic smoke harness
 (``datp.attacks.cell_runner``). The key difference from the smoke harness:
-``mu_flag_threshold`` is locked once per training seed from the *clean B1*
+``mu_flag_threshold`` is locked once per training seed from the *clean GLOBAL_THRESHOLD*
 eligible-client mean FPR and passed in explicitly, then reused unmodified
 across every policy/source/fraction/victim/poisoning-seed cell for that
-training seed — it is never recomputed from a non-B1 policy's clean pair.
+training seed — it is never recomputed from a non-GLOBAL_THRESHOLD policy's clean pair.
 """
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 
@@ -28,29 +29,29 @@ from datp.attacks.metric_engine import (
 )
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.types import AurocSet, MetricEngineInput, PoisonedCalibrationSet
-from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.seeds import SeedPair
 
 
 def lock_mu_flag_threshold(collection: ScoreCollection) -> float:
-    """Lock ``mu_flag_threshold`` from the clean B1 eligible-client mean FPR.
+    """Lock ``mu_flag_threshold`` from the clean GLOBAL_THRESHOLD eligible-client mean FPR.
 
     Must be called once per training seed, before any poisoned run for that
     seed, and the returned value reused unmodified across every policy/cell
-    for that seed. The lock is always B1-derived, regardless of which policy a
+    for that seed. The lock is always GLOBAL_THRESHOLD-derived, regardless of which policy a
     given cell evaluates.
     """
     clean_cal = {
         cid: collection.clients[cid].cal.copy() for cid in collection.eligible_ids
     }
-    clean_b1_pair = recompute_pair(
+    clean_global_pair = recompute_pair(
         collection,
         PoisonedCalibrationSet.from_mapping(clean_cal),
-        ThresholdPolicy.B1_GLOBAL,
+        ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     clean_metrics = compute_metrics(
         MetricEngineInput(
-            collection=collection, pair=clean_b1_pair, mu_flag_threshold=None
+            collection=collection, pair=clean_global_pair, mu_flag_threshold=None
         )
     )
     return compute_mu_flag_threshold(clean_metrics.fleet_fpr.mean_fpr)
@@ -70,7 +71,7 @@ class SweepCellConfig:
     auroc_set: AurocSet | None = None
     scope_idx: int = 0
     q: float = THRESHOLD_QUANTILE
-    b4_seed: int = 0
+    cluster_seed: int = 0
 
 
 @dataclass(frozen=True, slots=True)

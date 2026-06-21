@@ -1,7 +1,7 @@
 """Single-victim injection and threshold-recompute orchestration for one cell.
 
 Pure orchestration over already-tested core modules (reservoir/source
-selection, fixed-budget injection, B1/B2/B4 threshold recompute) — no science
+selection, fixed-budget injection, GLOBAL_THRESHOLD/LOCAL_THRESHOLD/CLUSTER_THRESHOLD threshold recompute) — no science
 of its own. Shared by the synthetic smoke harness
 (``datp.testsupport.smoke_harness``) and the real-data bounded runner
 (``datp.attacks.bounded_sweep_cell``) so both run the identical pipeline. All
@@ -10,6 +10,7 @@ arrays are never mutated in place.
 """
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -19,17 +20,17 @@ from typing import assert_never
 import numpy as np
 
 from datp.artifacts.poison_names import TAIL_MASS, THRESHOLD_QUANTILE
-from datp.attacks.b4_recompute import compute_b4_pair
+from datp.attacks.cluster_threshold_recompute import compute_cluster_pair
 from datp.attacks.injector import InjectionResult, inject_fixed_budget
 from datp.attacks.reservoir import ReservoirResult
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.source_strategies import _select_reservoir
 from datp.attacks.threshold_recompute import (
-    compute_b1_pair,
-    compute_b2_pair,
+    compute_global_pair,
+    compute_local_pair,
 )
 from datp.attacks.types import PoisonedCalibrationSet, ThresholdPairBase
-from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.seed_sequence import SeedRecord, make_seed_rng
 from datp.core.seeds import SeedPair
 
@@ -210,15 +211,15 @@ def recompute_pair(
 ) -> PolicyPair:
     """Recompute the clean/poisoned threshold pair for one policy."""
     q = THRESHOLD_QUANTILE
-    if policy == ThresholdPolicy.B1_GLOBAL:
-        return compute_b1_pair(collection, poisoned_cal_set, q)
-    if policy == ThresholdPolicy.B2_PERSONALIZED:
-        tau_global_clean = compute_b1_pair(
+    if policy == ThresholdPolicy.GLOBAL_THRESHOLD:
+        return compute_global_pair(collection, poisoned_cal_set, q)
+    if policy == ThresholdPolicy.LOCAL_THRESHOLD:
+        tau_global_clean = compute_global_pair(
             collection, poisoned_cal_set, q
         ).tau_global_clean
-        return compute_b2_pair(collection, poisoned_cal_set, q, tau_global_clean)
-    if policy == ThresholdPolicy.B4_CLUSTER:
-        return compute_b4_pair(collection, poisoned_cal_set, q)
+        return compute_local_pair(collection, poisoned_cal_set, q, tau_global_clean)
+    if policy == ThresholdPolicy.CLUSTER_THRESHOLD:
+        return compute_cluster_pair(collection, poisoned_cal_set, q)
     assert_never(policy)
 
 

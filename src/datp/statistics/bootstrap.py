@@ -50,7 +50,7 @@ def bootstrap_ci(
     ci: float,
     seed: int,
 ) -> BootstrapResult:
-    """Percentile-based bootstrap CI on per-seed deltas (e.g. CV(FPR)[B1] − CV(FPR)[B2])."""
+    """Percentile-based bootstrap CI on per-seed deltas (e.g. CV(FPR)[GLOBAL_THRESHOLD] − CV(FPR)[LOCAL_THRESHOLD])."""
     deltas = _validate_deltas(deltas, BootstrapMethod.PERCENTILE)
     boot_means = _bootstrap_means(deltas, n_bootstrap, seed)
 

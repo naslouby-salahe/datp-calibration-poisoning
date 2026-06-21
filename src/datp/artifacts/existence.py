@@ -1,32 +1,31 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import json
 from pathlib import Path
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.metric_enums import PayloadKey
 from datp.evaluation.artifact_validation import validate_metrics_payload
 
 
 def results_exist(
-    baseline: Baseline,
-    regime: Regime,
+    policy: ThresholdPolicy,
+    stage: ExperimentStage,
     seed: int,
-    alpha: float | None,
     *,
     base_dir: Path,
 ) -> bool:
     """True only if metrics.json is valid and per-client entries include confusion_matrix; missing it -> stale, reruns cell."""
-    run = BaselineRunId(
-        cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
-        baseline=baseline,
+    run = PolicyRunId(
+        cell=TrainingCellId(stage=stage, seed=seed),
+        policy=policy,
     )
     metrics_file = (
-        ArtifactLayout(base_dir=base_dir, regime=regime).baseline_run(run).result_dir
-        / ArtifactFile.METRICS
+        ArtifactLayout(base_dir=base_dir, stage=stage).policy_run(run).metrics_path
     )
     if not (metrics_file.is_file() and metrics_file.stat().st_size > 0):
         return False

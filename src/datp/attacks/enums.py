@@ -8,9 +8,9 @@ import enum
 class ThresholdPolicy(enum.StrEnum):
     """Default threshold policies."""
 
-    B1_GLOBAL = "b1_global"
-    B2_PERSONALIZED = "b2_personalized"
-    B4_CLUSTER = "b4_cluster"
+    GLOBAL_THRESHOLD = "global_threshold"
+    LOCAL_THRESHOLD = "local_threshold"
+    CLUSTER_THRESHOLD = "cluster_threshold"
 
 
 class AttackerObjective(enum.StrEnum):
@@ -26,7 +26,7 @@ class PoisoningSourceStrategy(enum.StrEnum):
     RANDOM_BENIGN = "random_benign"
     HIGH_SCORE_BENIGN = "high_score_benign"
     LOW_SCORE_BENIGN = "low_score_benign"
-    TARGETED_REMOVAL_LOW_SCORE = "targeted_removal_low_score"
+    LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY = "low_score_targeted_removal_diagnostic_only"
 
 
 class CalibrationInjectionRule(enum.StrEnum):
@@ -39,7 +39,7 @@ class PoisoningKnowledge(enum.StrEnum):
     """Attacker knowledge model."""
 
     GRAY_BOX_SCORE_ACCESS = "gray_box_score_access"
-    WHITE_BOX = "white_box"
+    WHITE_BOX_DIAGNOSTIC_ONLY = "white_box_diagnostic_only"
 
 
 class PoisoningTargetScope(enum.StrEnum):
@@ -47,7 +47,7 @@ class PoisoningTargetScope(enum.StrEnum):
 
     SINGLE_CLIENT = "single_client"
     MULTI_CLIENT = "multi_client"
-    ALL_CLIENTS = "all_clients"
+    ALL_CLIENTS_DIAGNOSTIC_ONLY = "all_clients_diagnostic_only"
 
 
 class PoisoningDefense(enum.StrEnum):
@@ -64,19 +64,19 @@ class ReservoirStatus(enum.StrEnum):
 
 DIAGNOSTIC_ONLY_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
     {
-        PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
+        PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
     }
 )
 
 DIAGNOSTIC_ONLY_SCOPES: frozenset[PoisoningTargetScope] = frozenset(
     {
-        PoisoningTargetScope.ALL_CLIENTS,
+        PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY,
     }
 )
 
 DIAGNOSTIC_ONLY_KNOWLEDGE: frozenset[PoisoningKnowledge] = frozenset(
     {
-        PoisoningKnowledge.WHITE_BOX,
+        PoisoningKnowledge.WHITE_BOX_DIAGNOSTIC_ONLY,
     }
 )
 
@@ -89,7 +89,7 @@ def objective_for_source(
             return AttackerObjective.THRESHOLD_RAISE
         case (
             PoisoningSourceStrategy.LOW_SCORE_BENIGN
-            | PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE
+            | PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
         ):
             return AttackerObjective.THRESHOLD_LOWER
         case _:

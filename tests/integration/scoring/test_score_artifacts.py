@@ -6,7 +6,8 @@ import pytest
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import Regime, ScoringStage
+from datp.config.stages import ExperimentStage
+from datp.core.enums import ScoringStage
 from datp.core.identity import TrainingCellId
 from datp.core.seeds import set_seeds
 from datp.data.splits import Split
@@ -21,7 +22,7 @@ _STAGES = (ScoringStage.CAL, ScoringStage.TEST_BENIGN, ScoringStage.TEST_ATTACK)
 @pytest.mark.integration
 def test_artifacts_written(tmp_path) -> None:
     set_seeds(SEED)
-    cfg = make_fl_cfg(regime=Regime.A, rounds=2)
+    cfg = make_fl_cfg(stage=ExperimentStage.NBAIOT_MAIN, rounds=2)
     client_data = make_client_data(n_clients=2)
     client_ids = sorted(client_data.keys())
 
@@ -29,12 +30,11 @@ def test_artifacts_written(tmp_path) -> None:
         cfg=cfg,
         client_data=client_data,
         seed=SEED,
-        alpha=None,
         base_dir=tmp_path,
     )
 
-    layout = ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
-    cell = TrainingCellId(regime=Regime.A, seed=SEED, alpha=None)
+    layout = ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN)
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=SEED)
     for cid in client_ids:
         for stage in _STAGES:
             expected = layout.score_file(cell, stage, cid)
@@ -50,7 +50,7 @@ def test_artifacts_written(tmp_path) -> None:
 @pytest.mark.integration
 def test_artifact_schema(tmp_path) -> None:
     set_seeds(SEED)
-    cfg = make_fl_cfg(regime=Regime.A, rounds=2)
+    cfg = make_fl_cfg(stage=ExperimentStage.NBAIOT_MAIN, rounds=2)
     client_data = make_client_data(n_clients=2)
     first_cid = min(client_data.keys())
 
@@ -58,12 +58,11 @@ def test_artifact_schema(tmp_path) -> None:
         cfg=cfg,
         client_data=client_data,
         seed=SEED,
-        alpha=None,
         base_dir=tmp_path,
     )
 
-    cell = TrainingCellId(regime=Regime.A, seed=SEED, alpha=None)
-    parquet_file = ArtifactLayout(base_dir=tmp_path, regime=Regime.A).score_file(
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=SEED)
+    parquet_file = ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN).score_file(
         cell, ScoringStage.CAL, first_cid
     )
     df = pd.read_parquet(parquet_file)
@@ -77,9 +76,9 @@ def test_artifact_schema(tmp_path) -> None:
 
 
 def test_scoring_manifest_validation_fails_when_missing(tmp_path) -> None:
-    cell = TrainingCellId(regime=Regime.A, seed=SEED, alpha=None)
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=SEED)
     score_base = (
-        ArtifactLayout(base_dir=tmp_path, regime=Regime.A).score_cell(cell).score_dir
+        ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN).score_cell(cell).score_dir
     )
     score_base.mkdir(parents=True)
     (score_base / ArtifactFile.SCORING_MANIFEST).write_text(

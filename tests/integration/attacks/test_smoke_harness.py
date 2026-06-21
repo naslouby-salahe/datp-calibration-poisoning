@@ -12,14 +12,14 @@ Invariant map (see the decision log 2026-06-16 reconciliation entry):
   Prompt 4 HIGH raises / LOW lowers thresholds (direction)
   Prompt 5 Calibration-Pending excluded from victims/CV(FPR), gets tau_global
   Prompt 6 determinism (same seeds -> identical outputs)
-  Prompt 7 B4 Δτ_total = Δτ_agg + Δτ_churn
+  Prompt 7 CLUSTER_THRESHOLD Δτ_total = Δτ_agg + Δτ_churn
   Prompt 8 two-layer stats: bootstrap on 5 seed aggregates, not 45
   Prompt 9 manifest round-trips (child seeds, locks, reservoir mode, mu_flag)
   Prompt 10 AUROC invariant (test scores unchanged)
   Prompt 11 CV(FPR) reported with coverage, no ε
   Roadmap RANDOM_BENIGN -> near-null
-  Roadmap B1 victim shift < B2 victim shift (same single-client attack)
-  Roadmap B4 K stays fixed at 3 under clean AND poisoned cal
+  Roadmap GLOBAL_THRESHOLD victim shift < LOCAL_THRESHOLD victim shift (same single-client attack)
+  Roadmap CLUSTER_THRESHOLD K stays fixed at 3 under clean AND poisoned cal
   Roadmap outputs in temp only
 """
 
@@ -32,11 +32,11 @@ import numpy as np
 import pytest
 
 from datp.artifacts.poison_names import (
-    B4_K,
+    CLUSTER_K_NBAIOT,
     CALIBRATION_POISONING_OUTPUT_ROOT,
 )
 from datp.attacks.constants import POISONING_SEEDS
-from datp.attacks.b4_recompute import B4ThresholdPair
+from datp.attacks.cluster_threshold_recompute import ClusterThresholdPair
 from datp.attacks.cell_runner import (
     InjectionSpec,
     inject_single_victim,
@@ -69,11 +69,10 @@ from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.core.enums import Baseline
 from datp.core.seeds import SeedPair
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 from datp.testsupport.smoke_harness import (
-    b4_cluster_count,
+    cluster_count,
     collection_from_score_set,
     run_smoke_cell,
     victim_seed_deltas,
@@ -86,9 +85,9 @@ pytestmark = pytest.mark.integration
 _VICTIM = "eligible_0"
 _HIGH_FRACTION = 0.40
 _ALL_POLICIES = (
-    ThresholdPolicy.B1_GLOBAL,
-    ThresholdPolicy.B2_PERSONALIZED,
-    ThresholdPolicy.B4_CLUSTER,
+    ThresholdPolicy.GLOBAL_THRESHOLD,
+    ThresholdPolicy.LOCAL_THRESHOLD,
+    ThresholdPolicy.CLUSTER_THRESHOLD,
 )
 
 
@@ -161,7 +160,7 @@ def test_invariant_3_no_inplace_mutation(collection):
     cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
@@ -177,18 +176,18 @@ def test_invariant_3_no_inplace_mutation(collection):
 # ---------------------------------------------------------------------------
 
 
-def test_invariant_4_high_raises_low_lowers_b2(collection):
+def test_invariant_4_high_raises_low_lowers_local_threshold(collection):
     high = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
     low = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.LOW_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
@@ -262,14 +261,14 @@ def test_invariant_6_determinism(collection):
     cell_a = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
     cell_b = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
@@ -284,20 +283,20 @@ def test_invariant_6_determinism(collection):
 
 
 # ---------------------------------------------------------------------------
-# Invariant 7 — B4 decomposition identity Δτ_total = Δτ_agg + Δτ_churn
+# Invariant 7 — CLUSTER_THRESHOLD decomposition identity Δτ_total = Δτ_agg + Δτ_churn
 # ---------------------------------------------------------------------------
 
 
-def test_invariant_7_b4_decomposition_identity(collection):
+def test_invariant_7_cluster_threshold_decomposition_identity(collection):
     cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B4_CLUSTER,
+        policy=ThresholdPolicy.CLUSTER_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
     pair = cell.poisoned_pair
-    assert isinstance(pair, B4ThresholdPair)
+    assert isinstance(pair, ClusterThresholdPair)
     assert pair.decomposition  # client-indexed, non-empty
     for entry in pair.decomposition.values():
         assert math.isfinite(entry.delta_tau_total)
@@ -320,7 +319,7 @@ def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
         seed_deltas = victim_seed_deltas(
             collection,
             victim_id=victim,
-            policy=ThresholdPolicy.B2_PERSONALIZED,
+            policy=ThresholdPolicy.LOCAL_THRESHOLD,
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             fraction=_HIGH_FRACTION,
             poisoning_seeds=POISONING_SEEDS,
@@ -356,15 +355,15 @@ def test_invariant_9_manifest_round_trip(collection, tmp_path):
     cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
     manifest = build_manifest(
         ManifestBuildRequest(
             dataset="REGIME_SMOKE_SYNTHETIC",
-            scale=ExperimentScale.SMOKE,
-            policy=ThresholdPolicy.B2_PERSONALIZED,
+            stage=ExperimentStage.SYNTHETIC_SMOKE,
+            policy=ThresholdPolicy.LOCAL_THRESHOLD,
             objective=AttackerObjective.THRESHOLD_RAISE,
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             fraction=_HIGH_FRACTION,
@@ -397,8 +396,8 @@ def test_invariant_9_manifest_requires_locked_mu_flag(tmp_path):
     manifest = build_manifest(
         ManifestBuildRequest(
             dataset="REGIME_SMOKE_SYNTHETIC",
-            scale=ExperimentScale.SMOKE,
-            policy=ThresholdPolicy.B2_PERSONALIZED,
+            stage=ExperimentStage.SYNTHETIC_SMOKE,
+            policy=ThresholdPolicy.LOCAL_THRESHOLD,
             objective=AttackerObjective.THRESHOLD_RAISE,
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             fraction=_HIGH_FRACTION,
@@ -424,7 +423,7 @@ def test_invariant_10_auroc_invariant(collection):
     cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
@@ -446,7 +445,7 @@ def test_invariant_11_cv_fpr_reported_with_coverage(collection):
     cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
@@ -471,16 +470,16 @@ def test_invariant_11_cv_fpr_no_epsilon_returns_nan_when_mean_zero():
 
     # Uniform thresholds well above the (zero) benign scores.
     pair = ThresholdPair(
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         tau_global_clean=0.5,
         tau_global_pois=0.5,
         thresholds_clean=ClientThresholdsCollection.from_mapping(
             dict.fromkeys(coll.eligible_ids, 0.5),
-            Baseline.B2,
+            ThresholdPolicy.LOCAL_THRESHOLD,
         ),
         thresholds_pois=ClientThresholdsCollection.from_mapping(
             dict.fromkeys(coll.eligible_ids, 0.5),
-            Baseline.B2,
+            ThresholdPolicy.LOCAL_THRESHOLD,
         ),
     )
     fleet = compute_fleet_fpr(coll, pair, mu_flag_threshold=None)
@@ -497,13 +496,13 @@ def test_roadmap_random_benign_near_null(collection):
     cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
         fraction=_HIGH_FRACTION,
     )
     entry = cell.poisoned_metrics.delta_tau[_VICTIM]
     # Resampling from the full benign pool preserves the distribution: |Δτ| should
-    # stay within the per-client materiality scale (0.1 * IQR).
+    # stay within the per-client materiality stage (0.1 * IQR).
     assert near_null_criterion(
         delta_tau=entry.delta_tau,
         delta_tau_null_threshold=entry.delta_tau_scale,
@@ -512,39 +511,39 @@ def test_roadmap_random_benign_near_null(collection):
 
 
 # ---------------------------------------------------------------------------
-# Roadmap invariant — B1 victim shift < B2 victim shift (same attack)
+# Roadmap invariant — GLOBAL_THRESHOLD victim shift < LOCAL_THRESHOLD victim shift (same attack)
 # ---------------------------------------------------------------------------
 
 
-def test_roadmap_b1_shift_less_than_b2_shift(collection):
-    b1 = run_smoke_cell(
+def test_roadmap_global_shift_less_than_local_shift(collection):
+    global_cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B1_GLOBAL,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
-    b2 = run_smoke_cell(
+    local_cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
-    b1_shift = abs(b1.poisoned_metrics.delta_tau[_VICTIM].delta_tau)
-    b2_shift = abs(b2.poisoned_metrics.delta_tau[_VICTIM].delta_tau)
-    # B1 averages the victim's shift over all eligible clients -> diluted.
-    assert b1_shift < b2_shift
+    global_shift = abs(global_cell.poisoned_metrics.delta_tau[_VICTIM].delta_tau)
+    local_shift = abs(local_cell.poisoned_metrics.delta_tau[_VICTIM].delta_tau)
+    # GLOBAL_THRESHOLD averages the victim's shift over all eligible clients -> diluted.
+    assert global_shift < local_shift
 
 
 # ---------------------------------------------------------------------------
-# Roadmap invariant — B4 K stays fixed at 3 under clean AND poisoned cal
+# Roadmap invariant — CLUSTER_THRESHOLD K stays fixed at 3 under clean AND poisoned cal
 # ---------------------------------------------------------------------------
 
 
 def test_roadmap_b4_k_fixed_at_three(collection):
     clean_cal = collection.cal_dict()
-    assert b4_cluster_count(clean_cal) == B4_K == 3
+    assert cluster_count(clean_cal) == CLUSTER_K_NBAIOT == 3
 
     outcome = inject_single_victim(
         collection,
@@ -557,7 +556,7 @@ def test_roadmap_b4_k_fixed_at_three(collection):
     )
     poisoned_cal = dict(clean_cal)
     poisoned_cal[_VICTIM] = outcome.poisoned_cal[_VICTIM]
-    assert b4_cluster_count(poisoned_cal) == B4_K == 3
+    assert cluster_count(poisoned_cal) == CLUSTER_K_NBAIOT == 3
 
 
 # ---------------------------------------------------------------------------
@@ -570,15 +569,15 @@ def test_roadmap_outputs_in_temp_only(collection, tmp_path, monkeypatch):
     cell = run_smoke_cell(
         collection,
         victim_id=_VICTIM,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=_HIGH_FRACTION,
     )
     manifest = build_manifest(
         ManifestBuildRequest(
             dataset="REGIME_SMOKE_SYNTHETIC",
-            scale=ExperimentScale.SMOKE,
-            policy=ThresholdPolicy.B2_PERSONALIZED,
+            stage=ExperimentStage.SYNTHETIC_SMOKE,
+            policy=ThresholdPolicy.LOCAL_THRESHOLD,
             objective=AttackerObjective.THRESHOLD_RAISE,
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             fraction=_HIGH_FRACTION,

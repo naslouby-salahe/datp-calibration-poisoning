@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Proprietary
-"""Shared FL client; no baseline-specific branching — B1/B2/B3/B4 all train the same encoder."""
+"""Shared FL client; no policy-specific branching — all threshold policies train the same encoder."""
 
 from __future__ import annotations
 

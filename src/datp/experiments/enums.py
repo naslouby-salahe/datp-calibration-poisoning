@@ -3,29 +3,6 @@ from __future__ import annotations
 import enum
 
 
-class ExperimentScale(enum.StrEnum):
-    """Experiment execution scale gate."""
-
-    SMOKE = "smoke"
-    BOUNDED = "bounded"
-    FULL = "full"
-    STRETCH = "stretch"
-
-
-class DiagnosticStep(enum.StrEnum):
-    COMPOSE_CONFIG = "compose_config"
-    VALIDATE_CONFIG = "validate_config"
-    PREPARE_DATA = "prepare_data"
-    SET_SEEDS = "set_seeds"
-    FL_TRAINING = "fl_training"
-    LOAD_SCORES = "load_scores"
-    DERIVE_THRESHOLDS = "derive_thresholds"
-    EVALUATE = "evaluate"
-    WRITE_METRICS = "write_metrics"
-    CONTINGENCY_DECISION = "contingency_decision"
-    SUMMARY = "summary"
-
-
 class SweepStep(enum.StrEnum):
     BUILD_MATRIX = "build_matrix"
     VALIDATE_MATRIX = "validate_matrix"
@@ -38,10 +15,15 @@ class SweepStep(enum.StrEnum):
     DERIVE_THRESHOLD = "derive_threshold"
     EVALUATE = "evaluate"
     WRITE_METRICS = "write_metrics"
-    RUN_B0 = "run_b0"
     SWEEP_COMPLETE = "sweep_complete"
 
 
 class ContingencyDecision(enum.StrEnum):
     GO = "go"
     CONTINGENCY = "contingency"
+
+
+class PolicyRunStatus(enum.StrEnum):
+    DONE = "done"
+    SKIPPED = "skipped"
+    FAILED = "failed"

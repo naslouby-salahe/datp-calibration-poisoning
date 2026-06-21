@@ -20,7 +20,7 @@ from datp.attacks.enums import (
 )
 from datp.core.seed_sequence import SeedRecord, derive_seed_record
 from datp.core.seeds import SeedPair
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 from datp.validation.enums import AuditStatus
 from datp.validation.provenance_gate import (
     ProvenanceCheckCode,
@@ -59,8 +59,8 @@ def _seed_model(
 def _manifest(**overrides: object) -> RunManifest:
     defaults: dict[str, object] = {
         "dataset": "nbaiot",
-        "scale": ExperimentScale.BOUNDED,
-        "policy": ThresholdPolicy.B1_GLOBAL,
+        "stage": ExperimentStage.NBAIOT_MAIN,
+        "policy": ThresholdPolicy.GLOBAL_THRESHOLD,
         "objective": AttackerObjective.THRESHOLD_RAISE,
         "source": PoisoningSourceStrategy.RANDOM_BENIGN,
         "fraction": 0.10,
@@ -235,34 +235,6 @@ class TestSplitSemantics:
 
 
 # ---------------------------------------------------------------------------
-# Policy not B3
-# ---------------------------------------------------------------------------
-
-
-class TestPolicyNotB3:
-    def test_b1_global_passes(self, tmp_path: Path) -> None:
-        p = tmp_path / "manifest.json"
-        _write_manifest(p, _manifest(policy=ThresholdPolicy.B1_GLOBAL))
-        checks = check_provenance(p)
-        b3 = next(c for c in checks if c.code == ProvenanceCheckCode.POLICY_NOT_B3)
-        assert b3.status == AuditStatus.PASS
-
-    def test_b2_personalized_passes(self, tmp_path: Path) -> None:
-        p = tmp_path / "manifest.json"
-        _write_manifest(p, _manifest(policy=ThresholdPolicy.B2_PERSONALIZED))
-        checks = check_provenance(p)
-        b3 = next(c for c in checks if c.code == ProvenanceCheckCode.POLICY_NOT_B3)
-        assert b3.status == AuditStatus.PASS
-
-    def test_b4_cluster_passes(self, tmp_path: Path) -> None:
-        p = tmp_path / "manifest.json"
-        _write_manifest(p, _manifest(policy=ThresholdPolicy.B4_CLUSTER))
-        checks = check_provenance(p)
-        b3 = next(c for c in checks if c.code == ProvenanceCheckCode.POLICY_NOT_B3)
-        assert b3.status == AuditStatus.PASS
-
-
-# ---------------------------------------------------------------------------
 # Artifact presence checks (no score_root)
 # ---------------------------------------------------------------------------
 
@@ -424,7 +396,6 @@ class TestAssertProvenanceGate:
             ProvenanceCheckCode.LOCAL_EPOCHS_E1,
             ProvenanceCheckCode.PIPELINE_GENERATED_FLAG,
             ProvenanceCheckCode.SPLIT_SEMANTICS,
-            ProvenanceCheckCode.POLICY_NOT_B3,
             ProvenanceCheckCode.CAL_SCORES_PRESENT,
             ProvenanceCheckCode.TEST_SCORES_PRESENT,
         }

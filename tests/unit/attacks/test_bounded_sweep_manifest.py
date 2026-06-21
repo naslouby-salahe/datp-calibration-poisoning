@@ -28,7 +28,7 @@ def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResul
         scope_idx=0,
     )
     return BoundedSweepResultRow(
-        policy=ThresholdPolicy.B1_GLOBAL,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
         objective=None,
         fraction=0.0,
@@ -69,7 +69,7 @@ def _manifest(**overrides: object) -> BoundedSweepManifest:
         "provenance": ProvenanceRecord(
             local_epochs=1, repository="datp-calibration-poisoning"
         ),
-        "policies": (ThresholdPolicy.B1_GLOBAL,),
+        "policies": (ThresholdPolicy.GLOBAL_THRESHOLD,),
         "sources": (PoisoningSourceStrategy.RANDOM_BENIGN,),
         "fractions": (0.0,),
         "training_seeds": (0,),

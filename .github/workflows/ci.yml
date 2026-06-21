@@ -1,4 +1,4 @@
-name: CP2 CI
+name: datp-cp CI
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
         run: uv run pyright src/datp/attacks/ src/datp/config/
 
   unit-tests:
-    name: Unit tests (CP2 critical paths)
+    name: Unit tests (datp-cp critical paths)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: pip install uv && uv sync --dev
 
-      - name: Run CP2 critical unit tests
+      - name: Run datp-cp critical unit tests
         run: >
           uv run python -m pytest
           tests/unit/config/

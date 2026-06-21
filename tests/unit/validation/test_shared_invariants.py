@@ -1,6 +1,8 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
-from datp.core.enums import Baseline, Regime, ScoringStage
+from datp.config.stages import ExperimentStage
+from datp.core.enums import ScoringStage
 from datp.validation.enums import AuditStatus
 from datp.validation.invariants import (
     InvariantHashes,
@@ -8,9 +10,9 @@ from datp.validation.invariants import (
     build_invariant_results,
 )
 
-_CELL_A = InvariantKey(Regime.A, 0, None)
-_CELL_B = InvariantKey(Regime.B, 0, None)
-_CELL_C = InvariantKey(Regime.C, 0, "0.5")
+_CELL_A = InvariantKey(stage=ExperimentStage.NBAIOT_MAIN, seed=0)
+_CELL_B = InvariantKey(stage=ExperimentStage.SYNTHETIC_SMOKE, seed=0)
+_CELL_C = InvariantKey(stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, seed=0)
 
 _HASH_MAP_REF: dict[tuple[ScoringStage, str], str] = {
     (ScoringStage.CAL, "client_1"): "aaa",
@@ -26,12 +28,12 @@ _HASH_MAP_ALT: dict[tuple[ScoringStage, str], str] = {
 
 def _inputs(
     cell: InvariantKey,
-    baselines: list[Baseline],
+    baselines: list[ThresholdPolicy],
     split: str = "split1",
     model: str = "model1",
     scoring: str = "score1",
     metrics: str = "metrics1",
-) -> dict[InvariantKey, dict[Baseline, InvariantHashes]]:
+) -> dict[InvariantKey, dict[ThresholdPolicy, InvariantHashes]]:
     return {
         cell: {
             b: InvariantHashes(
@@ -48,17 +50,21 @@ def _inputs(
 
 def _score_hashes(
     cell: InvariantKey,
-    baselines: list[Baseline],
+    baselines: list[ThresholdPolicy],
     hash_map: dict[tuple[ScoringStage, str], str] | None = None,
-) -> dict[InvariantKey, dict[Baseline, dict[tuple[ScoringStage, str], str]]]:
+) -> dict[InvariantKey, dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]]:
     if hash_map is None:
         hash_map = _HASH_MAP_REF
     return {cell: {b: dict(hash_map) for b in baselines}}
 
 
 class TestInvariantPass:
-    def test_all_b1_b2_b3_b4_match_regime_a(self) -> None:
-        baselines = [Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4]
+    def test_all_controlled_policies_pass_nbaiot_main(self) -> None:
+        baselines = [
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ]
         results = build_invariant_results(
             _inputs(_CELL_A, baselines),
             _score_hashes(_CELL_A, baselines),
@@ -72,53 +78,47 @@ class TestInvariantPass:
         assert results[0].metrics_code_hash_shared is True
         assert results[0].disallowed_differences == []
 
-    def test_regime_b_no_b3_required_pass(self) -> None:
-        baselines = [Baseline.B1, Baseline.B2, Baseline.B4]
+    def test_synthetic_smoke_controlled_policies_pass(self) -> None:
+        baselines = [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
         results = build_invariant_results(
             _inputs(_CELL_B, baselines),
             _score_hashes(_CELL_B, baselines),
         )
         assert results[0].status == AuditStatus.PASS
-        assert Baseline.B3 not in results[0].checked_baselines
-        assert Baseline.B3 not in results[0].missing_baselines
 
-    def test_regime_c_no_b3_required_pass(self) -> None:
-        baselines = [Baseline.B1, Baseline.B2, Baseline.B4]
+    def test_nbaiot_full_controlled_policies_pass(self) -> None:
+        baselines = [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
         results = build_invariant_results(
             _inputs(_CELL_C, baselines),
             _score_hashes(_CELL_C, baselines),
         )
         assert results[0].status == AuditStatus.PASS
-        assert Baseline.B3 not in results[0].checked_baselines
 
 
 class TestInvariantFail:
     def test_model_hash_differs_marks_fail(self) -> None:
-        baselines = [Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4]
-        inv_inputs: dict[InvariantKey, dict[Baseline, InvariantHashes]] = {
+        baselines = [
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ]
+        inv_inputs: dict[InvariantKey, dict[ThresholdPolicy, InvariantHashes]] = {
             _CELL_A: {
-                Baseline.B1: InvariantHashes(
+                ThresholdPolicy.GLOBAL_THRESHOLD: InvariantHashes(
                     split_hash="s1",
                     model_hash="model_A",
                     encoder_hash="model_A",
                     scoring_code_hash="sc",
                     metrics_code_hash="mc",
                 ),
-                Baseline.B2: InvariantHashes(
+                ThresholdPolicy.LOCAL_THRESHOLD: InvariantHashes(
                     split_hash="s1",
                     model_hash="model_B",
                     encoder_hash="model_B",
                     scoring_code_hash="sc",
                     metrics_code_hash="mc",
                 ),
-                Baseline.B3: InvariantHashes(
-                    split_hash="s1",
-                    model_hash="model_A",
-                    encoder_hash="model_A",
-                    scoring_code_hash="sc",
-                    metrics_code_hash="mc",
-                ),
-                Baseline.B4: InvariantHashes(
+                ThresholdPolicy.CLUSTER_THRESHOLD: InvariantHashes(
                     split_hash="s1",
                     model_hash="model_A",
                     encoder_hash="model_A",
@@ -136,14 +136,14 @@ class TestInvariantFail:
         assert results[0].model_or_encoder_hash_shared is False
 
     def test_score_array_hash_differs_marks_fail(self) -> None:
-        baselines = [Baseline.B1, Baseline.B2, Baseline.B4]
+        baselines = [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
         score_hashes: dict[
-            InvariantKey, dict[Baseline, dict[tuple[ScoringStage, str], str]]
+            InvariantKey, dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]
         ] = {
             _CELL_B: {
-                Baseline.B1: dict(_HASH_MAP_REF),
-                Baseline.B2: dict(_HASH_MAP_ALT),
-                Baseline.B4: dict(_HASH_MAP_REF),
+                ThresholdPolicy.GLOBAL_THRESHOLD: dict(_HASH_MAP_REF),
+                ThresholdPolicy.LOCAL_THRESHOLD: dict(_HASH_MAP_ALT),
+                ThresholdPolicy.CLUSTER_THRESHOLD: dict(_HASH_MAP_REF),
             }
         }
         results = build_invariant_results(
@@ -155,30 +155,23 @@ class TestInvariantFail:
         assert "reconstruction_error_arrays" in results[0].disallowed_differences
 
     def test_split_hash_differs_marks_fail(self) -> None:
-        inv_inputs: dict[InvariantKey, dict[Baseline, InvariantHashes]] = {
+        inv_inputs: dict[InvariantKey, dict[ThresholdPolicy, InvariantHashes]] = {
             _CELL_A: {
-                Baseline.B1: InvariantHashes(
+                ThresholdPolicy.GLOBAL_THRESHOLD: InvariantHashes(
                     split_hash="s1",
                     model_hash="m1",
                     encoder_hash="m1",
                     scoring_code_hash="sc",
                     metrics_code_hash="mc",
                 ),
-                Baseline.B2: InvariantHashes(
+                ThresholdPolicy.LOCAL_THRESHOLD: InvariantHashes(
                     split_hash="s2",
                     model_hash="m1",
                     encoder_hash="m1",
                     scoring_code_hash="sc",
                     metrics_code_hash="mc",
                 ),
-                Baseline.B3: InvariantHashes(
-                    split_hash="s1",
-                    model_hash="m1",
-                    encoder_hash="m1",
-                    scoring_code_hash="sc",
-                    metrics_code_hash="mc",
-                ),
-                Baseline.B4: InvariantHashes(
+                ThresholdPolicy.CLUSTER_THRESHOLD: InvariantHashes(
                     split_hash="s1",
                     model_hash="m1",
                     encoder_hash="m1",
@@ -190,7 +183,12 @@ class TestInvariantFail:
         results = build_invariant_results(
             inv_inputs,
             _score_hashes(
-                _CELL_A, [Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4]
+                _CELL_A,
+                [
+                    ThresholdPolicy.GLOBAL_THRESHOLD,
+                    ThresholdPolicy.LOCAL_THRESHOLD,
+                    ThresholdPolicy.CLUSTER_THRESHOLD,
+                ],
             ),
         )
         assert results[0].status == AuditStatus.FAIL
@@ -198,18 +196,21 @@ class TestInvariantFail:
 
 
 class TestInvariantBlocked:
-    def test_missing_baselines_marks_blocked(self) -> None:
-        baselines = [Baseline.B1, Baseline.B2]
+    def test_missing_policies_marks_blocked(self) -> None:
+        baselines = [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD]
         results = build_invariant_results(
             _inputs(_CELL_A, baselines),
             _score_hashes(_CELL_A, baselines),
         )
         assert results[0].status == AuditStatus.BLOCKED_PENDING_RUN
-        assert Baseline.B3 in results[0].missing_baselines
-        assert Baseline.B4 in results[0].missing_baselines
+        assert ThresholdPolicy.CLUSTER_THRESHOLD in results[0].missing_policies
 
     def test_no_score_hashes_marks_blocked_not_fail(self) -> None:
-        baselines = [Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4]
+        baselines = [
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ]
         results = build_invariant_results(
             _inputs(_CELL_A, baselines),
             {},

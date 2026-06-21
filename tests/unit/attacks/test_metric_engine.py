@@ -1,6 +1,7 @@
 """Tests for metric engine ."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 
@@ -19,9 +20,8 @@ from datp.attacks.metric_engine import (
 from datp.attacks.types import MetricEngineInput
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
-from datp.attacks.threshold_recompute import compute_b1_pair, compute_b2_pair
-from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
-from datp.core.enums import Baseline
+from datp.attacks.threshold_recompute import compute_global_pair, compute_local_pair
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import make_standard_score_set
 from datp.thresholding.eligibility import ClientThresholdsCollection
@@ -58,77 +58,77 @@ class TestDeltaTau:
     def test_eligible_clients_covered(self) -> None:
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)
-        b2 = compute_b2_pair(
+        local_pair = compute_local_pair(
             col,
             pois_cal,
             THRESHOLD_QUANTILE,
-            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+            compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
         )
-        dt = compute_delta_tau(col, b2)
+        dt = compute_delta_tau(col, local_pair)
         assert set(dt.keys()) == set(col.eligible_ids)
 
     def test_victim_has_nonzero_delta(self) -> None:
         col = _make_collection()
         pois_cal, victim_id = _inject_one_victim(col)
-        b2 = compute_b2_pair(
+        local_pair = compute_local_pair(
             col,
             pois_cal,
             THRESHOLD_QUANTILE,
-            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+            compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
         )
-        dt = compute_delta_tau(col, b2)
+        dt = compute_delta_tau(col, local_pair)
         assert not math.isclose(dt[victim_id].delta_tau, 0.0, abs_tol=1e-10)
 
     def test_f0_all_delta_zero(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        dt = compute_delta_tau(col, b1)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        dt = compute_delta_tau(col, global_pair)
         for entry in dt.values():
             assert entry.delta_tau == pytest.approx(0.0, abs=1e-10)
 
     def test_delta_tau_rel_nonzero_for_nonzero_delta(self) -> None:
         col = _make_collection()
         pois_cal, victim_id = _inject_one_victim(col)
-        b2 = compute_b2_pair(
+        local_pair = compute_local_pair(
             col,
             pois_cal,
             THRESHOLD_QUANTILE,
-            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+            compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
         )
-        dt = compute_delta_tau(col, b2)
+        dt = compute_delta_tau(col, local_pair)
         assert not math.isclose(dt[victim_id].delta_tau_rel, 0.0, abs_tol=1e-10)
 
     def test_delta_tau_scale_positive(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        dt = compute_delta_tau(col, b1)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        dt = compute_delta_tau(col, global_pair)
         for entry in dt.values():
             assert entry.delta_tau_scale >= 0.0
 
     def test_policy_recorded(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        dt = compute_delta_tau(col, b1)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        dt = compute_delta_tau(col, global_pair)
         for entry in dt.values():
-            assert entry.policy == ThresholdPolicy.B1_GLOBAL
+            assert entry.policy == ThresholdPolicy.GLOBAL_THRESHOLD
 
 
 class TestFleetFpr:
     def test_coverage_ratio_correct(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        fleet = compute_fleet_fpr(col, b1, None)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        fleet = compute_fleet_fpr(col, global_pair, None)
         assert fleet.coverage_ratio == pytest.approx(5 / 6)
 
     def test_n_eligible_and_n_total(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        fleet = compute_fleet_fpr(col, b1, None)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        fleet = compute_fleet_fpr(col, global_pair, None)
         assert fleet.n_eligible == 5
         assert fleet.n_total == 6
 
@@ -137,19 +137,19 @@ class TestFleetFpr:
         col = _make_collection()
         # Force all FPRs to 0 by setting an impossibly high threshold.
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         # Set all poisoned thresholds very high to force FPR=0.
         from datp.attacks.threshold_recompute import ThresholdPair
 
         high_tau = 1e9
         high_pair = ThresholdPair(
-            policy=ThresholdPolicy.B1_GLOBAL,
-            tau_global_clean=b1.tau_global_clean,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
+            tau_global_clean=global_pair.tau_global_clean,
             tau_global_pois=high_tau,
-            thresholds_clean=b1.thresholds_clean,
+            thresholds_clean=global_pair.thresholds_clean,
             thresholds_pois=ClientThresholdsCollection.from_mapping(
-                dict.fromkeys(b1.thresholds_pois, high_tau),
-                Baseline.B1,
+                dict.fromkeys(global_pair.thresholds_pois, high_tau),
+                ThresholdPolicy.GLOBAL_THRESHOLD,
             ),
         )
         fleet = compute_fleet_fpr(col, high_pair, None)
@@ -158,16 +158,16 @@ class TestFleetFpr:
     def test_mu_flag_not_triggered_by_default(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        fleet = compute_fleet_fpr(col, b1, None)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        fleet = compute_fleet_fpr(col, global_pair, None)
         assert not fleet.mu_flag_triggered
 
     def test_companion_dispersion_populated(self) -> None:
         """Companion dispersion (IQR, range) accompanies CV(FPR) and is non-negative."""
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        fleet = compute_fleet_fpr(col, b1, None)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        fleet = compute_fleet_fpr(col, global_pair, None)
         assert math.isfinite(fleet.iqr_fpr)
         assert fleet.iqr_fpr >= 0.0
         assert math.isfinite(fleet.max_min_fpr_gap)
@@ -178,8 +178,8 @@ class TestFleetFpr:
     def test_worst_client_is_max_fpr(self) -> None:
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        fleet = compute_fleet_fpr(col, b1, None)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        fleet = compute_fleet_fpr(col, global_pair, None)
         if fleet.worst_client_id is not None:
             assert fleet.worst_client_fpr >= fleet.mean_fpr
 
@@ -230,24 +230,24 @@ class TestComputeMetrics:
     def test_returns_metric_result(self) -> None:
         col = _make_collection()
         pois_cal, _ = _inject_one_victim(col)
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         result = compute_metrics(
-            MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None)
+            MetricEngineInput(collection=col, pair=global_pair, mu_flag_threshold=None)
         )
         assert isinstance(result, MetricResult)
-        assert result.policy == ThresholdPolicy.B1_GLOBAL
+        assert result.policy == ThresholdPolicy.GLOBAL_THRESHOLD
 
     def test_all_fields_populated(self) -> None:
         col = _make_collection()
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b2 = compute_b2_pair(
+        local_pair = compute_local_pair(
             col,
             pois_cal,
             THRESHOLD_QUANTILE,
-            compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
+            compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
         )
         result = compute_metrics(
-            MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=0.05)
+            MetricEngineInput(collection=col, pair=local_pair, mu_flag_threshold=0.05)
         )
         assert set(result.delta_tau.keys()) == set(col.eligible_ids)
         assert set(result.auroc_records.keys()) == set(col.eligible_ids)

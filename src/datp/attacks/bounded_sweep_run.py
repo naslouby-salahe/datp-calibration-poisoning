@@ -3,7 +3,7 @@
 Single owner of the end-to-end bounded run: loads each training seed's
 real score collection once, locks ``mu_flag_threshold`` per seed before any
 poisoned cell for that seed, sweeps the locked 1620-cell matrix, and
-assembles the single ``nbaiot_bounded_sweep_manifest.json`` artifact. This is the only
+assembles the single ``nbaiot_main_manifest.json`` artifact. This is the only
 path that should ever produce that file — diagnostic/ad hoc scripts must not
 duplicate this orchestration.
 """
@@ -39,8 +39,8 @@ from datp.attacks.run_manifest import ProvenanceRecord
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.types import AurocSet
 from datp.attacks.enums import objective_for_source
-from datp.core.enums import Regime
 from datp.config.attack_config import CalibrationPoisoningConfig
+from datp.config.stages import ExperimentStage
 from datp.core.seed_sequence import derive_seed_record
 
 _REPOSITORY_NAME: str = "datp-calibration-poisoning"
@@ -122,16 +122,16 @@ def _row_for_cell(
     )
 
 
-def run_nbaiot_bounded_sweep(
+def run_nbaiot_main(
     base_dir: Path,
     config: CalibrationPoisoningConfig,
 ) -> BoundedSweepManifest:
     """Execute the locked bounded matrix and return the assembled manifest.
 
     Loads one real score collection per training seed, locks
-    ``mu_flag_threshold`` from that seed's clean B1 fleet FPR before any
+    ``mu_flag_threshold`` from that seed's clean GLOBAL_THRESHOLD fleet FPR before any
     poisoned cell, and reuses it unmodified across every cell for that seed.
-    Does not write to disk; callers persist via ``write_nbaiot_bounded_sweep_manifest``.
+    Does not write to disk; callers persist via ``write_nbaiot_main_manifest``.
     """
     collections: dict[int, ScoreCollection] = {}
     mu_flag_by_seed: dict[int, float] = {}
@@ -140,7 +140,7 @@ def run_nbaiot_bounded_sweep(
 
     for training_seed in config.seeds.training:
         collection = load_real_score_collection(
-            regime=Regime.A, seed=training_seed, base_dir=base_dir
+            stage=ExperimentStage.NBAIOT_MAIN, seed=training_seed, base_dir=base_dir
         )
         collections[training_seed] = collection
         mu_flag_by_seed[training_seed] = lock_mu_flag_threshold(collection)
@@ -173,15 +173,15 @@ def run_nbaiot_bounded_sweep(
     )
 
 
-def write_nbaiot_bounded_sweep_manifest(base_dir: Path) -> Path:
+def write_nbaiot_main_manifest(base_dir: Path) -> Path:
     """Run the bounded sweep and write the manifest to its canonical path.
 
-    Returns the path written (``PoisonLayout.nbaiot_bounded_sweep_manifest()``).
+    Returns the path written (``PoisonLayout.nbaiot_main_manifest()``).
     """
-    config = CalibrationPoisoningConfig.for_bounded_mvp()
-    manifest = run_nbaiot_bounded_sweep(base_dir=base_dir, config=config)
+    config = CalibrationPoisoningConfig.for_bounded_sweep()
+    manifest = run_nbaiot_main(base_dir=base_dir, config=config)
     layout = PoisonLayout(base_dir=base_dir)
-    out_path = layout.nbaiot_bounded_sweep_manifest()
+    out_path = layout.nbaiot_main_manifest()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
     return out_path

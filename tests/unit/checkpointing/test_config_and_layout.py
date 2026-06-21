@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pathlib import Path
 
@@ -13,8 +14,10 @@ from datp.checkpointing.enums import (
     PrimaryCheckpointSelectionRule,
 )
 from datp.config.models import CheckpointProtocolConfig
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
+
+_STAGE = ExperimentStage.NBAIOT_MAIN
 
 
 def _checkpoint_config(
@@ -27,8 +30,7 @@ def _checkpoint_config(
         max_rounds=max_rounds,
         milestones=milestones,
         convergence_mode=CheckpointConvergenceMode.LOG_ONLY,
-        primary_selection_regime=Regime.A,
-        primary_selection_rule=PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A,
+        primary_selection_rule=PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_NBAIOT_MAIN,
         artifact_path_mode=CheckpointArtifactPathMode.ROUND_AWARE,
     )
 
@@ -60,16 +62,16 @@ def test_checkpoint_config_rejects_invalid_milestones(
         _checkpoint_config(milestones=milestones, max_rounds=max_rounds)
 
 
-def test_round_aware_paths_include_round_and_temp_root(tmp_path: Path) -> None:
-    layout = ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
-    cell = TrainingCellId(regime=Regime.A, seed=7, alpha=None)
-    run = BaselineRunId(cell=cell, baseline=Baseline.B2)
+def test_round_aware_paths_include_round(tmp_path: Path) -> None:
+    layout = ArtifactLayout(base_dir=tmp_path, stage=_STAGE)
+    cell = TrainingCellId(stage=_STAGE, seed=7)
+    run = PolicyRunId(cell=cell, policy=ThresholdPolicy.LOCAL_THRESHOLD)
 
     checkpoint_dir = layout.checkpoint_dir_for_round(cell, 50)
     score_dir = layout.score_cell_for_round(cell, 50).score_dir
-    result_dir = layout.baseline_run_for_round(run, 50).result_dir
+    result_dir = layout.policy_run_for_round(run, 50).result_dir
 
-    assert checkpoint_dir == tmp_path / "checkpoints" / "a" / "seed_7" / "round_50"
-    assert score_dir == tmp_path / "scores" / "a" / "seed_7" / "round_50"
-    assert result_dir == tmp_path / "results" / "a" / "b2" / "seed_7" / "round_50"
+    assert checkpoint_dir == tmp_path / "checkpoints" / "nbaiot_main" / "seed_7" / "round_50"
+    assert score_dir == tmp_path / "scores" / "nbaiot_main" / "seed_7" / "round_50"
+    assert result_dir == tmp_path / "results" / "nbaiot_main" / "local_threshold" / "seed_7" / "round_50"
     assert "outputs" not in checkpoint_dir.parts

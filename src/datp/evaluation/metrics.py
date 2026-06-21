@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 from collections.abc import Callable, Sequence
@@ -7,15 +8,12 @@ from pathlib import Path
 
 import numpy as np
 
-from datp.core.enums import (
-    Baseline,
-    Regime,
-)
+from datp.config.stages import ExperimentStage
 from datp.core.errors import fmt
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID
-from datp.data.regimes.catalog import dataset_for_regime
+from datp.data.catalog import dataset_for_stage
 from datp.scoring.loading import ScoreProvider
 from datp.statistics.cv import cv
 
@@ -111,9 +109,9 @@ class DispersionMetrics:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationResult:
-    """Canonical evaluation result for one baseline run."""
+    """Canonical evaluation result for one policy run."""
 
-    run: BaselineRunId
+    run: PolicyRunId
     dataset: DatasetID
     clients: tuple[ClientEvaluationRecord, ...]
     eligible_ids: tuple[str, ...]
@@ -125,20 +123,16 @@ class EvaluationResult:
     # --- Property accessors for widely-used attribute access patterns ---
 
     @property
-    def baseline(self) -> Baseline:
-        return self.run.baseline
+    def policy(self) -> ThresholdPolicy:
+        return self.run.policy
 
     @property
-    def regime(self) -> Regime:
-        return self.run.regime
+    def stage(self) -> ExperimentStage:
+        return self.run.stage
 
     @property
     def seed(self) -> int:
         return self.run.seed
-
-    @property
-    def alpha(self) -> float | None:
-        return self.run.alpha
 
     @property
     def cv_fpr(self) -> float:
@@ -349,10 +343,9 @@ def _validate_client_records(
 
 def build_evaluation_result(
     *,
-    baseline: Baseline,
-    regime: Regime,
+    policy: ThresholdPolicy,
+    stage: ExperimentStage,
     seed: int,
-    alpha: float | None,
     clients: tuple[ClientEvaluationRecord, ...],
     eligible_ids: tuple[str, ...],
     pending_ids: tuple[str, ...],
@@ -361,13 +354,13 @@ def build_evaluation_result(
     _validate_client_records(clients, eligible_ids, pending_ids)
     incomplete = () if incomplete_ids is None else incomplete_ids
     dispersion = _aggregate_dispersion(clients, eligible_ids, incomplete)
-    run = BaselineRunId(
-        cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
-        baseline=baseline,
+    run = PolicyRunId(
+        cell=TrainingCellId(stage=stage, seed=seed),
+        policy=policy,
     )
     return EvaluationResult(
         run=run,
-        dataset=dataset_for_regime(regime),
+        dataset=dataset_for_stage(stage),
         clients=clients,
         eligible_ids=eligible_ids,
         pending_ids=pending_ids,
@@ -431,12 +424,11 @@ def _validate_client_thresholds(client_thresholds: Sequence[ClientThreshold]) ->
     _check_threshold_strategy_uniformity(client_thresholds)
 
 
-def evaluate_baseline(
+def evaluate_policy_run(
     client_thresholds: Sequence[ClientThreshold],
     score_root: Path,
-    regime: Regime,
+    stage: ExperimentStage,
     seed: int,
-    alpha: float | None,
     *,
     score_provider: ScoreProvider | None,
 ) -> EvaluationResult:
@@ -467,10 +459,9 @@ def evaluate_baseline(
             incomplete_ids.append(cid)
 
     return build_evaluation_result(
-        baseline=client_thresholds[0].strategy,
-        regime=regime,
+        policy=client_thresholds[0].strategy,
+        stage=stage,
         seed=seed,
-        alpha=alpha,
         clients=tuple(client_records),
         eligible_ids=tuple(eligible_ids),
         pending_ids=tuple(pending_ids),

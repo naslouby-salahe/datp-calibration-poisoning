@@ -13,14 +13,14 @@ import pytest
 import torch
 
 from datp.attacks.bounded_sweep_run import (
-    run_nbaiot_bounded_sweep,
-    write_nbaiot_bounded_sweep_manifest,
+    run_nbaiot_main,
+    write_nbaiot_main_manifest,
 )
 from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import ConvergenceConfig, DatpConfig, FederationConfig
 from datp.core.device import resolve_device
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.core.seeds import set_seeds
 from datp.federated.protocols.fedavg import run_fl_training
 from datp.federated.types import ClientData
@@ -29,8 +29,8 @@ _N_FEATURES = 10
 _N_TRAIN = 200
 _N_CAL = 150
 _N_TEST = 50
-_N_CLIENTS = 4  # B4_CLUSTER's locked K=3 requires eligible_count > k
-_CONFIG = CalibrationPoisoningConfig.for_bounded_mvp()
+_N_CLIENTS = 4  # CLUSTER_THRESHOLD's locked K=3 requires eligible_count > k
+_CONFIG = CalibrationPoisoningConfig.for_bounded_sweep()
 
 
 def _make_client_data(seed: int) -> dict[str, ClientData]:
@@ -52,7 +52,7 @@ def _make_client_data(seed: int) -> dict[str, ClientData]:
 def _make_cfg() -> DatpConfig:
     return BASE_CONFIG.model_copy(
         update={
-            "regime": Regime.A,
+            "stage": ExperimentStage.NBAIOT_MAIN,
             "model": BASE_CONFIG.model.model_copy(
                 update={"input_dim": _N_FEATURES, "encoder_dims": [8, 4]}
             ),
@@ -75,7 +75,7 @@ def _make_cfg() -> DatpConfig:
 
 
 @pytest.mark.integration
-def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
+def test_run_nbaiot_main_sweep_end_to_end(tmp_path) -> None:
     cfg = _make_cfg()
     for training_seed in _CONFIG.seeds.training:
         set_seeds(training_seed)
@@ -88,7 +88,7 @@ def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
             base_dir=tmp_path,
         )
 
-    manifest = run_nbaiot_bounded_sweep(base_dir=tmp_path, config=_CONFIG)
+    manifest = run_nbaiot_main(base_dir=tmp_path, config=_CONFIG)
 
     assert manifest.n_cells == len(_CONFIG.seeds.training) * _N_CLIENTS * 3 * 3 * 4
     assert len(manifest.results) == manifest.n_cells
@@ -134,7 +134,7 @@ def test_run_nbaiot_bounded_sweep_end_to_end(tmp_path) -> None:
 
 
 @pytest.mark.integration
-def test_write_nbaiot_bounded_sweep_manifest_writes_canonical_path(tmp_path) -> None:
+def test_write_nbaiot_main_manifest_writes_canonical_path(tmp_path) -> None:
     cfg = _make_cfg()
     for training_seed in _CONFIG.seeds.training:
         set_seeds(training_seed)
@@ -147,18 +147,18 @@ def test_write_nbaiot_bounded_sweep_manifest_writes_canonical_path(tmp_path) -> 
             base_dir=tmp_path,
         )
 
-    out_path = write_nbaiot_bounded_sweep_manifest(tmp_path)
+    out_path = write_nbaiot_main_manifest(tmp_path)
 
-    assert out_path.name == "nbaiot_bounded_sweep_manifest.json"
+    assert out_path.name == "nbaiot_main_manifest.json"
     assert out_path.exists()
 
 
-def test_run_nbaiot_bounded_sweep_config_is_required() -> None:
+def test_run_nbaiot_main_sweep_config_is_required() -> None:
     """config must be a required parameter with no default fallback."""
     import inspect
-    sig = inspect.signature(run_nbaiot_bounded_sweep)
+    sig = inspect.signature(run_nbaiot_main)
     config_param = sig.parameters["config"]
     assert config_param.default is inspect.Parameter.empty, (
-        "run_nbaiot_bounded_sweep must not have a default config — "
+        "run_nbaiot_main must not have a default config — "
         "callers must construct and pass CalibrationPoisoningConfig explicitly"
     )

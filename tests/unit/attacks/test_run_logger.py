@@ -23,7 +23,7 @@ from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 def _build_manifest(
@@ -33,9 +33,9 @@ def _build_manifest(
 ) -> RunManifest:
     return build_manifest(
         ManifestBuildRequest(
-            dataset="nbaiot_regime_a",
-            scale=ExperimentScale.SMOKE,
-            policy=ThresholdPolicy.B1_GLOBAL,
+            dataset="nbaiot",
+            stage=ExperimentStage.SYNTHETIC_SMOKE,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             objective=AttackerObjective.THRESHOLD_RAISE,
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             fraction=0.40,
@@ -126,8 +126,8 @@ class TestEmitManifest:
 class TestWriteRunLog:
     def _make_entry(self, mu: float = 0.005) -> RunLogEntry:
         return RunLogEntry(
-            dataset="nbaiot_regime_a",
-            policy="b1_global",
+            dataset="nbaiot",
+            policy="global_threshold",
             objective="threshold_raise",
             source="high_score_benign",
             fraction=0.40,

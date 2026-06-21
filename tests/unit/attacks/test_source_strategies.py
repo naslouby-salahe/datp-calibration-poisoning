@@ -30,7 +30,7 @@ class TestIsDiagnosticSource:
             assert not is_diagnostic_source(source)
 
     def test_diagnostic_source_flagged(self) -> None:
-        assert is_diagnostic_source(PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE)
+        assert is_diagnostic_source(PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY)
 
 
 class TestSelectReservoirBoundedSources:
@@ -64,7 +64,7 @@ class TestDiagnosticGate:
         c = make_eligible_client()
         with pytest.raises(DiagnosticSourceError, match="diagnostic-only"):
             _select_reservoir(
-                source=PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
+                source=PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
                 clean_cal=c.cal,
                 tail_mass=_TAIL_MASS,
                 allow_diagnostic=False,
@@ -73,19 +73,19 @@ class TestDiagnosticGate:
     def test_diagnostic_source_with_flag_succeeds(self) -> None:
         c = make_eligible_client()
         res = _select_reservoir(
-            source=PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
+            source=PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
             clean_cal=c.cal,
             tail_mass=_TAIL_MASS,
             allow_diagnostic=True,
         )
-        assert res.source == PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE
+        assert res.source == PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
 
     def test_diagnostic_source_default_blocked(self) -> None:
         """Default allow_diagnostic=False blocks diagnostic source."""
         c = make_eligible_client()
         with pytest.raises(DiagnosticSourceError):
             _select_reservoir(
-                source=PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
+                source=PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
                 clean_cal=c.cal,
                 tail_mass=_TAIL_MASS,
             )

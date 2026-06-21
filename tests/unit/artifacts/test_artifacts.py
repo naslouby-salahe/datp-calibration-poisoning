@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import json
 from pathlib import Path
@@ -10,7 +11,6 @@ from pydantic import BaseModel, ConfigDict
 from datp.artifacts.io import write_csv, write_metrics_atomic
 from datp.artifacts.lifecycle import RunLifecycle, check_run_state
 from datp.artifacts.names import RunState
-from datp.core.enums import Baseline
 
 
 class TestCheckRunState:
@@ -38,7 +38,7 @@ class TestCheckRunState:
 class TestRunLifecycleMarkers:
     def test_run_lifecycle_markers_success(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "run_ok"
-        with RunLifecycle(run_dir, baseline=Baseline.B1, seed=42) as rl:
+        with RunLifecycle(run_dir, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=42) as rl:
             assert (run_dir / "IN_PROGRESS").exists()
             rl.last_completed_round = 5
 
@@ -51,7 +51,7 @@ class TestRunLifecycleMarkers:
         (run_dir).mkdir()
         (run_dir / "ABORTED.txt").write_text("previous failure\n")
 
-        with RunLifecycle(run_dir, baseline=Baseline.B1, seed=42):
+        with RunLifecycle(run_dir, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=42):
             assert not (run_dir / "ABORTED.txt").exists()
 
         assert (run_dir / "DONE.txt").exists()
@@ -60,7 +60,7 @@ class TestRunLifecycleMarkers:
     def test_run_lifecycle_markers_failure(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "run_fail"
         with pytest.raises(RuntimeError, match="boom"):
-            with RunLifecycle(run_dir, baseline=Baseline.B2, seed=7) as rl:
+            with RunLifecycle(run_dir, policy=ThresholdPolicy.LOCAL_THRESHOLD, seed=7) as rl:
                 assert (run_dir / "IN_PROGRESS").exists()
                 rl.last_completed_round = 3
                 raise RuntimeError("boom")
@@ -87,13 +87,13 @@ class TestAbortedMarker:
     def test_aborted_marker_contains_round_info(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "abort_info"
         with pytest.raises(RuntimeError):
-            with RunLifecycle(run_dir, baseline=Baseline.B1, seed=42) as rl:
+            with RunLifecycle(run_dir, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=42) as rl:
                 rl.last_completed_round = 10
                 raise RuntimeError("OOM at round 11")
 
         content = (run_dir / "ABORTED.txt").read_text()
         assert "last_completed_round: 10" in content
-        assert "baseline: b1" in content
+        assert "policy: global_threshold" in content
         assert "seed: 42" in content
         assert "RuntimeError" in content
         assert "OOM at round 11" in content
@@ -101,12 +101,12 @@ class TestAbortedMarker:
     def test_aborted_marker_with_no_round(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "abort_no_rnd"
         with pytest.raises(KeyError):
-            with RunLifecycle(run_dir, baseline=Baseline.B3, seed=1):
+            with RunLifecycle(run_dir, policy=ThresholdPolicy.CLUSTER_THRESHOLD, seed=1):
                 raise KeyError("missing key")
 
         content = (run_dir / "ABORTED.txt").read_text()
         assert "last_completed_round: None" in content
-        assert "baseline: b3" in content
+        assert "policy: cluster_threshold" in content
 
     def test_aborted_marker_not_written_on_success(self, tmp_path: Path) -> None:
         run_dir = tmp_path / "no_abort"
@@ -144,7 +144,7 @@ class TestMetricsAtomicRename:
 
 def test_clean_run_has_metrics_and_done(tmp_path: Path) -> None:
     run_dir = tmp_path / "full_run"
-    with RunLifecycle(run_dir, baseline=Baseline.B1, seed=0) as rl:
+    with RunLifecycle(run_dir, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0) as rl:
         rl.last_completed_round = 40
         write_metrics_atomic(run_dir, {"auc": 0.99})
 

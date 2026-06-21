@@ -1,13 +1,13 @@
 """Metric recomputation verification for the results audit."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import dataclasses
 import math
 
-from datp.core.enums import Baseline, Regime
+from datp.config.stages import ExperimentStage
 from datp.core.metric_enums import MetricName
-from datp.evaluation.metrics import recompute_binary_metrics
 from datp.validation.enums import DenominatorStatus
 from datp.validation.schemas import MetricRecomputationRecord
 
@@ -26,9 +26,8 @@ class RecomputationParams:
 
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     client_id: str
     tp: int
     fp: int
@@ -77,9 +76,8 @@ def _make_recomputation_record(
     return MetricRecomputationRecord(
         run_id=params.run_id,
         seed=params.seed,
-        regime=params.regime,
-        baseline=params.baseline,
-        alpha=params.alpha,
+        stage=params.stage,
+        policy=params.policy,
         client_id=params.client_id,
         metric=metric,
         saved_value=saved_value,
@@ -139,6 +137,8 @@ def append_recomputation_records(
     params: RecomputationParams,
 ) -> None:
     """Recompute binary metrics from confusion matrix and append comparison records."""
+    from datp.evaluation.metrics import recompute_binary_metrics  # noqa: PLC0415
+
     bm = recompute_binary_metrics(params.tp, params.fp, params.tn, params.fn)
     recomputed: dict[MetricName, float] = {
         MetricName.FPR: bm.fpr,

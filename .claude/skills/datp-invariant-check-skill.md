@@ -1,8 +1,10 @@
 # DATP Invariant Check Skill
 
-Use this skill whenever a task touches DATP science, experiment logic, datasets, baselines, thresholds, training, metrics, reporting, tickets, or manuscript claims.
+Use this skill whenever a task touches calibration-channel poisoning science, experiment logic, datasets, threshold policies, attack mechanics, metrics, reporting, or manuscript claims.
 
-The goal is to prove that the change preserves the DATP scientific contract.
+The goal is to prove that the change preserves the datp-cp scientific contract.
+
+Protocol of record: `docs/DATP_CP_Roadmap.md`.
 
 ---
 
@@ -10,150 +12,91 @@ The goal is to prove that the change preserves the DATP scientific contract.
 
 Before applying this skill, inspect:
 
-**CP2 (active):**
-1. `docs/DATP_CP_Roadmap.md` — CP2 protocol of record
-2. `docs/tickets/README.md` §9 — CP2 scientific locks
-3. Relevant `docs/tickets/<phase>/CP2-T*.md`
+1. `docs/DATP_CP_Roadmap.md` — protocol of record
+2. `CLAUDE.md` — active vocabulary and coding rules
+3. Relevant source code and tests
+4. Relevant configs and manifests
+5. Relevant manuscript text, if any
 
-**DATP journal (if that work resumes):**
-1. Active `docs/journal/*.md`
-
-**Always:**
-2. Relevant tickets.
-3. Relevant code.
-4. Relevant tests.
-5. Relevant artifacts.
-6. Relevant manuscript text, if any.
-
-Do not rely on memory.
-
-Do not rely on archived roadmap context when active planning files disagree.
+Do not rely on memory. Do not rely on archived or stale roadmap context.
 
 ---
 
-## CP2 Core Invariants (always check when touching CP2 code)
+## 2. Core Scientific Invariants
 
-1. Calibration-channel poisoning only — never poison training data, model weights,
-   aggregation, or test data.
-2. Injection rule is `REPLACE_FIXED_BUDGET`: replace m_i = max(1, round(f·n_i))
-   positions with values resampled **with replacement** from the victim-local reservoir.
-3. Clean arrays must never be mutated in place; always work on a copy.
-4. Reservoirs are victim-local benign calibration scores. Test scores and training
-   scores are never reservoirs.
-5. Seed scheme: `SeedSequence([training_seed, poisoning_seed, client_id, scope_id])`.
-   No integer seed addition.
-6. B3 is not part of the CP2 default policy enum. Default policies: {B1, B2, B4}.
-7. B4 for N-BaIoT: K=3, k-means++, n_init=10, max_iter=300, random_state=42;
-   fingerprint = [mean, std, skew, p95]; use client-indexed effective thresholds,
-   not raw cluster labels.
-8. CV(FPR) = σ/µ with **no epsilon** denominator. Always report coverage.
-9. AUROC must be invariant (test scores are unchanged by calibration-channel attack).
-10. Two-layer statistics only: per-victim paired seed deltas → 5 seed aggregates
-    → bootstrap CI. Never treat 9×5 as 45 independent samples.
-11. `mu_flag_threshold` must be locked before any poisoned run executes.
-12. Edge-IIoTset is forbidden for CP2. CICIoT2023 is optional stretch, FB4-gated.
+Check these whenever touching CP2 code:
+
+1. Calibration-channel poisoning only — never poison training data, model weights, aggregation, or test data.
+2. Injection rule is `REPLACE_FIXED_BUDGET`: replace `m_i = max(1, round(f·n_i))` positions with values resampled **with replacement** from the victim-local reservoir.
+3. Clean calibration arrays must never be mutated in place; always work on a copy.
+4. Reservoirs must be victim-local benign calibration scores. Test scores and training scores are never reservoirs.
+5. Attack-labeled samples must not enter calibration.
+6. Poisoning seed controls only replacement-position and reservoir-sampling randomness. Training is unaffected.
+7. AUROC must remain invariant because test scores and labels are unchanged by a calibration-channel attack.
+8. `GLOBAL_THRESHOLD`, `LOCAL_THRESHOLD`, and `CLUSTER_THRESHOLD` are the only valid threshold policies.
+9. `CLUSTER_THRESHOLD` for N-BaIoT uses fixed `K=3`, k-means++, `n_init=10`, `max_iter=300`, `random_state=42`; fingerprint is `[mean, std, skew, p95]`; all deltas use client-effective thresholds, never raw cluster label IDs.
+10. `CV(FPR)` uses `std(..., ddof=0) / mean(...)` over eligible clients; no epsilon denominator; `CV` is undefined when mean FPR is zero.
+11. Two-layer statistics: per-victim paired seed deltas → 5 seed aggregates → bootstrap CI. Never treat 9×5 as 45 independent samples.
+12. `mu_flag_threshold` must be locked from clean artifacts before any poisoned run.
+13. `q = 95` threshold percentile is locked; no poisoned run may alter `q`.
+14. `ε_num = 1e-12` is locked for all stabilized ratios.
+15. Edge-IIoTset is forbidden. CICIoT2023 is optional stretch contrast only, never main evidence.
 
 ---
 
-## 2. Core Invariant Checklist
+## 3. Policy Invariant Checklist
 
-Check these first:
+### `GLOBAL_THRESHOLD`
 
-| Invariant | Required answer |
-|---|---|
-| Is DATP still threshold-scope-only in the controlled ladder? | Yes |
-| Are B1–B4 derived from shared scores where required? | Yes |
-| Is training shared per controlled cell? | Yes |
-| Does threshold/result code avoid training? | Yes |
-| Does reporting avoid recomputation? | Yes |
-| Are scientific parameters config-driven? | Yes |
-| Is calibration-pending behavior preserved? | Yes |
-| Is CV(FPR) reported with coverage ratio? | Yes |
-| Are Regime statuses preserved? | Yes |
-| Are stress tests outside the core ladder? | Yes |
-| Are claims narrower than evidence? | Yes |
+Required:
 
-Any `No` is a blocking issue unless the user explicitly changed the scientific scope.
+1. One shared threshold computed from eligible clients' local calibration thresholds.
+2. `τ_global = mean(τ_i_local)` over eligible clients.
+3. Every eligible client receives the same threshold.
+4. No attack labels in calibration.
+
+### `LOCAL_THRESHOLD`
+
+Required:
+
+1. Per-eligible-client threshold at `q = 95`.
+2. Direct victim sensitivity; no cross-client spillover by design.
+3. No attack labels in calibration.
+
+### `CLUSTER_THRESHOLD`
+
+Required:
+
+1. Fingerprint `[mean, std, skew, p95]` over benign calibration errors.
+2. Clustering on eligible clients only; ineligible clients excluded.
+3. Client-effective threshold delta `Δτ_i = τ_i_eff,poisoned - τ_i_eff,clean`.
+4. Raw cluster label IDs never compared directly.
+5. `K = 3` locked for N-BaIoT main.
+6. Mandatory decomposition outputs: `Δτ_total`, `Δτ_aggregation`, `Δτ_churn`.
+7. Diagnostic outputs: `Δτ_frozen_scaler`, `Δτ_normalization_gap`.
 
 ---
 
-## 3. Baseline Checklist
+## 4. Attack Validity Checklist
 
-### B1
+| Source strategy     | Valid objective   |
+|---------------------|-------------------|
+| `HIGH_SCORE_BENIGN` | `THRESHOLD_RAISE` |
+| `LOW_SCORE_BENIGN`  | `THRESHOLD_LOWER` |
+| `RANDOM_BENIGN`     | Either (as negative control) |
 
-Required:
+Invalid main combinations that must fail config validation:
 
-1. One shared threshold.
-2. Derived from eligible benign calibration thresholds.
-3. Equal-client arithmetic mean unless explicitly named sensitivity variant.
-4. No attack labels.
-5. No retraining.
-
-### B2
-
-Required:
-
-1. Per-client benign threshold.
-2. Canonical p95 unless active config changes q.
-3. Calibration-pending fallback to global threshold.
-4. No attack labels.
-5. No retraining.
-
-### B3
-
-Required:
-
-1. Family labels from canonical taxonomy.
-2. Family-level threshold from eligible clients.
-3. Proper fallback for missing/pending clients.
-4. Correct Regime A scope unless explicitly extended.
-
-### B4
-
-Required:
-
-1. Fingerprint is `[mean, std, skew, p95]` over benign calibration errors.
-2. Clustering uses eligible clients.
-3. Pending clients excluded from clustering.
-4. Pending clients use global fallback.
-5. Not framed as privacy.
-6. K value follows active journal plan.
-
-### Comparators
-
-Required:
-
-1. FedProx is stress-test only.
-2. Ditto name used only if faithful.
-3. FedRep-AE/FedPer-AE fallback labeled honestly.
-4. `B-FedStatsBenign` is benign-only and not faithful Laridi.
-5. `B-LaridiFaithful` is anomaly-labeled and outside DATP's benign-only assumption.
-6. FedBN remains rejected unless active plan changes.
-
----
-
-## 4. Regime Checklist
-
-| Regime | Required interpretation |
-|---|---|
-| Regime A | Confirmatory physical-device N-BaIoT anchor. |
-| Regime B-a | CICIoT2023 file-level pseudo-client boundary condition. |
-| Regime B-b | Conditional CICIoT2023 device-MAC or device-group repartition after feasibility. |
-| Regime C | N-BaIoT Dirichlet severity sweep, supportive/exploratory. |
-| Regime D | Conditional Edge-IIoTset external validation after feasibility. |
-
-Reject any wording that makes:
-
-1. Regime B-a physical-device evidence.
-2. Regime C the primary claim.
-3. Regime D unconditional.
-4. Regime B-b valid without metadata evidence.
+```text
+HIGH_SCORE_BENIGN + THRESHOLD_LOWER
+LOW_SCORE_BENIGN  + THRESHOLD_RAISE
+```
 
 ---
 
 ## 5. Stage Boundary Checklist
 
-Verify the stage boundaries:
+Valid stage flow:
 
 ```text
 prepare → score → threshold/result → report
@@ -167,61 +110,53 @@ Forbidden crossings:
 4. Figure/table code recomputes metrics from raw data.
 5. CLI command silently performs multiple scientific stages without clear naming.
 6. Stored-score analysis retrains.
-7. Stress-test training overwrites mainline outputs.
 
 ---
 
 ## 6. Metric Checklist
 
-Required around CV(FPR):
+Required context around every reported metric:
 
-1. Coverage ratio.
-2. Eligible client count.
-3. Pending client count when applicable.
-4. Seed count.
-5. Delta definition.
-6. Bootstrap CI when required.
-7. Detection-quality tradeoff context.
-8. Lower-tail Macro-F1 or worst-client BA when available.
+1. Eligible client count and seed count.
+2. Coverage ratio when CV(FPR) is shown.
+3. Absolute dispersion metrics (`IQR(FPR)`, `max-min FPR`, `WorstClientFPR`) alongside any CV.
+4. Delta definition and materiality threshold `δτ_i`.
+5. Bootstrap CI when required.
+6. Sign consistency across seeds (≥4/5 required for primary claims).
 
 Reject:
 
-1. CV(FPR) alone.
-2. Accuracy-only summaries.
-3. Missing coverage.
-4. Unqualified five-seed inference.
-5. Hiding Macro-F1 degradation.
+1. CV(FPR) alone without coverage or absolute dispersion.
+2. Claims based on single-seed results.
+3. Missing materiality definition.
+4. AUROC movement (must be zero; any movement signals implementation error).
 
 ---
 
 ## 7. Claim Checklist
 
-Allowed:
+Allowed if the primary claim gate is met:
 
 ```text
-DATP reduces cross-client FPR dispersion under the tested fixed-encoder threshold-scope protocol.
+datp-cp shows that calibration-channel poisoning can materially shift threshold policies
+while training, aggregation, model parameters, and test data remain clean.
 ```
 
-Forbidden unless directly proven:
+Forbidden:
 
-1. Global anomaly-detection superiority.
-2. Universal personalization superiority.
-3. Formal privacy.
-4. Poisoning robustness.
-5. Backdoor robustness.
-6. Evasion robustness.
-7. Concept drift handling.
-8. Hardware validation.
-9. Deployment readiness.
-10. Communication-efficiency claim.
-11. Superiority over anomaly-labeled thresholding methods.
-12. CICIoT2023 file-level results as physical-device proof.
+1. Universal threshold vulnerability claim.
+2. Universal threshold robustness claim.
+3. Raw-traffic attack realizability claim.
+4. Broad FL robustness claim.
+5. Privacy guarantee claim.
+6. Deployment-readiness claim.
+7. Model-poisoning, training-poisoning, aggregation-poisoning, backdoor, or evasion claim.
+8. Claims from diagnostic-only variants as main evidence.
+9. Multi-client claims from single-client data.
 
 ---
 
 ## 8. Required Output
-
-Use this format:
 
 ```text
 # DATP Invariant Check
@@ -231,30 +166,32 @@ Scope:
 Files inspected:
 Commands run:
 
-## Baselines
-B1:
-B2:
-B3:
-B4:
-Comparators:
+## Core Invariants
+1. Calibration-only isolation:
+2. REPLACE_FIXED_BUDGET:
+3. No in-place mutation:
+4. Reservoir validity:
+5. AUROC invariance:
+6. q=95 locked:
+7. ε_num locked:
 
-## Regimes
-Regime A:
-Regime B-a:
-Regime B-b:
-Regime C:
-Regime D:
+## Policy Checks
+GLOBAL_THRESHOLD:
+LOCAL_THRESHOLD:
+CLUSTER_THRESHOLD:
+
+## Attack Validity
+Source-objective pairs:
+Config validation:
 
 ## Stage Boundaries
-Prepare:
-Score:
-Threshold/result:
-Report:
+prepare → score:
+score → threshold/result:
+threshold/result → report:
 
 ## Metrics
-CV(FPR):
-Coverage:
-Detection tradeoff:
+CV(FPR) context:
+Materiality:
 Statistics:
 
 ## Claims
@@ -264,7 +201,6 @@ Required wording changes:
 
 ## Final Decision
 Can proceed:
-Can mark DONE:
 Reason:
 Invalidation rule:
 ```

@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.names import ArtifactDir
 from datp.config.models import DatpConfig
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.core.identity import TrainingCellId
 from datp.validation.constants import (
     CELL_VERDICT_JSON,
@@ -56,7 +56,7 @@ class VerdictSummary(BaseModel):
     total: int
     verified_reuse_safe: int
     reuse_blocked_rerun_required: int
-    by_regime: dict[Regime, dict[ReuseVerdict, int]]
+    by_stage: dict[ExperimentStage, dict[ReuseVerdict, int]]
 
 
 class VerdictTable(BaseModel):
@@ -83,23 +83,23 @@ def _failing_reproduction_entries(
     reproduction_result: CellReproductionResult,
 ) -> list[ValidationCheck]:
     entries: list[ValidationCheck] = []
-    for baseline_result in reproduction_result.baselines:
-        for check in baseline_result.checks:
+    for policy_result in reproduction_result.policies:
+        for check in policy_result.checks:
             if check.status == AuditStatus.PASS:
                 continue
             entries.append(
                 ValidationCheck(
-                    code=f"{_REPRODUCTION_PREFIX}:{baseline_result.baseline.value}.{check.code}",
+                    code=f"{_REPRODUCTION_PREFIX}:{policy_result.policy.value}.{check.code}",
                     status=check.status,
                     detail=check.detail,
                 )
             )
-    for missing_baseline in reproduction_result.missing_baselines:
+    for missing_policy in reproduction_result.missing_policies:
         entries.append(
             ValidationCheck(
-                code=f"{_REPRODUCTION_PREFIX}:{missing_baseline.value}.metrics_json_missing",
+                code=f"{_REPRODUCTION_PREFIX}:{missing_policy.value}.metrics_json_missing",
                 status=AuditStatus.MISSING,
-                detail=f"metrics.json absent for baseline {missing_baseline.value}",
+                detail=f"metrics.json absent for policy {missing_policy.value}",
             )
         )
     return entries
@@ -156,13 +156,14 @@ def compute_reuse_verdict(
 
 
 def _summarize(cells: list[CellVerdict]) -> VerdictSummary:
-    by_regime: dict[Regime, dict[ReuseVerdict, int]] = {
-        regime: dict.fromkeys(ReuseVerdict, 0) for regime in Regime
-    }
+    by_stage: dict[ExperimentStage, dict[ReuseVerdict, int]] = {}
     safe = 0
     blocked = 0
     for cell in cells:
-        by_regime[cell.cell.regime][cell.verdict] += 1
+        stage = cell.cell.stage
+        if stage not in by_stage:
+            by_stage[stage] = dict.fromkeys(ReuseVerdict, 0)
+        by_stage[stage][cell.verdict] += 1
         if cell.verdict == ReuseVerdict.VERIFIED_REUSE_SAFE:
             safe += 1
         else:
@@ -171,7 +172,7 @@ def _summarize(cells: list[CellVerdict]) -> VerdictSummary:
         total=len(cells),
         verified_reuse_safe=safe,
         reuse_blocked_rerun_required=blocked,
-        by_regime=by_regime,
+        by_stage=by_stage,
     )
 
 

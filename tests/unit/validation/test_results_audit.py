@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import json
 import re
@@ -9,18 +10,16 @@ import pandas as pd
 import polars as pl
 from datp.artifacts.names import ArtifactFile
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import Baseline
 from datp.core.types import ClientThreshold
 from datp.data.common.storage import write_artifact
 from datp.evaluation.metrics import compute_client_record
 from datp.scoring.schema import SCORE_COLUMN
 from datp.validation.constants import (
     AUDIT_SUMMARY_MD,
-    B4_CLUSTER_STABILITY_CSV,
-    BASELINE_INVARIANTS_JSON,
+    CLUSTER_STABILITY_CSV,
+    POLICY_INVARIANTS_JSON,
     METRIC_DENOMINATOR_AUDIT_CSV,
     RECONSTRUCTION_ERROR_SUMMARY_CSV,
-    REGIME_C_SEVERITY_TREND_CSV,
     RUN_MANIFEST_CSV,
     THRESHOLD_VALUES_CSV,
     WARNINGS_MD,
@@ -41,7 +40,7 @@ _SAFE_SCORE_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
 def _safe_score_path(root: Path, stage: str, client_id: str) -> Path:
     if not _SAFE_SCORE_NAME.fullmatch(client_id):
         raise ValueError(f"Unsafe client id in score fixture: {client_id}")
-    base = (root / "scores/a/seed_0").resolve()
+    base = (root / "scores/nbaiot_main/seed_0").resolve()
     path = (base / stage / f"{client_id}.parquet").resolve()
     if not path.is_relative_to(base):
         raise ValueError(f"Score fixture path escapes base: {path}")
@@ -64,12 +63,12 @@ def _write_scores(root: Path) -> None:
             )
 
 
-def _make_client_metric_entry(client_id: str, baseline: Baseline) -> dict:
+def _make_client_metric_entry(client_id: str, policy: ThresholdPolicy) -> dict:
     ct = ClientThreshold(
         client_id=client_id,
         threshold=0.06,
         calibration_pending=False,
-        strategy=baseline,
+        strategy=policy,
     )
     rec = compute_client_record(
         client_id, np.array([0.01, 0.02, 0.07]), np.array([0.08, 0.09, 0.10]), ct
@@ -95,25 +94,24 @@ def _make_client_metric_entry(client_id: str, baseline: Baseline) -> dict:
         "calibration_pending": False,
         "evaluation_incomplete": False,
         "threshold_value": 0.06,
-        "threshold_source": baseline.value,
+        "threshold_source": policy.value,
     }
 
 
-def _metrics_payload(baseline: Baseline) -> dict:
-    per_client = [_make_client_metric_entry(cid, baseline) for cid in _CLIENTS]
+def _metrics_payload(policy: ThresholdPolicy) -> dict:
+    per_client = [_make_client_metric_entry(cid, policy) for cid in _CLIENTS]
     return {
         "schema_version": "2",
         "metric_schema_version": "2",
         "threshold_schema_version": "1",
-        "run_id": f"a_{baseline.value}_seed0",
+        "run_id": f"nbaiot_main_{policy.value}_seed0",
         "run_kind": "core_ladder",
         "dataset": "nbaiot",
-        "alpha": None,
-        "baseline": baseline.value,
+        "policy": policy.value,
         "threshold_scope": "eligible_client_arithmetic_mean",
-        "threshold_strategy_name": baseline.value,
+        "threshold_strategy_name": policy.value,
         "coverage_ratio": 1.0,
-        "cv_fpr": 0.0 if baseline == Baseline.B2 else 0.1,
+        "cv_fpr": 0.0 if policy == ThresholdPolicy.LOCAL_THRESHOLD else 0.1,
         "mean_fpr": 0.0,
         "std_fpr": 0.0,
         "cv_tpr": 0.0,
@@ -128,7 +126,7 @@ def _metrics_payload(baseline: Baseline) -> dict:
         "eligible_ids": list(_CLIENTS),
         "pending_ids": [],
         "eval_incomplete_ids": [],
-        "aggregate_metrics": {"cv_fpr": 0.0 if baseline == Baseline.B2 else 0.1},
+        "aggregate_metrics": {"cv_fpr": 0.0 if policy == ThresholdPolicy.LOCAL_THRESHOLD else 0.1},
         "provenance": {
             "config_identity": "fixture",
             "split_manifest_identity": "fixture",
@@ -140,7 +138,7 @@ def _metrics_payload(baseline: Baseline) -> dict:
             "generated_at_utc": "2026-01-01T00:00:00+00:00",
         },
         "per_client": per_client,
-        "regime": "a",
+        "stage": "nbaiot_main",
         "seed": 0,
         "tau_global": 0.06,
         "normalization_scope": "per_client_zscore",
@@ -158,14 +156,14 @@ def _write_minimal_outputs(root: Path) -> None:
     manifest_path = root / "data/processed/nbaiot" / ArtifactFile.MANIFEST
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    ckpt = root / "checkpoints/a/seed_0/model.pt"
+    ckpt = root / "checkpoints/nbaiot_main/seed_0/model.pt"
     ckpt.parent.mkdir(parents=True, exist_ok=True)
     ckpt.write_bytes(b"fixture-model")
-    for baseline in (Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4):
-        result_dir = root / "results/a" / baseline.value / "seed_0"
+    for policy in (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD):
+        result_dir = root / "results/nbaiot_main" / policy.value / "seed_0"
         result_dir.mkdir(parents=True, exist_ok=True)
         (result_dir / ArtifactFile.METRICS).write_text(
-            json.dumps(_metrics_payload(baseline)), encoding="utf-8"
+            json.dumps(_metrics_payload(policy)), encoding="utf-8"
         )
         (result_dir / ArtifactFile.RESOLVED_CONFIG).write_text(
             "seed: 0\n", encoding="utf-8"
@@ -185,7 +183,7 @@ def test_results_audit_generates_core_artifacts(tmp_path: Path) -> None:
     from datp.validation.results import AuditOutputName
 
     assert paths.path_for(AuditOutputName.RUN_MANIFEST).is_file()
-    assert (audit_dir / BASELINE_INVARIANTS_JSON).is_file()
+    assert (audit_dir / POLICY_INVARIANTS_JSON).is_file()
     assert (audit_dir / RUN_MANIFEST_CSV).is_file()
     assert (audit_dir / RECONSTRUCTION_ERROR_SUMMARY_CSV).is_file()
     assert (audit_dir / METRIC_DENOMINATOR_AUDIT_CSV).is_file()
@@ -194,7 +192,7 @@ def test_results_audit_generates_core_artifacts(tmp_path: Path) -> None:
     assert (audit_dir / AUDIT_SUMMARY_MD).is_file()
 
     invariants = json.loads(
-        (audit_dir / BASELINE_INVARIANTS_JSON).read_text(encoding="utf-8")
+        (audit_dir / POLICY_INVARIANTS_JSON).read_text(encoding="utf-8")
     )
     assert invariants[0]["status"] == "PASS"
     assert invariants[0]["split_hash_shared"] is True
@@ -203,7 +201,7 @@ def test_results_audit_generates_core_artifacts(tmp_path: Path) -> None:
     thresholds = pd.read_csv(audit_dir / THRESHOLD_VALUES_CSV)
     assert "threshold_aggregation_method" in thresholds.columns
     assert "local_tau_i" in thresholds.columns
-    b1_rows = thresholds[thresholds["baseline"] == "b1"]
+    b1_rows = thresholds[thresholds["policy"] == ThresholdPolicy.GLOBAL_THRESHOLD.value]
     assert set(b1_rows["threshold_aggregation_method"]) == {
         "eligible_client_arithmetic_mean"
     }
@@ -218,13 +216,11 @@ def test_results_audit_generates_severity_trend_and_cluster_stability(
     _write_minimal_outputs(outputs)
     paths = run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
 
-    assert "regime_c_severity_trend" in paths
-    assert "b4_cluster_stability" in paths
-    assert (audit_dir / REGIME_C_SEVERITY_TREND_CSV).is_file()
-    assert (audit_dir / B4_CLUSTER_STABILITY_CSV).is_file()
+    assert "cluster_stability" in paths
+    assert (audit_dir / CLUSTER_STABILITY_CSV).is_file()
 
     summary = (audit_dir / AUDIT_SUMMARY_MD).read_text(encoding="utf-8")
-    assert "B0 is a centralized reference comparator" in summary
+    assert "Controlled threshold policies share the trained encoder" in summary
 
 
 def test_results_audit_generates_seed_deltas(tmp_path: Path) -> None:
@@ -239,26 +235,26 @@ def test_results_audit_generates_seed_deltas(tmp_path: Path) -> None:
     assert csv_path.is_file()
     df = pd.read_csv(csv_path)
     for col in (
-        "regime",
+        "stage",
         "seed",
-        "b1_cv_fpr",
-        "b2_cv_fpr",
-        "delta_cv_fpr_b1_minus_b2",
+        "global_cv_fpr",
+        "local_cv_fpr",
+        "delta_cv_fpr_global_minus_local",
         "coverage_ratio",
     ):
         assert col in df.columns
 
 
-def test_results_audit_generates_regime_c_alpha_csv(tmp_path: Path) -> None:
-    from datp.validation.constants import REGIME_C_ALPHA_AUDIT_CSV
+def test_results_audit_generates_metric_denominator_audit(tmp_path: Path) -> None:
+    from datp.validation.constants import METRIC_DENOMINATOR_AUDIT_CSV
 
     outputs = tmp_path / "outputs"
     audit_dir = tmp_path / "audit"
 
     _write_minimal_outputs(outputs)
     paths = run_results_audit(base_dir=outputs, audit_dir=audit_dir, cfg=BASE_CONFIG)
-    assert (audit_dir / REGIME_C_ALPHA_AUDIT_CSV).is_file()
-    assert "regime_c_alpha_audit" in paths
+    assert (audit_dir / METRIC_DENOMINATOR_AUDIT_CSV).is_file()
+    assert "metric_denominator_audit" in paths
 
 
 def test_results_audit_fpr_companion_has_required_columns(tmp_path: Path) -> None:
@@ -295,8 +291,8 @@ def test_results_audit_generates_metric_recomputation_csv(tmp_path: Path) -> Non
     for col in (
         "run_id",
         "seed",
-        "regime",
-        "baseline",
+        "stage",
+        "policy",
         "client_id",
         "metric",
         "saved_value",
@@ -318,7 +314,7 @@ def test_naked_cv_fpr_emits_fail_warning(tmp_path: Path) -> None:
     audit_dir = tmp_path / "audit"
 
     _write_minimal_outputs(outputs)
-    result_dir = outputs / "results/a" / Baseline.B1.value / "seed_0"
+    result_dir = outputs / "results/nbaiot_main" / ThresholdPolicy.GLOBAL_THRESHOLD.value / "seed_0"
     payload = json.loads((result_dir / ArtifactFile.METRICS).read_text("utf-8"))
     del payload["mean_fpr"]
     del payload["std_fpr"]

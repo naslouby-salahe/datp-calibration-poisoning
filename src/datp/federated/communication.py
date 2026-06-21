@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Proprietary
-"""Threshold calibration communication overhead.
+"""Threshold calibration payload accounting.
 
 Accounting model: **server-aggregated payload bytes**.
 - uplink_bytes = total bytes received by the server from all clients in one round/phase.
@@ -8,21 +8,18 @@ All payloads are 32-bit (4-byte) floats.
 """
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 
-from datp.core.enums import (
-    B4_FINGERPRINT_FEATURES,
-    CONTROLLED_BASELINES,
-    Baseline,
-)
+from datp.core.enums import CLUSTER_FINGERPRINT_FEATURES
 from datp.core.errors import fmt
 
 _BYTES_PER_SCALAR = 4
 _MODULE = "federated.communication"
 
-# B4 downlink: server sends cluster assignment index + cluster-level threshold = 2 floats.
-_B4_DOWNLINK_FLOATS_PER_CLIENT = 2
+# Cluster threshold downlink: assignment index + cluster-level threshold.
+_CLUSTER_DOWNLINK_FLOATS_PER_CLIENT = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +31,7 @@ class RoundComm:
 
 @dataclass(frozen=True, slots=True)
 class ThresholdComm:
-    baseline: Baseline
+    policy: ThresholdPolicy
     server_uplink_payload_bytes: int
     server_downlink_payload_bytes: int
 
@@ -53,7 +50,7 @@ class TrainingCommSummary:
 @dataclass(frozen=True, slots=True)
 class CommSummary:
     training: TrainingCommSummary
-    threshold_calibration: dict[Baseline, ThresholdComm]
+    threshold_calibration: dict[ThresholdPolicy, ThresholdComm]
 
 
 def compute_model_bytes(param_count: int) -> int:
@@ -73,47 +70,41 @@ def compute_round_comm(
 
 
 def compute_threshold_comm(
-    baseline: Baseline,
+    policy: ThresholdPolicy,
     k_eligible: int,
     n_families: int,
 ) -> ThresholdComm:
-    if baseline == Baseline.B1:
+    if policy == ThresholdPolicy.GLOBAL_THRESHOLD:
         return ThresholdComm(
-            baseline=baseline,
+            policy=policy,
             server_uplink_payload_bytes=_BYTES_PER_SCALAR * k_eligible,
             server_downlink_payload_bytes=_BYTES_PER_SCALAR * k_eligible,
         )
-    if baseline == Baseline.B2:
-        # B2 computes the per-client threshold locally from calibration scores — no inter-client
+    if policy == ThresholdPolicy.LOCAL_THRESHOLD:
+        # LOCAL_THRESHOLD computes the per-client threshold locally from calibration scores — no inter-client
         # threshold communication is required; each client applies only its own quantile.
         return ThresholdComm(
-            baseline=baseline,
+            policy=policy,
             server_uplink_payload_bytes=0,
             server_downlink_payload_bytes=0,
         )
-    if baseline == Baseline.B3:
+    if policy == ThresholdPolicy.CLUSTER_THRESHOLD:
+        cluster_fingerprint_floats = len(CLUSTER_FINGERPRINT_FEATURES)
         return ThresholdComm(
-            baseline=baseline,
-            server_uplink_payload_bytes=_BYTES_PER_SCALAR * k_eligible,
-            server_downlink_payload_bytes=_BYTES_PER_SCALAR * n_families,
-        )
-    if baseline == Baseline.B4:
-        _b4_fingerprint_floats = len(B4_FINGERPRINT_FEATURES)
-        return ThresholdComm(
-            baseline=baseline,
-            server_uplink_payload_bytes=_b4_fingerprint_floats
+            policy=policy,
+            server_uplink_payload_bytes=cluster_fingerprint_floats
             * _BYTES_PER_SCALAR
             * k_eligible,
-            server_downlink_payload_bytes=_B4_DOWNLINK_FLOATS_PER_CLIENT
+            server_downlink_payload_bytes=_CLUSTER_DOWNLINK_FLOATS_PER_CLIENT
             * _BYTES_PER_SCALAR
             * k_eligible,
         )
     raise ValueError(
         fmt(
             _MODULE,
-            "Unknown baseline for comm overhead",
-            "one of ['b1', 'b2', 'b3', 'b4']",
-            repr(baseline),
+            "Unknown policy for comm overhead",
+            "one of ['global_threshold', 'local_threshold', 'cluster_threshold']",
+            repr(policy),
         )
     )
 
@@ -135,8 +126,8 @@ def build_comm_summary(
         total_downlink_bytes=model_bytes * num_clients * total_rounds,
     )
 
-    threshold_calibration: dict[Baseline, ThresholdComm] = {}
-    for bl in CONTROLLED_BASELINES:
+    threshold_calibration: dict[ThresholdPolicy, ThresholdComm] = {}
+    for bl in ThresholdPolicy:
         threshold_calibration[bl] = compute_threshold_comm(bl, k_eligible, n_families)
 
     return CommSummary(

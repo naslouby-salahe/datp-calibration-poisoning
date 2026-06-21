@@ -6,7 +6,7 @@ import pyarrow.parquet as pq
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from datp.artifacts.markers import write_json_atomic
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.core.errors import fmt, fmt_missing
 from datp.core.logging import get_logger
 from datp.data.contracts import PartitionResult
@@ -42,11 +42,11 @@ class AuditSummary(BaseModel):
 
 
 class PartitionAudit(BaseModel):
-    """Validated JSON payload for ``data_audit/<regime>_audit.json``."""
+    """Validated JSON payload for ``data_audit/<stage>_audit.json``."""
 
     model_config = ConfigDict(extra="forbid")
 
-    regime: Regime
+    stage: ExperimentStage
     n_clients: int = Field(ge=0)
     n_min: int = Field(ge=0)
     clients: dict[str, AuditClient]
@@ -101,7 +101,7 @@ class PartitionAudit(BaseModel):
 
 def audit_partitions(
     partition_results: dict[str, PartitionResult],
-    regime: Regime,
+    stage: ExperimentStage,
     output_dir: Path,
     n_min: int,
 ) -> PartitionAudit:
@@ -151,7 +151,7 @@ def audit_partitions(
     all_above_n_min = calibration_pending_count == 0
 
     audit_model = PartitionAudit(
-        regime=Regime(regime),
+        stage=stage,
         n_clients=len(partition_results),
         n_min=n_min,
         clients=clients,
@@ -167,7 +167,7 @@ def audit_partitions(
     )
     audit_dir = output_dir / DATA_AUDIT_DIR
     audit_dir.mkdir(parents=True, exist_ok=True)
-    audit_path = audit_dir / f"{regime}_audit.json"
+    audit_path = audit_dir / f"{stage.value}_audit.json"
     write_json_atomic(audit_path, audit_model)
 
     logger.info(

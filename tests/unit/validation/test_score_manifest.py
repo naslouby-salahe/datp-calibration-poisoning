@@ -13,8 +13,8 @@ import pytest
 from datp.artifacts.names import ArtifactFile
 from datp.core.enums import (
     SCORING_STAGES,
-    Regime,
 )
+from datp.config.stages import ExperimentStage
 from datp.data.catalog import DatasetID
 from datp.data.common.storage import write_artifact
 from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
@@ -43,7 +43,7 @@ def _build_cell(
     *,
     base_dir: Path,
     data_root: Path,
-    regime: Regime = Regime.A,
+    stage: ExperimentStage = ExperimentStage.NBAIOT_MAIN,
     seed: int = 0,
     clients: tuple[str, ...] = CLIENTS,
     dataset: DatasetID = DatasetID.NBAIOT,
@@ -55,14 +55,14 @@ def _build_cell(
     checkpoint_present: bool = True,
     write_partition: bool = True,
 ) -> Path:
-    """Construct a minimal Regime-A score cell + partition + checkpoint."""
-    cell_dir = base_dir / "scores" / regime.value / f"seed_{seed}"
+    """Construct a minimal score cell + partition + checkpoint."""
+    cell_dir = base_dir / "scores" / stage.value / f"seed_{seed}"
     cell_dir.mkdir(parents=True, exist_ok=True)
 
-    for stage in SCORING_STAGES:
+    for score_stage in SCORING_STAGES:
         for client_id in clients:
             arr = np.linspace(0.01, 0.05, 25, dtype=np.float32)
-            _write_score_parquet(cell_dir / stage.value / f"{client_id}.parquet", arr)
+            _write_score_parquet(cell_dir / score_stage.value / f"{client_id}.parquet", arr)
 
     if write_partition:
         partition_root = data_root / "data" / "processed" / dataset
@@ -88,7 +88,7 @@ def _build_cell(
     ckpt = (
         base_dir
         / "checkpoints"
-        / regime.value
+        / stage.value
         / f"seed_{seed}"
         / ArtifactFile.MODEL_CHECKPOINT
     )
@@ -103,9 +103,8 @@ def _build_cell(
         manifest = {
             "schema_version": "1",
             "dataset": dataset,
-            "regime": regime.value,
+            "stage": stage.value,
             "seed": seed,
-            "alpha": None,
             "model_checkpoint_path": str(ckpt.relative_to(data_root))
             if data_root in ckpt.parents
             else str(ckpt),
@@ -113,13 +112,13 @@ def _build_cell(
             "scoring_code_version": "fixture",
             "score_column_name": SCORE_COLUMN,
             "expected_client_ids": sorted(clients),
-            "expected_splits": [stage.value for stage in SCORING_STAGES],
+            "expected_splits": [s.value for s in SCORING_STAGES],
             "actual_client_ids": sorted(clients),
-            "actual_splits": sorted(stage.value for stage in SCORING_STAGES),
+            "actual_splits": sorted(s.value for s in SCORING_STAGES),
             "records": [
-                {"client_id": cid, "split": stage.value}
+                {"client_id": cid, "split": s.value}
                 for cid in clients
-                for stage in SCORING_STAGES
+                for s in SCORING_STAGES
             ],
             "completion_status": completion_status,
             "generated_at_utc": "2026-04-26T00:00:00+00:00",
@@ -152,7 +151,7 @@ def test_valid_cell_passes_all_checks(tmp_path: Path) -> None:
     report = verify_score_cell(cell, base_dir, data_root=tmp_path)
 
     assert report.overall_status == AuditStatus.PASS, report.checks
-    assert report.cell.regime == Regime.A
+    assert report.cell.stage == ExperimentStage.NBAIOT_MAIN
     assert report.cell.seed == 0
     assert set(report.expected_client_ids) == set(CLIENTS)
 
@@ -220,7 +219,7 @@ def test_missing_checkpoint_file_fails(tmp_path: Path) -> None:
     base_dir = tmp_path / "outputs"
     cell = _build_cell(base_dir=base_dir, data_root=tmp_path)
     # Remove the actual checkpoint file.
-    (base_dir / "checkpoints" / "a" / "seed_0" / ArtifactFile.MODEL_CHECKPOINT).unlink()
+    (base_dir / "checkpoints" / ExperimentStage.NBAIOT_MAIN.value / "seed_0" / ArtifactFile.MODEL_CHECKPOINT).unlink()
 
     report = verify_score_cell(cell, base_dir, data_root=tmp_path)
 
@@ -338,11 +337,11 @@ def test_client_mismatch_vs_partition_fails(tmp_path: Path) -> None:
 
 def test_iter_score_cells_and_verify_all(tmp_path: Path) -> None:
     base_dir = tmp_path / "outputs"
-    _build_cell(base_dir=base_dir, data_root=tmp_path, regime=Regime.A, seed=0)
-    _build_cell(base_dir=base_dir, data_root=tmp_path, regime=Regime.A, seed=1)
+    _build_cell(base_dir=base_dir, data_root=tmp_path, stage=ExperimentStage.NBAIOT_MAIN, seed=0)
+    _build_cell(base_dir=base_dir, data_root=tmp_path, stage=ExperimentStage.NBAIOT_MAIN, seed=1)
 
     cells = iter_score_cells(base_dir)
-    assert {(c.regime, c.seed) for c in cells} == {(Regime.A, 0), (Regime.A, 1)}
+    assert {(c.stage, c.seed) for c in cells} == {(ExperimentStage.NBAIOT_MAIN, 0), (ExperimentStage.NBAIOT_MAIN, 1)}
 
     reports = verify_all_score_cells(base_dir, data_root=tmp_path, write_reports=True)
     assert len(reports) == 2

@@ -1,16 +1,10 @@
 # reviewer-agent
 
-> **CP2 active.** This repo is executing the CP2 program — **calibration-channel
-> poisoning only**. Locks: `CLAUDE.md` + `docs/tickets/README.md` §9. Workflow:
-> `docs/tickets/TICKET_INDEX.md`; progress in
-> `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`. No backward compatibility
-> by default. Run `graphify update .` where applicable. Tests: unit → integration
-> → e2e (`tests/`). Manuscript evidence →
-> `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md`.
+> **datp-cp active.** Protocol of record: `docs/DATP_CP_Roadmap.md`.
+> No backward compatibility by default. Tests: unit → integration (`tests/`).
 > Forbidden: training/model/aggregation/test-data poisoning, Edge-IIoTset,
-> FedProx/Ditto/FedRep/FedPer/Laridi/B-FedStatsBenign, conformal/temporal
-> recalibration, journal-extension scope. Default policies
-> `{B1_GLOBAL, B2_PERSONALIZED, B4_CLUSTER}` — B3 excluded.
+> conformal/temporal recalibration, journal-extension scope.
+> Canonical policies: `GLOBAL_THRESHOLD`, `LOCAL_THRESHOLD`, `CLUSTER_THRESHOLD`.
 
 ## Role
 
@@ -100,10 +94,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## Review Questions
 
 1. Is the controlled variable truly isolated?
-2. Are B1, B2, B3, and B4 fairly compared?
-3. Are all baselines derived from the same scores?
-4. Is Regime A treated as confirmatory?
-5. Are supportive and exploratory regimes clearly labeled?
+2. Are GLOBAL_THRESHOLD, LOCAL_THRESHOLD, and CLUSTER_THRESHOLD fairly compared?
+3. Are all policies derived from the same scores?
+4. Are NBAIOT_MAIN results treated as confirmatory and STRETCH_DIAGNOSTIC_ONLY clearly labeled?
+5. Are supportive and diagnostic results clearly labeled?
 6. Are statistics sufficient?
 7. Are metrics reported with required context?
 8. Are limitations honest?

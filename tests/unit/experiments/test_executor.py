@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -6,16 +7,11 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from datp.core.enums import (
-    ISOLATED_BASELINES,
-    Activation,
-    Baseline,
-    Regime,
-)
+from datp.core.enums import Activation
+from datp.config.stages import ExperimentStage
 from datp.core.identity import TrainingCellId
 from datp.experiments.enums import SweepStep
 from datp.experiments.executor import (
-    IsolatedBaselineExecutor,
     SharedTrainingExecutor,
     ThresholdEvaluationExecutor,
 )
@@ -24,11 +20,9 @@ from datp.experiments.stages.train_encoder import ensure_fl_checkpoint
 
 
 def _make_request(
-    baseline: Baseline,
+    policy: ThresholdPolicy,
     tmp_path: Path,
-    regime: Regime = Regime.A,
     seed: int = 1,
-    alpha: float | None = None,
 ) -> PipelineRequest:
     cfg = MagicMock()
     cfg.threshold.n_min = 100
@@ -41,83 +35,16 @@ def _make_request(
     cfg.model.activation = Activation.RELU
     cfg.model.use_bn = True
     cfg.machine.batch_size_train = 256
-    cfg.dataset.b0_val_fraction = 0.1
     cfg.logging.training_progress_interval = 10
     cfg.runtime.lock_timeout_seconds = 60.0
     return PipelineRequest(
-        key=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
-        baseline=baseline,
+        key=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed),
+        policy=policy,
         cfg=cfg,
         base_dir=tmp_path,
         prepared_dir=tmp_path / "prepared",
         checkpoint_round=None,
     )
-
-
-class TestIsolatedBaselinesConstant:
-    def test_does_not_contain_shared_baselines(self) -> None:
-        for bl in (Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4):
-            assert bl not in ISOLATED_BASELINES
-
-    def test_is_frozenset(self) -> None:
-        assert isinstance(ISOLATED_BASELINES, frozenset)
-
-
-class TestIsolatedBaselineExecutor:
-    def test_raises_for_shared_baseline(self, tmp_path: Path) -> None:
-        executor = IsolatedBaselineExecutor(step_fn=None)
-        request = _make_request(Baseline.B1, tmp_path)
-        with pytest.raises(ValueError):
-            executor.run(request)
-
-    def test_raises_for_b2(self, tmp_path: Path) -> None:
-        executor = IsolatedBaselineExecutor(step_fn=None)
-        request = _make_request(Baseline.B2, tmp_path)
-        with pytest.raises(ValueError):
-            executor.run(request)
-
-    def test_dispatches_b0(self, tmp_path: Path) -> None:
-        executor = IsolatedBaselineExecutor(step_fn=None)
-        request = _make_request(Baseline.B0, tmp_path, regime=Regime.A, seed=42)
-
-        with (
-            patch("datp.experiments.baselines.b0_centralized.run_b0") as mock_b0,
-            patch("datp.experiments.executor.IsolatedBaselineExecutor._step"),
-        ):
-            executor.run(request)
-
-        mock_b0.assert_called_once()
-        (b0_request,) = mock_b0.call_args[0]
-        assert b0_request.seed == 42
-        assert b0_request.regime == Regime.A
-
-    def test_step_fn_called(self, tmp_path: Path) -> None:
-        step_calls: list[tuple[SweepStep, str]] = []
-
-        def record_step(step: SweepStep, detail: str = "") -> None:
-            step_calls.append((step, detail))
-
-        executor = IsolatedBaselineExecutor(step_fn=record_step)
-        request = _make_request(Baseline.B0, tmp_path, regime=Regime.A, seed=1)
-
-        with patch("datp.experiments.baselines.b0_centralized.run_b0"):
-            executor.run(request)
-
-        assert len(step_calls) >= 1
-        assert step_calls[0][0] == SweepStep.RUN_B0
-
-    def test_no_step_fn_no_error(self, tmp_path: Path) -> None:
-        executor = IsolatedBaselineExecutor(step_fn=None)
-        request = _make_request(Baseline.B0, tmp_path)
-
-        with patch("datp.experiments.baselines.b0_centralized.run_b0"):
-            executor.run(request)  # should not raise
-
-    def test_error_message_includes_isolated_baselines(self, tmp_path: Path) -> None:
-        executor = IsolatedBaselineExecutor(step_fn=None)
-        request = _make_request(Baseline.B3, tmp_path)
-        with pytest.raises(ValueError, match="Not an isolated baseline"):
-            executor.run(request)
 
 
 class TestSharedTrainingExecutor:
@@ -135,7 +62,7 @@ class TestSharedTrainingExecutor:
         executor = SharedTrainingExecutor(
             step_fn=record_step, checkpoint_status_fn=None
         )
-        request = _make_request(Baseline.B1, tmp_path)
+        request = _make_request(ThresholdPolicy.GLOBAL_THRESHOLD, tmp_path)
 
         with (
             patch.object(executor, "_step_fn", wraps=record_step),
@@ -168,7 +95,7 @@ class TestSharedTrainingExecutor:
 
     def test_build_context_returns_typed_context(self, tmp_path: Path) -> None:
         executor = SharedTrainingExecutor(step_fn=None, checkpoint_status_fn=None)
-        request = _make_request(Baseline.B1, tmp_path)
+        request = _make_request(ThresholdPolicy.GLOBAL_THRESHOLD, tmp_path)
 
         with (
             patch("datp.experiments.executor.ensure_fl_checkpoint"),
@@ -211,7 +138,7 @@ class TestThresholdEvaluationExecutor:
         from datp.thresholding.metrics_serialization import SweepMetrics
 
         executor = ThresholdEvaluationExecutor(step_fn=None)
-        request = _make_request(Baseline.B2, tmp_path)
+        request = _make_request(ThresholdPolicy.LOCAL_THRESHOLD, tmp_path)
 
         ctx = SharedPipelineContext(
             key=request.key,
@@ -236,7 +163,7 @@ class TestThresholdEvaluationExecutor:
                 ),
             ),
             patch(
-                "datp.experiments.executor.evaluate_baseline",
+                "datp.experiments.executor.evaluate_policy_run",
                 return_value=MagicMock(),
             ),
             patch(
@@ -258,7 +185,7 @@ class TestThresholdEvaluationExecutor:
             step_calls.append((step, detail))
 
         executor = ThresholdEvaluationExecutor(step_fn=record_step)
-        request = _make_request(Baseline.B2, tmp_path)
+        request = _make_request(ThresholdPolicy.LOCAL_THRESHOLD, tmp_path)
 
         ctx = SharedPipelineContext(
             key=request.key,
@@ -282,7 +209,7 @@ class TestThresholdEvaluationExecutor:
                 ),
             ),
             patch(
-                "datp.experiments.executor.evaluate_baseline",
+                "datp.experiments.executor.evaluate_policy_run",
                 return_value=MagicMock(),
             ),
             patch(
@@ -303,19 +230,20 @@ class TestEnsureFlCheckpoint:
     def test_lock_wraps_score_only_recovery(self, tmp_path: Path) -> None:
         cfg = MagicMock()
         request = PipelineRequest(
-            key=TrainingCellId(regime=Regime.A, seed=4, alpha=None),
-            baseline=Baseline.B1,
+            key=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=4),
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             cfg=cfg,
             base_dir=tmp_path,
             prepared_dir=tmp_path / "prepared",
             checkpoint_round=None,
         )
-        ckpt_dir = tmp_path / "checkpoints" / "a" / "seed_4"
+        (tmp_path / "prepared").mkdir(parents=True, exist_ok=True)
+        ckpt_dir = tmp_path / "checkpoints" / "nbaiot_main" / "seed_4"
         ckpt_dir.mkdir(parents=True, exist_ok=True)
         ckpt = ckpt_dir / "model.pt"
         ckpt.touch()
 
-        score_dir = tmp_path / "scores" / "a" / "seed_4"
+        score_dir = tmp_path / "scores" / "nbaiot_main" / "seed_4"
         score_dir.mkdir(parents=True, exist_ok=True)
 
         class _Lock:
@@ -355,18 +283,19 @@ class TestEnsureFlCheckpoint:
         cfg = MagicMock()
         cfg.machine.require_cuda = False
         request = PipelineRequest(
-            key=TrainingCellId(regime=Regime.A, seed=5, alpha=None),
-            baseline=Baseline.B1,
+            key=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=5),
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             cfg=cfg,
             base_dir=tmp_path,
             prepared_dir=tmp_path / "prepared",
             checkpoint_round=None,
         )
-        ckpt_dir = tmp_path / "checkpoints" / "a" / "seed_5"
+        (tmp_path / "prepared").mkdir(parents=True, exist_ok=True)
+        ckpt_dir = tmp_path / "checkpoints" / "nbaiot_main" / "seed_5"
         ckpt_dir.mkdir(parents=True, exist_ok=True)
         (ckpt_dir / "model.pt").touch()
 
-        score_dir = tmp_path / "scores" / "a" / "seed_5"
+        score_dir = tmp_path / "scores" / "nbaiot_main" / "seed_5"
         score_dir.mkdir(parents=True, exist_ok=True)
 
         with (
@@ -375,6 +304,7 @@ class TestEnsureFlCheckpoint:
                 return_value={"records": []},
             ),
             patch("datp.federated.protocols.fedavg.run_fl_training") as run_fl,
+            patch("datp.federated.data_loading.discover_client_dirs", return_value=[]),
         ):
             ensure_fl_checkpoint(
                 request,
@@ -389,8 +319,8 @@ class TestEnsureFlCheckpoint:
         cfg = MagicMock()
         cfg.machine.require_cuda = False
         request = PipelineRequest(
-            key=TrainingCellId(regime=Regime.A, seed=6, alpha=None),
-            baseline=Baseline.B1,
+            key=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=6),
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             cfg=cfg,
             base_dir=tmp_path,
             prepared_dir=tmp_path / "prepared",

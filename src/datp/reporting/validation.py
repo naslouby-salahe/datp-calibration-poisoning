@@ -1,15 +1,16 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from collections.abc import Sequence
 
-from datp.core.enums import MAIN_BODY_BASELINES, Baseline
+from datp.core.enums import MAIN_BODY_POLICIES
 
 
-def validate_main_body_role(baselines: Sequence[Baseline]) -> None:
-    for b in baselines:
-        if b not in MAIN_BODY_BASELINES:
+def validate_main_body_role(policies: Sequence[ThresholdPolicy]) -> None:
+    for p in policies:
+        if p not in MAIN_BODY_POLICIES:
             raise ValueError(
-                f"[reporting] Baseline '{b}' is not permitted in main-body "
+                f"[reporting] ThresholdPolicy '{p}' is not permitted in main-body "
                 f"figures/tables. "
-                f"Allowed: {sorted(b.value for b in MAIN_BODY_BASELINES)}"
+                f"Allowed: {sorted(p.value for p in MAIN_BODY_POLICIES)}"
             )

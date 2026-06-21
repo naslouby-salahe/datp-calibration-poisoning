@@ -1,4 +1,4 @@
-"""B1/B2 threshold recomputation under calibration poisoning.
+"""GLOBAL_THRESHOLD/LOCAL_THRESHOLD threshold recomputation under calibration poisoning.
 
 Thin adapter over the inherited thresholding strategies. Accepts a clean
 ScoreCollection and a poisoned calibration dict, and returns typed
@@ -7,9 +7,9 @@ clean/poisoned threshold pairs.
 Eligibility is fixed from the clean collection (cardinality is preserved under
 REPLACE_FIXED_BUDGET, so eligible/pending partition never changes).
 
-B1 (global): tau_global = mean of per-client eligible percentiles.
+GLOBAL_THRESHOLD: tau_global = mean of per-client eligible percentiles.
   Poisoning one victim shifts the global mean.
-B2 (personalized): each eligible client has its own percentile threshold.
+LOCAL_THRESHOLD: each eligible client has its own percentile threshold.
   Poisoning one victim changes only that victim's threshold.
 
 Pending clients receive tau_global in both policies.
@@ -22,7 +22,6 @@ import numpy as np
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.enums import ThresholdPolicy
 from datp.attacks.types import PoisonedCalibrationSet, ThresholdPairBase
-from datp.core.enums import Baseline
 from datp.core.types import ClientThreshold
 from datp.thresholding.eligibility import (
     CalibrationErrorSet,
@@ -49,7 +48,7 @@ def _error_set_from_poisoned(
 
 
 def _uniform_thresholds(
-    eligible_ids: tuple[str, ...], tau: float, strategy: Baseline
+    eligible_ids: tuple[str, ...], tau: float, strategy: ThresholdPolicy
 ) -> ClientThresholdsCollection:
     return ClientThresholdsCollection(
         entries=tuple(
@@ -64,14 +63,14 @@ def _uniform_thresholds(
     )
 
 
-def compute_b1_pair(
+def compute_global_pair(
     collection: ScoreCollection,
     poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
     q: float,
 ) -> ThresholdPair:
-    """Compute B1 (global) threshold pair from clean vs poisoned cal.
+    """Compute GLOBAL_THRESHOLD threshold pair from clean vs poisoned cal.
 
-    B1 tau_global = (1/K_elig) × Σ τᵢ over eligible clients.
+    GLOBAL_THRESHOLD tau_global = (1/K_elig) × Σ τᵢ over eligible clients.
     When a victim's cal is poisoned, their τᵢ changes, shifting tau_global.
     All clients (eligible and pending) receive the same tau_global.
 
@@ -93,12 +92,12 @@ def compute_b1_pair(
     )
     tau_global_pois = compute_tau_global(taus_pois)
 
-    # B1: all eligible clients share tau_global; per-client dict is uniform.
-    thresholds_clean = _uniform_thresholds(eligible_ids, tau_global_clean, Baseline.B1)
-    thresholds_pois = _uniform_thresholds(eligible_ids, tau_global_pois, Baseline.B1)
+    # GLOBAL_THRESHOLD: all eligible clients share tau_global; per-client dict is uniform.
+    thresholds_clean = _uniform_thresholds(eligible_ids, tau_global_clean, ThresholdPolicy.GLOBAL_THRESHOLD)
+    thresholds_pois = _uniform_thresholds(eligible_ids, tau_global_pois, ThresholdPolicy.GLOBAL_THRESHOLD)
 
     return ThresholdPair(
-        policy=ThresholdPolicy.B1_GLOBAL,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         tau_global_clean=tau_global_clean,
         tau_global_pois=tau_global_pois,
         thresholds_clean=thresholds_clean,
@@ -106,19 +105,19 @@ def compute_b1_pair(
     )
 
 
-def compute_b2_pair(
+def compute_local_pair(
     collection: ScoreCollection,
     poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
     q: float,
     tau_global_clean: float,
 ) -> ThresholdPair:
-    """Compute B2 (personalized) threshold pair from clean vs poisoned cal.
+    """Compute LOCAL_THRESHOLD threshold pair from clean vs poisoned cal.
 
-    B2: each eligible client has τᵢ = percentile_q(cal_i).
+    LOCAL_THRESHOLD: each eligible client has τᵢ = percentile_q(cal_i).
     Poisoning victim v only changes τ_v; other clients are unchanged.
-    tau_global_clean is the B1 global threshold (used as fallback for pending;
-    it is also the reference tau_global for B2 — computed from B1).
-    tau_global_pois for B2 is recomputed (mean of poisoned per-client taus).
+    tau_global_clean is the GLOBAL_THRESHOLD threshold (used as fallback for pending;
+    it is also the reference tau_global for LOCAL_THRESHOLD — computed from GLOBAL_THRESHOLD).
+    tau_global_pois for LOCAL_THRESHOLD is recomputed (mean of poisoned per-client taus).
 
     poisoned_cal must contain entries for all eligible clients.
     """
@@ -138,7 +137,7 @@ def compute_b2_pair(
     tau_global_pois = compute_tau_global(taus_pois)
 
     return ThresholdPair(
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         tau_global_clean=tau_global_clean,
         tau_global_pois=tau_global_pois,
         thresholds_clean=taus_clean,

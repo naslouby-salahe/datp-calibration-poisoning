@@ -1,11 +1,11 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 
 import numpy as np
 import pytest
 
-from datp.core.enums import Baseline
 from datp.core.types import ClientThreshold
 from datp.evaluation.metrics import compute_client_record, recompute_binary_metrics
 
@@ -18,7 +18,7 @@ class TestRecomputeBinaryMetrics:
             client_id="c",
             threshold=0.5,
             calibration_pending=False,
-            strategy=Baseline.B1,
+            strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         )
         cr = compute_client_record("c", benign, attack, ct)
         bm = recompute_binary_metrics(

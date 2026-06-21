@@ -5,6 +5,7 @@ scientific parameters downstream.
 """
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -14,11 +15,9 @@ from datp.checkpointing.enums import (
     CheckpointProtocolMode,
     PrimaryCheckpointSelectionRule,
 )
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
     Activation,
-    B4RegimeAMode,
-    Baseline,
-    Regime,
 )
 
 
@@ -61,9 +60,6 @@ class DatasetConfig(BaseModel):
     feature_count: int
     n_min: int
     cap: int
-    b0_val_fraction: float
-    regime_c_train_fraction: float
-    regime_c_cal_fraction: float
     attack_reserve_fraction: float
     nbaiot_balanced_test: bool
 
@@ -109,12 +105,9 @@ def _validate_checkpoint_milestones(
 
 
 def _validate_checkpoint_selection(
-    regime: Regime,
     rule: PrimaryCheckpointSelectionRule,
 ) -> None:
-    if regime != Regime.A:
-        raise ValueError("checkpoint selection must use Regime A")
-    if rule != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A:
+    if rule != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_NBAIOT_MAIN:
         raise ValueError("unsupported primary checkpoint selection rule")
 
 
@@ -137,17 +130,13 @@ class CheckpointProtocolConfig(BaseModel):
     max_rounds: int = Field(gt=0)
     milestones: tuple[int, ...]
     convergence_mode: CheckpointConvergenceMode
-    primary_selection_regime: Regime
     primary_selection_rule: PrimaryCheckpointSelectionRule
     artifact_path_mode: CheckpointArtifactPathMode
 
     @model_validator(mode="after")
     def validate_checkpoint_protocol(self) -> "CheckpointProtocolConfig":
         _validate_checkpoint_milestones(self.milestones, self.max_rounds)
-        _validate_checkpoint_selection(
-            self.primary_selection_regime,
-            self.primary_selection_rule,
-        )
+        _validate_checkpoint_selection(self.primary_selection_rule)
         _validate_checkpoint_modes(self.convergence_mode, self.artifact_path_mode)
         return self
 
@@ -160,19 +149,16 @@ class ThresholdConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     n_min: int
     q: float
-    b4_regime_a_mode: B4RegimeAMode
-    b4_k_regime_a: int
-    b4_k_candidates: list[int]
-    b4_n_init: int
-    b4_max_iter: int
-    b4_random_state: int
+    cluster_k_nbaiot: int
+    cluster_k_candidates: list[int]
+    cluster_n_init: int
+    cluster_max_iter: int
+    cluster_random_state: int
 
 
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     seeds: list[int]
-    regime_c_alphas: list[float]
-    regime_c_n_clients: int
     absorption_strong_retention: float = 0.0
     absorption_partial: float = 0.0
 
@@ -183,14 +169,12 @@ class StatisticsConfig(BaseModel):
     ci_level: float
     bootstrap_seed: int
     significance_alpha: float
-    # Preliminary single-seed GO threshold for CV(FPR)[B1, Regime A].
+    # Preliminary single-seed GO threshold for CV(FPR)[GLOBAL_THRESHOLD, NBAIOT_MAIN].
     dispersion_threshold: float
 
 
 class QualityGateConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    b0_sanity_min: float
-    b3_dispersion_threshold: float
     ciciot_homogeneity_threshold: float
     js_divergence_n_bins: int
 
@@ -201,8 +185,8 @@ class StyleConfig(BaseModel):
     font_size: int
     figsize_single_col: tuple[float, float]
     figsize_double_col: tuple[float, float]
-    baseline_colors: dict[Baseline, str]
-    baseline_labels: dict[Baseline, str]
+    policy_colors: dict[ThresholdPolicy, str]
+    policy_labels: dict[ThresholdPolicy, str]
 
 
 class LoggingConfig(BaseModel):
@@ -251,10 +235,9 @@ class DatpConfig(BaseModel):
     logging: LoggingConfig
     tracking: TrackingConfig
 
-    regime: Regime | None = None
-    baseline: Baseline | None = None
+    stage: ExperimentStage | None = None
+    policy: ThresholdPolicy | None = None
     seed: int | None = None
-    alpha: float | None = None
 
     @model_validator(mode="after")
     def check_input_dim_matches_features(self) -> "DatpConfig":

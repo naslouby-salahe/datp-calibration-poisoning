@@ -1,2 +1,2 @@
 # SPDX-License-Identifier: Proprietary
-"""Threshold derivation strategies (B0-B4), eligibility, and metrics serialization."""
+"""Threshold derivation strategies (GLOBAL, LOCAL, CLUSTER), eligibility, and metrics serialization."""

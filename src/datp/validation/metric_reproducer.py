@@ -1,11 +1,12 @@
-"""Per-cell metric reproduction: recompute B1/B2/B3/B4 from stored scores and compare to stored metrics.json.
+"""Per-cell metric reproduction: recompute threshold policies from stored scores and compare to stored metrics.json.
 
-Reuses canonical threshold computation (``baselines.common.thresholds.derive_threshold``),
+Reuses canonical threshold computation (``thresholding.thresholds.derive_threshold``),
 canonical metric computation (``evaluation.metrics``), and canonical score loading
 (``evaluation.score_loading``). Does not retrain, re-score, or modify any formula.
 """
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import enum
 import json
@@ -21,18 +22,17 @@ from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile
 from datp.config.compose import compose_config
 from datp.config.models import DatpConfig
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
-    Baseline,
-    Regime,
+    CONTROLLED_POLICIES,
     ScoringStage,
-    controlled_baselines_for_regime,
 )
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.metric_enums import ConfusionKey, MetricName, PayloadKey
 from datp.core.types import ThresholdResult
 from datp.evaluation.metrics import (
     EvaluationResult,
-    evaluate_baseline,
+    evaluate_policy_run,
 )
 from datp.scoring.loading import ScoreProvider, load_parquets_from_dir
 from datp.thresholding.thresholds import _DeriveInput, derive_threshold
@@ -99,9 +99,9 @@ def _format_check_detail(
     return ", ".join(parts)
 
 
-class BaselineReproductionResult(BaseModel):
+class PolicyReproductionResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    baseline: Baseline
+    policy: ThresholdPolicy
     status: AuditStatus
     metrics_path: str
     recomputed: dict[str, Any]
@@ -113,8 +113,8 @@ class CellReproductionResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
     cell: TrainingCellId
     overall_status: AuditStatus
-    baselines: list[BaselineReproductionResult]
-    missing_baselines: list[Baseline] = Field(default_factory=list)
+    policies: list[PolicyReproductionResult]
+    missing_policies: list[ThresholdPolicy] = Field(default_factory=list)
 
 
 def _abs_diff(expected: float | None, actual: float | None) -> float | None:
@@ -341,16 +341,14 @@ def _normalize_per_client(stored: dict[str, Any]) -> list[dict[str, Any]]:
 def _evaluate(
     threshold_result: ThresholdResult,
     score_provider: ScoreProvider,
-    regime: Regime,
+    stage: ExperimentStage,
     seed: int,
-    alpha: float | None,
 ) -> tuple[EvaluationResult, dict[str, float]]:
-    evaluation = evaluate_baseline(
+    evaluation = evaluate_policy_run(
         threshold_result.client_thresholds,
         Path(""),
-        regime,
+        stage,
         seed,
-        alpha,
         score_provider=score_provider,
     )
     client_thresholds = {
@@ -359,28 +357,24 @@ def _evaluate(
     return evaluation, client_thresholds
 
 
-def _compute_b1_tau_global(
+def _compute_global_tau_global(
     cal_errors: dict[str, np.ndarray],
     cfg: DatpConfig,
-    regime: Regime,
     *,
     seed: int = 0,
-    alpha: float | None = None,
 ) -> float:
-    b1_result = derive_threshold(
+    global_result = derive_threshold(
         _DeriveInput(
-            baseline=Baseline.B1,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
             q=cfg.threshold.q,
             tau_global=0.0,
-            regime=regime,
             threshold_cfg=cfg.threshold,
             seed=seed,
-            alpha=alpha,
         )
     )
-    return float(b1_result.tau_global)
+    return float(global_result.tau_global)
 
 
 def _stored_per_client_map(stored: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -398,7 +392,7 @@ def _stored_scalar(stored: dict[str, Any], field: str) -> Any:
     return aggregate.get(field)
 
 
-def _scalar_checks_for_baseline(
+def _scalar_checks_for_policy_run(
     stored: dict[str, Any],
     evaluation: EvaluationResult,
     threshold_result: ThresholdResult,
@@ -508,14 +502,14 @@ def _per_client_checks(
     ]
 
 
-def _build_baseline_checks(
+def _build_policy_checks(
     *,
     stored: dict[str, Any],
     evaluation: EvaluationResult,
     threshold_result: ThresholdResult,
     client_thresholds_actual: dict[str, float],
 ) -> list[ValidationCheck]:
-    checks = _scalar_checks_for_baseline(stored, evaluation, threshold_result)
+    checks = _scalar_checks_for_policy_run(stored, evaluation, threshold_result)
     checks.extend(_count_and_id_checks(stored, evaluation))
     checks.extend(
         _per_client_checks(
@@ -531,10 +525,9 @@ def _serialize_recomputed(
     client_thresholds: dict[str, float],
 ) -> dict[str, Any]:
     return {
-        PayloadKey.BASELINE: evaluation.baseline.value,
-        PayloadKey.REGIME: evaluation.regime.value,
+        PayloadKey.POLICY: evaluation.policy.value,
+        PayloadKey.STAGE: evaluation.stage.value,
         PayloadKey.SEED: evaluation.seed,
-        PayloadKey.ALPHA: evaluation.alpha,
         PayloadKey.DATASET: evaluation.dataset,
         MetricName.TAU_GLOBAL: float(threshold_result.tau_global),
         PayloadKey.COVERAGE_RATIO: evaluation.coverage_ratio,
@@ -577,10 +570,9 @@ def _serialize_recomputed(
 
 def _select_stored_summary(stored: dict[str, Any]) -> dict[str, Any]:
     keys = (
-        PayloadKey.BASELINE,
-        PayloadKey.REGIME,
+        PayloadKey.POLICY,
+        PayloadKey.STAGE,
         PayloadKey.SEED,
-        PayloadKey.ALPHA,
         PayloadKey.DATASET,
         MetricName.TAU_GLOBAL,
         PayloadKey.COVERAGE_RATIO,
@@ -604,49 +596,46 @@ def _select_stored_summary(stored: dict[str, Any]) -> dict[str, Any]:
     return {k: stored.get(k) for k in keys}
 
 
-def _reproduce_one_baseline(
-    baseline: Baseline,
+def _reproduce_one_policy(
+    policy: ThresholdPolicy,
     cell: TrainingCellId,
     layout: ArtifactLayout,
     cal_errors: dict[str, np.ndarray],
     score_provider: ScoreProvider,
     cfg: DatpConfig,
-    tau_global_b1: float,
-) -> BaselineReproductionResult | None:
-    """Reproduce a single baseline for a cell; returns None when metrics artifact is absent."""
-    run = BaselineRunId(cell=cell, baseline=baseline)
-    metrics_path = layout.baseline_run(run).result_dir / ArtifactFile.METRICS
+    tau_global_ref: float,
+) -> PolicyReproductionResult | None:
+    """Reproduce a single policy run for a cell; returns None when metrics artifact is absent."""
+    run = PolicyRunId(cell=cell, policy=policy)
+    metrics_path = layout.policy_run(run).result_dir / ArtifactFile.METRICS
     if not metrics_path.exists():
         return None
     stored = _read_metrics_json(metrics_path)
     threshold_result = derive_threshold(
         _DeriveInput(
-            baseline=baseline,
+            policy=policy,
             client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
             q=cfg.threshold.q,
-            tau_global=tau_global_b1,
-            regime=cell.regime,
+            tau_global=tau_global_ref,
             threshold_cfg=cfg.threshold,
             seed=cell.seed,
-            alpha=cell.alpha,
         )
     )
     evaluation, client_thresholds = _evaluate(
         threshold_result,
         score_provider,
-        cell.regime,
+        cell.stage,
         cell.seed,
-        cell.alpha,
     )
-    checks = _build_baseline_checks(
+    checks = _build_policy_checks(
         stored=stored,
         evaluation=evaluation,
         threshold_result=threshold_result,
         client_thresholds_actual=client_thresholds,
     )
-    return BaselineReproductionResult(
-        baseline=baseline,
+    return PolicyReproductionResult(
+        policy=policy,
         status=_overall_status(checks),
         metrics_path=str(metrics_path),
         recomputed=_serialize_recomputed(
@@ -663,69 +652,67 @@ def reproduce_cell_metrics(
     *,
     config: DatpConfig | None = None,
 ) -> CellReproductionResult:
-    """Reproduce metrics for every baseline result that exists for the given score cell.
+    """Reproduce metrics for every policy result that exists for the given score cell.
 
-    ``cell_dir`` is the score cell directory ``<base_dir>/scores/<regime>/seed_N[/alpha_*]/``.
+    ``cell_dir`` is the score cell directory ``<base_dir>/scores/<stage>/seed_N/``.
     ``base_dir`` is the experiment root (containing ``scores/`` and ``results/``).
     ``config`` overrides the composed runtime config (used in tests). When None, the canonical
-    config is composed via Hydra using the cell's regime/seed/alpha.
+    config is composed via Hydra using the cell's stage/seed.
 
-    Raises FileNotFoundError when no baseline metrics.json exist for the cell.
+    Raises FileNotFoundError when no policy metrics.json exist for the cell.
     """
     cell_dir = cell_dir.resolve()
     base_dir = base_dir.resolve()
     scores_root = base_dir / ArtifactDir.SCORES
     location = parse_score_cell_dir(scores_root, cell_dir)
-    regime = location.regime
-    seed = location.seed
-    alpha = location.alpha
+    stage = location.cell.stage
+    seed = location.cell.seed
 
-    layout = ArtifactLayout(base_dir=base_dir, regime=regime)
-    cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
+    layout = ArtifactLayout(base_dir=base_dir, stage=stage)
+    cell = TrainingCellId(stage=stage, seed=seed)
     score_root = layout.score_cell(cell).score_dir
     cal_errors = load_parquets_from_dir(score_root / ScoringStage.CAL)
     score_provider = ScoreProvider(score_root)
 
     cfg = config or compose_config(
-        regime=regime,
-        baseline=Baseline.B1,
+        stage=stage,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         seed=seed,
-        alpha=alpha,
     )
-    tau_global_b1 = _compute_b1_tau_global(
-        cal_errors, cfg, regime, seed=seed, alpha=alpha
+    tau_global_ref = _compute_global_tau_global(
+        cal_errors, cfg, seed=seed
     )
 
-    baseline_results: list[BaselineReproductionResult] = []
-    missing_baselines: list[Baseline] = []
-    for baseline in controlled_baselines_for_regime(regime):
-        result = _reproduce_one_baseline(
-            baseline, cell, layout, cal_errors, score_provider, cfg, tau_global_b1
+    policy_results: list[PolicyReproductionResult] = []
+    missing_policies: list[ThresholdPolicy] = []
+    for policy in CONTROLLED_POLICIES:
+        result = _reproduce_one_policy(
+            policy, cell, layout, cal_errors, score_provider, cfg, tau_global_ref
         )
         if result is None:
-            missing_baselines.append(baseline)
+            missing_policies.append(policy)
         else:
-            baseline_results.append(result)
+            policy_results.append(result)
 
     overall = _aggregate_overall(
-        [br.status for br in baseline_results], missing_baselines
+        [pr.status for pr in policy_results], missing_policies
     )
     return CellReproductionResult(
-        cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
+        cell=TrainingCellId(stage=stage, seed=seed),
         overall_status=overall,
-        baselines=baseline_results,
-        missing_baselines=missing_baselines,
+        policies=policy_results,
+        missing_policies=missing_policies,
     )
 
 
 def _aggregate_overall(
     statuses: list[AuditStatus],
-    missing_baselines: list[Baseline],
+    missing_policies: list[ThresholdPolicy],
 ) -> AuditStatus:
     if AuditStatus.FAIL in statuses:
         return AuditStatus.FAIL
     any_incomplete = (
-        bool(missing_baselines)
+        bool(missing_policies)
         or AuditStatus.MISSING in statuses
         or AuditStatus.PARTIAL in statuses
     )

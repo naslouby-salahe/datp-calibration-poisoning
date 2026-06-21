@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Proprietary
-"""Shared FL simulation orchestration — train once per (regime, seed, α); score artifacts produced afterward."""
+"""Shared FL simulation orchestration — train once per (stage, seed); score artifacts produced afterward."""
 
 from __future__ import annotations
 
@@ -22,7 +22,8 @@ from datp.artifacts.lifecycle import RunLifecycle
 from datp.artifacts.names import ArtifactDir, ArtifactFile
 from datp.config.models import CheckpointProtocolConfig, DatpConfig
 from datp.core.device import resolve_device
-from datp.core.enums import DeviceType, Regime
+from datp.config.stages import ExperimentStage
+from datp.core.enums import DeviceType
 from datp.core.errors import fmt
 from datp.core.logging import get_logger
 from datp.core.seeds import set_seeds
@@ -37,7 +38,7 @@ from datp.core.tracking import (
     log_metrics,
     log_params,
 )
-from datp.data.regimes.catalog import dataset_for_regime
+from datp.data.catalog import dataset_for_stage
 from datp.federated.catalog import TrainingClientCatalog
 from datp.federated.checkpoints import (
     ConvergenceSnapshot,
@@ -106,9 +107,8 @@ class SimClientConfig:
 
 @dataclass(frozen=True, slots=True)
 class TrainingResult:
-    regime: Regime
+    stage: ExperimentStage
     seed: int
-    alpha: float | None
     converged_round: int | None
     total_rounds: int
     checkpoint_dir: Path
@@ -140,21 +140,20 @@ class _CheckpointProtocolContext:
     ckpt_dir_by_round: dict[int, Path]
     scoring_data: dict[str, ClientData]
     score_base: Path
-    regime: Regime
+    stage: ExperimentStage
     seed: int
-    alpha: float | None
     cfg: DatpConfig
 
 
-def validate_regime(cfg: DatpConfig) -> Regime:
-    regime = cfg.regime
-    if regime is None:
+def validate_stage(cfg: DatpConfig) -> ExperimentStage:
+    stage = cfg.stage
+    if stage is None:
         raise ValueError(
             fmt(
-                _MODULE, "regime must be set in config", "non-null regime", repr(regime)
+                _MODULE, "stage must be set in config", "non-null stage", repr(stage)
             )
         )
-    return regime
+    return stage
 
 
 def _init_model_and_params(
@@ -321,9 +320,8 @@ def _checkpoint_dirs_by_round(
     checkpoint_cfg: CheckpointProtocolConfig | None,
     protocol_enabled: bool,
     ckpt_dir: Path,
-    regime: Regime,
+    stage: ExperimentStage,
     seed: int,
-    alpha: float | None,
 ) -> dict[int, Path]:
     if checkpoint_cfg is None or not protocol_enabled:
         return {}
@@ -333,9 +331,9 @@ def _checkpoint_dirs_by_round(
 
     layout = ArtifactLayout(
         base_dir=_artifact_root_from_path(ckpt_dir, ArtifactDir.CHECKPOINTS),
-        regime=regime,
+        stage=stage,
     )
-    cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
+    cell = TrainingCellId(stage=stage, seed=seed)
     return {
         round_count: layout.checkpoint_dir_for_round(cell, round_count)
         for round_count in checkpoint_cfg.milestones
@@ -368,9 +366,9 @@ def _score_checkpoint_protocol_rounds(ctx: _CheckpointProtocolContext) -> None:
 
     score_layout = ArtifactLayout(
         base_dir=_artifact_root_from_path(ctx.score_base, ArtifactDir.SCORES),
-        regime=ctx.regime,
+        stage=ctx.stage,
     )
-    score_cell = TrainingCellId(regime=ctx.regime, seed=ctx.seed, alpha=ctx.alpha)
+    score_cell = TrainingCellId(stage=ctx.stage, seed=ctx.seed)
     for checkpoint_round in ctx.checkpoint_cfg.milestones:
         round_params = _params_for_checkpoint_round(
             checkpoint_round, ctx.strategy, ctx.ckpt_dir_by_round
@@ -386,10 +384,9 @@ def _score_checkpoint_protocol_rounds(ctx: _CheckpointProtocolContext) -> None:
             model=ctx.model,
             client_data=ctx.scoring_data,
             score_base=round_score_base,
-            regime=ctx.regime,
+            stage=ctx.stage,
             seed=ctx.seed,
-            alpha=ctx.alpha,
-            dataset=dataset_for_regime(ctx.regime),
+            dataset=dataset_for_stage(ctx.stage),
             checkpoint_path=round_ckpt,
             checkpoint_round=checkpoint_round,
             scoring_batch_size=ctx.cfg.machine.scoring_batch_size,
@@ -400,7 +397,6 @@ def run_fl_simulation(
     cfg: DatpConfig,
     client_data: dict[str, ClientData] | None,
     seed: int,
-    alpha: float | None,
     *,
     model_cls: type[Autoencoder],
     ckpt_dir: Path,
@@ -409,7 +405,7 @@ def run_fl_simulation(
     prepared_dir: Path | None = None,
     client_config: SimClientConfig = SimClientConfig(),
 ) -> TrainingResult:
-    regime = validate_regime(cfg)
+    stage = validate_stage(cfg)
     checkpoint_cfg = cfg.checkpoint_protocol
     protocol_enabled = _checkpoint_protocol_enabled(cfg, ckpt_dir, score_base)
     effective_rounds_max = (
@@ -438,14 +434,13 @@ def run_fl_simulation(
     logger.info(
         "starting FL training",
         label=label,
-        regime=regime,
+        stage=stage,
         seed=seed,
-        alpha=alpha,
         n_clients=num_clients,
     )
 
     ckpt_dir_by_round = _checkpoint_dirs_by_round(
-        checkpoint_cfg, protocol_enabled, ckpt_dir, regime, seed, alpha
+        checkpoint_cfg, protocol_enabled, ckpt_dir, stage, seed
     )
 
     strategy = DatpFedAvg.from_config(
@@ -512,9 +507,8 @@ def run_fl_simulation(
                     ckpt_dir_by_round=ckpt_dir_by_round,
                     scoring_data=scoring_data,
                     score_base=score_base,
-                    regime=regime,
+                    stage=stage,
                     seed=seed,
-                    alpha=alpha,
                     cfg=cfg,
                 )
             )
@@ -523,10 +517,9 @@ def run_fl_simulation(
                 model=model,
                 client_data=scoring_data,
                 score_base=score_base,
-                regime=regime,
+                stage=stage,
                 seed=seed,
-                alpha=alpha,
-                dataset=dataset_for_regime(regime),
+                dataset=dataset_for_stage(stage),
                 checkpoint_path=ckpt_dir / ArtifactFile.MODEL_CHECKPOINT,
                 checkpoint_round=None,
                 scoring_batch_size=cfg.machine.scoring_batch_size,
@@ -535,7 +528,7 @@ def run_fl_simulation(
     log_params(
         TrackingParams(
             (
-                TrackingParam(TrackingParamKey.REGIME, regime),
+                TrackingParam(TrackingParamKey.STAGE, stage),
                 TrackingParam(TrackingParamKey.SEED, seed),
                 TrackingParam(TrackingParamKey.ROUNDS_MAX, effective_rounds_max),
                 TrackingParam(TrackingParamKey.LABEL, label),
@@ -562,9 +555,8 @@ def run_fl_simulation(
         log_artifact(ckpt_file, artifact_path=None)
 
     return TrainingResult(
-        regime=regime,
+        stage=stage,
         seed=seed,
-        alpha=alpha,
         converged_round=converged_round,
         total_rounds=total_rounds,
         checkpoint_dir=ckpt_dir,

@@ -18,7 +18,7 @@ from datp.attacks.enums import (
 )
 from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.core.seeds import SeedPair
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,11 +83,11 @@ def enumerate_bounded_sweep_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
     config: CalibrationPoisoningConfig,
 ) -> tuple[SweepCellSpec, ...]:
-    """Enumerate the bounded matrix; config.scale must be BOUNDED."""
-    if config.scale != ExperimentScale.BOUNDED:
+    """Enumerate the bounded matrix; config.stage must be NBAIOT_MAIN."""
+    if config.stage != ExperimentStage.NBAIOT_MAIN:
         raise ValueError(
-            f"enumerate_bounded_sweep_matrix requires ExperimentScale.BOUNDED config; "
-            f"got {config.scale}"
+            f"enumerate_bounded_sweep_matrix requires ExperimentStage.NBAIOT_MAIN config; "
+            f"got {config.stage}"
         )
     return _enumerate_single_victim_matrix(victims_by_training_seed, config)
 
@@ -96,10 +96,10 @@ def enumerate_full_sweep_matrix(
     victims_by_training_seed: Mapping[int, Sequence[str]],
     config: CalibrationPoisoningConfig,
 ) -> tuple[SweepCellSpec, ...]:
-    """Enumerate the full-scope matrix; config.scale must be FULL."""
-    if config.scale != ExperimentScale.FULL:
+    """Enumerate the full optional matrix; config.stage must be NBAIOT_FULL_OPTIONAL."""
+    if config.stage != ExperimentStage.NBAIOT_FULL_OPTIONAL:
         raise ValueError(
-            f"enumerate_full_sweep_matrix requires ExperimentScale.FULL config; "
-            f"got {config.scale}"
+            f"enumerate_full_sweep_matrix requires ExperimentStage.NBAIOT_FULL_OPTIONAL config; "
+            f"got {config.stage}"
         )
     return _enumerate_single_victim_matrix(victims_by_training_seed, config)

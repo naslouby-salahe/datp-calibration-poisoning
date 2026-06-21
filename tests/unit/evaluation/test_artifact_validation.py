@@ -45,7 +45,7 @@ def _base_client(client_id: str = "c1", calibration_pending: bool = False) -> di
         PayloadKey.CALIBRATION_PENDING: calibration_pending,
         PayloadKey.EVALUATION_INCOMPLETE: False,
         PayloadKey.THRESHOLD_VALUE: 0.5,
-        PayloadKey.THRESHOLD_SOURCE: "b1",
+        PayloadKey.THRESHOLD_SOURCE: "global_threshold",
     }
 
 
@@ -54,15 +54,14 @@ def _valid_payload(**overrides) -> dict:
         PayloadKey.SCHEMA_VERSION: "2",
         PayloadKey.METRIC_SCHEMA_VERSION: "2",
         PayloadKey.THRESHOLD_SCHEMA_VERSION: "1",
-        PayloadKey.RUN_ID: "a_b1_seed0",
+        PayloadKey.RUN_ID: "a_global_threshold_seed0",
         PayloadKey.RUN_KIND: "core_ladder",
         PayloadKey.DATASET: "nbaiot",
-        PayloadKey.BASELINE: "b1",
-        PayloadKey.REGIME: "a",
+        PayloadKey.POLICY: "global_threshold",
+        PayloadKey.STAGE: "nbaiot_main",
         PayloadKey.SEED: 0,
-        PayloadKey.ALPHA: None,
         PayloadKey.THRESHOLD_SCOPE: "eligible_client_arithmetic_mean",
-        PayloadKey.THRESHOLD_STRATEGY_NAME: "b1",
+        PayloadKey.THRESHOLD_STRATEGY_NAME: "global_threshold",
         "tau_global": 0.5,
         PayloadKey.PER_CLIENT: [_base_client()],
         PayloadKey.ELIGIBLE_IDS: ["c1"],
@@ -126,8 +125,8 @@ class TestProvenanceValidation:
         payload = _valid_payload(
             provenance=_base_provenance(
                 **{
-                    PayloadKey.MODEL_CHECKPOINT_IDENTITY: "NOT_APPLICABLE_B0_OWN_MODEL",
-                    PayloadKey.SCORE_ARTIFACT_IDENTITY: "NOT_APPLICABLE_B0_DIRECT_EVAL",
+                    PayloadKey.MODEL_CHECKPOINT_IDENTITY: "NOT_APPLICABLE_MODEL",
+                    PayloadKey.SCORE_ARTIFACT_IDENTITY: "NOT_APPLICABLE_DIRECT_EVAL",
                 }
             )
         )

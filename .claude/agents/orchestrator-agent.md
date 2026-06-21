@@ -30,14 +30,10 @@ You do not treat implementation as complete until the appropriate specialist age
 Before starting or delegating implementation work, read:
 
 1. `CLAUDE.md`
-2. `AGENTS.md`
-3. **CP2 active:** `docs/tickets/TICKET_INDEX.md`
-4. **CP2 active:** `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
-5. The relevant CP2 ticket file or files under `docs/tickets/<phase>/`.
-6. Relevant files under `docs/journal/` only when DATP journal work resumes.
-7. Relevant `.claude/agents/*.md`.
-8. Relevant `.claude/skills/*.md`.
-9. Existing code, tests, configs, scripts, and artifacts related to the task.
+2. `docs/DATP_CP_Roadmap.md`
+3. Relevant `.claude/agents/*.md`.
+4. Relevant `.claude/skills/*.md`.
+5. Existing code, tests, configs, scripts, and artifacts related to the task.
 
 ---
 
@@ -45,12 +41,11 @@ Before starting or delegating implementation work, read:
 
 Use these agents by default:
 
-1. `ticket-planner-agent` for ticket creation or ticket restructuring.
-2. `implementation-agent` for production implementation.
+1. `implementation-agent` for production implementation.
 3. `refactor-agent` for cleanup, ownership correction, simplification, and smell removal.
 4. `test-agent` for unit, integration, regression, and edge-case tests.
 5. `code-quality-gate-agent` for static analysis, complexity, ownership, and quality blocking.
-6. `ticket-completion-auditor-agent` for DONE eligibility.
+6. `drift-enforcer-agent` for DONE eligibility confirmation on scientific scope.
 7. `drift-enforcer-agent` for roadmap, paper, and scientific-scope drift.
 8. `scientific-contract-agent` for DATP invariants and claim boundaries.
 9. `experiment-runner-agent` for experiment execution only after implementation and quality gates pass.
@@ -115,12 +110,8 @@ For every implementation ticket:
 5. Ask `refactor-agent` to clean affected code and related existing code.
 6. Ask `test-agent` to add, adapt, or delete tests as needed.
 7. Ask `code-quality-gate-agent` to audit changed and related code.
-8. Ask `ticket-completion-auditor-agent` to verify DONE eligibility.
-9. Ask `drift-enforcer-agent` if the ticket touches scientific scope, roadmap, paper claims, or experiment behavior.
-10. For CP2, update `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`.
-11. For CP2, update `docs/tickets/TICKET_INDEX.md` only if ticket scope or
-    status summary changes. Use `ticket_progress.md` / `ticket_inventory.md`
-    only for DATP journal fallback work.
+8. Ask `drift-enforcer-agent` if the task touches scientific scope, roadmap, paper claims, or experiment behavior.
+9. Update `docs/DATP_CP_Roadmap.md` if task scope or status changes.
 
 ---
 
@@ -238,7 +229,7 @@ Preserve the DATP paper and roadmap scope:
 1. Do not change the controlled comparison unless explicitly requested.
 2. Do not introduce new aggregation protocols.
 3. Do not introduce poisoning, backdoor, evasion, DP, hardware, or concept-drift claims into the controlled paper unless explicitly scoped.
-4. Keep B1 vs B2 central where the DATP conference paper requires it.
+4. Keep GLOBAL_THRESHOLD vs LOCAL_THRESHOLD central where the DATP conference paper requires it.
 5. Preserve shared training and threshold-scope isolation.
 6. Treat CICIoT2023 B-b metadata infeasibility as a formal feasibility outcome when applicable.
 
@@ -263,41 +254,24 @@ When coordinating a task, report:
 
 ---
 
-## CP2 Active Context
+## datp-cp Active Context
 
-The repository is currently executing the **CP2 ticket program**:
+This repository executes the datp-cp research protocol:
 **Calibration-Channel Poisoning of Federated Threshold Personalization in IoT Anomaly Detection: A Policy-Differentiated Vulnerability Analysis**
 
-### CP2 source-of-truth files (read before any CP2 ticket)
+### Source of truth
 
 ```
-docs/DATP_CP_Roadmap.md          ← CP2 protocol of record
-docs/tickets/TICKET_INDEX.md      ← authoritative ticket spec
-docs/tickets/README.md            ← phase layout and scientific locks
-docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md
-docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md
-docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md
-docs/tickets/_ai_tracking/graphify/CP2_GRAPHIFY_STATUS.md
+docs/DATP_CP_Roadmap.md   ← protocol of record
+CLAUDE.md                  ← active vocabulary and coding rules
 ```
 
-### CP2 ticket workflow
+### Greenfield rule
 
-1. Read the active ticket from `docs/tickets/<phase>/CP2-T*.md`.
-2. Read its dependencies before starting.
-3. Inspect actual code, configs, tests, outputs — do not trust progress files alone.
-4. Do not skip dependencies. Do not run experiments before CP2-T056.
-5. After completing work, update `CP2_PROGRESS.md` with evidence.
-6. If the ticket affects claims/methods/figures/limitations, append to `CP2_PAPER_NOTES_CONSOLIDATED.md`.
-7. Run `graphify update .` after structural changes (Graphify is AVAILABLE; see `CP2_GRAPHIFY_STATUS.md`).
+Existing code is **not** automatically canonical. No backward compatibility is required. Remove instead of aliasing.
 
-### CP2 greenfield rule
+### Hard stops
 
-CP2 is greenfield inside this repository. Existing code is **not** automatically canonical. No backward compatibility is required unless a ticket explicitly says so.
-
-### CP2 hard stops for this agent
-
-- Do not treat `docs/journal/*.md` as the active CP2 planning layer.
-- Do not reference `docs/tickets/ticket_inventory.md` or `ticket_progress.md` for CP2 — use `TICKET_INDEX.md` and `CP2_PROGRESS.md`.
-- Do not run final experiments before CP2-T056.
-- Do not write the final paper package before CP2-T058.
-- See `CLAUDE.md` for full CP2 scientific locks.
+- Do not run N-BaIoT main experiments before `FINAL_AUDIT` and `SYNTHETIC_SMOKE` gates pass.
+- Do not write the final paper package before poisoned results are validated.
+- See `CLAUDE.md` and `docs/DATP_CP_Roadmap.md` §22 (Final Protocol-Lock Checklist) for gates.

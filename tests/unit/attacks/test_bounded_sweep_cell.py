@@ -1,6 +1,7 @@
 """Unit tests for the bounded sweep cell runner."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 
@@ -11,7 +12,7 @@ from datp.attacks.bounded_sweep_cell import (
 )
 from datp.attacks.bounded_sweep_matrix import SweepCellSpec
 from datp.attacks.score_containers import build_score_collection
-from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.seeds import SeedPair
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
@@ -49,7 +50,7 @@ def test_run_sweep_cell_zero_fraction_gives_zero_delta():
     spec = _make_spec(
         col,
         victim_id=victim_id,
-        policy=ThresholdPolicy.B1_GLOBAL,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
         fraction=0.0,
         training_seed=0,
@@ -69,7 +70,7 @@ def test_run_sweep_cell_high_source_raises_threshold():
     spec = _make_spec(
         col,
         victim_id=victim_id,
-        policy=ThresholdPolicy.B2_PERSONALIZED,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         fraction=0.40,
         training_seed=0,
@@ -90,7 +91,7 @@ def test_run_sweep_cell_uses_passed_mu_flag_not_recomputed():
     spec = _make_spec(
         col,
         victim_id=victim_id,
-        policy=ThresholdPolicy.B4_CLUSTER,
+        policy=ThresholdPolicy.CLUSTER_THRESHOLD,
         source=PoisoningSourceStrategy.LOW_SCORE_BENIGN,
         fraction=0.20,
         training_seed=0,

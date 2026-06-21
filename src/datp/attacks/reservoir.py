@@ -68,7 +68,7 @@ def build_reservoir(
         pool = sorted_cal[-n_tail:].copy()
     elif source in (
         PoisoningSourceStrategy.LOW_SCORE_BENIGN,
-        PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE,
+        PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY,
     ):
         pool = sorted_cal[:n_tail].copy()
     else:

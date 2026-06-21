@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -6,11 +7,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from datp.core.errors import fmt
-from datp.core.identity import BaselineRunId
-from datp.core.enums import Baseline
+from datp.core.identity import PolicyRunId
 from datp.core.types import (
-    B3Metadata,
-    B4Metadata,
+    ClusterMetadata,
     ClientThreshold,
     ThresholdMetadata,
     ThresholdResult,
@@ -72,7 +71,7 @@ class ClientThresholdsCollection:
 
     @classmethod
     def from_mapping(
-        cls, thresholds: Mapping[str, float], strategy: Baseline
+        cls, thresholds: Mapping[str, float], strategy: ThresholdPolicy
     ) -> "ClientThresholdsCollection":
         return cls(
             entries=tuple(
@@ -161,7 +160,7 @@ def compute_client_thresholds(
                 client_id=cid,
                 threshold=percentile_threshold(error_set.for_client(cid).errors, q=q),
                 calibration_pending=False,
-                strategy=Baseline.B2,
+                strategy=ThresholdPolicy.LOCAL_THRESHOLD,
             )
             for cid in eligibility.eligible_ids
         )
@@ -171,9 +170,9 @@ def compute_client_thresholds(
 def compute_tau_global(
     thresholds: ClientThresholdsCollection | Mapping[str, float],
 ) -> float:
-    """tau_global = (1/K_elig)×Στᵢ (B1 formula); never sample-weighted; raises ValueError if client_taus is empty."""
+    """tau_global = (1/K_elig)×Στᵢ (GLOBAL_THRESHOLD formula); never sample-weighted; raises ValueError if client_taus is empty."""
     if not isinstance(thresholds, ClientThresholdsCollection):
-        thresholds = ClientThresholdsCollection.from_mapping(thresholds, Baseline.B2)
+        thresholds = ClientThresholdsCollection.from_mapping(thresholds, ThresholdPolicy.LOCAL_THRESHOLD)
     if not thresholds.entries:
         raise ValueError(
             fmt(
@@ -187,12 +186,11 @@ def compute_tau_global(
 
 
 def build_threshold_result(
-    run: BaselineRunId,
+    run: PolicyRunId,
     tau_global: float,
     eligible_thresholds: ClientThresholdsCollection | Mapping[str, float],
     pending_clients: tuple[str, ...] | Sequence[str],
-    b3_metadata: B3Metadata | None,
-    b4_metadata: B4Metadata | None,
+    cluster_metadata: ClusterMetadata | None,
 ) -> ThresholdResult:
     thresholds: list[ClientThreshold] = []
 
@@ -203,7 +201,7 @@ def build_threshold_result(
                     client_id=cid,
                     threshold=tau,
                     calibration_pending=False,
-                    strategy=run.baseline,
+                    strategy=run.policy,
                 )
                 for cid, tau in eligible_thresholds.items()
             )
@@ -215,7 +213,7 @@ def build_threshold_result(
                 client_id=entry.client_id,
                 threshold=entry.threshold,
                 calibration_pending=False,
-                strategy=run.baseline,
+                strategy=run.policy,
             )
         )
 
@@ -225,7 +223,7 @@ def build_threshold_result(
                 client_id=cid,
                 threshold=tau_global,
                 calibration_pending=True,
-                strategy=run.baseline,
+                strategy=run.policy,
             )
         )
 
@@ -233,5 +231,5 @@ def build_threshold_result(
         run=run,
         tau_global=tau_global,
         client_thresholds=tuple(thresholds),
-        metadata=ThresholdMetadata(b3=b3_metadata, b4=b4_metadata),
+        metadata=ThresholdMetadata(cluster=cluster_metadata),
     )

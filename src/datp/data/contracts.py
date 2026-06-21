@@ -21,7 +21,7 @@ class PartitionResult(BaseModel):
     split_indices: Optional[dict[str, tuple[int, int]]] = None
 
 
-class RegimeCClientSummary(BaseModel):
+class CiciotClientSummary(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     client_id: str
@@ -33,7 +33,7 @@ class RegimeCClientSummary(BaseModel):
     device_mixture_proportions: dict[str, float] = Field(default_factory=dict)
 
 
-class RegimeCResult(BaseModel):
+class CiciotResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     alpha: float
@@ -43,4 +43,4 @@ class RegimeCResult(BaseModel):
     n_eligible: int
     n_calibration_pending: int
     coverage: str
-    clients: list[RegimeCClientSummary]
+    clients: list[CiciotClientSummary]

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Proprietary
-"""Tests for run_fl_simulation orchestration, validate_regime, SimClientConfig, TrainingResult, and load_scoring_data."""
+"""Tests for run_fl_simulation orchestration, validate_stage, SimClientConfig,
+TrainingResult, and load_scoring_data."""
 
 from __future__ import annotations
 
@@ -9,40 +10,44 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-from datp.core.enums import DeviceType, Regime
+from datp.config.stages import ExperimentStage
+from datp.core.enums import DeviceType
 from datp.federated.clients import DatpClient
 from datp.federated.simulation import (
     SimClientConfig,
     TrainingResult,
     load_scoring_data,
-    validate_regime,
+    validate_stage,
 )
 from datp.federated.runtime import RayClientResourceRequest
 from datp.federated.types import ClientData
 from datp.modeling.autoencoder import Autoencoder
 
+_STAGE = ExperimentStage.NBAIOT_MAIN
+
+
 # ---------------------------------------------------------------------------
-# validate_regime
+# validate_stage
 # ---------------------------------------------------------------------------
 
 
-class TestValidateRegime:
-    def test_returns_regime_when_set(self) -> None:
+class TestValidateStage:
+    def test_returns_stage_when_set(self) -> None:
         cfg = MagicMock()
-        cfg.regime = Regime.A
-        assert validate_regime(cfg) is Regime.A
+        cfg.stage = _STAGE
+        assert validate_stage(cfg) is _STAGE
 
-    def test_raises_when_regime_is_none(self) -> None:
+    def test_raises_when_stage_is_none(self) -> None:
         cfg = MagicMock()
-        cfg.regime = None
-        with pytest.raises(ValueError, match="regime must be set"):
-            validate_regime(cfg)
+        cfg.stage = None
+        with pytest.raises(ValueError, match="stage must be set"):
+            validate_stage(cfg)
 
     def test_error_message_includes_expected_and_got(self) -> None:
         cfg = MagicMock()
-        cfg.regime = None
-        with pytest.raises(ValueError, match="non-null regime"):
-            validate_regime(cfg)
+        cfg.stage = None
+        with pytest.raises(ValueError, match="non-null stage"):
+            validate_stage(cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -85,9 +90,8 @@ class TestSimClientConfig:
 class TestTrainingResult:
     def _make(self, tmp_path: Path) -> TrainingResult:
         return TrainingResult(
-            regime=Regime.A,
+            stage=_STAGE,
             seed=0,
-            alpha=None,
             converged_round=10,
             total_rounds=20,
             checkpoint_dir=tmp_path,
@@ -97,25 +101,22 @@ class TestTrainingResult:
 
     def test_construction(self, tmp_path: Path) -> None:
         r = self._make(tmp_path)
-        assert r.regime is Regime.A
+        assert r.stage is _STAGE
         assert r.seed == 0
-        assert r.alpha is None
         assert r.converged_round == 10
         assert r.total_rounds == 20
         assert r.loss_history == [1.0, 0.5]
 
-    def test_alpha_can_be_float(self, tmp_path: Path) -> None:
+    def test_converged_round_can_be_none(self, tmp_path: Path) -> None:
         r = TrainingResult(
-            regime=Regime.C,
+            stage=_STAGE,
             seed=1,
-            alpha=0.5,
             converged_round=None,
             total_rounds=5,
             checkpoint_dir=tmp_path,
             score_dir=tmp_path,
             loss_history=[],
         )
-        assert r.alpha == pytest.approx(0.5)
         assert r.converged_round is None
 
     def test_is_frozen(self, tmp_path: Path) -> None:
@@ -219,8 +220,8 @@ class TestClientDataNotMutated:
         monkeypatch.setattr(sim_mod, "make_client_fn", fake_make_client_fn)
         monkeypatch.setattr(
             sim_mod,
-            "validate_regime",
-            lambda _cfg: Regime.A,
+            "validate_stage",
+            lambda _cfg: _STAGE,
         )
         monkeypatch.setattr(
             sim_mod, "resolve_device", lambda _: torch.device(DeviceType.CPU)
@@ -244,7 +245,6 @@ class TestClientDataNotMutated:
                 cfg=mock_cfg,
                 client_data=original_data,
                 seed=0,
-                alpha=None,
                 model_cls=Autoencoder,
                 ckpt_dir=tmp_path,
                 score_base=tmp_path,

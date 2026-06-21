@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from datp.attacks.constants import (
-    BOUNDED_SWEEP_FRACTIONS,
-    BOUNDED_SWEEP_OBJECTIVES,
-    BOUNDED_SWEEP_SOURCES,
     DEFAULT_POLICIES,
-    FULL_SWEEP_FRACTIONS,
+    NBAIOT_FULL_OPTIONAL_SWEEP_FRACTIONS,
+    NBAIOT_MAIN_SWEEP_FRACTIONS,
+    NBAIOT_MAIN_SWEEP_OBJECTIVES,
+    NBAIOT_MAIN_SWEEP_SOURCES,
 )
 from datp.attacks.enums import (
     AttackerObjective,
@@ -16,19 +16,14 @@ from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 class TestThresholdPolicy:
-    def test_b3_excluded(self) -> None:
-        values = {p.value for p in ThresholdPolicy}
-        assert "b3" not in values
-        assert "b3_family" not in values
-
-    def test_contains_b1_b2_b4(self) -> None:
-        assert ThresholdPolicy.B1_GLOBAL == "b1_global"
-        assert ThresholdPolicy.B2_PERSONALIZED == "b2_personalized"
-        assert ThresholdPolicy.B4_CLUSTER == "b4_cluster"
+    def test_contains_global_local_cluster(self) -> None:
+        assert ThresholdPolicy.GLOBAL_THRESHOLD == "global_threshold"
+        assert ThresholdPolicy.LOCAL_THRESHOLD == "local_threshold"
+        assert ThresholdPolicy.CLUSTER_THRESHOLD == "cluster_threshold"
 
     def test_exactly_three_members(self) -> None:
         assert len(ThresholdPolicy) == 3
@@ -57,7 +52,7 @@ class TestAttackerObjective:
             assert isinstance(obj, str)
 
     def test_bounded_objectives_tuple(self) -> None:
-        assert set(BOUNDED_SWEEP_OBJECTIVES) == set(AttackerObjective)
+        assert set(NBAIOT_MAIN_SWEEP_OBJECTIVES) == set(AttackerObjective)
 
 
 class TestPoisoningSourceStrategy:
@@ -72,16 +67,16 @@ class TestPoisoningSourceStrategy:
 
     def test_diagnostic_only_member_exists(self) -> None:
         assert (
-            PoisoningSourceStrategy.TARGETED_REMOVAL_LOW_SCORE
+            PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
             in PoisoningSourceStrategy
         )
 
     def test_bounded_sources_excludes_diagnostic(self) -> None:
-        for s in BOUNDED_SWEEP_SOURCES:
+        for s in NBAIOT_MAIN_SWEEP_SOURCES:
             assert "diagnostic" not in s.value
 
     def test_bounded_sources_contains_three_members(self) -> None:
-        assert len(BOUNDED_SWEEP_SOURCES) == 3
+        assert len(NBAIOT_MAIN_SWEEP_SOURCES) == 3
 
 
 class TestCalibrationInjectionRule:
@@ -101,7 +96,7 @@ class TestPoisoningKnowledge:
         assert PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS == "gray_box_score_access"
 
     def test_white_box_diagnostic_only_value(self) -> None:
-        assert PoisoningKnowledge.WHITE_BOX == "white_box"
+        assert PoisoningKnowledge.WHITE_BOX_DIAGNOSTIC_ONLY == "white_box_diagnostic_only"
 
     def test_exactly_two_members(self) -> None:
         assert len(PoisoningKnowledge) == 2
@@ -115,7 +110,7 @@ class TestPoisoningTargetScope:
         assert PoisoningTargetScope.MULTI_CLIENT == "multi_client"
 
     def test_all_clients_diagnostic_only_value(self) -> None:
-        assert PoisoningTargetScope.ALL_CLIENTS == "all_clients"
+        assert PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY == "all_clients_diagnostic_only"
 
 
 class TestPoisoningDefense:
@@ -129,43 +124,54 @@ class TestPoisoningDefense:
         assert len(PoisoningDefense) == 2
 
 
-class TestExperimentScale:
+class TestExperimentStage:
     def test_smoke_value(self) -> None:
-        assert ExperimentScale.SMOKE == "smoke"
+        assert ExperimentStage.SYNTHETIC_SMOKE == "synthetic_smoke"
 
-    def test_bounded_value(self) -> None:
-        assert ExperimentScale.BOUNDED == "bounded"
+    def test_nbaiot_main_value(self) -> None:
+        assert ExperimentStage.NBAIOT_MAIN == "nbaiot_main"
 
-    def test_full_value(self) -> None:
-        assert ExperimentScale.FULL == "full"
+    def test_full_optional_value(self) -> None:
+        assert ExperimentStage.NBAIOT_FULL_OPTIONAL == "nbaiot_full_optional"
 
-    def test_stretch_value(self) -> None:
-        assert ExperimentScale.STRETCH == "stretch"
+    def test_stretch_diagnostic_value(self) -> None:
+        assert (
+            ExperimentStage.STRETCH_DIAGNOSTIC_ONLY
+            == "stretch_diagnostic_only"
+        )
 
-    def test_exactly_four_members(self) -> None:
-        assert len(ExperimentScale) == 4
+    def test_exactly_five_members(self) -> None:
+        assert len(ExperimentStage) == 5
 
 
-class TestBoundedSweepFractions:
+class TestNbaiotMainSweepFractions:
     def test_fraction_grid(self) -> None:
-        assert BOUNDED_SWEEP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
+        assert NBAIOT_MAIN_SWEEP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
 
     def test_four_fractions(self) -> None:
-        assert len(BOUNDED_SWEEP_FRACTIONS) == 4
+        assert len(NBAIOT_MAIN_SWEEP_FRACTIONS) == 4
 
     def test_no_fraction_five_percent(self) -> None:
-        assert 0.05 not in BOUNDED_SWEEP_FRACTIONS
+        assert 0.05 not in NBAIOT_MAIN_SWEEP_FRACTIONS
 
     def test_zero_fraction_present(self) -> None:
-        assert 0.0 in BOUNDED_SWEEP_FRACTIONS
+        assert 0.0 in NBAIOT_MAIN_SWEEP_FRACTIONS
 
 
-class TestFullSweepFractions:
+class TestNbaiotFullOptionalSweepFractions:
     def test_full_grid_adds_005(self) -> None:
-        assert FULL_SWEEP_FRACTIONS == (0.0, 0.05, 0.10, 0.20, 0.40)
+        assert NBAIOT_FULL_OPTIONAL_SWEEP_FRACTIONS == (
+            0.0,
+            0.05,
+            0.10,
+            0.20,
+            0.40,
+        )
 
-    def test_full_grid_is_bounded_plus_005(self) -> None:
-        assert set(BOUNDED_SWEEP_FRACTIONS) | {0.05} == set(FULL_SWEEP_FRACTIONS)
+    def test_full_grid_is_main_plus_005(self) -> None:
+        assert set(NBAIOT_MAIN_SWEEP_FRACTIONS) | {0.05} == set(
+            NBAIOT_FULL_OPTIONAL_SWEEP_FRACTIONS
+        )
 
     def test_full_grid_has_five_fractions(self) -> None:
-        assert len(FULL_SWEEP_FRACTIONS) == 5
+        assert len(NBAIOT_FULL_OPTIONAL_SWEEP_FRACTIONS) == 5

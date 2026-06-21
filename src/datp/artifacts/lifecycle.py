@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import contextlib
 import traceback
@@ -7,7 +8,6 @@ from types import TracebackType
 from typing import TYPE_CHECKING
 
 from datp.artifacts.names import ArtifactFile, RunState
-from datp.core.enums import Baseline
 
 if TYPE_CHECKING:
     from datp.core.logging import _LoggerProtocol
@@ -42,11 +42,11 @@ class RunLifecycle:
         self,
         run_dir: Path,
         *,
-        baseline: Baseline | None = None,
+        policy: ThresholdPolicy | None = None,
         seed: int | None = None,
     ) -> None:
         self.run_dir = run_dir
-        self.baseline = baseline
+        self.policy = policy
         self.seed = seed
         self.last_completed_round: int | None = None
 
@@ -101,7 +101,7 @@ class RunLifecycle:
     ) -> None:
         lines = [
             f"last_completed_round: {self.last_completed_round}",
-            f"baseline: {str(self.baseline) if self.baseline is not None else 'None'}",
+            f"policy: {str(self.policy) if self.policy is not None else 'None'}",
             f"seed: {self.seed}",
             f"exception_type: {exc_type.__name__ if exc_type else 'None'}",
             f"exception_message: {exc_val}",

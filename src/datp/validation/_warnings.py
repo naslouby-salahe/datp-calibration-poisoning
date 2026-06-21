@@ -1,11 +1,12 @@
 """Warning emission functions for the results audit."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from datp.core.enums import Baseline, Regime
+from datp.config.stages import ExperimentStage
 from datp.core.metric_enums import MetricName
 from datp.validation.constants import (
     BLOCKED_RESUME_COMMAND,
@@ -27,16 +28,16 @@ if TYPE_CHECKING:
     from datp.validation._audit_types import _CellPanel
 
 
-def _is_worsened(b1_val: float | None, b2_val: float | None) -> bool:
-    return b1_val is not None and b2_val is not None and b2_val < b1_val
+def _is_worsened(global_val: float | None, local_val: float | None) -> bool:
+    return global_val is not None and local_val is not None and local_val < global_val
 
 
 def _emit_worst_client_group_warning(
-    key: tuple[Regime, str | None, Baseline, MetricName],
+    key: tuple[ExperimentStage, ThresholdPolicy, MetricName],
     entries: list[tuple[int, str | None]],
     warnings: list[WarningRecord],
 ) -> None:
-    regime, alpha_text, baseline, metric = key
+    stage, policy, metric = key
     ids = sorted({cid for _, cid in entries if cid is not None})
     if len(ids) == 1:
         warnings.append(
@@ -44,20 +45,20 @@ def _emit_worst_client_group_warning(
                 severity=AuditSeverity.WARNING,
                 code=WarningCode.WORST_CLIENT_STABLE,
                 message=(
-                    f"{regime}/{baseline}/alpha={alpha_text} worst client on {metric} is "
+                    f"{stage}/{policy} worst client on {metric} is "
                     f"{ids[0]} across all {len(entries)} seeds; treat as encoder-quality "
                     "limitation, not threshold-strategy effect."
                 ),
             )
         )
-    else:
+    elif len(ids) > 1:
         warnings.append(
             WarningRecord(
-                severity=AuditSeverity.INFO,
+                severity=AuditSeverity.WARNING,
                 code=WarningCode.WORST_CLIENT_VARIES,
                 message=(
-                    f"{regime}/{baseline}/alpha={alpha_text} worst client on {metric} "
-                    f"varies across {len(entries)} seeds: {ids}."
+                    f"{stage}/{policy} worst client on {metric} rotates among "
+                    f"{ids} across {len(entries)} seeds; verify encoder stability."
                 ),
             )
         )
@@ -67,20 +68,90 @@ def emit_worst_client_stability_warnings(
     worst_client_records: list[WorstClientRecord],
     warnings: list[WarningRecord],
 ) -> None:
-    """Warn when the same client is worst across seeds, indicating a likely encoder-quality limitation."""
     grouped: dict[
-        tuple[Regime, str | None, Baseline, MetricName], list[tuple[int, str | None]]
+        tuple[ExperimentStage, ThresholdPolicy, MetricName], list[tuple[int, str | None]]
     ] = defaultdict(list)
     for record in worst_client_records:
-        if record.worst_client_id is None:
-            continue
-        grouped[(record.regime, record.alpha, record.baseline, record.metric)].append(
+        grouped[(record.stage, record.policy, record.metric)].append(
             (record.seed, record.worst_client_id)
         )
-    for key, entries in sorted(grouped.items()):
-        if len(entries) < WORST_CLIENT_STABLE_MIN_SEEDS:
-            continue  # not enough seeds to draw a stability conclusion
-        _emit_worst_client_group_warning(key, entries, warnings)
+    for key, entries in grouped.items():
+        if len(entries) >= WORST_CLIENT_STABLE_MIN_SEEDS:
+            cell = f"stage={entries[0][0] if entries else '?'}/policy={key[1]}"
+            _ = cell  # suppress unused warning; message built in group warning
+            _emit_worst_client_group_warning(key, entries, warnings)
+
+
+def _emit_flat_cv_tpr_cell_warning(
+    cell_key: tuple[ExperimentStage, int],
+    tpr_values: list[float],
+    warnings: list[WarningRecord],
+) -> None:
+    stage, seed = cell_key
+    if len(set(tpr_values)) == 1:
+        warnings.append(
+            WarningRecord(
+                severity=AuditSeverity.WARNING,
+                code=WarningCode.FLAT_CV_TPR_SUSPICIOUS,
+                message=f"{stage}_seed{seed} CV(TPR) is identical across "
+                f"all policies ({tpr_values[0]:.4f}); verify threshold attribution.",
+            )
+        )
+    elif all(abs(v - tpr_values[0]) < FLAT_CV_TPR_EPSILON for v in tpr_values):
+        warnings.append(
+            WarningRecord(
+                severity=AuditSeverity.WARNING,
+                code=WarningCode.FLAT_CV_TPR_SUSPICIOUS,
+                message=f"{stage}_seed{seed} CV(TPR) is nearly identical across "
+                f"all policies (range < {FLAT_CV_TPR_EPSILON}); verify threshold attribution.",
+            )
+        )
+
+
+def emit_flat_cv_tpr_warnings(
+    cell_panel: "dict[tuple[ExperimentStage, int, ThresholdPolicy], _CellPanel]",
+    warnings: list[WarningRecord],
+) -> None:
+    by_cell: dict[tuple[ExperimentStage, int], list[float]] = defaultdict(list)
+    for (stage, seed, _), panel in cell_panel.items():
+        if panel.cv_tpr is not None:
+            by_cell[(stage, seed)].append(float(panel.cv_tpr))
+    for cell_key, tpr_values in by_cell.items():
+        if len(tpr_values) >= 2:
+            _emit_flat_cv_tpr_cell_warning(cell_key, tpr_values, warnings)
+
+
+def _emit_local_utility_warning(
+    cell_key: tuple[ExperimentStage, int],
+    b1: "_CellPanel",
+    b2: "_CellPanel",
+    warnings: list[WarningRecord],
+) -> None:
+    stage, seed = cell_key
+    worsened: list[str] = []
+    if _is_worsened(b1.macro_f1_mean, b2.macro_f1_mean):
+        worsened.append("macro_f1_mean")
+    if _is_worsened(b1.auroc_mean, b2.auroc_mean):
+        worsened.append("auroc_mean")
+    if _is_worsened(b1.pr_auc_mean, b2.pr_auc_mean):
+        worsened.append("pr_auc_mean")
+    if worsened:
+        warnings.append(
+            WarningRecord(
+                severity=AuditSeverity.WARNING,
+                code=WarningCode.LOCAL_UTILITY_TRADEOFF,
+                message=f"{stage}_seed{seed} LOCAL_THRESHOLD improves CV(FPR) but worsens {', '.join(worsened)} relative to GLOBAL_THRESHOLD.",
+            )
+        )
+
+
+def check_local_threshold_utility_tradeoff(
+    cell_key: tuple[ExperimentStage, int],
+    b1: "_CellPanel",
+    b2: "_CellPanel",
+    warnings: list[WarningRecord],
+) -> None:
+    _emit_local_utility_warning(cell_key, b1, b2, warnings)
 
 
 def emit_ciciot_homogeneity_warnings(
@@ -89,18 +160,15 @@ def emit_ciciot_homogeneity_warnings(
     *,
     homogeneity_threshold: float,
 ) -> None:
-    """Emit CICIoT2023 homogeneity warnings based on pairwise JS divergence."""
     for record in homogeneity_records:
-        cell = f"regime={record.regime}/seed={record.seed}/baseline={record.baseline}"
         if record.homogeneity_verdict == HomogeneityVerdict.HOMOGENEOUS:
             warnings.append(
                 WarningRecord(
                     severity=AuditSeverity.INFO,
                     code=WarningCode.CICIOT_HOMOGENEITY_VERIFIED,
                     message=(
-                        f"{cell} pairwise JS mean "
-                        f"{record.pairwise_js_mean:.4g} < {homogeneity_threshold}; "
-                        "reported claims may describe CICIoT2023 clients as homogeneous."
+                        f"CICIoT2023 clients are homogeneous "
+                        f"(JS mean={record.pairwise_js_mean:.4f} < {homogeneity_threshold})."
                     ),
                 )
             )
@@ -110,94 +178,19 @@ def emit_ciciot_homogeneity_warnings(
                     severity=AuditSeverity.WARNING,
                     code=WarningCode.CICIOT_NOT_HOMOGENEOUS,
                     message=(
-                        f"{cell} pairwise JS mean "
-                        f"{record.pairwise_js_mean:.4g} ≥ {homogeneity_threshold}; "
-                        "reported claims must not describe CICIoT2023 clients as homogeneous."
+                        f"CICIoT2023 clients are heterogeneous "
+                        f"(JS mean={record.pairwise_js_mean:.4f} >= {homogeneity_threshold}); "
+                        "claims of homogeneous CICIoT2023 behavior are not supported."
                     ),
                 )
             )
-        else:
+        elif record.homogeneity_verdict == HomogeneityVerdict.BLOCKED_PENDING_RUN:
             warnings.append(
                 WarningRecord(
                     severity=AuditSeverity.BLOCKED_PENDING_RUN,
                     code=WarningCode.CICIOT_HOMOGENEITY_INCOMPLETE,
-                    message=f"{cell} pairwise homogeneity could not be computed (insufficient client data).",
+                    message="CICIoT2023 homogeneity verdict is BLOCKED_PENDING_RUN; "
+                    "cannot confirm or deny homogeneity claims.",
                     exact_command=BLOCKED_RESUME_COMMAND,
                 )
             )
-
-
-def _check_flat_cv_tpr_group(
-    key: tuple[Regime, int, str | None],
-    values: list[float],
-    warnings: list[WarningRecord],
-) -> None:
-    if len(values) < 2:
-        return
-    spread = max(values) - min(values)
-    if spread >= FLAT_CV_TPR_EPSILON:
-        return
-    regime, seed, alpha_text = key
-    warnings.append(
-        WarningRecord(
-            severity=AuditSeverity.WARNING,
-            code=WarningCode.FLAT_CV_TPR_SUSPICIOUS,
-            message=(
-                f"{regime}_seed{seed}_alpha{alpha_text} CV(TPR) is identical across "
-                f"{len(values)} baselines (spread {spread:.2e}); investigate denominator, "
-                "NaN fill, or zero-attack-client aggregation."
-            ),
-        )
-    )
-
-
-def emit_flat_cv_tpr_warnings(
-    cell_panel: "dict[tuple[Regime, int, str | None, Baseline], _CellPanel]",
-    warnings: list[WarningRecord],
-) -> None:
-    """Warn when CV(TPR) is suspiciously identical across baselines in a cell."""
-    by_cell: dict[tuple[Regime, int, str | None], list[float]] = defaultdict(list)
-    for (regime, seed, alpha_text, _), panel in cell_panel.items():
-        if panel.cv_tpr is not None:
-            by_cell[(regime, seed, alpha_text)].append(float(panel.cv_tpr))
-    for key, values in by_cell.items():
-        _check_flat_cv_tpr_group(key, values, warnings)
-
-
-def _b2_cv_fpr_improves(b1: "_CellPanel", b2: "_CellPanel") -> bool:
-    return b1.cv_fpr is not None and b2.cv_fpr is not None and b2.cv_fpr < b1.cv_fpr
-
-
-def _collect_worsened_metrics(b1: "_CellPanel", b2: "_CellPanel") -> list[MetricName]:
-    worsened: list[MetricName] = []
-    if _is_worsened(b1.macro_f1_mean, b2.macro_f1_mean):
-        worsened.append(MetricName.MACRO_F1)
-    if _is_worsened(b1.pr_auc_mean, b2.pr_auc_mean):
-        worsened.append(MetricName.PR_AUC)
-    if _is_worsened(b1.auroc_mean, b2.auroc_mean):
-        worsened.append(MetricName.AUROC)
-    if _is_worsened(b1.cv_tpr, b2.cv_tpr):
-        worsened.append(MetricName.CV_TPR)
-    return worsened
-
-
-def check_b2_utility_tradeoff(
-    cell_key: tuple[Regime, int, str | None],
-    b1: "_CellPanel",
-    b2: "_CellPanel",
-    warnings: list[WarningRecord],
-) -> None:
-    """Warn when B2 improves CV(FPR) but worsens utility metrics relative to B1."""
-    if not _b2_cv_fpr_improves(b1, b2):
-        return
-    regime, seed, alpha_text = cell_key
-    worsened = _collect_worsened_metrics(b1, b2)
-    if not worsened:
-        return
-    warnings.append(
-        WarningRecord(
-            severity=AuditSeverity.WARNING,
-            code=WarningCode.B2_UTILITY_TRADEOFF,
-            message=f"{regime}_seed{seed}_alpha{alpha_text} B2 improves CV(FPR) but worsens {', '.join(worsened)} relative to B1.",
-        )
-    )

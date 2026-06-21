@@ -152,7 +152,7 @@ def _abs_delta_tau_for_poisoned(
     pair = recompute_pair(
         work_col,
         PoisonedCalibrationSet.from_mapping(work_pois),
-        ThresholdPolicy.B2_PERSONALIZED,
+        ThresholdPolicy.LOCAL_THRESHOLD,
     )
     return abs(pair.thresholds_pois[victim] - pair.thresholds_clean[victim])
 
@@ -208,7 +208,7 @@ def test_defense_runs_end_to_end_through_recompute_pipeline():
     pair = recompute_pair(
         work_col,
         PoisonedCalibrationSet.from_mapping(work_pois),
-        ThresholdPolicy.B2_PERSONALIZED,
+        ThresholdPolicy.LOCAL_THRESHOLD,
     )
     assert math.isfinite(pair.thresholds_clean[victim])
     assert math.isfinite(pair.thresholds_pois[victim])

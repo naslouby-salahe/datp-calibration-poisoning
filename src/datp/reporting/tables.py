@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import csv
 from dataclasses import dataclass, field
@@ -7,7 +8,6 @@ from pathlib import Path
 import numpy as np
 
 from datp.config.models import StyleConfig
-from datp.core.enums import Baseline
 from datp.evaluation.metrics import EvaluationResult
 from datp.reporting.engine import format_mean_std as _format_mean_std
 from datp.reporting.engine import render
@@ -18,7 +18,7 @@ MANDATORY_FOOTNOTE = "† Eligible clients only."
 
 @dataclass(frozen=True, slots=True)
 class TableRow:
-    baseline: Baseline
+    policy: ThresholdPolicy
     cv_fpr_mean: float
     cv_fpr_std: float
     cv_tpr_mean: float
@@ -56,31 +56,26 @@ class ResultTable:
     footnote: str = MANDATORY_FOOTNOTE
 
     def to_latex(self) -> str:
-        non_b0 = [r for r in self.rows if r.baseline != Baseline.B0]
-        best_cv_fpr = (
-            min(non_b0, key=lambda r: r.cv_fpr_mean).baseline if non_b0 else None
-        )
-        best_cv_tpr = (
-            min(non_b0, key=lambda r: r.cv_tpr_mean).baseline if non_b0 else None
-        )
+        best_cv_fpr = min(self.rows, key=lambda r: r.cv_fpr_mean).policy if self.rows else None
+        best_cv_tpr = min(self.rows, key=lambda r: r.cv_tpr_mean).policy if self.rows else None
 
-        labels = self.style.baseline_labels
+        labels = self.style.policy_labels
         template_rows: list[LatexTableRow] = []
         for row in self.rows:
-            label = labels[row.baseline]
+            label = labels[row.policy]
             template_rows.append(
                 LatexTableRow(
                     label=label,
                     cv_fpr=_format_mean_std(
                         row.cv_fpr_mean,
                         row.cv_fpr_std,
-                        bold=(row.baseline == best_cv_fpr),
+                        bold=(row.policy == best_cv_fpr),
                     )
                     + f" ({row.eligible_count}/{row.eligible_count + row.pending_count})",
                     cv_tpr=_format_mean_std(
                         row.cv_tpr_mean,
                         row.cv_tpr_std,
-                        bold=(row.baseline == best_cv_tpr),
+                        bold=(row.policy == best_cv_tpr),
                     ),
                     worst_ba=_format_mean_std(
                         row.worst_ba_mean, row.worst_ba_std, bold=False
@@ -97,10 +92,10 @@ class ResultTable:
             )
 
         eligible_counts = ", ".join(
-            f"{labels[r.baseline]}: {r.eligible_count}" for r in self.rows
+            f"{labels[r.policy]}: {r.eligible_count}" for r in self.rows
         )
         pending_counts = ", ".join(
-            f"{labels[r.baseline]}: {r.pending_count}" for r in self.rows
+            f"{labels[r.policy]}: {r.pending_count}" for r in self.rows
         )
 
         return render(
@@ -108,7 +103,7 @@ class ResultTable:
             title=self.title,
             caption=self.title,
             header=(
-                "Baseline & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ "
+                "ThresholdPolicy & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ "
                 "& Worst BA & P10 client Macro-F1 & Coverage"
             ),
             rows=template_rows,
@@ -120,13 +115,13 @@ class ResultTable:
         )
 
     def to_csv(self, path: Path) -> Path:
-        labels = self.style.baseline_labels
+        labels = self.style.policy_labels
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
                 [
-                    "Baseline",
+                    "ThresholdPolicy",
                     "CV(FPR) mean",
                     "CV(FPR) std",
                     "CV(TPR) mean",
@@ -141,7 +136,7 @@ class ResultTable:
                 ]
             )
             for row in self.rows:
-                label = labels[row.baseline]
+                label = labels[row.policy]
                 writer.writerow(
                     [
                         label,
@@ -170,7 +165,7 @@ def _mean_std(values: list[float]) -> tuple[float, float]:
 
 
 def _validate_coverage_stability(
-    baseline: Baseline,
+    policy: ThresholdPolicy,
     results: list[EvaluationResult],
     expected_eligible: int,
     expected_pending: int,
@@ -179,24 +174,24 @@ def _validate_coverage_stability(
     for result in results:
         if not np.isfinite(result.coverage_ratio):
             raise ValueError(
-                f"[reporting] Coverage ratio missing. Expected: finite coverage for {baseline}. Got: {result.coverage_ratio}."
+                f"[reporting] Coverage ratio missing. Expected: finite coverage for {policy}. Got: {result.coverage_ratio}."
             )
         if (
             len(result.eligible_ids) != expected_eligible
             or len(result.pending_ids) != expected_pending
         ):
             raise ValueError(
-                f"[reporting] Coverage count mismatch. Expected: stable eligible/pending counts for {baseline}. Got: seed={result.seed} eligible={len(result.eligible_ids)} pending={len(result.pending_ids)}."
+                f"[reporting] Coverage count mismatch. Expected: stable eligible/pending counts for {policy}. Got: seed={result.seed} eligible={len(result.eligible_ids)} pending={len(result.pending_ids)}."
             )
 
 
 def _build_table_row(
-    baseline: Baseline,
+    policy: ThresholdPolicy,
     results: list[EvaluationResult],
 ) -> TableRow:
     eligible_count = len(results[0].eligible_ids)
     pending_count = len(results[0].pending_ids)
-    _validate_coverage_stability(baseline, results, eligible_count, pending_count)
+    _validate_coverage_stability(policy, results, eligible_count, pending_count)
 
     cv_fpr_mean, cv_fpr_std = _mean_std([r.cv_fpr for r in results])
     cv_tpr_mean, cv_tpr_std = _mean_std([r.cv_tpr for r in results])
@@ -204,7 +199,7 @@ def _build_table_row(
     macro_f1_mean, macro_f1_std = _mean_std([r.p10_macro_f1 for r in results])
 
     return TableRow(
-        baseline=baseline,
+        policy=policy,
         cv_fpr_mean=cv_fpr_mean,
         cv_fpr_std=cv_fpr_std,
         cv_tpr_mean=cv_tpr_mean,
@@ -221,16 +216,16 @@ def _build_table_row(
 
 def _generate_table(
     title: str,
-    results_by_baseline: dict[Baseline, list[EvaluationResult]],
+    results_by_policy: dict[ThresholdPolicy, list[EvaluationResult]],
     output_dir: Path,
     filename_stem: str,
     style: StyleConfig,
 ) -> Path:
-    validate_main_body_role(list(results_by_baseline.keys()))
+    validate_main_body_role(list(results_by_policy.keys()))
 
     table = ResultTable(title=title, style=style)
-    for baseline in sorted(results_by_baseline.keys()):
-        table.rows.append(_build_table_row(baseline, results_by_baseline[baseline]))
+    for policy in sorted(results_by_policy.keys()):
+        table.rows.append(_build_table_row(policy, results_by_policy[policy]))
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -244,13 +239,13 @@ def _generate_table(
 
 
 def generate_table3(
-    results_by_baseline: dict[Baseline, list[EvaluationResult]],
+    results_by_policy: dict[ThresholdPolicy, list[EvaluationResult]],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
     return _generate_table(
         title="Table 3: N-BaIoT Main Results",
-        results_by_baseline=results_by_baseline,
+        results_by_policy=results_by_policy,
         output_dir=output_dir,
         filename_stem="table3_nbaiot",
         style=style,
@@ -258,13 +253,13 @@ def generate_table3(
 
 
 def generate_table4(
-    results_by_baseline: dict[Baseline, list[EvaluationResult]],
+    results_by_policy: dict[ThresholdPolicy, list[EvaluationResult]],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
     return _generate_table(
         title="Table 4: CICIoT2023 External Validation Results",
-        results_by_baseline=results_by_baseline,
+        results_by_policy=results_by_policy,
         output_dir=output_dir,
         filename_stem="table4_ciciot",
         style=style,

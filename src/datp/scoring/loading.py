@@ -1,4 +1,4 @@
-"""B1/B2/B3/B4 share one ScoreProvider per (regime, seed, alpha) cell; missing artifacts always raise FileNotFoundError."""
+"""ScoreProvider per stage+seed cell; shared across GLOBAL_THRESHOLD, LOCAL_THRESHOLD, CLUSTER_THRESHOLD."""
 
 from __future__ import annotations
 

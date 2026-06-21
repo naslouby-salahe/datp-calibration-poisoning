@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pathlib import Path
 
@@ -10,15 +11,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from datp.config.models import StyleConfig
-from datp.core.enums import Baseline
 from datp.reporting.constants import (
     FIGURE1_STEM,
     FIGURE2_STEM,
     FIGURE3_STEM,
     FIGURE4_STEM,
     NBAIOT_DEVICE_SHORT_LABELS,
-    REGIME_C_ALPHA_DISPLAY_ORDER,
-    REGIME_C_ALPHA_TICK_LABELS,
 )
 
 # Embedded fonts for IEEE compliance.
@@ -39,12 +37,12 @@ plt.rcParams.update(
 )
 
 
-def _baseline_label(baseline: Baseline, style: StyleConfig) -> str:
-    return style.baseline_labels[baseline]
+def _policy_label(policy: ThresholdPolicy, style: StyleConfig) -> str:
+    return style.policy_labels[policy]
 
 
-def _baseline_color(baseline: Baseline, style: StyleConfig) -> str:
-    return style.baseline_colors[baseline]
+def _policy_color(policy: ThresholdPolicy, style: StyleConfig) -> str:
+    return style.policy_colors[policy]
 
 
 def generate_figure1(
@@ -69,15 +67,15 @@ def generate_figure1(
         x - width / 2,
         fpr_b1,
         width,
-        label=_baseline_label(Baseline.B1, style),
-        color=_baseline_color(Baseline.B1, style),
+        label=_policy_label(ThresholdPolicy.GLOBAL_THRESHOLD, style),
+        color=_policy_color(ThresholdPolicy.GLOBAL_THRESHOLD, style),
     )
     ax.bar(
         x + width / 2,
         fpr_b2,
         width,
-        label=_baseline_label(Baseline.B2, style),
-        color=_baseline_color(Baseline.B2, style),
+        label=_policy_label(ThresholdPolicy.LOCAL_THRESHOLD, style),
+        color=_policy_color(ThresholdPolicy.LOCAL_THRESHOLD, style),
     )
 
     ax.set_xlabel("Device")
@@ -130,7 +128,7 @@ def generate_figure2(
         color="black",
         linestyle="--",
         linewidth=1.2,
-        label="B1 client-averaged threshold",
+        label="GLOBAL_THRESHOLD client-averaged threshold",
     )
     ax.set_xlabel("Reconstruction Error")
     ax.set_ylabel("ECDF")
@@ -146,11 +144,11 @@ def generate_figure2(
 
 
 def generate_figure3(
-    fpr_by_baseline: dict[Baseline, list[np.ndarray]],
+    fpr_by_policy: dict[ThresholdPolicy, list[np.ndarray]],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    baselines = sorted(fpr_by_baseline.keys())
+    policies = sorted(fpr_by_policy.keys())
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size  # type: ignore[index]
 
     fig, ax = plt.subplots(figsize=style.figsize_single_col)
@@ -158,11 +156,11 @@ def generate_figure3(
     data = []
     labels = []
     colors = []
-    for b in baselines:
-        combined = np.concatenate(fpr_by_baseline[b])
+    for b in policies:
+        combined = np.concatenate(fpr_by_policy[b])
         data.append(combined)
-        labels.append(_baseline_label(b, style))
-        colors.append(_baseline_color(b, style))
+        labels.append(_policy_label(b, style))
+        colors.append(_policy_color(b, style))
 
     bp = ax.boxplot(data, tick_labels=labels, patch_artist=True)
     for patch, color in zip(bp["boxes"], colors, strict=True):
@@ -183,18 +181,25 @@ def generate_figure3(
 
 
 def generate_figure4(
-    cv_fpr_by_baseline: dict[Baseline, dict[str, list[float]]],
+    cv_fpr_by_policy: dict[ThresholdPolicy, dict[str, list[float]]],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    baselines = sorted(cv_fpr_by_baseline.keys())
+    policies = sorted(cv_fpr_by_policy.keys())
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size  # type: ignore[index]
+
+    all_alpha_keys: list[str] = []
+    for b in policies:
+        for a in cv_fpr_by_policy[b]:
+            if a not in all_alpha_keys:
+                all_alpha_keys.append(a)
+    all_alpha_keys.sort()
 
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
 
-    for b in baselines:
-        alpha_map = cv_fpr_by_baseline[b]
-        alpha_order = [a for a in REGIME_C_ALPHA_DISPLAY_ORDER if a in alpha_map]
+    for b in policies:
+        alpha_map = cv_fpr_by_policy[b]
+        alpha_order = [a for a in all_alpha_keys if a in alpha_map]
         x = np.arange(len(alpha_order), dtype=np.float64)
         means = [float(np.mean(alpha_map[a])) for a in alpha_order]
         stds = [
@@ -204,8 +209,8 @@ def generate_figure4(
         means_arr = np.array(means)
         stds_arr = np.array(stds)
 
-        color = _baseline_color(b, style)
-        label = _baseline_label(b, style)
+        color = _policy_color(b, style)
+        label = _policy_label(b, style)
         ax.plot(x, means, marker="o", markersize=3, color=color, label=label)
         ax.fill_between(
             x,
@@ -215,12 +220,10 @@ def generate_figure4(
             alpha=0.2,
         )
 
-    ax.set_xticks(
-        np.arange(len(REGIME_C_ALPHA_TICK_LABELS)), list(REGIME_C_ALPHA_TICK_LABELS)
-    )
+    ax.set_xticks(np.arange(len(all_alpha_keys)), all_alpha_keys)
     ax.set_xlabel(r"Dirichlet $\alpha$ / IID reference")
     ax.set_ylabel("CV(FPR)")
-    ax.set_title(r"CV(FPR) vs. Dirichlet $\alpha$ (Regime C)")
+    ax.set_title(r"CV(FPR) comparison")
     ax.legend(fontsize=style.font_size - 1)
     fig.tight_layout()
 

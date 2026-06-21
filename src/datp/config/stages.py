@@ -1,8 +1,8 @@
 """Stage-scoped configuration for the calibration-poisoning experiments.
 
-Each stage maps to a fixed (scale, dataset) pair, an authorization gate, and a
-flag indicating whether experiment execution is permitted. Heavy stages require
-explicit gate authorization; no stage triggers a run by default.
+Each stage maps to a fixed dataset, an authorization gate, and a flag indicating
+whether experiment execution is permitted. Heavy stages require explicit gate
+authorization; no stage triggers a run by default.
 """
 
 from __future__ import annotations
@@ -10,20 +10,17 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass
 
-from datp.data.catalog import DatasetID
-from datp.experiments.enums import ExperimentScale
+from datp.core.enums import DatasetID
 
 
 class ExperimentStage(enum.StrEnum):
     """Canonical execution stages, ordered from lightest to heaviest."""
 
-    COMMON = "common"
-    AUDIT_READONLY = "audit_readonly"
-    NBAIOT_SMOKE = "nbaiot_smoke"
-    NBAIOT_BOUNDED = "nbaiot_bounded"
-    NBAIOT_FULL = "nbaiot_full"
-    CICIOT2023_STRETCH = "ciciot2023_stretch"
-    PAPER_FIGURES = "paper_figures"
+    FINAL_AUDIT = "final_audit"
+    SYNTHETIC_SMOKE = "synthetic_smoke"
+    NBAIOT_MAIN = "nbaiot_main"
+    NBAIOT_FULL_OPTIONAL = "nbaiot_full_optional"
+    STRETCH_DIAGNOSTIC_ONLY = "stretch_diagnostic_only"
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,19 +29,16 @@ class ExperimentStageConfig:
 
     Attributes:
         stage: Canonical stage identifier.
-        scale: Experiment scale, or None for non-execution stages.
         dataset: Target dataset, or None for cross-dataset stages.
         allow_run: Whether this stage may trigger experiment execution.
             False until this stage's gate is satisfied, then flipped to True
-            for exactly that stage. The N-BaIoT smoke and bounded stages are
-            enabled; the full, stretch, and paper-figure stages remain gated.
+            for exactly that stage.
         gate: Authorization gate that must be resolved before a run is
-            permitted (a short domain label). None means no additional gate.
+            permitted (a short domain label).
         description: Human-readable summary for CLI output.
     """
 
     stage: ExperimentStage
-    scale: ExperimentScale | None
     dataset: DatasetID | None
     allow_run: bool
     gate: str | None
@@ -56,79 +50,40 @@ class ExperimentStageConfig:
 # ---------------------------------------------------------------------------
 
 _STAGE_CONFIGS: dict[ExperimentStage, ExperimentStageConfig] = {
-    ExperimentStage.COMMON: ExperimentStageConfig(
-        stage=ExperimentStage.COMMON,
-        scale=None,
+    ExperimentStage.FINAL_AUDIT: ExperimentStageConfig(
+        stage=ExperimentStage.FINAL_AUDIT,
         dataset=None,
         allow_run=False,
-        gate=None,
-        description="Shared constants and settings; no experiment execution.",
+        gate="final_audit_pass",
+        description="Protocol audit and provenance validation before execution.",
     ),
-    ExperimentStage.AUDIT_READONLY: ExperimentStageConfig(
-        stage=ExperimentStage.AUDIT_READONLY,
-        scale=None,
+    ExperimentStage.SYNTHETIC_SMOKE: ExperimentStageConfig(
+        stage=ExperimentStage.SYNTHETIC_SMOKE,
         dataset=None,
-        allow_run=False,
-        gate=None,
-        description="Read-only artifact audit; validates provenance, no writes.",
-    ),
-    ExperimentStage.NBAIOT_SMOKE: ExperimentStageConfig(
-        stage=ExperimentStage.NBAIOT_SMOKE,
-        scale=ExperimentScale.SMOKE,
-        dataset=DatasetID.NBAIOT,
         allow_run=True,
         gate="smoke_diagnostics_signoff",
-        description=(
-            "N-BaIoT real-data smoke diagnostics (scale=SMOKE; one-seed/"
-            "one-victim and one-seed/all-victims) validating the pipeline "
-            "end-to-end on real clean scores. No paper-quality results."
-        ),
+        description="Synthetic invariant validation; must pass before N-BaIoT main.",
     ),
-    ExperimentStage.NBAIOT_BOUNDED: ExperimentStageConfig(
-        stage=ExperimentStage.NBAIOT_BOUNDED,
-        scale=ExperimentScale.BOUNDED,
+    ExperimentStage.NBAIOT_MAIN: ExperimentStageConfig(
+        stage=ExperimentStage.NBAIOT_MAIN,
         dataset=DatasetID.NBAIOT,
         allow_run=True,
-        gate="bounded_run_lock",
-        description=(
-            "N-BaIoT bounded run (scale=BOUNDED, fractions={0,0.10,0.20,0.40}, "
-            "5 seed pairs, policies B1/B2/B4) over the locked 1620-cell "
-            "matrix with per-seed mu_flag_threshold fixed from clean data. "
-            "Primary bounded result set, restricted to exactly this matrix."
-        ),
+        gate="nbaiot_main_run_lock",
+        description="Primary N-BaIoT single-client calibration-poisoning experiment.",
     ),
-    ExperimentStage.NBAIOT_FULL: ExperimentStageConfig(
-        stage=ExperimentStage.NBAIOT_FULL,
-        scale=ExperimentScale.FULL,
+    ExperimentStage.NBAIOT_FULL_OPTIONAL: ExperimentStageConfig(
+        stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
         dataset=DatasetID.NBAIOT,
         allow_run=False,
         gate="full_scope_continue_decision",
-        description=(
-            "N-BaIoT full run (scale=FULL, adds fraction=0.05). "
-            "Requires a CONTINUE decision on the full-scope gate."
-        ),
+        description="Optional multi-client extension (pairs and triples).",
     ),
-    ExperimentStage.CICIOT2023_STRETCH: ExperimentStageConfig(
-        stage=ExperimentStage.CICIOT2023_STRETCH,
-        scale=ExperimentScale.STRETCH,
+    ExperimentStage.STRETCH_DIAGNOSTIC_ONLY: ExperimentStageConfig(
+        stage=ExperimentStage.STRETCH_DIAGNOSTIC_ONLY,
         dataset=DatasetID.CICIOT2023,
         allow_run=False,
         gate="ciciot_feasibility_decision",
-        description=(
-            "CICIoT2023 stretch run (scale=STRETCH). "
-            "Requires a CONTINUE decision on the feasibility gate."
-        ),
-    ),
-    ExperimentStage.PAPER_FIGURES: ExperimentStageConfig(
-        stage=ExperimentStage.PAPER_FIGURES,
-        scale=None,
-        dataset=None,
-        allow_run=False,
-        gate="final_analysis_authorization",
-        description=(
-            "Generate paper figures and tables from the final analysis. "
-            "Blocked until final-analysis authorization."
-        ),
+        description="Optional CICIoT2023 pseudo-client diagnostic contrast.",
     ),
 }
 

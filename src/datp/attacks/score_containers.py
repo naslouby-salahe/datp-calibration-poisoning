@@ -1,7 +1,7 @@
 """Typed Score containers and victim-set model.
 
 Reuses inherited eligibility logic from thresholding.eligibility. Calibration-Pending
-clients receive tau_global, are excluded from CV(FPR), victim sets, and B4 clustering.
+clients receive tau_global, are excluded from CV(FPR), victim sets, and CLUSTER_THRESHOLD clustering.
 """
 
 from __future__ import annotations

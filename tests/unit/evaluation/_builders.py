@@ -1,11 +1,12 @@
 """Typed test builders for evaluation unit tests."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 from dataclasses import dataclass
 
-from datp.core.enums import Baseline, Regime
+from datp.config.stages import ExperimentStage
 from datp.core.types import ClientThreshold
 from datp.evaluation.metrics import (
     BinaryMetrics,
@@ -20,10 +21,9 @@ from datp.evaluation.metrics import (
 class _EvalSpec:
     """Optional overrides for _make_eval_result; keeps the signature at ≤4 args."""
 
-    baseline: Baseline = Baseline.B1
-    regime: Regime = Regime.A
+    policy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD
+    stage: ExperimentStage = ExperimentStage.NBAIOT_MAIN
     seed: int = 42
-    alpha: float | None = None
     eval_incomplete_ids: tuple[str, ...] = ()
 
 
@@ -34,10 +34,9 @@ def _make_eval_result(
     spec: _EvalSpec = _EvalSpec(),
 ) -> EvaluationResult:
     return build_evaluation_result(
-        baseline=spec.baseline,
-        regime=spec.regime,
+        policy=spec.policy,
+        stage=spec.stage,
         seed=spec.seed,
-        alpha=spec.alpha,
         clients=tuple(per_client),
         eligible_ids=tuple(eligible_ids),
         pending_ids=tuple(pending_ids),
@@ -91,7 +90,7 @@ def _make_client_record(
             client_id=client_id,
             threshold=0.5,
             calibration_pending=False,
-            strategy=Baseline.B1,
+            strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         ),
         evaluation_incomplete=(n_attack == 0),
     )

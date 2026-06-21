@@ -8,17 +8,16 @@ from rich.table import Table
 from datp.artifacts.existence import results_exist
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import Regime
 from datp.experiments.sweep import build_experiment_matrix
 
 console = Console()
 
 
 @dataclass(slots=True)
-class _RegimeReport:
+class _StageReport:
     """Internal accumulator — mutable during construction in get_status()."""
 
-    regime: Regime
+    stage: str
     complete: list = field(default_factory=list)
     missing: list = field(default_factory=list)
     aborted: list = field(default_factory=list)
@@ -44,7 +43,7 @@ class _RegimeReport:
 class _StatusReport:
     """Internal accumulator — mutable during construction in get_status()."""
 
-    regime_reports: dict[str, _RegimeReport] = field(default_factory=dict)
+    stage_reports: dict[str, _StageReport] = field(default_factory=dict)
 
     def summary_rows(self) -> list[tuple[str, int, int, int, int]]:
         rows: list[tuple[str, int, int, int, int]] = []
@@ -53,11 +52,11 @@ class _StatusReport:
         total_aborted = 0
         total_all = 0
 
-        for name in sorted(self.regime_reports):
-            report = self.regime_reports[name]
+        for name in sorted(self.stage_reports):
+            report = self.stage_reports[name]
             rows.append(
                 (
-                    f"Regime {name.upper()}",
+                    f"Stage {name.upper()}",
                     report.complete_count,
                     report.missing_count,
                     report.aborted_count,
@@ -105,40 +104,27 @@ class _StatusReport:
         return table
 
 
-def get_status(
-    regime: Regime | None,
-    base_dir: Path,
-) -> _StatusReport:
+def get_status(base_dir: Path) -> _StatusReport:
     cells = build_experiment_matrix()
-
-    if regime is not None:
-        cells = [c for c in cells if c.regime == regime]
-
     report = _StatusReport()
 
     for cell in cells:
-        regime_key = cell.regime
-        if regime_key not in report.regime_reports:
-            report.regime_reports[regime_key] = _RegimeReport(regime=regime_key)
+        stage_key = cell.stage.value
+        if stage_key not in report.stage_reports:
+            report.stage_reports[stage_key] = _StageReport(stage=stage_key)
 
-        rr = report.regime_reports[regime_key]
+        rr = report.stage_reports[stage_key]
 
         rp = (
-            ArtifactLayout(base_dir=base_dir, regime=cell.regime)
-            .baseline_run(cell)
+            ArtifactLayout(base_dir=base_dir, stage=cell.stage)
+            .policy_run(cell)
             .result_dir
         )
 
         aborted_file = rp / ArtifactFile.RUN_ABORTED
         if aborted_file.is_file():
             rr.aborted.append(cell)
-        elif results_exist(
-            cell.baseline,
-            cell.regime,
-            cell.seed,
-            cell.alpha,
-            base_dir=base_dir,
-        ):
+        elif results_exist(cell.policy, cell.stage, cell.seed, base_dir=base_dir):
             rr.complete.append(cell)
         else:
             rr.missing.append(cell)
@@ -147,11 +133,8 @@ def get_status(
 
 
 def status(
-    regime: Regime | None = typer.Option(
-        None, help="Show status for this regime only (a, b, c)"
-    ),
     base_dir: Path = typer.Option(..., help="Root output directory"),
 ) -> None:
     """Report experiment cell completion status."""
-    report = get_status(regime=regime, base_dir=base_dir)
+    report = get_status(base_dir=base_dir)
     console.print(report.render_table())

@@ -1,4 +1,4 @@
-"""Secondary for Regime A (n=9 limit); primary for Regime C with Bonferroni correction across α levels."""
+"""Wilcoxon signed-rank test utilities; secondary for N-BaIoT main (n=9 limit), with Bonferroni correction across α levels."""
 
 from __future__ import annotations
 

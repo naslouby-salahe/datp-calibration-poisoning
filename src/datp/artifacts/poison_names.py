@@ -13,7 +13,7 @@ class ManifestFile(StrEnum):
 
     PROJECT_AUDIT_REPORT = "project_audit_report.json"
     CLEAN_SCORE_ARTIFACTS = "clean_score_artifacts.json"
-    NBAIOT_BOUNDED_SWEEP_MANIFEST = "nbaiot_bounded_sweep_manifest.json"
+    NBAIOT_MAIN_MANIFEST = "nbaiot_main_manifest.json"
     PAPER_FIGURE_MANIFEST = "paper_figure_manifest.json"
     RUN_MANIFEST = "run_manifest.json"
 
@@ -41,12 +41,12 @@ MATERIALITY_FACTOR: float = 0.1
 THRESHOLD_QUANTILE: float = 0.95  # Calibration quantile for threshold derivation.
 
 # Trimmed-calibration defense: symmetric trim fraction removed from each tail
-# before the threshold quantile and before B4 fingerprinting. Primary t=5%;
+# before the threshold quantile and before CLUSTER_THRESHOLD fingerprinting. Primary t=5%;
 # t=10% is appendix-only.
 TRIM_FRACTION_PRIMARY: float = 0.05
 TRIM_FRACTION_APPENDIX: float = 0.10
 
-# Locked B4 hyperparameters for N-BaIoT (Regime A).
-B4_K: int = 3
-B4_N_INIT: int = 10
-B4_MAX_ITER: int = 300
+# Locked CLUSTER_THRESHOLD hyperparameters for N-BaIoT main.
+CLUSTER_K_NBAIOT: int = 3
+CLUSTER_N_INIT: int = 10
+CLUSTER_MAX_ITER: int = 300

@@ -6,7 +6,7 @@ Three bounded sweep strategies:
   LOW_SCORE_BENIGN — lower tail_mass fraction → threshold lowers.
 
 Diagnostic-only strategy (never in main matrix, never in gray-box claims):
-  TARGETED_REMOVAL_LOW_SCORE — requires explicit allow_diagnostic=True.
+  LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY — requires explicit allow_diagnostic=True.
 
 Near-null criterion for RANDOM: |Δτ| ≤ delta_tau_null_threshold is an audit flag,
 not an auto-kill. Evaluation logic decides whether to flag, not this module.

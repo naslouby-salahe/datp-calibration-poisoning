@@ -2,14 +2,14 @@
 
 The only locked defense is TRIMMED_CALIBRATION: a symmetric trim that drops the
 top and bottom ``trim_fraction`` of each client's calibration scores before the
-threshold quantile and before B4 fingerprinting. The defense is applied
+threshold quantile and before CLUSTER_THRESHOLD fingerprinting. The defense is applied
 uniformly to every client (eligible and pending) and to both clean and poisoned
 calibration. Clean arrays are never mutated in place.
 
 The defense transforms the inputs to the existing threshold-recompute pipeline
 (a defended ScoreCollection and a defended poisoned-cal dict); the threshold
 logic itself is unchanged, so trimming necessarily precedes both the percentile
-and the B4 fingerprint.
+and the CLUSTER_THRESHOLD fingerprint.
 """
 
 from __future__ import annotations

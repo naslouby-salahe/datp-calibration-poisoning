@@ -20,12 +20,12 @@ def _source(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-class TestNoLocalRegimeBaselines:
+class TestNoLocalRegimePolicyConstants:
     """No module-level _REGIME_*_BASELINES definitions outside datp/core."""
 
     _PATTERN = re.compile(r"^_REGIME_\w*BASELINES\s*=", re.MULTILINE)
 
-    def test_no_local_regime_baselines_in_reporting(self) -> None:
+    def test_no_local_regime_policy_constants_in_reporting(self) -> None:
         for path in _all_py_files(_SRC_ROOT / "reporting"):
             src = _source(path)
             matches = self._PATTERN.findall(src)
@@ -35,7 +35,7 @@ class TestNoLocalRegimeBaselines:
                 "Move to datp.core.enums."
             )
 
-    def test_no_local_regime_baselines_in_validation(self) -> None:
+    def test_no_local_regime_policy_constants_in_validation(self) -> None:
         for path in _all_py_files(_SRC_ROOT / "validation"):
             src = _source(path)
             matches = self._PATTERN.findall(src)
@@ -45,7 +45,7 @@ class TestNoLocalRegimeBaselines:
                 "Move to datp.core.enums."
             )
 
-    def test_no_local_regime_baselines_in_analyses(self) -> None:
+    def test_no_local_regime_policy_constants_in_analyses(self) -> None:
         for path in _all_py_files(_SRC_ROOT / "analyses"):
             src = _source(path)
             matches = self._PATTERN.findall(src)
@@ -176,20 +176,16 @@ class TestAttrsRemovedFromDependencies:
 
 
 class TestReportingUsesCorePolicies:
-    """reporting/build.py imports baseline/regime policies from datp.core, not locally."""
+    """reporting/build.py imports policies from datp.core, not locally."""
 
-    def test_build_imports_stats_reporting_baselines(self) -> None:
+    def test_build_imports_controlled_baselines(self) -> None:
         build_py = _SRC_ROOT / "reporting" / "build.py"
         src = _source(build_py)
-        assert "STATS_REPORTING_BASELINES" in src, (
-            "reporting/build.py must import STATS_REPORTING_BASELINES from datp.core.enums"
+        assert "CONTROLLED_BASELINES" not in src, (
+            "CONTROLLED_BASELINES is stale; use ThresholdPolicy directly"
         )
-
-    def test_build_imports_regime_baselines(self) -> None:
-        build_py = _SRC_ROOT / "reporting" / "build.py"
-        src = _source(build_py)
-        assert "REGIME_BASELINES" in src, (
-            "reporting/build.py must import REGIME_BASELINES from datp.core.enums"
+        assert "ThresholdPolicy" in src, (
+            "reporting/build.py must use ThresholdPolicy for policy iteration"
         )
 
     def test_build_imports_figure_name(self) -> None:

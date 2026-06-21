@@ -5,6 +5,7 @@ for every model in ``datp.config.models``.
 """
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import pytest
 from pydantic import ValidationError
@@ -27,7 +28,7 @@ from datp.config.models import (
     ThresholdConfig,
     TrackingConfig,
 )
-from datp.core.enums import Activation, B4RegimeAMode, Baseline
+from datp.core.enums import Activation
 
 # ── SafetyBounds ──────────────────────────────────────────────────────────
 
@@ -121,9 +122,6 @@ class TestDatasetConfig:
             feature_count=115,
             n_min=100,
             cap=50000,
-            b0_val_fraction=0.1,
-            regime_c_train_fraction=0.7,
-            regime_c_cal_fraction=0.15,
             attack_reserve_fraction=0.2,
             nbaiot_balanced_test=False,
         )
@@ -136,9 +134,6 @@ class TestDatasetConfig:
                 feature_count=115,
                 n_min=100,
                 cap=50000,
-                b0_val_fraction=0.1,
-                regime_c_train_fraction=0.7,
-                regime_c_cal_fraction=0.15,
                 attack_reserve_fraction=0.2,
                 nbaiot_balanced_test=False,
                 bogus=1,  # type: ignore[call-arg]
@@ -264,66 +259,25 @@ class TestThresholdConfig:
         t = ThresholdConfig(
             n_min=100,
             q=0.95,
-            b4_regime_a_mode=B4RegimeAMode.FIXED,
-            b4_k_regime_a=3,
-            b4_k_candidates=[2, 3, 4, 5],
-            b4_n_init=10,
-            b4_max_iter=300,
-            b4_random_state=42,
+            cluster_k_nbaiot=3,
+            cluster_k_candidates=[2, 3, 4, 5],
+            cluster_n_init=10,
+            cluster_max_iter=300,
+            cluster_random_state=42,
         )
         assert abs(t.q - 0.95) < 1e-9
-        assert t.b4_regime_a_mode is B4RegimeAMode.FIXED
-
-    def test_string_mode_coerced_to_enum(self) -> None:
-        t = ThresholdConfig(
-            n_min=100,
-            q=0.95,
-            b4_regime_a_mode="fixed",  # type: ignore[arg-type]
-            b4_k_regime_a=3,
-            b4_k_candidates=[2, 3, 4, 5],
-            b4_n_init=10,
-            b4_max_iter=300,
-            b4_random_state=42,
-        )
-        assert t.b4_regime_a_mode is B4RegimeAMode.FIXED
-
-    def test_invalid_b4_mode_rejected(self) -> None:
-        with pytest.raises(ValidationError):
-            ThresholdConfig(
-                n_min=100,
-                q=0.95,
-                b4_regime_a_mode="invalid_mode",  # type: ignore[arg-type]
-                b4_k_regime_a=3,
-                b4_k_candidates=[2, 3, 4, 5],
-                b4_n_init=10,
-                b4_max_iter=300,
-                b4_random_state=42,
-            )
-
-    def test_silhouette_mode_accepted(self) -> None:
-        t = ThresholdConfig(
-            n_min=100,
-            q=0.95,
-            b4_regime_a_mode=B4RegimeAMode.SILHOUETTE,
-            b4_k_regime_a=3,
-            b4_k_candidates=[2, 3, 4, 5],
-            b4_n_init=10,
-            b4_max_iter=300,
-            b4_random_state=42,
-        )
-        assert t.b4_regime_a_mode is B4RegimeAMode.SILHOUETTE
+        assert t.cluster_k_nbaiot == 3
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
             ThresholdConfig(  # type: ignore[call-arg]
                 n_min=100,
                 q=0.95,
-                b4_regime_a_mode=B4RegimeAMode.FIXED,
-                b4_k_regime_a=3,
-                b4_k_candidates=[2, 3, 4, 5],
-                b4_n_init=10,
-                b4_max_iter=300,
-                b4_random_state=42,
+                cluster_k_nbaiot=3,
+                cluster_k_candidates=[2, 3, 4, 5],
+                cluster_n_init=10,
+                cluster_max_iter=300,
+                cluster_random_state=42,
                 bogus=1,  # type: ignore[call-arg]
             )
 
@@ -335,8 +289,6 @@ class TestExperimentConfig:
     def test_valid_construction(self) -> None:
         e = ExperimentConfig(
             seeds=[0, 1, 2],
-            regime_c_alphas=[0.1, 0.5, 1.0],
-            regime_c_n_clients=20,
             absorption_strong_retention=0.75,
             absorption_partial=0.25,
         )
@@ -347,8 +299,6 @@ class TestExperimentConfig:
         with pytest.raises(ValidationError, match="extra"):
             ExperimentConfig(  # type: ignore[call-arg]
                 seeds=[0, 1, 2],
-                regime_c_alphas=[0.1, 0.5, 1.0],
-                regime_c_n_clients=20,
                 absorption_strong_retention=0.75,
                 absorption_partial=0.25,
                 bogus=1,  # type: ignore[call-arg]
@@ -387,18 +337,14 @@ class TestStatisticsConfig:
 class TestQualityGateConfig:
     def test_valid_construction(self) -> None:
         qg = QualityGateConfig(
-            b0_sanity_min=0.90,
-            b3_dispersion_threshold=0.25,
             ciciot_homogeneity_threshold=0.05,
             js_divergence_n_bins=32,
         )
-        assert abs(qg.b0_sanity_min - 0.90) < 1e-9
+        assert qg.ciciot_homogeneity_threshold == 0.05
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
             QualityGateConfig(  # type: ignore[call-arg]
-                b0_sanity_min=0.90,
-                b3_dispersion_threshold=0.25,
                 ciciot_homogeneity_threshold=0.05,
                 js_divergence_n_bins=32,
                 bogus=1,  # type: ignore[call-arg]
@@ -415,23 +361,19 @@ class TestStyleConfig:
             font_size=9,
             figsize_single_col=(3.5, 2.5),
             figsize_double_col=(7.16, 3.0),
-            baseline_colors={
-                Baseline.B0: "#808080",
-                Baseline.B1: "#1f77b4",
-                Baseline.B2: "#ff7f0e",
-                Baseline.B3: "#2ca02c",
-                Baseline.B4: "#d62728",
+            policy_colors={
+                ThresholdPolicy.GLOBAL_THRESHOLD: "#1f77b4",
+                ThresholdPolicy.LOCAL_THRESHOLD: "#ff7f0e",
+                ThresholdPolicy.CLUSTER_THRESHOLD: "#d62728",
             },
-            baseline_labels={
-                Baseline.B0: "B0 (Centralised)",
-                Baseline.B1: "B1 (Client-Averaged)",
-                Baseline.B2: "B2 (Per-Client)",
-                Baseline.B3: "B3 (Family-Mean)",
-                Baseline.B4: "B4 (Cluster-Mean)",
+            policy_labels={
+                ThresholdPolicy.GLOBAL_THRESHOLD: "GLOBAL_THRESHOLD",
+                ThresholdPolicy.LOCAL_THRESHOLD: "LOCAL_THRESHOLD",
+                ThresholdPolicy.CLUSTER_THRESHOLD: "CLUSTER_THRESHOLD",
             },
         )
         assert s.dpi == 300
-        assert s.baseline_colors[Baseline.B1] == "#1f77b4"
+        assert s.policy_colors[ThresholdPolicy.GLOBAL_THRESHOLD] == "#1f77b4"
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
@@ -440,8 +382,8 @@ class TestStyleConfig:
                 font_size=9,
                 figsize_single_col=(3.5, 2.5),
                 figsize_double_col=(7.16, 3.0),
-                baseline_colors={Baseline.B1: "#1f77b4"},
-                baseline_labels={Baseline.B1: "B1"},
+                policy_colors={ThresholdPolicy.GLOBAL_THRESHOLD: "#1f77b4"},
+                policy_labels={ThresholdPolicy.GLOBAL_THRESHOLD: "GLOBAL_THRESHOLD"},
                 bogus=1,  # type: ignore[call-arg]
             )
 
@@ -526,8 +468,8 @@ class TestReportingConfig:
                 font_size=9,
                 figsize_single_col=(3.5, 2.5),
                 figsize_double_col=(7.16, 3.0),
-                baseline_colors={Baseline.B1: "#1f77b4"},
-                baseline_labels={Baseline.B1: "B1"},
+                policy_colors={ThresholdPolicy.GLOBAL_THRESHOLD: "#1f77b4"},
+                policy_labels={ThresholdPolicy.GLOBAL_THRESHOLD: "GLOBAL_THRESHOLD"},
             ),
         )
         assert r.figure2_max_points == 5000
@@ -543,8 +485,8 @@ class TestReportingConfig:
                     font_size=9,
                     figsize_single_col=(3.5, 2.5),
                     figsize_double_col=(7.16, 3.0),
-                    baseline_colors={Baseline.B1: "#1f77b4"},
-                    baseline_labels={Baseline.B1: "B1"},
+                    policy_colors={ThresholdPolicy.GLOBAL_THRESHOLD: "#1f77b4"},
+                    policy_labels={ThresholdPolicy.GLOBAL_THRESHOLD: "GLOBAL_THRESHOLD"},
                 ),
                 bogus=1,  # type: ignore[call-arg]
             )
@@ -557,13 +499,12 @@ class TestDatpConfig:
     """Top-level config model with cross-section validators."""
 
     def test_optional_runtime_fields_default_to_none(self) -> None:
-        """regime, baseline, seed, alpha are optional override slots."""
+        """stage, policy, seed are optional override slots."""
         from datp.config.compose import BASE_CONFIG
 
-        assert BASE_CONFIG.regime is None
-        assert BASE_CONFIG.baseline is None
+        assert BASE_CONFIG.stage is None
+        assert BASE_CONFIG.policy is None
         assert BASE_CONFIG.seed is None
-        assert BASE_CONFIG.alpha is None
 
     def test_frozen_config_is_immutable(self) -> None:
         from datp.config.compose import BASE_CONFIG

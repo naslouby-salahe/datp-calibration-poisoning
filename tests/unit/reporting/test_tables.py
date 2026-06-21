@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import csv
 import math
@@ -8,8 +9,8 @@ import numpy as np
 import pytest
 
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID
 from datp.evaluation.metrics import (
@@ -34,7 +35,7 @@ _ELIGIBLE_IDS = _DEVICE_IDS[:5]
 _PENDING_IDS = _DEVICE_IDS[5:]
 
 
-def _make_client_record(client_id: str, baseline: Baseline) -> ClientEvaluationRecord:
+def _make_client_record(client_id: str, policy: ThresholdPolicy) -> ClientEvaluationRecord:
     fpr = float(RNG.uniform(0.01, 0.15))
     tpr = float(RNG.uniform(0.85, 0.99))
     tnr = 1.0 - fpr
@@ -58,14 +59,14 @@ def _make_client_record(client_id: str, baseline: Baseline) -> ClientEvaluationR
             client_id=client_id,
             threshold=0.1,
             calibration_pending=client_id in _PENDING_IDS,
-            strategy=baseline,
+            strategy=policy,
         ),
         evaluation_incomplete=False,
     )
 
 
-def _make_eval_result(baseline: Baseline, seed: int) -> EvaluationResult:
-    clients = tuple(_make_client_record(d, baseline) for d in _DEVICE_IDS)
+def _make_eval_result(policy: ThresholdPolicy, seed: int) -> EvaluationResult:
+    clients = tuple(_make_client_record(d, policy) for d in _DEVICE_IDS)
     eligible_fprs = [c.metrics.fpr for c in clients if c.client_id in _ELIGIBLE_IDS]
     eligible_tprs = [c.metrics.tpr for c in clients if c.client_id in _ELIGIBLE_IDS]
     from datp.statistics.cv import cv
@@ -102,8 +103,8 @@ def _make_eval_result(baseline: Baseline, seed: int) -> EvaluationResult:
         ),
         None,
     )
-    cell = TrainingCellId(regime=Regime.A, seed=seed, alpha=None)
-    run = BaselineRunId(cell=cell, baseline=baseline)
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed)
+    run = PolicyRunId(cell=cell, policy=policy)
     return EvaluationResult(
         run=run,
         dataset=DatasetID.NBAIOT,
@@ -135,15 +136,15 @@ def _make_eval_result(baseline: Baseline, seed: int) -> EvaluationResult:
 _STYLE = BASE_CONFIG.reporting.style
 
 
-def _synthetic_results() -> dict[Baseline, list[EvaluationResult]]:
-    data: dict[Baseline, list[EvaluationResult]] = {}
-    for bl in (Baseline.B1, Baseline.B2, Baseline.B4):
+def _synthetic_results() -> dict[ThresholdPolicy, list[EvaluationResult]]:
+    data: dict[ThresholdPolicy, list[EvaluationResult]] = {}
+    for bl in (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD):
         data[bl] = [_make_eval_result(bl, seed) for seed in range(2)]
     return data
 
 
-def _synthetic_results_single_seed() -> dict[Baseline, list[EvaluationResult]]:
-    return {Baseline.B1: [_make_eval_result(Baseline.B1, 0)]}
+def _synthetic_results_single_seed() -> dict[ThresholdPolicy, list[EvaluationResult]]:
+    return {ThresholdPolicy.GLOBAL_THRESHOLD: [_make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, 0)]}
 
 
 # ── generate_table3 ──────────────────────────────────────────────
@@ -191,9 +192,9 @@ def test_generate_table4_creates_files(tmp_path: Path) -> None:
 
 
 def test_build_table_row_multi_seed() -> None:
-    results = [_make_eval_result(Baseline.B1, s) for s in range(3)]
-    row = _build_table_row(Baseline.B1, results)
-    assert row.baseline == Baseline.B1
+    results = [_make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, s) for s in range(3)]
+    row = _build_table_row(ThresholdPolicy.GLOBAL_THRESHOLD, results)
+    assert row.policy == ThresholdPolicy.GLOBAL_THRESHOLD
     assert row.eligible_count == 5
     assert row.pending_count == 1
     assert row.coverage_ratio == pytest.approx(5 / 6)
@@ -201,34 +202,34 @@ def test_build_table_row_multi_seed() -> None:
 
 
 def test_build_table_row_single_seed() -> None:
-    results = [_make_eval_result(Baseline.B2, 0)]
-    row = _build_table_row(Baseline.B2, results)
-    assert row.baseline == Baseline.B2
+    results = [_make_eval_result(ThresholdPolicy.LOCAL_THRESHOLD, 0)]
+    row = _build_table_row(ThresholdPolicy.LOCAL_THRESHOLD, results)
+    assert row.policy == ThresholdPolicy.LOCAL_THRESHOLD
     assert row.cv_fpr_std == pytest.approx(0.0)
     assert row.cv_tpr_std == pytest.approx(0.0)
 
 
 def test_build_table_row_eligible_count_mismatch_raises() -> None:
-    r1 = _make_eval_result(Baseline.B1, 0)
-    r2 = _make_eval_result(Baseline.B1, 1)
+    r1 = _make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, 0)
+    r2 = _make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, 1)
     object.__setattr__(r2, "eligible_ids", ("dev_0", "dev_1"))
     with pytest.raises(ValueError, match="Coverage count mismatch"):
-        _build_table_row(Baseline.B1, [r1, r2])
+        _build_table_row(ThresholdPolicy.GLOBAL_THRESHOLD, [r1, r2])
 
 
 # ── ResultTable.to_csv ───────────────────────────────────────────
 
 
 def test_result_table_to_csv(tmp_path: Path) -> None:
-    results = [_make_eval_result(Baseline.B1, 0)]
-    row = _build_table_row(Baseline.B1, results)
+    results = [_make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, 0)]
+    row = _build_table_row(ThresholdPolicy.GLOBAL_THRESHOLD, results)
     table = ResultTable(title="Test", style=_STYLE, rows=[row])
     csv_path = table.to_csv(tmp_path / "test.csv")
     assert csv_path.exists()
 
     with csv_path.open("r") as f:
         reader = list(csv.reader(f))
-    assert reader[0][0] == "Baseline"
+    assert reader[0][0] == "ThresholdPolicy"
     assert MANDATORY_FOOTNOTE in reader[-1][0]
 
 
@@ -236,7 +237,7 @@ def test_result_table_to_csv(tmp_path: Path) -> None:
 
 
 def test_build_table_row_nonfinite_coverage_raises() -> None:
-    r1 = _make_eval_result(Baseline.B1, 0)
+    r1 = _make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, 0)
     object.__setattr__(r1, "coverage_ratio", float("nan"))
     with pytest.raises(ValueError, match="Coverage ratio missing"):
-        _build_table_row(Baseline.B1, [r1])
+        _build_table_row(ThresholdPolicy.GLOBAL_THRESHOLD, [r1])

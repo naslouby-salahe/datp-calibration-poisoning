@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Proprietary
-"""Score artifacts have no baseline subdirectory — they are shared across B1/B2/B3/B4."""
+"""Score artifacts have no baseline subdirectory — they are shared across threshold policies (GLOBAL, LOCAL, CLUSTER)."""
 
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ import torch
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.names import ArtifactFile, PathToken
 from datp.core.device import resolve_device
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
     SCORING_STAGES,
-    Regime,
     ScoringStage,
 )
 from datp.core.errors import fmt
@@ -68,9 +68,8 @@ class ScoringRecord:
 class ScoringManifest:
     schema_version: str
     dataset: DatasetID | str
-    regime: Regime | str
+    stage: ExperimentStage | str
     seed: int | None
-    alpha: float | None
     model_checkpoint_path: str
     model_checkpoint_hash: str
     checkpoint_round: int | None
@@ -312,9 +311,8 @@ def _manifest_from_payload(payload: Mapping[str, object]) -> ScoringManifest:
     return ScoringManifest(
         schema_version=_required_text(payload, "schema_version"),
         dataset=str(payload.get("dataset", SCORING_MANIFEST_NOT_PROVIDED)),
-        regime=str(payload.get("regime", SCORING_MANIFEST_NOT_PROVIDED)),
+        stage=str(payload.get("stage", SCORING_MANIFEST_NOT_PROVIDED)),
         seed=_optional_int(payload, "seed"),
-        alpha=_optional_float(payload, "alpha"),
         model_checkpoint_path=_optional_text(payload, "model_checkpoint_path"),
         model_checkpoint_hash=_optional_text(payload, "model_checkpoint_hash"),
         checkpoint_round=_optional_int(payload, "checkpoint_round"),
@@ -422,9 +420,8 @@ class ScoringManifestContext:
     """Bundled metadata written into the scoring manifest."""
 
     dataset: DatasetID
-    regime: Regime | None
+    stage: ExperimentStage | None
     seed: int | None
-    alpha: float | None
     checkpoint_path: Path | None
     checkpoint_round: int | None
 
@@ -439,9 +436,8 @@ def _write_scoring_manifest_and_sentinel(
     manifest = ScoringManifest(
         schema_version=SCORING_MANIFEST_SCHEMA_VERSION,
         dataset=ctx.dataset,
-        regime=ctx.regime if ctx.regime is not None else SCORING_MANIFEST_NOT_PROVIDED,
+        stage=ctx.stage if ctx.stage is not None else SCORING_MANIFEST_NOT_PROVIDED,
         seed=ctx.seed,
-        alpha=ctx.alpha,
         model_checkpoint_path=str(ctx.checkpoint_path)
         if ctx.checkpoint_path is not None
         else SCORING_MANIFEST_NOT_PROVIDED,
@@ -472,9 +468,8 @@ def score_clients(
     client_data: Mapping[str, ClientData],
     *,
     score_base: Path,
-    regime: Regime | None,
+    stage: ExperimentStage | None,
     seed: int | None,
-    alpha: float | None,
     dataset: DatasetID,
     checkpoint_path: Path | None,
     checkpoint_round: int | None,
@@ -497,9 +492,8 @@ def score_clients(
         score_base,
         ScoringManifestContext(
             dataset=dataset,
-            regime=regime,
+            stage=stage,
             seed=seed,
-            alpha=alpha,
             checkpoint_path=checkpoint_path,
             checkpoint_round=checkpoint_round,
         ),

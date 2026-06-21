@@ -14,15 +14,15 @@ from collections.abc import Iterable
 import numpy as np
 
 from datp.attacks.constants import (
-    BOUNDED_SWEEP_FRACTION_SET,
-    FULL_SWEEP_FRACTION_SET,
+    NBAIOT_MAIN_SWEEP_FRACTION_SET,
+    NBAIOT_FULL_OPTIONAL_SWEEP_FRACTION_SET,
 )
 from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
 from datp.core.enums import ScoringStage
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 class GuardrailError(ValueError):
@@ -85,24 +85,17 @@ def assert_reservoir_not_test_or_training(reservoir_source: ScoringStage) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Policy guardrail (B3 excluded)
+# Policy validity guardrail
 # ---------------------------------------------------------------------------
 
 
-def assert_policy_not_b3(policy: ThresholdPolicy) -> None:
-    """Raise if ``policy`` is B3, which is excluded.
-
-    B3 (conformal threshold) is not part of the default policy enum.
-    This is a defence-in-depth check; the enum itself cannot represent B3.
-
-    Raises:
-        GuardrailError: If the policy string contains "b3".
-    """
-    if "b3" in str(policy).lower():
+def assert_valid_policy(policy: ThresholdPolicy) -> None:
+    """Raise if policy is not one of the three valid calibration-poisoning policies."""
+    valid = frozenset(ThresholdPolicy)
+    if policy not in valid:
         raise GuardrailError(
-            f"Calibration-poisoning guardrail: policy {policy!r} is B3. "
-            "B3 is excluded from the ThresholdPolicy enum and must not "
-            "be selected as a default policy."
+            f"Calibration-poisoning guardrail: policy {policy!r} is not valid. "
+            f"Valid policies: {sorted(valid)}"
         )
 
 
@@ -113,31 +106,31 @@ def assert_policy_not_b3(policy: ThresholdPolicy) -> None:
 
 def assert_fractions_in_locked_grid(
     fractions: Iterable[float],
-    scale: ExperimentScale,
+    stage: ExperimentStage,
 ) -> None:
-    """Raise if any fraction is outside the locked grid for ``scale``.
+    """Raise if any fraction is outside the locked grid for ``stage``.
 
     bounded fraction grid: {0, 0.10, 0.20, 0.40}.
-    Full scope adds 0.05 (conditional on the full-scope CONTINUE decision).
+    Full scope adds 0.05 (conditional on the full optional CONTINUE decision).
     Smoke/Stretch use the bounded fraction grid.
 
     Args:
         fractions: The fraction values to validate.
-        scale: The experiment scale; determines the allowed grid.
+        stage: The experiment stage; determines the allowed grid.
 
     Raises:
         GuardrailError: If any fraction is not in the allowed grid.
     """
     allowed = (
-        FULL_SWEEP_FRACTION_SET
-        if scale == ExperimentScale.FULL
-        else BOUNDED_SWEEP_FRACTION_SET
+        NBAIOT_FULL_OPTIONAL_SWEEP_FRACTION_SET
+        if stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
+        else NBAIOT_MAIN_SWEEP_FRACTION_SET
     )
     invalid = [f for f in fractions if f not in allowed]
     if invalid:
         raise GuardrailError(
             f"Calibration-poisoning guardrail: fractions {invalid!r} are not in the locked grid "
-            f"{sorted(allowed)} for scale {scale!r}. "
+            f"{sorted(allowed)} for stage {stage!r}. "
             "Fractions are fixed by the locked scientific protocol grid."
         )
 
@@ -148,24 +141,24 @@ def assert_fractions_in_locked_grid(
 
 
 def assert_bounded_scale_requires_single_client(
-    scale: ExperimentScale,
+    stage: ExperimentStage,
     target_scope: PoisoningTargetScope,
 ) -> None:
-    """Raise if BOUNDED scale is paired with a non-SINGLE_CLIENT target scope.
+    """Raise if NBAIOT_MAIN stage is paired with a non-SINGLE_CLIENT target scope.
 
     Args:
-        scale: The experiment scale.
+        stage: The experiment stage.
         target_scope_value: The string value of the PoisoningTargetScope enum.
 
     Raises:
-        GuardrailError: If scale is bounded sweep but scope is not SINGLE_CLIENT.
+        GuardrailError: If stage is bounded sweep but scope is not SINGLE_CLIENT.
     """
     if (
-        scale == ExperimentScale.BOUNDED
+        stage == ExperimentStage.NBAIOT_MAIN
         and target_scope != PoisoningTargetScope.SINGLE_CLIENT
     ):
         raise GuardrailError(
-            f"Calibration-poisoning guardrail: BOUNDED scale requires SINGLE_CLIENT target scope; "
+            f"Calibration-poisoning guardrail: NBAIOT_MAIN stage requires SINGLE_CLIENT target scope; "
             f"got {target_scope!r}. Multi-client and all-client scopes "
             "are diagnostic-only and must not be used in bounded runs."
         )

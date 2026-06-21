@@ -1,4 +1,4 @@
-"""Atomic write of per-client confusion matrices; Regime C filenames include alpha to prevent cross-alpha overwriting."""
+"""Atomic write of per-client confusion matrices."""
 
 from __future__ import annotations
 
@@ -13,21 +13,17 @@ from datp.evaluation.metrics import EvaluationResult
 
 def save_confusion_matrices(eval_result: EvaluationResult, base_dir: Path) -> Path:
     base_dir = Path(base_dir)
-    cm_dir = base_dir / ArtifactDir.CONFUSION_MATRICES / eval_result.regime
+    cm_dir = base_dir / ArtifactDir.CONFUSION_MATRICES / str(eval_result.stage)
 
-    filename = f"{eval_result.baseline}_seed{eval_result.seed}"
-    if eval_result.alpha is not None:
-        filename += f"_alpha{eval_result.alpha}"
-    filename += ".json"
+    filename = f"{eval_result.policy}_seed{eval_result.seed}.json"
 
     out_path = cm_dir / filename
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     payload: dict[str, object] = {
-        PayloadKey.BASELINE: eval_result.baseline.value,
-        PayloadKey.REGIME: eval_result.regime.value,
+        PayloadKey.POLICY: eval_result.policy.value,
+        PayloadKey.STAGE: eval_result.stage.value,
         PayloadKey.SEED: eval_result.seed,
-        PayloadKey.ALPHA: eval_result.alpha,
         PayloadKey.COVERAGE_RATIO: eval_result.coverage_ratio,
     }
     payload[PayloadKey.PER_CLIENT] = [

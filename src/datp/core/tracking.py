@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import contextlib
 import enum
@@ -9,7 +10,6 @@ from pathlib import Path
 from typing import Generator, Generic, Protocol, TypeVar
 
 from datp.artifacts.names import ArtifactDir
-from datp.core.enums import Baseline
 from datp.core.logging import get_logger
 from datp.core.metric_enums import MetricName
 
@@ -42,8 +42,8 @@ class TrackingMetricKey(enum.StrEnum):
 
 
 class TrackingParamKey(enum.StrEnum):
-    BASELINE = "baseline"
-    REGIME = "regime"
+    POLICY = "policy"
+    STAGE = "stage"
     SEED = "seed"
     ALPHA = "alpha"
     EPOCHS = "epochs"
@@ -58,30 +58,30 @@ class TrackingParamKey(enum.StrEnum):
 
 
 class TrackingTagKey(enum.StrEnum):
-    BASELINE = "baseline"
+    POLICY = "policy"
     PIPELINE = "pipeline"
 
 
 @dataclass(frozen=True, slots=True)
-class BaselineTrackingMetricKey:
-    baseline: Baseline
+class PolicyTrackingMetricKey:
+    policy: ThresholdPolicy
     key: TrackingMetricKey
 
 
 @dataclass(frozen=True, slots=True)
 class TrackingMetric:
-    key: TrackingMetricKey | MetricName | BaselineTrackingMetricKey
+    key: TrackingMetricKey | MetricName | PolicyTrackingMetricKey
     value: float | int
 
     @classmethod
-    def for_baseline(
+    def for_policy(
         cls,
-        baseline: Baseline,
+        policy: ThresholdPolicy,
         key: TrackingMetricKey,
         value: float | int,
     ) -> "TrackingMetric":
         return cls(
-            key=BaselineTrackingMetricKey(baseline=baseline, key=key), value=value
+            key=PolicyTrackingMetricKey(policy=policy, key=key), value=value
         )
 
 
@@ -273,10 +273,10 @@ def _tags_to_mapping(tags: TrackingTags) -> dict[str, str]:
 
 
 def _metric_key_to_str(
-    key: TrackingMetricKey | MetricName | BaselineTrackingMetricKey,
+    key: TrackingMetricKey | MetricName | PolicyTrackingMetricKey,
 ) -> str:
-    if isinstance(key, BaselineTrackingMetricKey):
-        return f"{key.baseline.value}_{key.key.value}"
+    if isinstance(key, PolicyTrackingMetricKey):
+        return f"{key.policy.value}_{key.key.value}"
     return key.value
 
 

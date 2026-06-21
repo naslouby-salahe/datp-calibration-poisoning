@@ -4,20 +4,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from datp.artifacts.names import ArtifactDir, ArtifactFile, PathToken
-from datp.core.enums import Regime, ScoringStage
+from datp.config.stages import ExperimentStage
+from datp.core.enums import ScoringStage
 from datp.core.identity import (
-    BaselineRunId,
+    PolicyRunId,
     TrainingCellId,
-    format_alpha_dir,
     seed_segment,
 )
 
 
-def _seed_segment(seed: int, alpha: float | None) -> Path:
-    p = Path(seed_segment(seed))
-    if alpha is not None:
-        p = p / format_alpha_dir(alpha)
-    return p
+def _seed_segment(seed: int) -> Path:
+    return Path(seed_segment(seed))
 
 
 def _round_segment(checkpoint_round: int) -> Path:
@@ -26,8 +23,8 @@ def _round_segment(checkpoint_round: int) -> Path:
     return Path(f"{PathToken.ROUND_PREFIX}{checkpoint_round}")
 
 
-def _round_aware_segment(seed: int, alpha: float | None, checkpoint_round: int) -> Path:
-    return _seed_segment(seed, alpha) / _round_segment(checkpoint_round)
+def _round_aware_segment(seed: int, checkpoint_round: int) -> Path:
+    return _seed_segment(seed) / _round_segment(checkpoint_round)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,10 +39,10 @@ class ScoreCellPaths:
 
 
 @dataclass(frozen=True, slots=True)
-class BaselineRunPaths:
-    """Resolved paths for a baseline evaluation run."""
+class PolicyRunPaths:
+    """Resolved paths for a policy evaluation run."""
 
-    run: BaselineRunId
+    run: PolicyRunId
     result_dir: Path
     log_dir: Path
     metrics_path: Path
@@ -54,39 +51,39 @@ class BaselineRunPaths:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactLayout:
-    """Canonical artifact paths for one regime.
+    """Canonical artifact paths for one experiment stage.
 
-    Checkpoint and score paths intentionally omit baseline: B1-B4 share the
+    Checkpoint and score paths intentionally omit policy: GLOBAL_THRESHOLD-CLUSTER_THRESHOLD share the
     trained encoder and scores.
     """
 
     base_dir: Path
-    regime: Regime
+    stage: ExperimentStage
 
     @property
     def _checkpoint_root(self) -> Path:
-        return self.base_dir / ArtifactDir.CHECKPOINTS / self.regime.value
+        return self.base_dir / ArtifactDir.CHECKPOINTS / self.stage.value
 
     @property
     def _score_root(self) -> Path:
-        return self.base_dir / ArtifactDir.SCORES / self.regime.value
+        return self.base_dir / ArtifactDir.SCORES / self.stage.value
 
     @property
     def _result_root(self) -> Path:
-        return self.base_dir / ArtifactDir.RESULTS / self.regime.value
+        return self.base_dir / ArtifactDir.RESULTS / self.stage.value
 
     @property
     def _log_root(self) -> Path:
-        return self.base_dir / ArtifactDir.LOGS / self.regime.value
+        return self.base_dir / ArtifactDir.LOGS / self.stage.value
 
     def checkpoint_dir(self, cell: TrainingCellId) -> Path:
-        return self._checkpoint_root / _seed_segment(cell.seed, cell.alpha)
+        return self._checkpoint_root / _seed_segment(cell.seed)
 
     def checkpoint_dir_for_round(
         self, cell: TrainingCellId, checkpoint_round: int
     ) -> Path:
         return self._checkpoint_root / _round_aware_segment(
-            cell.seed, cell.alpha, checkpoint_round
+            cell.seed, checkpoint_round
         )
 
     def _score_cell_paths(
@@ -101,39 +98,39 @@ class ArtifactLayout:
             checkpoint_round=checkpoint_round,
         )
 
-    def _baseline_run_paths(
-        self, run: BaselineRunId, seg: Path, checkpoint_round: int | None = None
-    ) -> BaselineRunPaths:
-        result_dir = self._result_root / run.baseline.value / seg
-        return BaselineRunPaths(
+    def _policy_run_paths(
+        self, run: PolicyRunId, seg: Path, checkpoint_round: int | None = None
+    ) -> PolicyRunPaths:
+        result_dir = self._result_root / run.policy.value / seg
+        return PolicyRunPaths(
             run=run,
             result_dir=result_dir,
             metrics_path=result_dir / ArtifactFile.METRICS,
-            log_dir=self._log_root / run.baseline.value / seg,
+            log_dir=self._log_root / run.policy.value / seg,
             checkpoint_round=checkpoint_round,
         )
 
     def score_cell(self, cell: TrainingCellId) -> ScoreCellPaths:
-        return self._score_cell_paths(cell, _seed_segment(cell.seed, cell.alpha))
+        return self._score_cell_paths(cell, _seed_segment(cell.seed))
 
     def score_cell_for_round(
         self, cell: TrainingCellId, checkpoint_round: int
     ) -> ScoreCellPaths:
         return self._score_cell_paths(
             cell,
-            _round_aware_segment(cell.seed, cell.alpha, checkpoint_round),
+            _round_aware_segment(cell.seed, checkpoint_round),
             checkpoint_round,
         )
 
-    def baseline_run(self, run: BaselineRunId) -> BaselineRunPaths:
-        return self._baseline_run_paths(run, _seed_segment(run.seed, run.alpha))
+    def policy_run(self, run: PolicyRunId) -> PolicyRunPaths:
+        return self._policy_run_paths(run, _seed_segment(run.seed))
 
-    def baseline_run_for_round(
-        self, run: BaselineRunId, checkpoint_round: int
-    ) -> BaselineRunPaths:
-        return self._baseline_run_paths(
+    def policy_run_for_round(
+        self, run: PolicyRunId, checkpoint_round: int
+    ) -> PolicyRunPaths:
+        return self._policy_run_paths(
             run,
-            _round_aware_segment(run.seed, run.alpha, checkpoint_round),
+            _round_aware_segment(run.seed, checkpoint_round),
             checkpoint_round,
         )
 
@@ -142,7 +139,7 @@ class ArtifactLayout:
     ) -> Path:
         """Return the canonical path for a client's score parquet file.
 
-        Scores are shared across B1-B4 (no baseline dimension).
+        Scores are shared across GLOBAL_THRESHOLD-CLUSTER_THRESHOLD (no baseline dimension).
         Path: <score_dir>/<stage>/<client_id>.parquet
         """
         return (

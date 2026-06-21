@@ -86,40 +86,31 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 10. Avoid unnecessary comments.
 11. Avoid backward-compatibility clutter unless scientifically required.
 
-## Ticket Execution Rule
+## Task Execution Rule
 
-When implementing from a ticket, the agent must first read:
+When implementing a task, first read:
 
 1. `CLAUDE.md`
-2. **CP2 (active):** `docs/tickets/TICKET_INDEX.md` and `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
-   (DATP journal fallback: `docs/tickets/ticket_inventory.md` / `ticket_progress.md`)
-3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
-4. The specific `docs/tickets/<phase>/CP2-T*.md`
+2. `docs/DATP_CP_Roadmap.md`
 
 Before implementation, verify:
 
-1. All previous tickets are `DONE`, `SKIPPED_WITH_REASON`, or correctly blocked.
-2. This ticket is not `BLOCKED_HUMAN`.
-3. Human intervention is not required.
-4. Dependencies are satisfied.
-5. Existing code has been inspected.
-6. Existing tests have been inspected.
+1. Human intervention is not required.
+2. Dependencies are satisfied.
+3. Existing code has been inspected.
+4. Existing tests have been inspected.
 
-If a previous ticket is incomplete, stop and return to that ticket first.
+If human intervention is required, stop and tell the user exactly what is needed.
 
-If this ticket requires human intervention, stop and update `docs/tickets/human_interventions.md`.
+Implementation must include required refactoring and test work.
 
-Implementation must include the ticket’s required refactoring and test work.
-
-Do not treat a ticket as complete until:
+Do not treat a task as complete until:
 
 1. Code is implemented.
 2. Refactoring is done.
 3. Tests are added, adapted, or deleted as needed.
 4. Targeted tests pass.
-5. Required final validation is run if the ticket is marked breaking.
-6. `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md` is updated with evidence.
-7. If the ticket affects claims/methods/figures, paper notes are appended to `CP2_PAPER_NOTES_CONSOLIDATED.md`.
+5. Required final validation is run if the change is breaking.
 
 ## Mandatory Pre-Implementation Questions
 
@@ -201,7 +192,7 @@ Stop and report if:
 3. Required scientific behavior is ambiguous.
 4. Existing outputs would be invalidated without documentation.
 5. The task requires an experiment before tests are ready.
-6. The ticket is human-blocked.
+6. Human intervention is required.
 7. Required datasets or raw files are missing.
 8. Existing code ownership is unclear enough that implementation would duplicate logic.
 9. The change would require unsupported backward compatibility clutter.

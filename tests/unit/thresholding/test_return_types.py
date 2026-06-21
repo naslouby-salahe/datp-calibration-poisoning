@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import dataclasses
 import typing
@@ -9,13 +10,12 @@ def test_baseline_types_importable():
     import typing
 
     from datp.core.types import (
-        B0Result,
-        BaselineResult,
+        ThresholdResult,
         ClientEvalResult,
         ClientEvalResultWithAuroc,
     )
 
-    for cls in (B0Result, BaselineResult, ClientEvalResult, ClientEvalResultWithAuroc):
+    for cls in (ThresholdResult, ClientEvalResult, ClientEvalResultWithAuroc):
         assert len(typing.get_type_hints(cls)) > 0, f"{cls.__name__} has no type hints"
 
 
@@ -38,39 +38,16 @@ def test_evaluation_result_is_frozen_dataclass():
 
 
 def test_baseline_result_required_keys():
-    from datp.core.types import BaselineResult
+    from datp.core.types import ThresholdResult
 
-    hints = typing.get_type_hints(BaselineResult)
+    hints = typing.get_type_hints(ThresholdResult)
     expected = {
-        "baseline",
-        "regime",
-        "seed",
-        "per_client",
-        "n_clients",
-        "calibration_pending_clients",
+        "run",
+        "tau_global",
+        "client_thresholds",
+        "metadata",
     }
     assert expected.issubset(hints.keys()), f"Missing keys: {expected - hints.keys()}"
-
-
-def test_b0_result_keys():
-    from datp.core.types import B0Result
-
-    hints = typing.get_type_hints(B0Result)
-    b0_specific = {"tau_b0", "q", "n_min", "auroc"}
-    base_keys = {
-        "baseline",
-        "regime",
-        "seed",
-        "per_client",
-        "n_clients",
-        "calibration_pending_clients",
-    }
-    assert b0_specific.issubset(hints.keys()), (
-        f"Missing B0 keys: {b0_specific - hints.keys()}"
-    )
-    assert base_keys.issubset(hints.keys()), (
-        f"Missing base keys: {base_keys - hints.keys()}"
-    )
 
 
 def test_client_eval_result_with_auroc_keys():
@@ -132,23 +109,18 @@ def test_threshold_result_client_thresholds_is_tuple():
     assert "tuple" in str(hints["client_thresholds"])
 
 
-def test_b3_b4_metadata_are_frozen_dataclasses():
-    from datp.core.types import (
-        B3FamilyInfo,
-        B3Metadata,
-        B4ClusterInfo,
-        B4Metadata,
-    )
+def test_cluster_metadata_is_frozen_dataclass():
+    from datp.core.types import ClusterInfo, ClusterMetadata
 
-    for cls in (B3FamilyInfo, B3Metadata, B4ClusterInfo, B4Metadata):
+    for cls in (ClusterInfo, ClusterMetadata):
         assert dataclasses.is_dataclass(cls), f"{cls.__name__} must be a dataclass"
         assert cls.__dataclass_params__.frozen, f"{cls.__name__} must be frozen"  # type: ignore[attr-defined]
 
 
 def test_identity_classes_are_frozen_dataclasses():
-    from datp.core.identity import BaselineRunId, TrainingCellId
+    from datp.core.identity import PolicyRunId, TrainingCellId
 
-    for cls in (TrainingCellId, BaselineRunId):
+    for cls in (TrainingCellId, PolicyRunId):
         assert dataclasses.is_dataclass(cls), f"{cls.__name__} must be a dataclass"
         assert cls.__dataclass_params__.frozen, f"{cls.__name__} must be frozen"  # type: ignore[attr-defined]
 
@@ -157,9 +129,9 @@ def test_serialization_boundary_classes_are_pydantic():
     """Guard: classes that need model_dump() must remain Pydantic."""
     from pydantic import BaseModel
 
-    from datp.core.types import B0Result, BaselineResult, ClientEvalResult
+    from datp.core.types import PolicyResult, ClientEvalResult
 
-    for cls in (B0Result, BaselineResult, ClientEvalResult):
+    for cls in (PolicyResult, ClientEvalResult):
         assert issubclass(cls, BaseModel), (
             f"{cls.__name__} must remain Pydantic (serialization boundary)"
         )
@@ -174,14 +146,13 @@ def test_score_cell_id_is_frozen_dataclass():
 
 
 def test_score_cell_id_delegates_to_cell():
-    from datp.core.enums import Regime
+    from datp.config.stages import ExperimentStage
     from datp.core.identity import TrainingCellId
 
-    cell = TrainingCellId(regime=Regime.A, seed=42, alpha=None)
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=42)
     sc = cell
-    assert sc.regime == Regime.A
+    assert sc.stage == ExperimentStage.NBAIOT_MAIN
     assert sc.seed == 42
-    assert sc.alpha is None
 
 
 def test_dispersion_metrics_is_frozen_dataclass():
@@ -223,24 +194,24 @@ def test_score_cell_paths_is_frozen_dataclass():
 
 
 def test_baseline_run_paths_is_frozen_dataclass():
-    from datp.artifacts.layout import BaselineRunPaths
+    from datp.artifacts.layout import PolicyRunPaths
 
-    assert dataclasses.is_dataclass(BaselineRunPaths)
-    assert BaselineRunPaths.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    assert dataclasses.is_dataclass(PolicyRunPaths)
+    assert PolicyRunPaths.__dataclass_params__.frozen  # type: ignore[attr-defined]
 
 
 def test_path_contracts_compose_with_identity(tmp_path: Path):
     """Guard: path contracts must accept identity types."""
     from datp.artifacts.layout import ArtifactLayout
-    from datp.core.enums import Baseline, Regime
-    from datp.core.identity import BaselineRunId, TrainingCellId
+    from datp.config.stages import ExperimentStage
+    from datp.core.identity import PolicyRunId, TrainingCellId
 
-    cell = TrainingCellId(regime=Regime.A, seed=1, alpha=None)
-    layout = ArtifactLayout(base_dir=tmp_path / "out", regime=Regime.A)
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=1)
+    layout = ArtifactLayout(base_dir=tmp_path / "out", stage=ExperimentStage.NBAIOT_MAIN)
 
     sc_paths = layout.score_cell(cell)
     assert "seed_1" in str(sc_paths.checkpoint_dir)
 
-    run = BaselineRunId(cell=cell, baseline=Baseline.B1)
-    br_paths = layout.baseline_run(run)
-    assert "b1" in str(br_paths.result_dir)
+    run = PolicyRunId(cell=cell, policy=ThresholdPolicy.GLOBAL_THRESHOLD)
+    br_paths = layout.policy_run(run)
+    assert "global_threshold" in str(br_paths.result_dir)

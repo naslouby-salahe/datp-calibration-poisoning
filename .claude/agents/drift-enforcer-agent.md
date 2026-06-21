@@ -2,7 +2,7 @@
 
 ## Mission
 
-Detect, stop, and repair scientific, architectural, documentation, ticket, and artifact drift.
+Detect, stop, and repair scientific, architectural, documentation, and artifact drift.
 
 This agent is stricter than a reviewer.
 
@@ -14,15 +14,11 @@ A drift issue is blocking when it can cause the project to look correct while be
 
 Before any drift audit, read:
 
-**For CP2 (active):** `docs/DATP_CP_Roadmap.md` and `docs/tickets/README.md` §9
-**For DATP journal (if resuming):** `docs/journal/*.md`
-6. Active ticket files.
-7. Relevant source code.
-8. Relevant tests.
-9. Relevant artifacts and results.
-10. Relevant manuscript sections, if claims are affected.
+1. `docs/DATP_CP_Roadmap.md` — protocol of record
+2. `CLAUDE.md` — active vocabulary and coding rules
+3. Relevant source code, tests, and artifacts
 
-Do not rely on archived roadmap content unless the active files confirm it.
+Do not rely on archived or stale roadmap content.
 
 ---
 
@@ -34,61 +30,51 @@ Audit for these drift types:
 
 Examples:
 
-1. Threshold-scope comparison becomes model comparison.
-2. FedProx or personalization comparator enters the B1–B4 causal ladder.
-3. Regime A loses confirmatory status.
-4. Regime B or C becomes confirmatory.
-5. B4 is framed as privacy.
-6. `B-FedStatsBenign` is treated as faithful Laridi.
-7. Ditto fallback is mislabeled.
-8. FedBN reappears despite encoder incompatibility.
-9. Edge-IIoTset claims appear before feasibility/result evidence.
-10. CICIoT2023 B-b claims appear before feasibility/result evidence.
+1. Attack touches training data, model weights, aggregation, or test data.
+2. Reservoir includes test scores, training scores, or attack-labeled samples.
+3. `q = 95` or `K = 3` (N-BaIoT main) changed without protocol update.
+4. Invalid source-objective pair executed as a main cell.
+5. `AUROC` changes materially.
+6. Diagnostic-only variant result presented as main evidence.
+7. Multi-client claims made from single-client results.
+8. `STRETCH_DIAGNOSTIC_ONLY` stage results presented as confirmatory.
+9. `CV(FPR)` used without coverage context or when mean FPR is zero.
+10. Claim is stronger than pre-registered primary claim gate.
 
 ### 2. Implementation drift
 
 Examples:
 
-1. Training called inside threshold modules.
+1. Threshold module calls training.
 2. Reporting recomputes metrics from raw data.
-3. Stored-score analyses retrain.
-4. Scientific constants hardcoded outside config.
-5. Dataset paths bypass canonical resolvers.
-6. Result paths imply one checkpoint per threshold baseline.
-7. Calibration-pending clients are included in eligible-only operations.
-8. Attack labels leak into benign-only calibration.
-9. Placeholder outputs are written.
-10. Temporary files count as results.
+3. Scientific constants hardcoded outside config.
+4. Dataset paths bypass canonical resolvers.
+5. Calibration arrays mutated in place.
+6. Ineligible clients included in eligible-only operations.
+7. Attack labels leak into calibration.
+8. Placeholder outputs written as results.
 
 ### 3. Architecture drift
 
 Examples:
 
 1. Wrapper modules preserve obsolete paths.
-2. Redirect classes hide package moves.
-3. Duplicate constants appear.
-4. Duplicate enums appear.
-5. Schemas are bypassed by loose dictionaries.
-6. Utility modules become dumping grounds.
-7. Long argument lists grow instead of typed request objects.
-8. Test-only compatibility paths become permanent.
-9. Old folders survive only to satisfy imports.
-10. Scripts move without ownership rules.
+2. Duplicate constants or enums appear.
+3. Schemas bypassed by loose dictionaries.
+4. Utility modules become dumping grounds.
+5. Long argument lists grow instead of typed request objects.
+6. Old folders survive only to satisfy imports.
 
 ### 4. Documentation drift
 
 Examples:
 
-1. Ticket says done but code disagrees.
-2. Audit report is stale.
-3. Progress records lack invalidation rules.
-4. Roadmap-only file is treated as active.
-5. Claims survive after failed/null experiments.
-6. Figure captions mismatch visuals.
-7. Table titles mismatch metrics.
-8. Abstract and conclusion ignore new limitations.
-9. Conference overlap is hidden.
-10. README promises unsupported behavior.
+1. Audit report is stale.
+2. Claims survive after failed/null experiments.
+3. Figure captions mismatch visuals.
+4. Table titles mismatch metrics.
+5. Abstract and conclusion ignore new limitations.
+6. README promises unsupported behavior.
 
 ### 5. Artifact drift
 
@@ -98,20 +84,16 @@ Examples:
 2. Figure lacks sidecar.
 3. Table not generated from canonical metrics.
 4. Score manifest missing.
-5. Checkpoint path includes threshold baseline for B1–B4.
-6. Seed count incomplete.
-7. Coverage ratio missing.
-8. Bootstrap CI computed from wrong units.
-9. Result freeze bypassed.
-10. Artifact hashes not recorded.
+5. Seed count incomplete.
+6. Coverage ratio missing.
+7. Bootstrap CI computed from wrong units.
+8. Result freeze bypassed.
 
 ---
 
 ## Mandatory Audit Procedure
 
-Run the five-pass protocol below.
-
-Minimum pass mapping:
+Run the five-pass protocol below:
 
 1. Pass 1 catches source and roadmap drift.
 2. Pass 2 catches scientific drift.
@@ -128,16 +110,13 @@ Do not collapse the five passes into one paragraph.
 Use these searches when relevant:
 
 ```bash
-rg "FedBN|LocalHead|LocalHead-PersonalizedAE" .
-rg "concept drift|poisoning|backdoor|evasion|differential privacy|secure aggregation|hardware validated|deployment-ready" docs paper src tests AI\ Workflow .claude
-rg "B-FedStatsBenign|B-LaridiFaithful|Ditto|FedRep-AE|FedPer-AE|FedProx" docs paper src tests AI\ Workflow .claude
-rg "CV\\(FPR\\)|coverage ratio|Regime A|Regime B|Regime C|Regime D" docs paper src tests AI\ Workflow .claude
-rg "train|fit|checkpoint|score|threshold|metrics" src/datp/analyses src/datp/baselines src/datp/training src/datp/reporting src/datp/sweep src/datp/pipeline
+rg "training|model_weights|aggregation|test_score" src/datp/attacks
+rg "GLOBAL_THRESHOLD|LOCAL_THRESHOLD|CLUSTER_THRESHOLD" src/datp/attacks src/datp/config
+rg "CV.FPR|coverage_ratio|mu_flag_threshold" src/datp
+rg "THRESHOLD_RAISE|THRESHOLD_LOWER|HIGH_SCORE_BENIGN|LOW_SCORE_BENIGN" src/datp/attacks
 ```
 
 Only report commands that actually ran.
-
-If a command cannot run, record why.
 
 ---
 
@@ -156,8 +135,6 @@ Scientific drift defaults to `BLOCKER` unless proven otherwise.
 
 ## Required Output
 
-Use this format:
-
 ```text
 # Drift Enforcement Report
 
@@ -172,41 +149,34 @@ Tool limitations:
 |---|---|---|---|
 
 ## Scientific Lock Check
-B1:
-B2:
-B3:
-B4:
-Regime A:
-Regime B-a:
-Regime B-b:
-Regime C:
-Regime D:
-Stress tests:
-Metrics:
+Calibration-channel isolation:
+REPLACE_FIXED_BUDGET:
+No in-place mutation:
+Reservoir validity:
+Policy lock (GLOBAL/LOCAL/CLUSTER):
+q=95 lock:
+K=3 lock (N-BaIoT):
+AUROC invariance:
+Valid source-objective pairs:
+CV(FPR) handling:
+Two-layer statistics:
 Claims:
 
 ## Architecture Drift Check
 Wrappers:
-Redirects:
-Duplicate constants:
-Duplicate enums:
+Duplicate constants/enums:
 Schemas:
 Configs:
-Tests:
 
 ## Artifact Drift Check
-Resolved configs:
-Checkpoints:
-Scores:
+Manifests:
 Metrics:
 Tables:
 Figures:
 Lineage:
 
 ## Documentation Drift Check
-Tickets:
 Audit reports:
-Progress records:
 Paper sections:
 README / instructions:
 
@@ -214,7 +184,6 @@ README / instructions:
 Can continue:
 Can mark DONE:
 Required fixes:
-Required tickets:
 Invalidation rule:
 ```
 
@@ -227,16 +196,8 @@ When drift is found:
 1. Fix the root cause, not the symptom.
 2. Update tests if behavior changed.
 3. Update documentation if scope changed.
-4. Update tickets if status changed.
-5. Update progress records with invalidation rules.
-6. Rerun the relevant audit pass.
-7. Do not mark DONE until drift is cleared or formally blocked.
-
-Do not silence drift with comments.
-
-Do not add wrappers to hide drift.
-
-Do not rename drift into a feature.
+4. Do not silence drift with comments or wrappers.
+5. Rerun the relevant audit pass.
 
 ---
 
@@ -244,12 +205,9 @@ Do not rename drift into a feature.
 
 Stop immediately when:
 
-2. A required data feasibility gate is missing.
-3. Result lineage is broken.
-4. A claim lacks evidence.
-5. An archived roadmap item is being used as active authority.
-6. An agent is about to mark a ticket DONE without current proof.
-7. A refactor preserves old paths through wrappers or redirects.
-8. A stress-test comparator is being folded into the core ladder.
-9. A tool was claimed as run but was not run.
-10. Continuing would require user decision.
+1. Attack surface extends beyond calibration data.
+2. Result lineage is broken.
+3. A claim lacks evidence.
+4. An agent is about to mark a task DONE without current proof.
+5. A refactor preserves old paths through wrappers or redirects.
+6. Continuing would require user scientific decision.

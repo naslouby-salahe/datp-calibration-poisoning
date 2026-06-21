@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from datp.config.attack_config import (
-    B4ClusterConfig,
+    ClusterConfig,
     CalibrationPoisoningConfig,
     SeedPools,
 )
@@ -18,7 +18,7 @@ from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 # ── SeedPools ──────────────────────────────────────────────────────────
 
@@ -66,28 +66,28 @@ class TestSeedPools:
             pools.training = (9,)  # type: ignore[misc]
 
 
-# ── B4ClusterConfig ───────────────────────────────────────────────────────────
+# ── ClusterConfig ───────────────────────────────────────────────────────────
 
 
-class TestB4ClusterConfig:
+class TestClusterConfig:
     def test_defaults_are_locked_values(self) -> None:
-        b4 = B4ClusterConfig()
-        assert b4.k == 3
-        assert b4.n_init == 10
-        assert b4.max_iter == 300
-        assert b4.random_state == 42
+        cluster = ClusterConfig()
+        assert cluster.k == 3
+        assert cluster.n_init == 10
+        assert cluster.max_iter == 300
+        assert cluster.random_state == 42
 
     def test_k_not_three_raises(self) -> None:
         with pytest.raises(ValidationError, match="k must be 3"):
-            B4ClusterConfig(k=4)
+            ClusterConfig(k=4)
 
     def test_invalid_random_state_raises(self) -> None:
         with pytest.raises(ValidationError, match="random_state must be 42"):
-            B4ClusterConfig(random_state=0)
+            ClusterConfig(random_state=0)
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
-            B4ClusterConfig(bogus=1)  # type: ignore[call-arg]
+            ClusterConfig(bogus=1)  # type: ignore[call-arg]
 
 
 # ── CalibrationPoisoningConfig ─────────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ class TestB4ClusterConfig:
 
 def _valid_config(**overrides: object) -> CalibrationPoisoningConfig:
     defaults: dict[str, object] = {
-        "policies": (ThresholdPolicy.B1_GLOBAL, ThresholdPolicy.B2_PERSONALIZED, ThresholdPolicy.B4_CLUSTER),
+        "policies": (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
         "sources": (
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -103,7 +103,7 @@ def _valid_config(**overrides: object) -> CalibrationPoisoningConfig:
         ),
         "knowledge": PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
         "target_scope": PoisoningTargetScope.SINGLE_CLIENT,
-        "scale": ExperimentScale.BOUNDED,
+        "stage": ExperimentStage.NBAIOT_MAIN,
     }
     defaults.update(overrides)
     return CalibrationPoisoningConfig(**defaults)  # type: ignore[arg-type]
@@ -114,9 +114,9 @@ class TestConfigValid:
         cfg = _valid_config()
         assert cfg.local_epochs == 1
         assert cfg.policies == (
-            ThresholdPolicy.B1_GLOBAL,
-            ThresholdPolicy.B2_PERSONALIZED,
-            ThresholdPolicy.B4_CLUSTER,
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
         )
         assert cfg.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
         assert cfg.defense == PoisoningDefense.NONE
@@ -142,12 +142,12 @@ class TestConfigValid:
         assert cfg.seeds.poisoning == (100, 101, 102, 103, 104)
         assert cfg.seeds.compromise_pattern == 400
 
-    def test_default_b4_locked_values(self) -> None:
+    def test_default_cluster_locked_values(self) -> None:
         cfg = _valid_config()
-        assert cfg.b4.k == 3
-        assert cfg.b4.n_init == 10
-        assert cfg.b4.max_iter == 300
-        assert cfg.b4.random_state == 42
+        assert cfg.cluster.k == 3
+        assert cfg.cluster.n_init == 10
+        assert cfg.cluster.max_iter == 300
+        assert cfg.cluster.random_state == 42
 
     def test_mu_flag_threshold_can_be_set(self) -> None:
         cfg = _valid_config(mu_flag_threshold=0.025)
@@ -159,24 +159,24 @@ class TestConfigValid:
             cfg.local_epochs = 2  # type: ignore[misc]
 
 
-# ── for_bounded_mvp() canonical constructor ────────────────────────────
+# ── for_bounded_sweep() canonical constructor ────────────────────────────
 
 
-class TestForBoundedMvp:
+class TestForBoundedSweep:
     def test_returns_config_instance(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert isinstance(cfg, CalibrationPoisoningConfig)
 
-    def test_has_exactly_b1_b2_b4_policies(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+    def test_has_exactly_three_canonical_policies(self) -> None:
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert set(cfg.policies) == {
-            ThresholdPolicy.B1_GLOBAL,
-            ThresholdPolicy.B2_PERSONALIZED,
-            ThresholdPolicy.B4_CLUSTER,
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
         }
 
     def test_has_exactly_three_bounded_sources(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert set(cfg.sources) == {
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -184,38 +184,38 @@ class TestForBoundedMvp:
         }
 
     def test_fractions_are_locked_bounded_grid(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert set(cfg.fractions) == {0.0, 0.10, 0.20, 0.40}
         assert 0.05 not in cfg.fractions
 
     def test_seed_pools_are_locked(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert cfg.seeds.training == (0, 1, 2, 3, 4)
         assert cfg.seeds.poisoning == (100, 101, 102, 103, 104)
         assert cfg.seeds.compromise_pattern == 400
 
     def test_scale_is_bounded(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
-        assert cfg.scale == ExperimentScale.BOUNDED
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
+        assert cfg.stage == ExperimentStage.NBAIOT_MAIN
 
     def test_target_scope_is_single_client(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert cfg.target_scope == PoisoningTargetScope.SINGLE_CLIENT
 
     def test_local_epochs_is_one(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert cfg.local_epochs == 1
 
     def test_injection_rule_is_replace_fixed_budget(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert cfg.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
 
-    def test_b4_config_is_locked(self) -> None:
-        cfg = CalibrationPoisoningConfig.for_bounded_mvp()
-        assert cfg.b4.k == 3
-        assert cfg.b4.n_init == 10
-        assert cfg.b4.max_iter == 300
-        assert cfg.b4.random_state == 42
+    def test_cluster_config_is_locked(self) -> None:
+        cfg = CalibrationPoisoningConfig.for_bounded_sweep()
+        assert cfg.cluster.k == 3
+        assert cfg.cluster.n_init == 10
+        assert cfg.cluster.max_iter == 300
+        assert cfg.cluster.random_state == 42
 
 
 # ── E=1 enforcement ────────────────────────────────────────────────────
@@ -262,11 +262,11 @@ class TestConfigFractionValidation:
 
     def test_bounded_scale_rejects_005_fraction(self) -> None:
         with pytest.raises(ValidationError, match="requires exactly fractions"):
-            _valid_config(scale=ExperimentScale.BOUNDED, fractions=(0.0, 0.05, 0.10))
+            _valid_config(stage=ExperimentStage.NBAIOT_MAIN, fractions=(0.0, 0.05, 0.10))
 
     def test_bounded_scale_rejects_partial_fraction_subset(self) -> None:
         with pytest.raises(ValidationError, match="requires exactly fractions"):
-            _valid_config(scale=ExperimentScale.BOUNDED, fractions=(0.10, 0.20, 0.40))
+            _valid_config(stage=ExperimentStage.NBAIOT_MAIN, fractions=(0.10, 0.20, 0.40))
 
 
 # ── Injection rule ──────────────────────────────────────────────────────
@@ -278,59 +278,59 @@ class TestConfigInjectionRule:
         assert cfg.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
 
 
-# ── BOUNDED scale constraints ───────────────────────────────────────────
+# ── NBAIOT_MAIN stage constraints ───────────────────────────────────────────
 
 
 class TestConfigBoundedScaleConstraints:
     def test_bounded_single_client_accepted(self) -> None:
         cfg = _valid_config(
-            scale=ExperimentScale.BOUNDED,
+            stage=ExperimentStage.NBAIOT_MAIN,
             target_scope=PoisoningTargetScope.SINGLE_CLIENT,
         )
-        assert cfg.scale == ExperimentScale.BOUNDED
+        assert cfg.stage == ExperimentStage.NBAIOT_MAIN
 
     def test_bounded_multi_client_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="BOUNDED scale requires SINGLE_CLIENT"):
+        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires SINGLE_CLIENT"):
             _valid_config(
-                scale=ExperimentScale.BOUNDED,
+                stage=ExperimentStage.NBAIOT_MAIN,
                 target_scope=PoisoningTargetScope.MULTI_CLIENT,
             )
 
     def test_bounded_requires_all_three_policies(self) -> None:
-        with pytest.raises(ValidationError, match="BOUNDED scale requires exactly policies"):
+        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires exactly policies"):
             _valid_config(
-                scale=ExperimentScale.BOUNDED,
-                policies=(ThresholdPolicy.B1_GLOBAL, ThresholdPolicy.B2_PERSONALIZED),
+                stage=ExperimentStage.NBAIOT_MAIN,
+                policies=(ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD),
             )
 
-    def test_bounded_rejects_b1_only_policies(self) -> None:
-        with pytest.raises(ValidationError, match="BOUNDED scale requires exactly policies"):
+    def test_bounded_rejects_incomplete_policies(self) -> None:
+        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires exactly policies"):
             _valid_config(
-                scale=ExperimentScale.BOUNDED,
-                policies=(ThresholdPolicy.B1_GLOBAL,),
+                stage=ExperimentStage.NBAIOT_MAIN,
+                policies=(ThresholdPolicy.GLOBAL_THRESHOLD,),
             )
 
     def test_bounded_requires_exactly_three_bounded_sources(self) -> None:
-        with pytest.raises(ValidationError, match="BOUNDED scale requires exactly sources"):
+        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires exactly sources"):
             _valid_config(
-                scale=ExperimentScale.BOUNDED,
+                stage=ExperimentStage.NBAIOT_MAIN,
                 sources=(PoisoningSourceStrategy.RANDOM_BENIGN,),
             )
 
     def test_full_scale_multi_client_accepted(self) -> None:
         cfg = _valid_config(
-            scale=ExperimentScale.FULL,
+            stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
             target_scope=PoisoningTargetScope.MULTI_CLIENT,
-            policies=(ThresholdPolicy.B1_GLOBAL,),
+            policies=(ThresholdPolicy.GLOBAL_THRESHOLD,),
             sources=(PoisoningSourceStrategy.RANDOM_BENIGN,),
         )
         assert cfg.target_scope == PoisoningTargetScope.MULTI_CLIENT
 
     def test_full_scale_accepts_fraction_005(self) -> None:
         cfg = _valid_config(
-            scale=ExperimentScale.FULL,
+            stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
             target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-            policies=(ThresholdPolicy.B1_GLOBAL, ThresholdPolicy.B2_PERSONALIZED, ThresholdPolicy.B4_CLUSTER),
+            policies=(ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
             sources=(
                 PoisoningSourceStrategy.RANDOM_BENIGN,
                 PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -341,16 +341,12 @@ class TestConfigBoundedScaleConstraints:
         assert 0.05 in cfg.fractions
 
 
-# ── B3 excluded ─────────────────────────────────────────────────────────
+# ── Canonical policy membership ─────────────────────────────────────────
 
 
-class TestConfigB3Excluded:
-    def test_b3_not_in_threshold_policy(self) -> None:
-        for policy in ThresholdPolicy:
-            assert "b3" not in policy.value
-
-    def test_only_b1_b2_b4_policies_exist(self) -> None:
-        expected = {"b1_global", "b2_personalized", "b4_cluster"}
+class TestThresholdPolicyMembership:
+    def test_only_canonical_policies_exist(self) -> None:
+        expected = {"global_threshold", "local_threshold", "cluster_threshold"}
         actual = {p.value for p in ThresholdPolicy}
         assert actual == expected
 
@@ -362,7 +358,7 @@ class TestPoliciesSourcesValidation:
     def test_empty_policies_rejected(self) -> None:
         with pytest.raises(ValidationError, match="policies must not be empty"):
             _valid_config(
-                scale=ExperimentScale.FULL,
+                stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
                 target_scope=PoisoningTargetScope.SINGLE_CLIENT,
                 policies=(),
                 sources=(PoisoningSourceStrategy.RANDOM_BENIGN,),
@@ -371,8 +367,8 @@ class TestPoliciesSourcesValidation:
     def test_empty_sources_rejected(self) -> None:
         with pytest.raises(ValidationError, match="sources must not be empty"):
             _valid_config(
-                scale=ExperimentScale.FULL,
+                stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
                 target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-                policies=(ThresholdPolicy.B1_GLOBAL,),
+                policies=(ThresholdPolicy.GLOBAL_THRESHOLD,),
                 sources=(),
             )

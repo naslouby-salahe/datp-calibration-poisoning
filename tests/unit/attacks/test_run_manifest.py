@@ -20,7 +20,7 @@ from datp.attacks.enums import (
 )
 from datp.core.seed_sequence import SeedRecord, derive_seed_record
 from datp.core.seeds import SeedPair
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 def _valid_provenance(**overrides: object) -> ProvenanceRecord:
@@ -48,8 +48,8 @@ def _seed_record_model(
 def _valid_manifest(**overrides: object) -> RunManifest:
     defaults: dict[str, object] = {
         "dataset": "nbaiot",
-        "scale": ExperimentScale.BOUNDED,
-        "policy": ThresholdPolicy.B1_GLOBAL,
+        "stage": ExperimentStage.NBAIOT_MAIN,
+        "policy": ThresholdPolicy.GLOBAL_THRESHOLD,
         "objective": AttackerObjective.THRESHOLD_RAISE,
         "source": PoisoningSourceStrategy.RANDOM_BENIGN,
         "fraction": 0.10,

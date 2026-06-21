@@ -1,11 +1,11 @@
 """Typed schema for the bounded N-BaIoT manifest+results artifact.
 
-The filename is locked (``ManifestFile.NBAIOT_BOUNDED_SWEEP_MANIFEST`` =
-``nbaiot_bounded_sweep_manifest.json``, see ``PoisonLayout.nbaiot_bounded_sweep_manifest()``). One
+The filename is locked (``ManifestFile.NBAIOT_MAIN_MANIFEST`` =
+``nbaiot_main_manifest.json``, see ``PoisonLayout.nbaiot_main_manifest()``). One
 file holds run-level provenance plus the full embedded results array for the
 locked 1620-cell matrix — there is no per-victim directory tree for the
 bounded sweep. This is architecturally distinct from ``RunManifest``
-(``CellId``/``PoisonLayout.cell_paths()``), which is the full-scope, per-cell
+(``CellId``/``PoisonLayout.cell_paths()``), which is the full optional, per-cell
 manifest and has no victim dimension of its
 own. No change to that schema was made or is needed here.
 """
@@ -29,7 +29,7 @@ from datp.attacks.enums import (
 )
 from datp.core.seed_sequence import SeedRecord
 from datp.data.catalog import DatasetID
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 class BoundedSweepResultRow(BaseModel):
@@ -104,7 +104,7 @@ class BoundedSweepManifest(BaseModel):
     schema_version: str = "1"
     generated_at_utc: str
     dataset: DatasetID = DatasetID.NBAIOT
-    scale: ExperimentScale = ExperimentScale.BOUNDED
+    stage: ExperimentStage = ExperimentStage.NBAIOT_MAIN
     injection_rule: CalibrationInjectionRule = (
         CalibrationInjectionRule.REPLACE_FIXED_BUDGET
     )

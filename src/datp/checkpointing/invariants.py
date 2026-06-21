@@ -1,11 +1,13 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar, cast
 
-from datp.core.enums import Baseline, Regime, controlled_baselines_for_regime
+from datp.config.stages import ExperimentStage
+from datp.core.enums import CONTROLLED_POLICIES
 from datp.core.errors import fmt
 from datp.thresholding.metrics_serialization import SweepMetrics
 
@@ -24,10 +26,10 @@ class ScoreManifestIdentity:
 
 @dataclass(frozen=True, slots=True)
 class CheckpointEvaluationInvariant:
-    regime: Regime
+    stage: ExperimentStage
     seed: int
     checkpoint_round: int
-    baselines: tuple[Baseline, ...]
+    policies: tuple[ThresholdPolicy, ...]
     score_manifest_identity: str
     checkpoint_identity: str
     client_ids: tuple[str, ...]
@@ -37,13 +39,13 @@ class CheckpointEvaluationInvariant:
 
 @dataclass(frozen=True, slots=True)
 class _MetricsInvariantContext:
-    regime: Regime
+    stage: ExperimentStage
     seed: int
     checkpoint_round: int
     score_manifest_path: Path
     score_manifest_identity: str
     manifest: ScoreManifestIdentity
-    expected_baselines: set[Baseline]
+    expected_policies: set[ThresholdPolicy]
     config_identity: str | None
     split_manifest_identity: str | None
     min_coverage_ratio: float
@@ -132,12 +134,12 @@ def _validate_metrics_cell_identity(
     metrics: SweepMetrics,
     context: _MetricsInvariantContext,
 ) -> None:
-    if metrics.regime != context.regime or metrics.seed != context.seed:
+    if metrics.stage != context.stage or metrics.seed != context.seed:
         raise ValueError(
             fmt(
                 _MODULE,
                 "Metrics cell identity mismatch",
-                f"{context.regime}/seed {context.seed}",
+                f"{context.stage}/seed {context.seed}",
                 metrics.run_id,
             )
         )
@@ -152,26 +154,17 @@ def _validate_metrics_cell_identity(
         )
 
 
-def _validate_metrics_baseline(
+def _validate_metrics_policy(
     metrics: SweepMetrics,
     context: _MetricsInvariantContext,
 ) -> None:
-    if metrics.baseline == Baseline.B3 and context.regime != Regime.A:
+    if metrics.policy not in context.expected_policies:
         raise ValueError(
             fmt(
                 _MODULE,
-                "B3 is invalid outside Regime A",
-                "suppressed",
-                context.regime.value,
-            )
-        )
-    if metrics.baseline not in context.expected_baselines:
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "Unexpected baseline for regime",
-                str(sorted(context.expected_baselines)),
-                metrics.baseline.value,
+                "Unexpected policy for stage",
+                str(sorted(context.expected_policies)),
+                metrics.policy.value,
             )
         )
 
@@ -256,7 +249,7 @@ def _validate_metrics_file(
 ) -> SweepMetrics:
     metrics = load_sweep_metrics(metrics_path)
     _validate_metrics_cell_identity(metrics, context)
-    _validate_metrics_baseline(metrics, context)
+    _validate_metrics_policy(metrics, context)
     _validate_metrics_provenance(
         metrics,
         context,
@@ -270,12 +263,12 @@ def _validate_metrics_file(
 class CheckpointValidationConfig:
     """Fixed metadata for a checkpoint evaluation invariant check.
 
-    Bundles regime, seed, checkpoint round, identity hashes, and coverage
-    floor — the parameters that are shared across all baseline metrics files
+    Bundles stage, seed, checkpoint round, identity hashes, and coverage
+    floor — the parameters that are shared across all policy metrics files
     for one training seed.
     """
 
-    regime: Regime
+    stage: ExperimentStage
     seed: int
     checkpoint_round: int
     score_manifest_path: Path
@@ -302,29 +295,29 @@ def validate_checkpoint_evaluation_invariants(
     _validate_manifest_round(manifest, config.checkpoint_round)
 
     context = _MetricsInvariantContext(
-        regime=config.regime,
+        stage=config.stage,
         seed=config.seed,
         checkpoint_round=config.checkpoint_round,
         score_manifest_path=config.score_manifest_path,
         score_manifest_identity=_hash_file(config.score_manifest_path),
         manifest=manifest,
-        expected_baselines=set(controlled_baselines_for_regime(config.regime)),
+        expected_policies=set(CONTROLLED_POLICIES),
         config_identity=config.config_identity,
         split_manifest_identity=config.split_manifest_identity,
         min_coverage_ratio=config.min_coverage_ratio,
     )
-    seen: list[Baseline] = []
+    seen: list[ThresholdPolicy] = []
     coverage_values: list[float] = []
     for metrics_path in metrics_paths:
         metrics = _validate_metrics_file(metrics_path, context)
-        seen.append(metrics.baseline)
+        seen.append(metrics.policy)
         coverage_values.append(metrics.coverage_ratio)
 
     return CheckpointEvaluationInvariant(
-        regime=config.regime,
+        stage=config.stage,
         seed=config.seed,
         checkpoint_round=config.checkpoint_round,
-        baselines=tuple(sorted(seen)),
+        policies=tuple(sorted(seen)),
         score_manifest_identity=context.score_manifest_identity,
         checkpoint_identity=manifest.checkpoint_identity,
         client_ids=manifest.client_ids,

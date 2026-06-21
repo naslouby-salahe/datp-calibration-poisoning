@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import csv
 import dataclasses
@@ -16,21 +17,16 @@ from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile
 from datp.checkpointing.enums import EvidenceRole
 from datp.config.models import DatpConfig
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
-    REGIME_BASELINES,
-    STATS_REPORTING_BASELINES,
-    Baseline,
-    Regime,
+    CONTROLLED_POLICIES,
     RunKind,
     ScoringStage,
     SeedScope,
 )
 from datp.core.identity import (
-    AlphaLabel,
-    BaselineRunId,
+    PolicyRunId,
     TrainingCellId,
-    alpha_from_label,
-    alpha_label,
 )
 from datp.core.metric_enums import (
     AuditField,
@@ -63,15 +59,12 @@ from datp.reporting.figures import (
     generate_figure1,
     generate_figure2,
     generate_figure3,
-    generate_figure4,
 )
 from datp.reporting.tables import generate_table3, generate_table4
 from datp.scoring.loading import ScoreProvider
 from datp.scoring.schema import SCORE_COLUMN
 from datp.statistics.bootstrap import bootstrap_ci
-from datp.statistics.effect_size import cliffs_delta
 from datp.statistics.enums import BootstrapField, StatsField
-from datp.statistics.wilcoxon import bonferroni_correct, wilcoxon_test
 from datp.validation.enums import AuditStatus
 
 _REPORTING_SOURCES: set[str] = set()
@@ -90,20 +83,18 @@ class BuildOutputs:
 @dataclass(frozen=True, slots=True)
 class _ResultPathKey:
     base_dir: Path
-    regime: Regime
-    baseline: Baseline
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     seed: int
-    alpha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class _LoadResultsParams:
     base_dir: Path
-    regime: Regime
-    baselines: tuple[Baseline, ...]
+    stage: ExperimentStage
+    policies: tuple[ThresholdPolicy, ...]
     seeds: tuple[int, ...]
     metric_tol: float
-    alpha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,14 +107,13 @@ class _CalibrationErrorsParams:
 
 
 def _result_path(key: _ResultPathKey) -> Path:
-    alpha_float = alpha_from_label(key.alpha)
-    run = BaselineRunId(
-        cell=TrainingCellId(regime=key.regime, seed=key.seed, alpha=alpha_float),
-        baseline=key.baseline,
+    run = PolicyRunId(
+        cell=TrainingCellId(stage=key.stage, seed=key.seed),
+        policy=key.policy,
     )
     return (
-        ArtifactLayout(base_dir=key.base_dir, regime=key.regime)
-        .baseline_run(run)
+        ArtifactLayout(base_dir=key.base_dir, stage=key.stage)
+        .policy_run(run)
         .result_dir
         / ArtifactFile.METRICS
     )
@@ -153,9 +143,8 @@ def _load_json(path: Path) -> dict[str, Any]:
 def _payload_alpha(value: Any) -> float | None:
     if value is None:
         return None
-    from datp.core.identity import AlphaLabel
 
-    if isinstance(value, str) and value.lower() in {AlphaLabel.IID, "inf"}:
+    if isinstance(value, str) and value.lower() in {"inf", "iid"}:
         return math.inf
     return float(value)
 
@@ -199,7 +188,7 @@ def _client_records_from_payload(
     payload: dict[str, Any],
 ) -> tuple[ClientEvaluationRecord, ...]:
     records: list[ClientEvaluationRecord] = []
-    baseline = Baseline(payload[PayloadKey.BASELINE])
+    policy = ThresholdPolicy(payload[PayloadKey.POLICY])
     for client_id, row in client_rows(payload):
         tp, fp, tn, fn = _extract_confusion_counts(
             client_id, row[PayloadKey.CONFUSION_MATRIX]
@@ -219,7 +208,7 @@ def _client_records_from_payload(
                     calibration_pending=bool(
                         row.get(PayloadKey.CALIBRATION_PENDING, False)
                     ),
-                    strategy=baseline,
+                    strategy=policy,
                 ),
                 evaluation_incomplete=bool(
                     row.get(PayloadKey.EVALUATION_INCOMPLETE, False)
@@ -269,10 +258,9 @@ def _evaluation_from_payload(
         str(client_id) for client_id in payload[PayloadKey.EVAL_INCOMPLETE_IDS]
     )
     result = build_evaluation_result(
-        baseline=Baseline(payload[PayloadKey.BASELINE]),
-        regime=Regime(payload[PayloadKey.REGIME]),
+        policy=ThresholdPolicy(payload[PayloadKey.POLICY]),
+        stage=ExperimentStage(payload.get(PayloadKey.STAGE, ExperimentStage.NBAIOT_MAIN.value)),
         seed=int(payload[PayloadKey.SEED]),
-        alpha=_payload_alpha(payload.get(PayloadKey.ALPHA)),
         clients=clients,
         eligible_ids=eligible_ids,
         pending_ids=pending_ids,
@@ -315,21 +303,20 @@ def _evaluation_from_payload(
     return result
 
 
-def _load_results(params: _LoadResultsParams) -> dict[Baseline, list[EvaluationResult]]:
-    loaded: dict[Baseline, list[EvaluationResult]] = {}
-    for baseline in params.baselines:
-        loaded[baseline] = []
+def _load_results(params: _LoadResultsParams) -> dict[ThresholdPolicy, list[EvaluationResult]]:
+    loaded: dict[ThresholdPolicy, list[EvaluationResult]] = {}
+    for policy in params.policies:
+        loaded[policy] = []
         for seed in params.seeds:
             key = _ResultPathKey(
                 base_dir=params.base_dir,
-                regime=params.regime,
-                baseline=baseline,
+                stage=params.stage,
+                policy=policy,
                 seed=seed,
-                alpha=params.alpha,
             )
             path = _result_path(key)
             try:
-                loaded[baseline].append(
+                loaded[policy].append(
                     _evaluation_from_payload(_load_json(path), params.metric_tol)
                 )
             except ValueError as exc:
@@ -356,7 +343,7 @@ def _eligible_intersection_fprs(
     ids = sorted(set(left_map) & set(right_map))
     if not ids:
         raise ValueError(
-            f"[reporting] No eligible-client intersection. Expected: shared eligible clients for {left.baseline} vs {right.baseline}. Got: empty."
+            f"[reporting] No eligible-client intersection. Expected: shared eligible clients for {left.policy} vs {right.policy}. Got: empty."
         )
     left_missing = sorted(set(left_map) - set(ids))
     right_missing = sorted(set(right_map) - set(ids))
@@ -388,9 +375,9 @@ def _bootstrap_payload(
 
 
 def _paired_deltas(
-    results: dict[Baseline, list[EvaluationResult]],
-    left: Baseline,
-    right: Baseline,
+    results: dict[ThresholdPolicy, list[EvaluationResult]],
+    left: ThresholdPolicy,
+    right: ThresholdPolicy,
 ) -> np.ndarray:
     return np.array(
         [
@@ -401,9 +388,9 @@ def _paired_deltas(
 
 
 def _pooled_intersection_fprs(
-    results: dict[Baseline, list[EvaluationResult]],
-    left: Baseline,
-    right: Baseline,
+    results: dict[ThresholdPolicy, list[EvaluationResult]],
+    left: ThresholdPolicy,
+    right: ThresholdPolicy,
 ) -> tuple[np.ndarray, np.ndarray]:
     left_arrays: list[np.ndarray] = []
     right_arrays: list[np.ndarray] = []
@@ -417,33 +404,33 @@ def _pooled_intersection_fprs(
 
 
 def _intersect_eligible_ids(
-    maps: dict[Baseline, dict[str, float]], baselines: tuple[Baseline, ...]
+    maps: dict[ThresholdPolicy, dict[str, float]], policies: tuple[ThresholdPolicy, ...]
 ) -> list[str]:
-    """Return sorted common eligible-client IDs across baselines; raise on empty or asymmetric sets."""
-    ids = sorted(set.intersection(*(set(maps[b]) for b in baselines)))
+    """Return sorted common eligible-client IDs across policies; raise on empty or asymmetric sets."""
+    ids = sorted(set.intersection(*(set(maps[p]) for p in policies)))
     if not ids:
         raise ValueError(
-            f"[reporting] No eligible-client intersection. Expected: shared eligible clients for {baselines}. Got: empty."
+            f"[reporting] No eligible-client intersection. Expected: shared eligible clients for {policies}. Got: empty."
         )
-    for baseline in baselines:
-        missing = sorted(set(maps[baseline]) - set(ids))
+    for policy in policies:
+        missing = sorted(set(maps[policy]) - set(ids))
         if missing:
             raise ValueError(
-                f"[reporting] Eligible-client set mismatch. Expected: identical eligible-client sets for {baselines}. Got: baseline={baseline} extra={missing}."
+                f"[reporting] Eligible-client set mismatch. Expected: identical eligible-client sets for {policies}. Got: policy={policy} extra={missing}."
             )
     return ids
 
 
 def _common_eligible_fprs(
-    results: dict[Baseline, list[EvaluationResult]], baselines: tuple[Baseline, ...]
-) -> dict[Baseline, list[np.ndarray]]:
-    out: dict[Baseline, list[np.ndarray]] = {baseline: [] for baseline in baselines}
-    for idx in range(len(results[baselines[0]])):
-        maps = {b: _eligible_fprs(results[b][idx]) for b in baselines}
-        ids = _intersect_eligible_ids(maps, baselines)
-        for baseline in baselines:
-            out[baseline].append(
-                np.array([maps[baseline][cid] for cid in ids], dtype=np.float64)
+    results: dict[ThresholdPolicy, list[EvaluationResult]], policies: tuple[ThresholdPolicy, ...]
+) -> dict[ThresholdPolicy, list[np.ndarray]]:
+    out: dict[ThresholdPolicy, list[np.ndarray]] = {policy: [] for policy in policies}
+    for idx in range(len(results[policies[0]])):
+        maps = {p: _eligible_fprs(results[p][idx]) for p in policies}
+        ids = _intersect_eligible_ids(maps, policies)
+        for policy in policies:
+            out[policy].append(
+                np.array([maps[policy][cid] for cid in ids], dtype=np.float64)
             )
     return out
 
@@ -466,45 +453,29 @@ def _save_figure_copies(
 @dataclass(frozen=True, slots=True)
 class _HeterogeneityContextParams:
     bootstrap_payload: dict[str, Any]
-    regime_a: dict[Baseline, list[EvaluationResult]]
+    nbaiot_results: dict[ThresholdPolicy, list[EvaluationResult]]
     base_dir: Path
     practical_significance_threshold: float
     seeds: tuple[int, ...]
     metric_tol: float
 
 
-def _load_iid_b1_mean(
+def _load_iid_global_mean(
     base_dir: Path, seeds: tuple[int, ...], metric_tol: float
 ) -> tuple[float | None, bool]:
-    """Return (mean CV(FPR) for B1 IID Regime C, data_available). Returns (None, False) on missing data."""
-    try:
-        iid_results = _load_results(
-            _LoadResultsParams(
-                base_dir=base_dir,
-                regime=Regime.C,
-                baselines=(Baseline.B1,),
-                seeds=seeds,
-                metric_tol=metric_tol,
-                alpha=AlphaLabel.IID,
-            )
-        )
-        cv_fprs = [_cv_fpr(r) for r in iid_results[Baseline.B1]]
-        if cv_fprs:
-            return float(np.mean(cv_fprs)), True
-    except (FileNotFoundError, ValueError):
-        pass
+    """IID comparison is out of scope; returns (None, False)."""
     return None, False
 
 
 def _practical_significance(
-    b1_natural_mean: float,
-    b1_iid_mean: float | None,
+    global_natural_mean: float,
+    global_iid_mean: float | None,
     threshold: float,
 ) -> tuple[float | None, bool]:
     """Return (natural_minus_iid, practical_significance_met)."""
-    if b1_iid_mean is None:
+    if global_iid_mean is None:
         return None, False
-    delta = b1_natural_mean - b1_iid_mean
+    delta = global_natural_mean - global_iid_mean
     return delta, delta >= threshold
 
 
@@ -519,22 +490,22 @@ def _heterogeneity_context_label(
 
 
 def _check_heterogeneity_context(params: _HeterogeneityContextParams) -> dict[str, Any]:
-    """Evaluate Regime C IID context; the primary endpoint is Regime A B1-minus-B2 CV(FPR) bootstrap CI."""
+    """IID and CICIoT comparisons are out of scope; returns heterogeneity context based on N-BaIoT only."""
     primary_ci_excludes_zero: bool = bool(
         params.bootstrap_payload[StatsField.PRIMARY_ENDPOINT][
             BootstrapField.EXCLUDES_ZERO
         ]
     )
-    b1_natural_mean = (
-        float(np.mean([_cv_fpr(r) for r in params.regime_a[Baseline.B1]]))
-        if params.regime_a.get(Baseline.B1)
+    global_natural_mean = (
+        float(np.mean([_cv_fpr(r) for r in params.nbaiot_results[ThresholdPolicy.GLOBAL_THRESHOLD]]))
+        if params.nbaiot_results.get(ThresholdPolicy.GLOBAL_THRESHOLD)
         else float("nan")
     )
-    b1_iid_mean, iid_data_available = _load_iid_b1_mean(
+    global_iid_mean, iid_data_available = _load_iid_global_mean(
         params.base_dir, params.seeds, params.metric_tol
     )
     natural_minus_iid, practical_significance_met = _practical_significance(
-        b1_natural_mean, b1_iid_mean, params.practical_significance_threshold
+        global_natural_mean, global_iid_mean, params.practical_significance_threshold
     )
     context_result = _heterogeneity_context_label(
         primary_ci_excludes_zero, practical_significance_met
@@ -542,11 +513,10 @@ def _check_heterogeneity_context(params: _HeterogeneityContextParams) -> dict[st
 
     return {
         StatsField.CONDITION: (
-            "Regime C and IID comparisons are heterogeneity context/support checks, "
+            "IID and CICIoT comparisons are heterogeneity context/support checks, "
             "not the confirmatory endpoint."
         ),
-        StatsField.B1_CV_FPR_REGIME_A_MEAN: b1_natural_mean,
-        StatsField.B1_CV_FPR_IID_MEAN: b1_iid_mean,
+        StatsField.GLOBAL_CV_FPR_MEAN: global_natural_mean,
         StatsField.NATURAL_MINUS_IID: natural_minus_iid,
         StatsField.PRACTICAL_SIGNIFICANCE_THRESHOLD: params.practical_significance_threshold,
         StatsField.PRACTICAL_SIGNIFICANCE_MET: practical_significance_met,
@@ -554,25 +524,25 @@ def _check_heterogeneity_context(params: _HeterogeneityContextParams) -> dict[st
         StatsField.PRIMARY_ENDPOINT_CI_EXCLUDES_ZERO: primary_ci_excludes_zero,
         StatsField.CONTEXT_RESULT: context_result,
         StatsField.NOTE: (
-            "Primary endpoint: Regime A, B1 vs B2, CV(FPR), per-seed bootstrap CI. "
-            "Regime C and IID comparisons are heterogeneity context/support checks, not the confirmatory endpoint."
+            "Primary endpoint: NBAIOT_MAIN, GLOBAL_THRESHOLD vs LOCAL_THRESHOLD, CV(FPR), per-seed bootstrap CI. "
+            "IID and CICIoT comparisons are heterogeneity context/support checks, not the confirmatory endpoint."
         ),
     }
 
 
 def _convergence_summary_warnings(base_dir: Path, seeds: tuple[int, ...]) -> list[str]:
     warnings_list: list[str] = []
-    for regime in (Regime.A, Regime.B):
-        layout = ArtifactLayout(base_dir=base_dir, regime=regime)
+    for stage in (ExperimentStage.NBAIOT_MAIN,):
+        layout = ArtifactLayout(base_dir=base_dir, stage=stage)
         for seed in seeds:
             ckpt_dir = layout.checkpoint_dir(
-                TrainingCellId(regime=regime, seed=seed, alpha=None)
+                TrainingCellId(stage=stage, seed=seed)
             )
             model_pt = ckpt_dir / ArtifactFile.MODEL_CHECKPOINT
             summary = ckpt_dir / ArtifactFile.CONVERGENCE_SUMMARY
             if model_pt.exists() and not summary.exists():
                 warnings_list.append(
-                    f"[reporting] Missing {ArtifactFile.CONVERGENCE_SUMMARY} for {regime.value} seed {seed}. "
+                    f"[reporting] Missing {ArtifactFile.CONVERGENCE_SUMMARY} for {stage.value} seed {seed}. "
                     f"Expected: {summary}. Got: absent."
                 )
     return warnings_list
@@ -580,9 +550,6 @@ def _convergence_summary_warnings(base_dir: Path, seeds: tuple[int, ...]) -> lis
 
 def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     seeds = tuple(cfg.experiment.seeds)
-    regime_c_alphas = tuple(
-        alpha_label(alpha) or "" for alpha in cfg.experiment.regime_c_alphas
-    )
     n_bootstrap = cfg.statistics.n_bootstrap
     bootstrap_seed = cfg.statistics.bootstrap_seed
     ci = cfg.statistics.ci_level
@@ -591,24 +558,13 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     analysis_dir = base_dir / ArtifactDir.ANALYSIS
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
-    stats_baselines_a = tuple(sorted(STATS_REPORTING_BASELINES[Regime.A]))
-    stats_baselines_b = tuple(sorted(STATS_REPORTING_BASELINES[Regime.B]))
-    regime_c_baselines = tuple(sorted(REGIME_BASELINES[Regime.C]))
+    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
 
-    regime_a = _load_results(
+    nbaiot_results = _load_results(
         _LoadResultsParams(
             base_dir=base_dir,
-            regime=Regime.A,
-            baselines=stats_baselines_a,
-            seeds=seeds,
-            metric_tol=metric_tol,
-        )
-    )
-    regime_b = _load_results(
-        _LoadResultsParams(
-            base_dir=base_dir,
-            regime=Regime.B,
-            baselines=stats_baselines_b,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            policies=nbaiot_policies,
             seeds=seeds,
             metric_tol=metric_tol,
         )
@@ -616,84 +572,48 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
 
     payload: dict[str, Any] = {
         StatsField.PRIMARY_ENDPOINT: {
-            StatsField.CONDITION: "Primary endpoint: Regime A, B1 vs B2, CV(FPR), per-seed bootstrap CI.",
+            StatsField.CONDITION: "Primary endpoint: NBAIOT_MAIN, GLOBAL_THRESHOLD vs LOCAL_THRESHOLD, CV(FPR), per-seed bootstrap CI.",
             **_bootstrap_payload(
-                _paired_deltas(regime_a, Baseline.B1, Baseline.B2),
+                _paired_deltas(nbaiot_results, ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD),
                 n_bootstrap,
                 ci,
                 bootstrap_seed,
             ),
         },
-        StatsField.SECONDARY_REGIME_A: {
-            ComparisonLabel.B1_VS_B4.value: _bootstrap_payload(
-                _paired_deltas(regime_a, Baseline.B1, Baseline.B4),
+        "secondary_nbaiot": {
+            ComparisonLabel.GLOBAL_VS_CLUSTER.value: _bootstrap_payload(
+                _paired_deltas(nbaiot_results, ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
                 n_bootstrap,
                 ci,
                 bootstrap_seed,
             ),
-            ComparisonLabel.B4_VS_B2.value: _bootstrap_payload(
-                _paired_deltas(regime_a, Baseline.B4, Baseline.B2),
-                n_bootstrap,
-                ci,
-                bootstrap_seed,
-            ),
-        },
-        StatsField.SECONDARY_REGIME_B: {
-            ComparisonLabel.B1_VS_B2.value: _bootstrap_payload(
-                _paired_deltas(regime_b, Baseline.B1, Baseline.B2),
-                n_bootstrap,
-                ci,
-                bootstrap_seed,
-            ),
-            ComparisonLabel.B1_VS_B4.value: _bootstrap_payload(
-                _paired_deltas(regime_b, Baseline.B1, Baseline.B4),
+            ComparisonLabel.CLUSTER_VS_LOCAL.value: _bootstrap_payload(
+                _paired_deltas(nbaiot_results, ThresholdPolicy.CLUSTER_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD),
                 n_bootstrap,
                 ci,
                 bootstrap_seed,
             ),
         },
-        StatsField.REGIME_C: {},
+        "secondary_nbaiot_additional": {
+            ComparisonLabel.GLOBAL_VS_LOCAL.value: _bootstrap_payload(
+                _paired_deltas(nbaiot_results, ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD),
+                n_bootstrap,
+                ci,
+                bootstrap_seed,
+            ),
+            ComparisonLabel.GLOBAL_VS_CLUSTER.value: _bootstrap_payload(
+                _paired_deltas(nbaiot_results, ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
+                n_bootstrap,
+                ci,
+                bootstrap_seed,
+            ),
+        },
     }
-
-    regime_c_p_values: list[float] = []
-    for alpha in regime_c_alphas:
-        results = _load_results(
-            _LoadResultsParams(
-                base_dir=base_dir,
-                regime=Regime.C,
-                baselines=regime_c_baselines,
-                seeds=seeds,
-                metric_tol=metric_tol,
-                alpha=alpha,
-            )
-        )
-        b1_b2 = _paired_deltas(results, Baseline.B1, Baseline.B2)
-        b1_b4 = _paired_deltas(results, Baseline.B1, Baseline.B4)
-        b1_fpr, b2_fpr = _pooled_intersection_fprs(results, Baseline.B1, Baseline.B2)
-        wilcoxon = wilcoxon_test(b1_fpr, b2_fpr)
-        regime_c_p_values.append(wilcoxon.p_value)
-        cliff = cliffs_delta(b1_fpr, b2_fpr)
-        payload[StatsField.REGIME_C][alpha] = {
-            ComparisonLabel.B1_VS_B2.value: _bootstrap_payload(
-                b1_b2, n_bootstrap, ci, bootstrap_seed
-            ),
-            ComparisonLabel.B1_VS_B4.value: _bootstrap_payload(
-                b1_b4, n_bootstrap, ci, bootstrap_seed
-            ),
-            StatsField.PAIRED_CLIENT_FPR_POLICY: "eligible-client intersection within each seed, pooled across seeds",
-            StatsField.WILCOXON_B1_VS_B2: dataclasses.asdict(wilcoxon),
-            StatsField.CLIFFS_DELTA_B1_VS_B2: dataclasses.asdict(cliff),
-        }
-
-    bonferroni = bonferroni_correct(
-        regime_c_p_values, alpha=cfg.statistics.significance_alpha
-    )
-    payload[StatsField.REGIME_C_BONFERRONI] = dataclasses.asdict(bonferroni)
 
     payload[StatsField.HETEROGENEITY_CONTEXT_CHECK] = _check_heterogeneity_context(
         _HeterogeneityContextParams(
             bootstrap_payload=payload,
-            regime_a=regime_a,
+            nbaiot_results=nbaiot_results,
             base_dir=base_dir,
             practical_significance_threshold=cfg.statistics.dispersion_threshold,
             seeds=seeds,
@@ -720,34 +640,18 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         writer.writerow(
             [
                 StatsField.PRIMARY_ENDPOINT,
-                ComparisonLabel.B1_VS_B2.value,
+                ComparisonLabel.GLOBAL_VS_LOCAL.value,
                 payload[StatsField.PRIMARY_ENDPOINT][BootstrapField.MEAN_DELTA],
                 payload[StatsField.PRIMARY_ENDPOINT][BootstrapField.CI_LOWER],
                 payload[StatsField.PRIMARY_ENDPOINT][BootstrapField.CI_UPPER],
                 payload[StatsField.PRIMARY_ENDPOINT][BootstrapField.EXCLUDES_ZERO],
             ]
         )
-        for scope in (StatsField.SECONDARY_REGIME_A, StatsField.SECONDARY_REGIME_B):
+        for scope in ("secondary_nbaiot", "secondary_nbaiot_additional"):
             for comparison, stats in payload[scope].items():
                 writer.writerow(
                     [
                         scope,
-                        comparison,
-                        stats[BootstrapField.MEAN_DELTA],
-                        stats[BootstrapField.CI_LOWER],
-                        stats[BootstrapField.CI_UPPER],
-                        stats[BootstrapField.EXCLUDES_ZERO],
-                    ]
-                )
-        for alpha, stats_by_comparison in payload[StatsField.REGIME_C].items():
-            for comparison in (
-                ComparisonLabel.B1_VS_B2.value,
-                ComparisonLabel.B1_VS_B4.value,
-            ):
-                stats = stats_by_comparison[comparison]
-                writer.writerow(
-                    [
-                        f"regime_c_alpha_{alpha}",
                         comparison,
                         stats[BootstrapField.MEAN_DELTA],
                         stats[BootstrapField.CI_LOWER],
@@ -764,8 +668,8 @@ def _calibration_errors_for_devices(
 ) -> dict[str, np.ndarray]:
     errors: dict[str, np.ndarray] = {}
     rng = np.random.default_rng(params.rng_seed)
-    layout = ArtifactLayout(base_dir=params.base_dir, regime=Regime.A)
-    cell = TrainingCellId(regime=Regime.A, seed=params.seed, alpha=None)
+    layout = ArtifactLayout(base_dir=params.base_dir, stage=ExperimentStage.NBAIOT_MAIN)
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=params.seed)
     score_provider = ScoreProvider(layout.score_cell(cell).score_dir)
     for device_id in params.device_ids:
         values = score_provider.load(device_id, ScoringStage.CAL)
@@ -777,71 +681,71 @@ def _calibration_errors_for_devices(
 
 def _build_figure1_sidecar(
     base_dir: Path,
-    seed0_b1: EvaluationResult,
-    seed0_b2: EvaluationResult,
+    seed0_global: EvaluationResult,
+    seed0_local: EvaluationResult,
     figure1_ids: list[str],
-    b1_seed0_fpr: Any,
-    b2_seed0_fpr: Any,
+    global_seed0_fpr: Any,
+    local_seed0_fpr: Any,
 ) -> dict[str, Any]:
     return {
         SidecarField.FIGURE: FigureName.FIGURE_1.value,
-        SidecarField.TITLE: "Per-device FPR: B1 vs B2, Regime A — representative seed, descriptive only",
+        SidecarField.TITLE: "Per-device FPR: GLOBAL_THRESHOLD vs LOCAL_THRESHOLD, NBAIOT_MAIN — representative seed, descriptive only",
         SidecarField.DATASET: DatasetID.NBAIOT.value,
-        SidecarField.REGIME: Regime.A.value,
-        SidecarField.SEED: seed0_b1.seed,
-        SidecarField.SEEDS: [seed0_b1.seed],
+        SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN.value,
+        SidecarField.SEED: seed0_global.seed,
+        SidecarField.SEEDS: [seed0_global.seed],
         SidecarField.SOURCE_METRICS_FILES: [
             str(
                 _result_path(
-                    _ResultPathKey(base_dir, Regime.A, Baseline.B1, seed0_b1.seed)
+                    _ResultPathKey(base_dir, ExperimentStage.NBAIOT_MAIN, ThresholdPolicy.GLOBAL_THRESHOLD, seed0_global.seed)
                 )
             ),
             str(
                 _result_path(
-                    _ResultPathKey(base_dir, Regime.A, Baseline.B2, seed0_b2.seed)
+                    _ResultPathKey(base_dir, ExperimentStage.NBAIOT_MAIN, ThresholdPolicy.LOCAL_THRESHOLD, seed0_local.seed)
                 )
             ),
         ],
         SidecarField.RUN_IDS: [
-            f"{Regime.A.value}_b1_seed{seed0_b1.seed}",
-            f"{Regime.A.value}_b2_seed{seed0_b2.seed}",
+            f"{ExperimentStage.NBAIOT_MAIN.value}_global_threshold_seed{seed0_global.seed}",
+            f"{ExperimentStage.NBAIOT_MAIN.value}_local_threshold_seed{seed0_local.seed}",
         ],
         SidecarField.ALPHAS: [],
         SidecarField.ELIGIBLE_COUNTS: {
-            Baseline.B1.value: seed0_b1.eligible_count,
-            Baseline.B2.value: seed0_b2.eligible_count,
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.eligible_count,
+            ThresholdPolicy.LOCAL_THRESHOLD.value: seed0_local.eligible_count,
         },
         SidecarField.CLIENT_COUNTS: {
-            Baseline.B1.value: seed0_b1.client_count,
-            Baseline.B2.value: seed0_b2.client_count,
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.client_count,
+            ThresholdPolicy.LOCAL_THRESHOLD.value: seed0_local.client_count,
         },
         SidecarField.COVERAGE_RATIOS: {
-            Baseline.B1.value: seed0_b1.coverage_ratio,
-            Baseline.B2.value: seed0_b2.coverage_ratio,
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.coverage_ratio,
+            ThresholdPolicy.LOCAL_THRESHOLD.value: seed0_local.coverage_ratio,
         },
         SidecarField.METRIC_NAMES: [MetricName.FPR.value],
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
         SidecarField.SEED_SCOPE: SeedScope.REPRESENTATIVE_SEED.value,
         SidecarField.NOT_CONFIRMATORY_WARNING: NOT_CONFIRMATORY_WARNING,
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
-        SidecarField.BASELINES: [Baseline.B1.value, Baseline.B2.value],
-        SidecarField.BASELINE_ORDER: [Baseline.B1.value, Baseline.B2.value],
+        SidecarField.POLICIES: [ThresholdPolicy.GLOBAL_THRESHOLD.value, ThresholdPolicy.LOCAL_THRESHOLD.value],
+        SidecarField.POLICY_ORDER: [ThresholdPolicy.GLOBAL_THRESHOLD.value, ThresholdPolicy.LOCAL_THRESHOLD.value],
         SidecarField.ELIGIBILITY_POLICY: "eligible-client intersection",
         SidecarField.AXIS_LABELS: {"x": "Device", "y": "FPR"},
         SidecarField.CLIENTS: [
             {
                 SidecarField.CLIENT_ID: cid,
-                Baseline.B1.value: float(b1),
-                Baseline.B2.value: float(b2),
+                ThresholdPolicy.GLOBAL_THRESHOLD.value: float(global_val),
+                ThresholdPolicy.LOCAL_THRESHOLD.value: float(local_val),
             }
-            for cid, b1, b2 in zip(figure1_ids, b1_seed0_fpr, b2_seed0_fpr, strict=True)
+            for cid, global_val, local_val in zip(figure1_ids, global_seed0_fpr, local_seed0_fpr, strict=True)
         ],
     }
 
 
 def _build_figure2_sidecar(
     base_dir: Path,
-    seed0_b1: EvaluationResult,
+    seed0_global: EvaluationResult,
     rep_seed: int,
     representative: list[str],
     figure2_max_points: int,
@@ -849,34 +753,34 @@ def _build_figure2_sidecar(
 ) -> dict[str, Any]:
     return {
         SidecarField.FIGURE: FigureName.FIGURE_2.value,
-        SidecarField.TITLE: "Calibration-error ECDF for three representative N-BaIoT clients with B1 client-averaged threshold — representative seed, descriptive only",
+        SidecarField.TITLE: "Calibration-error ECDF for three representative N-BaIoT clients with GLOBAL_THRESHOLD client-averaged threshold — representative seed, descriptive only",
         SidecarField.DATASET: DatasetID.NBAIOT.value,
-        SidecarField.REGIME: Regime.A.value,
+        SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN.value,
         SidecarField.SEED: rep_seed,
         SidecarField.SEEDS: [rep_seed],
         SidecarField.SOURCE_METRICS_FILES: [
-            str(_result_path(_ResultPathKey(base_dir, Regime.A, Baseline.B1, rep_seed)))
+            str(_result_path(_ResultPathKey(base_dir, ExperimentStage.NBAIOT_MAIN, ThresholdPolicy.GLOBAL_THRESHOLD, rep_seed)))
         ],
         SidecarField.SOURCE_SCORE_MANIFESTS: [
             str(
-                ArtifactLayout(base_dir=base_dir, regime=Regime.A)
-                .score_cell(TrainingCellId(regime=Regime.A, seed=rep_seed, alpha=None))
+                ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
+                .score_cell(TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=rep_seed))
                 .manifest_path
             )
         ],
-        SidecarField.RUN_IDS: [f"{Regime.A.value}_b1_seed{rep_seed}"],
+        SidecarField.RUN_IDS: [f"{ExperimentStage.NBAIOT_MAIN.value}_global_threshold_seed{rep_seed}"],
         SidecarField.ALPHAS: [],
-        SidecarField.ELIGIBLE_COUNTS: {Baseline.B1.value: seed0_b1.eligible_count},
-        SidecarField.CLIENT_COUNTS: {Baseline.B1.value: seed0_b1.client_count},
-        SidecarField.COVERAGE_RATIOS: {Baseline.B1.value: seed0_b1.coverage_ratio},
+        SidecarField.ELIGIBLE_COUNTS: {ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.eligible_count},
+        SidecarField.CLIENT_COUNTS: {ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.client_count},
+        SidecarField.COVERAGE_RATIOS: {ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.coverage_ratio},
         SidecarField.METRIC_NAMES: [SCORE_COLUMN, PayloadKey.THRESHOLD_VALUE],
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
         SidecarField.SEED_SCOPE: SeedScope.REPRESENTATIVE_SEED.value,
         SidecarField.NOT_CONFIRMATORY_WARNING: NOT_CONFIRMATORY_WARNING,
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
-        SidecarField.BASELINES: [Baseline.B1.value],
-        SidecarField.BASELINE_ORDER: [Baseline.B1.value],
-        SidecarField.ELIGIBILITY_POLICY: f"selected eligible clients from B1 seed {rep_seed}",
+        SidecarField.POLICIES: [ThresholdPolicy.GLOBAL_THRESHOLD.value],
+        SidecarField.POLICY_ORDER: [ThresholdPolicy.GLOBAL_THRESHOLD.value],
+        SidecarField.ELIGIBILITY_POLICY: f"selected eligible clients from GLOBAL_THRESHOLD seed {rep_seed}",
         SidecarField.AXIS_LABELS: {"x": "Reconstruction Error", "y": "Density"},
         SidecarField.TAU_GLOBAL: tau_global,
         SidecarField.CLIENT_IDS: representative,
@@ -886,132 +790,58 @@ def _build_figure2_sidecar(
 
 def _build_figure3_sidecar(
     base_dir: Path,
-    regime_a: dict[Baseline, list[EvaluationResult]],
-    fpr_by_baseline: dict[Baseline, list[Any]],
+    nbaiot_results: dict[ThresholdPolicy, list[EvaluationResult]],
+    fpr_by_policy: dict[ThresholdPolicy, list[Any]],
     seeds: tuple[int, ...],
 ) -> dict[str, Any]:
-    b_values = (Baseline.B1.value, Baseline.B2.value, Baseline.B4.value)
-    b_enums = (Baseline.B1, Baseline.B2, Baseline.B4)
+    b_values = (ThresholdPolicy.GLOBAL_THRESHOLD.value, ThresholdPolicy.LOCAL_THRESHOLD.value, ThresholdPolicy.CLUSTER_THRESHOLD.value)
+    b_enums = (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD)
     return {
         SidecarField.FIGURE: FigureName.FIGURE_3.value,
-        SidecarField.TITLE: "Per-client FPR distribution, Regime A",
+        SidecarField.TITLE: "Per-client FPR distribution, N-BaIoT main",
         SidecarField.DATASET: DatasetID.NBAIOT.value,
-        SidecarField.REGIME: Regime.A.value,
+        SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN.value,
         SidecarField.SOURCE_METRICS_FILES: [
-            str(_result_path(_ResultPathKey(base_dir, Regime.A, Baseline(b), seed)))
+            str(_result_path(_ResultPathKey(base_dir, ExperimentStage.NBAIOT_MAIN, ThresholdPolicy(b), seed)))
             for b in b_values
             for seed in seeds
         ],
         SidecarField.RUN_IDS: [
-            f"{Regime.A.value}_{b}_seed{seed}" for b in b_values for seed in seeds
+            f"{ExperimentStage.NBAIOT_MAIN.value}_{b}_seed{seed}" for b in b_values for seed in seeds
         ],
         SidecarField.SEEDS: list(seeds),
         SidecarField.ALPHAS: [],
         SidecarField.ELIGIBLE_COUNTS: {
-            b.value: [r.eligible_count for r in regime_a[b]] for b in b_enums
+            b.value: [r.eligible_count for r in nbaiot_results[b]] for b in b_enums
         },
         SidecarField.CLIENT_COUNTS: {
-            b.value: [r.client_count for r in regime_a[b]] for b in b_enums
+            b.value: [r.client_count for r in nbaiot_results[b]] for b in b_enums
         },
         SidecarField.COVERAGE_RATIOS: {
-            b.value: [r.coverage_ratio for r in regime_a[b]] for b in b_enums
+            b.value: [r.coverage_ratio for r in nbaiot_results[b]] for b in b_enums
         },
-        SidecarField.METRIC_NAMES: [MetricName.FPR.value, "cv_fpr_delta_b1_b2"],
+        SidecarField.METRIC_NAMES: [MetricName.FPR.value, "cv_fpr_delta_global_minus_local"],
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE_WITH_CONFIRMATORY_SIDECAR_DELTA.value,
         SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
-        SidecarField.BASELINES: list(b_values),
+        SidecarField.POLICIES: list(b_values),
         SidecarField.PAIRED_SEED_CV_FPR_DELTA: [
-            float(x) for x in _paired_deltas(regime_a, Baseline.B1, Baseline.B2)
+            float(x) for x in _paired_deltas(nbaiot_results, ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD)
         ],
         SidecarField.SEED_AGGREGATION_POLICY: "eligible-client FPR values pooled across configured seeds after intersection",
-        SidecarField.BASELINE_ORDER: list(b_values),
+        SidecarField.POLICY_ORDER: list(b_values),
         SidecarField.ELIGIBILITY_POLICY: "eligible-client intersection within each seed",
-        SidecarField.AXIS_LABELS: {"x": "Baseline", "y": "FPR"},
+        SidecarField.AXIS_LABELS: {"x": "ThresholdPolicy", "y": "FPR"},
         SidecarField.VALUES: {
-            baseline: [[float(x) for x in arr] for arr in arrays]
-            for baseline, arrays in fpr_by_baseline.items()
-        },
-    }
-
-
-def _build_figure4_sidecar(
-    base_dir: Path,
-    regime_c_baselines: tuple[Baseline, ...],
-    regime_c_alphas: tuple[str, ...],
-    regime_c_loaded: dict[Baseline, dict[str, list[EvaluationResult]]],
-    cv_fpr_by_baseline: dict[Baseline, dict[str, list[float]]],
-    seeds: tuple[int, ...],
-) -> dict[str, Any]:
-    return {
-        SidecarField.FIGURE: FigureName.FIGURE_4.value,
-        SidecarField.TITLE: "CV(FPR) vs Dirichlet alpha, Regime C",
-        SidecarField.DATASET: DatasetID.NBAIOT.value,
-        SidecarField.REGIME: Regime.C.value,
-        SidecarField.SOURCE_METRICS_FILES: [
-            str(
-                _result_path(
-                    _ResultPathKey(base_dir, Regime.C, Baseline(b), seed, alpha)
-                )
-            )
-            for b in regime_c_baselines
-            for alpha in regime_c_alphas
-            for seed in seeds
-        ],
-        SidecarField.RUN_IDS: [
-            f"{Regime.C.value}_{b}_seed{seed}_alpha{alpha}"
-            for b in regime_c_baselines
-            for alpha in regime_c_alphas
-            for seed in seeds
-        ],
-        SidecarField.SEEDS: list(seeds),
-        SidecarField.ALPHAS: list(regime_c_alphas),
-        SidecarField.ELIGIBLE_COUNTS: {
-            b: {
-                a: [r.eligible_count for r in regime_c_loaded[b][a]]
-                for a in regime_c_alphas
-            }
-            for b in regime_c_baselines
-        },
-        SidecarField.CLIENT_COUNTS: {
-            b: {
-                a: [r.client_count for r in regime_c_loaded[b][a]]
-                for a in regime_c_alphas
-            }
-            for b in regime_c_baselines
-        },
-        SidecarField.COVERAGE_RATIOS: {
-            b: {
-                a: [r.coverage_ratio for r in regime_c_loaded[b][a]]
-                for a in regime_c_alphas
-            }
-            for b in regime_c_baselines
-        },
-        SidecarField.METRIC_NAMES: [MetricName.CV_FPR.value],
-        SidecarField.EVIDENCE_ROLE: EvidenceRole.SECONDARY.value,
-        SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS.value,
-        SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
-        SidecarField.BASELINES: list(regime_c_baselines),
-        SidecarField.SEED_AGGREGATION_POLICY: "mean with one-standard-deviation band across configured seeds",
-        SidecarField.BASELINE_ORDER: list(regime_c_baselines),
-        SidecarField.ELIGIBILITY_POLICY: "eligible clients only per result row",
-        SidecarField.AXIS_LABELS: {"x": "Dirichlet alpha", "y": "CV(FPR)"},
-        SidecarField.VALUES: {
-            baseline: {
-                str(alpha): [float(x) for x in values]
-                for alpha, values in alpha_map.items()
-            }
-            for baseline, alpha_map in cv_fpr_by_baseline.items()
+            policy: [[float(x) for x in arr] for arr in arrays]
+            for policy, arrays in fpr_by_policy.items()
         },
     }
 
 
 def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
-    """Generate Figures 1–4 from completed result and score artifacts."""
+    """Generate Figures 1–3 from completed result and score artifacts."""
     seeds = tuple(cfg.experiment.seeds)
-    regime_c_alphas = tuple(
-        alpha_label(alpha) or "" for alpha in cfg.experiment.regime_c_alphas
-    )
     metric_tol = cfg.reporting.metric_tol
     figure2_max_points = cfg.reporting.figure2_max_points
     style = cfg.reporting.style
@@ -1020,51 +850,50 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     figures_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
 
-    stats_baselines_a = tuple(sorted(STATS_REPORTING_BASELINES[Regime.A]))
-    regime_c_baselines = tuple(sorted(REGIME_BASELINES[Regime.C]))
+    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
 
-    regime_a = _load_results(
+    nbaiot_results = _load_results(
         _LoadResultsParams(
             base_dir=base_dir,
-            regime=Regime.A,
-            baselines=stats_baselines_a,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            policies=nbaiot_policies,
             seeds=seeds,
             metric_tol=metric_tol,
         )
     )
-    seed0_b1 = regime_a[Baseline.B1][0]
-    seed0_b2 = regime_a[Baseline.B2][0]
-    b1_seed0_fpr, b2_seed0_fpr, figure1_ids = _eligible_intersection_fprs(
-        seed0_b1, seed0_b2
+    seed0_global = nbaiot_results[ThresholdPolicy.GLOBAL_THRESHOLD][0]
+    seed0_local = nbaiot_results[ThresholdPolicy.LOCAL_THRESHOLD][0]
+    global_seed0_fpr, local_seed0_fpr, figure1_ids = _eligible_intersection_fprs(
+        seed0_global, seed0_local
     )
     paths.append(
         _write_figure_data(
             figures_dir,
             FigureName.FIGURE_1.value,
             _build_figure1_sidecar(
-                base_dir, seed0_b1, seed0_b2, figure1_ids, b1_seed0_fpr, b2_seed0_fpr
+                base_dir, seed0_global, seed0_local, figure1_ids, global_seed0_fpr, local_seed0_fpr
             ),
         )
     )
     fig1_png = generate_figure1(
-        dict(zip(figure1_ids, b1_seed0_fpr, strict=True)),
-        dict(zip(figure1_ids, b2_seed0_fpr, strict=True)),
+        dict(zip(figure1_ids, global_seed0_fpr, strict=True)),
+        dict(zip(figure1_ids, local_seed0_fpr, strict=True)),
         figures_dir,
-        seed=seed0_b1.seed,
+        seed=seed0_global.seed,
         style=style,
     )
     paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_1.value, fig1_png))
 
-    seed0_b1_fprs = _eligible_fprs(seed0_b1)
+    seed0_global_fprs = _eligible_fprs(seed0_global)
     sorted_devices = sorted(
-        seed0_b1_fprs, key=lambda device_id: seed0_b1_fprs[device_id]
+        seed0_global_fprs, key=lambda device_id: seed0_global_fprs[device_id]
     )
     representative = [
         sorted_devices[0],
         sorted_devices[len(sorted_devices) // 2],
         sorted_devices[-1],
     ]
-    rep_seed = seed0_b1.seed
+    rep_seed = seed0_global.seed
     cal_errors = _calibration_errors_for_devices(
         _CalibrationErrorsParams(
             base_dir=base_dir,
@@ -1076,7 +905,7 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     )
     tau_global = float(
         _load_json(
-            _result_path(_ResultPathKey(base_dir, Regime.A, Baseline.B1, rep_seed))
+            _result_path(_ResultPathKey(base_dir, ExperimentStage.NBAIOT_MAIN, ThresholdPolicy.GLOBAL_THRESHOLD, rep_seed))
         )[MetricName.TAU_GLOBAL.value]
     )
     paths.append(
@@ -1085,7 +914,7 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
             FigureName.FIGURE_2.value,
             _build_figure2_sidecar(
                 base_dir,
-                seed0_b1,
+                seed0_global,
                 rep_seed,
                 representative,
                 figure2_max_points,
@@ -1098,54 +927,20 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     )
     paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_2.value, fig2_png))
 
-    fpr_by_baseline = _common_eligible_fprs(
-        regime_a,
-        (Baseline.B1, Baseline.B2, Baseline.B4),
+    fpr_by_policy = _common_eligible_fprs(
+        nbaiot_results,
+        (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
     )
     paths.append(
         _write_figure_data(
             figures_dir,
             FigureName.FIGURE_3.value,
-            _build_figure3_sidecar(base_dir, regime_a, fpr_by_baseline, seeds),
+            _build_figure3_sidecar(base_dir, nbaiot_results, fpr_by_policy, seeds),
         )
     )
-    fig3_png = generate_figure3(fpr_by_baseline, figures_dir, style=style)
+    fig3_png = generate_figure3(fpr_by_policy, figures_dir, style=style)
     paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_3.value, fig3_png))
 
-    cv_fpr_by_baseline: dict[Baseline, dict[str, list[float]]] = {}
-    regime_c_loaded: dict[Baseline, dict[str, list[EvaluationResult]]] = {}
-    for baseline in regime_c_baselines:
-        cv_fpr_by_baseline[baseline] = {}
-        regime_c_loaded[baseline] = {}
-        for alpha in regime_c_alphas:
-            results = _load_results(
-                _LoadResultsParams(
-                    base_dir=base_dir,
-                    regime=Regime.C,
-                    baselines=(baseline,),
-                    seeds=seeds,
-                    metric_tol=metric_tol,
-                    alpha=alpha,
-                )
-            )[baseline]
-            regime_c_loaded[baseline][alpha] = results
-            cv_fpr_by_baseline[baseline][alpha] = [_cv_fpr(r) for r in results]
-    paths.append(
-        _write_figure_data(
-            figures_dir,
-            FigureName.FIGURE_4.value,
-            _build_figure4_sidecar(
-                base_dir,
-                regime_c_baselines,
-                regime_c_alphas,
-                regime_c_loaded,
-                cv_fpr_by_baseline,
-                seeds,
-            ),
-        )
-    )
-    fig4_png = generate_figure4(cv_fpr_by_baseline, figures_dir, style=style)
-    paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_4.value, fig4_png))
     return BuildOutputs(paths=paths)
 
 
@@ -1155,28 +950,18 @@ def build_tables(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     metric_tol = cfg.reporting.metric_tol
     style = cfg.reporting.style
     tables_dir = base_dir / ArtifactDir.TABLES
-    regime_a_baselines = tuple(sorted(REGIME_BASELINES[Regime.A]))
-    regime_b_baselines = tuple(sorted(REGIME_BASELINES[Regime.B]))
-    regime_a = _load_results(
+    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
+    nbaiot_results = _load_results(
         _LoadResultsParams(
             base_dir=base_dir,
-            regime=Regime.A,
-            baselines=regime_a_baselines,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            policies=nbaiot_policies,
             seeds=seeds,
             metric_tol=metric_tol,
         )
     )
-    regime_b = _load_results(
-        _LoadResultsParams(
-            base_dir=base_dir,
-            regime=Regime.B,
-            baselines=regime_b_baselines,
-            seeds=seeds,
-            metric_tol=metric_tol,
-        )
-    )
-    table3 = generate_table3(regime_a, tables_dir, style=style)
-    table4 = generate_table4(regime_b, tables_dir, style=style)
+    table3 = generate_table3(nbaiot_results, tables_dir, style=style)
+    table4 = generate_table4(nbaiot_results, tables_dir, style=style)
     return BuildOutputs(
         paths=[
             table3,
@@ -1189,55 +974,28 @@ def build_tables(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
 
 def validate_results(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     seeds = tuple(cfg.experiment.seeds)
-    regime_c_alphas = tuple(
-        alpha_label(alpha) or "" for alpha in cfg.experiment.regime_c_alphas
-    )
     metric_tol = cfg.reporting.metric_tol
     paths: list[Path] = []
-    regime_a_baselines = tuple(sorted(REGIME_BASELINES[Regime.A]))
-    regime_b_baselines = tuple(sorted(REGIME_BASELINES[Regime.B]))
-    regime_c_baselines = tuple(sorted(REGIME_BASELINES[Regime.C]))
+    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
     _load_results(
         _LoadResultsParams(
             base_dir=base_dir,
-            regime=Regime.A,
-            baselines=regime_a_baselines,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            policies=nbaiot_policies,
             seeds=seeds,
             metric_tol=metric_tol,
         )
     )
-    _load_results(
-        _LoadResultsParams(
-            base_dir=base_dir,
-            regime=Regime.B,
-            baselines=regime_b_baselines,
-            seeds=seeds,
-            metric_tol=metric_tol,
-        )
-    )
-    for alpha in regime_c_alphas:
-        _load_results(
-            _LoadResultsParams(
-                base_dir=base_dir,
-                regime=Regime.C,
-                baselines=regime_c_baselines,
-                seeds=seeds,
-                metric_tol=metric_tol,
-                alpha=alpha,
-            )
-        )
     validation_path = write_json_atomic(
         base_dir / ArtifactDir.ANALYSIS / ArtifactFile.METRICS_SCHEMA_VALIDATION,
         {
             ValidationField.STATUS: AuditStatus.PASS.value,
             ValidationField.SOURCE: "canonical per-client confusion-count reconstruction",
-            ValidationField.VALIDATED_REGIMES: [
-                Regime.A.value,
-                Regime.B.value,
-                Regime.C.value,
+            ValidationField.VALIDATED_STAGES: [
+                ExperimentStage.NBAIOT_MAIN.value,
+                ExperimentStage.SYNTHETIC_SMOKE.value,
             ],
             ValidationField.SEEDS: list(seeds),
-            ValidationField.REGIME_C_ALPHAS: list(regime_c_alphas),
         },
     )
     paths.append(validation_path)
@@ -1298,8 +1056,8 @@ def _build_audit_payload(
         AuditField.SOURCE_METRICS_FILES: sorted(_REPORTING_SOURCES),
         AuditField.SOURCE_SCORE_MANIFESTS: sorted(
             str(
-                ArtifactLayout(base_dir=base_dir, regime=Regime.A)
-                .score_cell(TrainingCellId(regime=Regime.A, seed=seed, alpha=None))
+                ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
+                .score_cell(TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed))
                 .manifest_path
             )
             for seed in cfg.experiment.seeds

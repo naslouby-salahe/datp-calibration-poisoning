@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pathlib import Path
 
@@ -7,11 +8,10 @@ from sklearn.metrics import f1_score
 
 from datp.checkpointing.enums import ConvergenceStatus
 from datp.core.enums import (
-    Baseline,
     NormalizationScope,
-    Regime,
     ThresholdAggregationMethod,
 )
+from datp.config.stages import ExperimentStage
 from datp.core.seeds import set_seeds
 from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID
@@ -30,9 +30,8 @@ def test_manifest_schema_validation() -> None:
         git_commit_hash="abc",
         seed=0,
         dataset=DatasetID.NBAIOT,
-        regime=Regime.A,
-        baseline=Baseline.B1,
-        alpha=None,
+        stage=ExperimentStage.NBAIOT_MAIN,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         client_count=4,
         split_hash="split",
         model_hash="model",
@@ -57,7 +56,7 @@ def test_manifest_schema_validation() -> None:
         calibration_count=None,
         test_count=24,
     )
-    assert record.baseline == Baseline.B1
+    assert record.policy == ThresholdPolicy.GLOBAL_THRESHOLD
     assert record.model_dump(mode="json")["convergence_status"] == "BLOCKED_PENDING_RUN"
 
 
@@ -73,7 +72,7 @@ def test_split_hash_stability(tmp_path: Path) -> None:
 
 def test_fpr_and_tpr_denominators() -> None:
     ct = ClientThreshold(
-        client_id="c", threshold=0.5, calibration_pending=False, strategy=Baseline.B1
+        client_id="c", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
     )
     rec = compute_client_record("c", np.array([0.1, 0.9]), np.array([0.8, 0.2]), ct)
     assert rec.confusion.fp + rec.confusion.tn == rec.n_benign
@@ -84,7 +83,7 @@ def test_binary_macro_f1_ignores_multiclass_attack_names() -> None:
     benign = np.array([0.1, 0.2])
     attack = np.array([0.9, 0.3])
     ct = ClientThreshold(
-        client_id="c", threshold=0.5, calibration_pending=False, strategy=Baseline.B1
+        client_id="c", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
     )
     rec = compute_client_record("c", benign, attack, ct)
     expected = f1_score(
@@ -106,7 +105,7 @@ def test_binary_macro_f1_ignores_multiclass_attack_names() -> None:
 
 def test_evaluation_incomplete_exclusion() -> None:
     ct = ClientThreshold(
-        client_id="c", threshold=0.5, calibration_pending=False, strategy=Baseline.B1
+        client_id="c", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
     )
     rec = compute_client_record("c", np.array([0.1, 0.9]), np.array([]), ct)
     assert np.isnan(rec.metrics.tpr)

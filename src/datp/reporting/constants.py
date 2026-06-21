@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datp.core.identity import AlphaLabel
-
 # Short display labels for N-BaIoT device client IDs used in figures 1 and 2.
 NBAIOT_DEVICE_SHORT_LABELS: dict[str, str] = {
     "Danmini_Doorbell": "Danmini DB",
@@ -16,27 +14,6 @@ NBAIOT_DEVICE_SHORT_LABELS: dict[str, str] = {
     "SimpleHome_XCS7_1002_WHT_Security_Camera": "SH XCS7-1002",
     "SimpleHome_XCS7_1003_WHT_Security_Camera": "SH XCS7-1003",
 }
-
-# Canonical Dirichlet-α / IID display order for Regime C figures.
-# Order matches the x-axis progression: increasing heterogeneity then IID reference.
-REGIME_C_ALPHA_DISPLAY_ORDER: tuple[str, ...] = (
-    "0.1",
-    "0.3",
-    "0.5",
-    "1.0",
-    "10.0",
-    AlphaLabel.IID,
-)
-
-# X-axis tick labels for Regime C alpha sweep figure (IID in uppercase for display).
-REGIME_C_ALPHA_TICK_LABELS: tuple[str, ...] = (
-    "0.1",
-    "0.3",
-    "0.5",
-    "1.0",
-    "10.0",
-    AlphaLabel.IID.display,
-)
 
 # Canonical figure filename stems — seed suffix appended by figure1 only.
 FIGURE1_STEM = "figure1_seed"  # completed by generate_figure1 with seed number

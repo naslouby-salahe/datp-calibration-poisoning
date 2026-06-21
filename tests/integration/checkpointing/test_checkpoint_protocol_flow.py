@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pathlib import Path
 
@@ -9,10 +10,11 @@ from datp.artifacts.names import ArtifactFile
 from datp.checkpointing.status import checkpoint_artifact_status
 from datp.checkpointing.summary import select_global_primary_checkpoint
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import Baseline, Regime, ScoringStage
+from datp.config.stages import ExperimentStage
+from datp.core.enums import ScoringStage
 from datp.core.identity import TrainingCellId
 from datp.data.catalog import DatasetID
-from datp.evaluation.metrics import evaluate_baseline
+from datp.evaluation.metrics import evaluate_policy_run
 from datp.federated.types import ClientData
 from datp.modeling.autoencoder import Autoencoder
 from datp.scoring.generation import score_clients
@@ -44,8 +46,8 @@ def _client_data() -> dict[str, ClientData]:
 
 def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> None:
     assert "outputs" not in tmp_path.parts
-    layout = ArtifactLayout(base_dir=tmp_path, regime=Regime.A)
-    cell = TrainingCellId(regime=Regime.A, seed=0, alpha=None)
+    layout = ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN)
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=0)
     model = Autoencoder(
         input_dim=4,
         hidden_dims=[3, 2],
@@ -65,9 +67,8 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
             model=model,
             client_data=client_data,
             score_base=layout.score_cell_for_round(cell, checkpoint_round).score_dir,
-            regime=Regime.A,
+            stage=ExperimentStage.NBAIOT_MAIN,
             seed=0,
-            alpha=None,
             dataset=DatasetID.NBAIOT,
             checkpoint_path=ckpt_path,
             checkpoint_round=checkpoint_round,
@@ -81,49 +82,45 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
     }
     client_taus = compute_client_thresholds(client_errors, ["c1", "c2"], q=0.95)
     tau_global = compute_tau_global(client_taus)
-    b1_thresholds = derive_threshold(
+    global_thresholds = derive_threshold(
         _DeriveInput(
-            baseline=Baseline.B1,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             client_errors=client_errors,
             n_min=1,
             q=0.95,
             tau_global=tau_global,
-            regime=Regime.A,
             threshold_cfg=BASE_CONFIG.threshold,
             seed=0,
         )
     )
-    b2_thresholds = derive_threshold(
+    local_thresholds = derive_threshold(
         _DeriveInput(
-            baseline=Baseline.B2,
+            policy=ThresholdPolicy.LOCAL_THRESHOLD,
             client_errors=client_errors,
             n_min=1,
             q=0.95,
             tau_global=tau_global,
-            regime=Regime.A,
             threshold_cfg=BASE_CONFIG.threshold,
             seed=0,
         )
     )
 
-    b1 = evaluate_baseline(
-        b1_thresholds.client_thresholds,
+    global_eval = evaluate_policy_run(
+        global_thresholds.client_thresholds,
         provider.score_root,
-        Regime.A,
+        ExperimentStage.NBAIOT_MAIN,
         0,
-        None,
         score_provider=provider,
     )
-    b2 = evaluate_baseline(
-        b2_thresholds.client_thresholds,
+    local_eval = evaluate_policy_run(
+        local_thresholds.client_thresholds,
         provider.score_root,
-        Regime.A,
+        ExperimentStage.NBAIOT_MAIN,
         0,
-        None,
         score_provider=provider,
     )
-    assert b1.run.baseline == Baseline.B1
-    assert b2.run.baseline == Baseline.B2
+    assert global_eval.run.policy == ThresholdPolicy.GLOBAL_THRESHOLD
+    assert local_eval.run.policy == ThresholdPolicy.LOCAL_THRESHOLD
 
     selection = select_global_primary_checkpoint(
         metrics=build_fake_checkpoint_metrics(rounds=(25, 50), seeds=(0, 1, 2)),
@@ -134,11 +131,10 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
 
     status = checkpoint_artifact_status(
         artifact_root=tmp_path,
-        regime=Regime.A,
+        stage=ExperimentStage.NBAIOT_MAIN,
         seed=0,
-        alpha=None,
         checkpoint_round=25,
-        baselines=(Baseline.B1, Baseline.B2),
+        policies=(ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD),
     )
     assert status.checkpoint.value == "present"
     assert status.scores.value == "present"

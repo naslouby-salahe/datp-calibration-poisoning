@@ -15,7 +15,7 @@ __all__ = [  # pylint: disable=undefined-all-variable
     "compute_binary_ranking_metrics",
     "compute_client_record",
     "build_evaluation_result",
-    "evaluate_baseline",
+    "evaluate_policy_run",
     "recompute_binary_metrics",
     "save_confusion_matrices",
 ]
@@ -30,7 +30,7 @@ def __getattr__(name: str) -> object:
         "EvaluationResult",
         "build_evaluation_result",
         "compute_client_record",
-        "evaluate_baseline",
+        "evaluate_policy_run",
         "recompute_binary_metrics",
     }
     _from_ranking = {"BinaryRankingMetrics", "compute_binary_ranking_metrics"}

@@ -1,3 +1,4 @@
+from datp.attacks.enums import ThresholdPolicy
 from pathlib import Path
 
 import typer
@@ -6,11 +7,8 @@ from rich.console import Console
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir
 from datp.config.compose import ComposeError, compose_config, write_resolved_config
-from datp.core.enums import (
-    Baseline,
-    Regime,
-)
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
 
 app = typer.Typer(help="Configuration commands.")
 
@@ -19,30 +17,28 @@ _stderr = Console(stderr=True)
 
 
 def _build_output_path(cfg) -> Path:
-    run = BaselineRunId(
-        cell=TrainingCellId(regime=cfg.regime, seed=cfg.seed, alpha=cfg.alpha),
-        baseline=cfg.baseline,
+    run = PolicyRunId(
+        cell=TrainingCellId(stage=cfg.stage, seed=cfg.seed),
+        policy=cfg.policy,
     )
     return (
-        ArtifactLayout(base_dir=Path(ArtifactDir.OUTPUTS), regime=cfg.regime)
-        .baseline_run(run)
+        ArtifactLayout(base_dir=Path(ArtifactDir.OUTPUTS), stage=cfg.stage)
+        .policy_run(run)
         .result_dir
     )
 
 
 def preview_config(
     *,
-    regime: Regime,
-    baseline: Baseline,
+    stage: ExperimentStage,
+    policy: ThresholdPolicy,
     seed: int,
-    alpha: float | None = None,
     output_dir: Path | None = None,
 ) -> Path:
     cfg = compose_config(
-        regime=regime,
-        baseline=baseline,
+        stage=stage,
+        policy=policy,
         seed=seed,
-        alpha=alpha,
     )
 
     if output_dir is None:
@@ -53,19 +49,17 @@ def preview_config(
 
 @app.command("preview")
 def preview(
-    regime: Regime = typer.Option(..., help="Experiment regime (a, b, c)"),
-    baseline: Baseline = typer.Option(..., help="Baseline (b0–b4)"),
+    stage: ExperimentStage = typer.Option(..., help="Experiment stage (nbaiot_main, synthetic_smoke, ...)"),
+    policy: ThresholdPolicy = typer.Option(..., help="ThresholdPolicy (global_threshold, local_threshold, cluster_threshold)"),
     seed: int = typer.Option(..., help="Random seed"),
-    alpha: float | None = typer.Option(None, help="Dirichlet alpha (regime c)"),
     output_dir: Path | None = typer.Option(None, help="Override output directory"),
 ) -> None:
     """Write resolved_config.yaml without launching training."""
     try:
         dest = preview_config(
-            regime=regime,
-            baseline=baseline,
+            stage=stage,
+            policy=policy,
             seed=seed,
-            alpha=alpha,
             output_dir=output_dir,
         )
     except ComposeError as exc:

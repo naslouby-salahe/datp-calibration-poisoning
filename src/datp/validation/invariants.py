@@ -1,29 +1,28 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 
 from datp.core.enums import (
-    Baseline,
-    Regime,
+    CONTROLLED_POLICIES,
     ScoringStage,
-    controlled_baselines_for_regime,
 )
+from datp.config.stages import ExperimentStage
 from datp.validation.enums import AuditStatus, InvariantField
-from datp.validation.schemas import BaselineInvariantResult
+from datp.validation.schemas import PolicyInvariantResult
 
 
 @dataclass(frozen=True, slots=True)
 class InvariantKey:
-    """Hashable key identifying a single (regime, seed, alpha) training cell."""
+    """Hashable key identifying a single (stage, seed) training cell."""
 
-    regime: Regime
+    stage: ExperimentStage
     seed: int
-    alpha: str | None
 
 
 @dataclass(frozen=True, slots=True)
 class InvariantHashes:
-    """Provenance hashes that must be identical across B1–B4 for a fixed cell."""
+    """Provenance hashes that must be identical across GLOBAL_THRESHOLD-CLUSTER_THRESHOLD for a fixed cell."""
 
     split_hash: str
     model_hash: str
@@ -33,7 +32,7 @@ class InvariantHashes:
 
 
 # Per-client score-array hashes keyed by (stage, client_id).
-_ScoreHashMap = dict[Baseline, dict[tuple[ScoringStage, str], str]]
+_ScoreHashMap = dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,19 +52,19 @@ class _ReconVerdict:
 
 
 def _shared_input_hashes(
-    by_baseline: dict[Baseline, InvariantHashes],
-    checked: list[Baseline],
+    by_policy: dict[ThresholdPolicy, InvariantHashes],
+    checked: list[ThresholdPolicy],
 ) -> _SharedFlags:
-    split_shared = len({by_baseline[b].split_hash for b in checked}) <= 1
+    split_shared = len({by_policy[b].split_hash for b in checked}) <= 1
     model_shared = (
         len(
-            {by_baseline[b].model_hash for b in checked}
-            | {by_baseline[b].encoder_hash for b in checked}
+            {by_policy[b].model_hash for b in checked}
+            | {by_policy[b].encoder_hash for b in checked}
         )
         <= 1
     )
-    scoring_shared = len({by_baseline[b].scoring_code_hash for b in checked}) <= 1
-    metrics_shared = len({by_baseline[b].metrics_code_hash for b in checked}) <= 1
+    scoring_shared = len({by_policy[b].scoring_code_hash for b in checked}) <= 1
+    metrics_shared = len({by_policy[b].metrics_code_hash for b in checked}) <= 1
     return _SharedFlags(
         split_shared=split_shared,
         model_shared=model_shared,
@@ -77,11 +76,11 @@ def _shared_input_hashes(
 
 
 def _reconstruction_hash_verdict(
-    checked: list[Baseline],
-    per_baseline_hashes: _ScoreHashMap,
+    checked: list[ThresholdPolicy],
+    per_policy_hashes: _ScoreHashMap,
 ) -> _ReconVerdict:
     checked_score_maps = [
-        per_baseline_hashes[b] for b in checked if b in per_baseline_hashes
+        per_policy_hashes[b] for b in checked if b in per_policy_hashes
     ]
     if len(checked_score_maps) >= 2:
         reference = checked_score_maps[0]
@@ -109,7 +108,7 @@ def _disallowed_differences(flags: _SharedFlags) -> list[InvariantField]:
 
 def _invariant_status(
     *,
-    missing: list[Baseline],
+    missing: list[ThresholdPolicy],
     score_hashes_missing: bool,
     disallowed: list[InvariantField],
 ) -> AuditStatus:
@@ -121,19 +120,19 @@ def _invariant_status(
 
 
 def build_invariant_results(
-    invariant_inputs: dict[InvariantKey, dict[Baseline, InvariantHashes]],
+    invariant_inputs: dict[InvariantKey, dict[ThresholdPolicy, InvariantHashes]],
     score_hashes_by_cell: dict[InvariantKey, _ScoreHashMap],
-) -> list[BaselineInvariantResult]:
-    invariant_results: list[BaselineInvariantResult] = []
-    for key, by_baseline in sorted(
+) -> list[PolicyInvariantResult]:
+    invariant_results: list[PolicyInvariantResult] = []
+    for key, by_policy in sorted(
         invariant_inputs.items(),
-        key=lambda item: (item[0].regime.value, item[0].seed, item[0].alpha or ""),
+        key=lambda item: (item[0].stage.value, item[0].seed),
     ):
-        regime, seed, alpha_text = key.regime, key.seed, key.alpha
-        required = list(controlled_baselines_for_regime(regime))
-        missing = [b for b in required if b not in by_baseline]
-        checked = [b for b in required if b in by_baseline]
-        shared_flags = _shared_input_hashes(by_baseline, checked)
+        stage, seed = key.stage, key.seed
+        required = list(CONTROLLED_POLICIES)
+        missing = [b for b in required if b not in by_policy]
+        checked = [b for b in required if b in by_policy]
+        shared_flags = _shared_input_hashes(by_policy, checked)
         verdict = _reconstruction_hash_verdict(
             checked, score_hashes_by_cell.get(key, {})
         )
@@ -152,13 +151,12 @@ def build_invariant_results(
             disallowed=disallowed,
         )
         invariant_results.append(
-            BaselineInvariantResult(
-                regime=regime,
+            PolicyInvariantResult(
+                stage=stage,
                 seed=seed,
-                alpha=alpha_text,
                 status=status,
-                checked_baselines=checked,
-                missing_baselines=missing,
+                checked_policies=checked,
+                missing_policies=missing,
                 split_hash_shared=flags.split_shared,
                 model_or_encoder_hash_shared=flags.model_shared,
                 reconstruction_error_hashes_shared=flags.recon_shared,

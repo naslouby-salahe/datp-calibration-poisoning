@@ -15,7 +15,7 @@ from datp.attacks.metric_engine import compute_metrics
 from datp.attacks.types import MetricEngineInput
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
-from datp.attacks.threshold_recompute import compute_b1_pair, compute_b2_pair
+from datp.attacks.threshold_recompute import compute_global_pair, compute_local_pair
 from datp.attacks.enums import (
     AttackerObjective,
     PoisoningSourceStrategy,
@@ -26,7 +26,7 @@ from datp.testsupport.synthetic_scores import make_standard_score_set
 
 
 def _make_setup(fraction: float = 0.40):
-    """Return (collection, b1_result, b2_result, victim_id)."""
+    """Return (collection, global_result, local_result, victim_id)."""
     ss = make_standard_score_set(n_eligible=5, n_pending=1)
     raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
     col = build_score_collection(raw)
@@ -46,53 +46,53 @@ def _make_setup(fraction: float = 0.40):
         for cid in eligible_ids
     }
 
-    b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
-    b2 = compute_b2_pair(col, pois_cal, THRESHOLD_QUANTILE, b1.tau_global_clean)
-    b1_result = compute_metrics(
-        MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None)
+    global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
+    local_pair = compute_local_pair(col, pois_cal, THRESHOLD_QUANTILE, global_pair.tau_global_clean)
+    global_result = compute_metrics(
+        MetricEngineInput(collection=col, pair=global_pair, mu_flag_threshold=None)
     )
-    b2_result = compute_metrics(
-        MetricEngineInput(collection=col, pair=b2, mu_flag_threshold=None)
+    local_result = compute_metrics(
+        MetricEngineInput(collection=col, pair=local_pair, mu_flag_threshold=None)
     )
-    return col, b1_result, b2_result, victim_id
+    return col, global_result, local_result, victim_id
 
 
 class TestAsr:
     def test_asr_in_0_1(self) -> None:
-        _, b1_result, _, victim_id = _make_setup()
+        _, global_result, _, victim_id = _make_setup()
         asr = compute_asr(
-            b1_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            global_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
         )
         assert 0.0 <= asr.asr <= 1.0
 
     def test_asr_victim_id_recorded(self) -> None:
-        _, _, b2_result, victim_id = _make_setup()
+        _, _, local_result, victim_id = _make_setup()
         asr = compute_asr(
-            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
         )
         assert asr.victim_id == victim_id
 
     def test_asr_policy_recorded(self) -> None:
-        _, _, b2_result, victim_id = _make_setup()
+        _, _, local_result, victim_id = _make_setup()
         asr = compute_asr(
-            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
         )
-        assert asr.policy == ThresholdPolicy.B2_PERSONALIZED
+        assert asr.policy == ThresholdPolicy.LOCAL_THRESHOLD
 
     def test_asr_raise_counts_positive_significant(self) -> None:
-        _, _, b2_result, victim_id = _make_setup()
+        _, _, local_result, victim_id = _make_setup()
         asr = compute_asr(
-            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
         )
         # Victim should have significant positive delta (HIGH_SCORE injection).
         assert asr.n_significant >= 1
 
     def test_asr_lower_zero_for_raise_attack(self) -> None:
         """THRESHOLD_LOWER ASR should be 0 when we only raised a victim threshold."""
-        _, _, b2_result, victim_id = _make_setup()
-        # B2: only victim changes, direction is RAISE → no LOWER significant clients.
+        _, _, local_result, victim_id = _make_setup()
+        # LOCAL_THRESHOLD: only victim changes, direction is RAISE → no LOWER significant clients.
         asr_lower = compute_asr(
-            b2_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_LOWER
+            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_LOWER
         )
         # No clients should have Δτ < -scale since we raised the threshold.
         assert asr_lower.n_significant == 0
@@ -102,9 +102,9 @@ class TestAsr:
         raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
         col = build_score_collection(raw)
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        b1 = compute_b1_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         result = compute_metrics(
-            MetricEngineInput(collection=col, pair=b1, mu_flag_threshold=None)
+            MetricEngineInput(collection=col, pair=global_pair, mu_flag_threshold=None)
         )
         asr = compute_asr(
             result,
@@ -115,51 +115,51 @@ class TestAsr:
 
 
 class TestBlastRadius:
-    def test_b2_blast_radius_victim_only(self) -> None:
-        """B2: only victim threshold changes → blast radius at most 1."""
-        _, _, b2_result, victim_id = _make_setup()
-        br = compute_blast_radius(b2_result, victim_id=victim_id)
+    def test_local_blast_radius_victim_only(self) -> None:
+        """LOCAL_THRESHOLD: only victim threshold changes → blast radius at most 1."""
+        _, _, local_result, victim_id = _make_setup()
+        br = compute_blast_radius(local_result, victim_id=victim_id)
         assert br.n_significant <= 1, (
-            "B2 blast radius must be at most 1 for single victim"
+            "LOCAL_THRESHOLD blast radius must be at most 1 for single victim"
         )
 
-    def test_b1_blast_radius_gte_b2(self) -> None:
-        """B1: global effect → blast radius >= B2 blast radius."""
-        _, b1_result, b2_result, victim_id = _make_setup()
-        br1 = compute_blast_radius(b1_result, victim_id=victim_id)
-        br2 = compute_blast_radius(b2_result, victim_id=victim_id)
-        assert br1.n_significant >= br2.n_significant
+    def test_global_blast_radius_gte_local(self) -> None:
+        """GLOBAL_THRESHOLD: global effect → blast radius >= LOCAL_THRESHOLD blast radius."""
+        _, global_result, local_result, victim_id = _make_setup()
+        br_global = compute_blast_radius(global_result, victim_id=victim_id)
+        br_local = compute_blast_radius(local_result, victim_id=victim_id)
+        assert br_global.n_significant >= br_local.n_significant
 
     def test_blast_fraction_in_0_1(self) -> None:
-        _, b1_result, _, victim_id = _make_setup()
-        br = compute_blast_radius(b1_result, victim_id=victim_id)
+        _, global_result, _, victim_id = _make_setup()
+        br = compute_blast_radius(global_result, victim_id=victim_id)
         assert 0.0 <= br.blast_fraction <= 1.0
 
     def test_n_eligible_correct(self) -> None:
-        _, b1_result, _, _ = _make_setup()
-        br = compute_blast_radius(b1_result)
+        _, global_result, _, _ = _make_setup()
+        br = compute_blast_radius(global_result)
         assert br.n_eligible == 5
 
 
 class TestSpillover:
-    def test_b2_no_spillover(self) -> None:
-        """B2 single-victim attack: only victim threshold changes → no spillover."""
-        _, _, b2_result, victim_id = _make_setup()
-        sp = compute_spillover(b2_result, victim_id=victim_id)
-        assert sp.n_spillover == 0, "B2 should have no spillover for single victim"
+    def test_local_no_spillover(self) -> None:
+        """LOCAL_THRESHOLD single-victim attack: only victim threshold changes → no spillover."""
+        _, _, local_result, victim_id = _make_setup()
+        sp = compute_spillover(local_result, victim_id=victim_id)
+        assert sp.n_spillover == 0, "LOCAL_THRESHOLD should have no spillover for single victim"
         assert len(sp.spillover_client_ids) == 0
 
     def test_spillover_does_not_include_victim(self) -> None:
-        _, b1_result, _, victim_id = _make_setup()
-        sp = compute_spillover(b1_result, victim_id=victim_id)
+        _, global_result, _, victim_id = _make_setup()
+        sp = compute_spillover(global_result, victim_id=victim_id)
         assert victim_id not in sp.spillover_client_ids
 
     def test_n_non_victims_correct(self) -> None:
-        _, _, b2_result, victim_id = _make_setup()
-        sp = compute_spillover(b2_result, victim_id=victim_id)
+        _, _, local_result, victim_id = _make_setup()
+        sp = compute_spillover(local_result, victim_id=victim_id)
         assert sp.n_non_victims == 4  # 5 eligible - 1 victim
 
     def test_spillover_ids_sorted(self) -> None:
-        _, b1_result, _, victim_id = _make_setup()
-        sp = compute_spillover(b1_result, victim_id=victim_id)
+        _, global_result, _, victim_id = _make_setup()
+        sp = compute_spillover(global_result, victim_id=victim_id)
         assert sp.spillover_client_ids == tuple(sorted(sp.spillover_client_ids))

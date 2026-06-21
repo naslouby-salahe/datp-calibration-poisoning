@@ -58,7 +58,7 @@ def test_render_table_main_template() -> None:
 
     rows = [
         LatexTableRow(
-            label="B1 (Global)",
+            label="GLOBAL_THRESHOLD (Global)",
             cv_fpr="0.120 ± 0.030",
             cv_tpr="0.950 ± 0.020",
             worst_ba="0.800 ± 0.050",
@@ -80,7 +80,7 @@ def test_render_table_main_template() -> None:
     assert "Test Table" in output
     assert "Test Caption" in output
     assert "H1 & H2 & H3 & H4 & H5 & H6" in output
-    assert "B1 (Global)" in output
+    assert "GLOBAL_THRESHOLD (Global)" in output
     assert "0.120 ± 0.030" in output
     assert "Test footnote." in output
     assert "% comment one" in output

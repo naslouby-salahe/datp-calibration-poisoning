@@ -5,18 +5,14 @@ from pathlib import Path
 
 from datp.artifacts.names import ArtifactFile
 from datp.config.models import DatpConfig
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.core.errors import fmt
 from datp.core.logging import get_logger
 from datp.data.common.storage import assert_no_csv_artifacts
+from datp.data.datasets.nbaiot.prepare import prepare_nbaiot
 from datp.data.manifests import PartitionManifest
-from datp.data.paths import (
-    prepared_root_for_regime,
-    processed_root,
-    raw_root,
-)
-from datp.data.regimes.catalog import dataset_for_regime
-from datp.data.regimes.prepare import prepare_regime_data
+from datp.data.paths import processed_root, raw_root
+from datp.data.catalog import dataset_for_stage
 from datp.data.splits import Split, filename_for_split, split_path
 
 logger = get_logger(__name__)
@@ -30,22 +26,17 @@ _REQUIRED_CLIENT_ARTIFACTS = tuple(filename_for_split(s) for s in Split) + (
 
 @dataclass(frozen=True, slots=True)
 class PreparedDataRequest:
-    """Minimal resolved request for ensuring prepared data exists for a (regime, seed, alpha) cell."""
+    """Minimal resolved request for ensuring prepared data exists for a (stage, seed) cell."""
 
-    regime: Regime
+    stage: ExperimentStage
     seed: int
     cfg: DatpConfig
     base_dir: Path
-    alpha: float | None
 
 
 def ensure_prepared_data(request: PreparedDataRequest) -> Path:
-    prepared_dir = prepared_root_for_regime(
-        request.regime,
-        base_dir=request.base_dir,
-        seed=request.seed,
-        alpha=request.alpha,
-    )
+    dataset_id = dataset_for_stage(request.stage)
+    prepared_dir = processed_root(dataset_id, base_dir=request.base_dir)
     manifest_file = prepared_dir / ArtifactFile.MANIFEST
     if manifest_file.exists():
         _verify_existing_prepared_data(request, prepared_dir, manifest_file)
@@ -53,9 +44,8 @@ def ensure_prepared_data(request: PreparedDataRequest) -> Path:
 
     logger.info(
         "processed data missing; running preparation",
-        regime=request.regime,
+        stage=request.stage,
         seed=request.seed,
-        alpha=request.alpha,
         prepared_dir=str(prepared_dir),
     )
     _prepare(request)
@@ -65,20 +55,14 @@ def ensure_prepared_data(request: PreparedDataRequest) -> Path:
 
 def _prepare(request: PreparedDataRequest) -> None:
     cfg = request.cfg
-    dataset_id = dataset_for_regime(request.regime)
+    dataset_id = dataset_for_stage(request.stage)
     raw_dir = raw_root(dataset_id, base_dir=request.base_dir)
-    prepare_regime_data(
-        regime=request.regime,
+    output_dir = processed_root(dataset_id, base_dir=request.base_dir)
+    prepare_nbaiot(
         raw_dir=raw_dir,
-        output_dir=processed_root(dataset_id, base_dir=request.base_dir),
+        output_dir=output_dir,
         n_min=cfg.threshold.n_min,
         seed=request.seed,
-        cap=cfg.dataset.cap,
-        attack_reserve_fraction=cfg.dataset.attack_reserve_fraction,
-        alpha=request.alpha,
-        n_clients=cfg.experiment.regime_c_n_clients,
-        train_frac=cfg.dataset.regime_c_train_fraction,
-        cal_frac=cfg.dataset.regime_c_cal_fraction,
         balanced_test=cfg.dataset.nbaiot_balanced_test,
     )
 
@@ -88,18 +72,16 @@ def _verify_existing_prepared_data(
     prepared_dir: Path,
     manifest_file: Path,
 ) -> None:
+    dataset_id = dataset_for_stage(request.stage)
     manifest = PartitionManifest.load(manifest_file)
-    raw_base_dir = raw_root(
-        dataset_for_regime(request.regime), base_dir=request.base_dir
-    )
+    raw_base_dir = raw_root(dataset_id, base_dir=request.base_dir)
     manifest.verify_hashes(raw_base_dir)
     _verify_client_artifacts(prepared_dir)
     assert_no_csv_artifacts(prepared_dir)
     logger.info(
         "processed data verified; reusing",
-        regime=request.regime,
+        stage=request.stage,
         seed=request.seed,
-        alpha=request.alpha,
         prepared_dir=str(prepared_dir),
     )
 

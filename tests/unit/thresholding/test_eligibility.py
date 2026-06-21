@@ -1,19 +1,17 @@
 """Unit tests for datp.thresholding.eligibility — eligibility partition, client thresholds, tau_global, and ThresholdResult assembly."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import numpy as np
 import pytest
 
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import (
-    B3FamilyInfo,
-    B3FamilyInfoTuple,
-    B3Metadata,
-    B4ClusterInfo,
-    B4ClusterInfoTuple,
-    B4Metadata,
+    ClusterInfo,
+    ClusterInfoTuple,
+    ClusterMetadata,
     ClientFingerprint,
     ClientFingerprintTuple,
     ClientSilhouetteScore,
@@ -29,9 +27,9 @@ from datp.thresholding.eligibility import (
 )
 
 
-def _run(baseline: Baseline = Baseline.B1) -> BaselineRunId:
-    return BaselineRunId(
-        cell=TrainingCellId(regime=Regime.A, seed=0, alpha=None), baseline=baseline
+def _run(policy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD) -> PolicyRunId:
+    return PolicyRunId(
+        cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=0), policy=policy
     )
 
 
@@ -144,71 +142,65 @@ class TestComputeTauGlobal:
 
 class TestBuildThresholdResult:
     def test_basic_construction(self) -> None:
-        run = _run(Baseline.B1)
+        run = _run(ThresholdPolicy.GLOBAL_THRESHOLD)
         result = build_threshold_result(
             run=run,
             tau_global=0.5,
             eligible_thresholds={"a": 0.3, "b": 0.7},
             pending_clients=["c"],
-            b3_metadata=None,
-            b4_metadata=None,
+            cluster_metadata=None,
         )
         assert isinstance(result, ThresholdResult)
         assert result.run == run
         assert result.tau_global == pytest.approx(0.5)
         assert result.eligible_count == 2
         assert result.pending_count == 1
-        assert result.metadata.b3 is None
-        assert result.metadata.b4 is None
+        assert result.metadata.cluster is None
 
     def test_eligible_clients_not_pending(self) -> None:
         result = build_threshold_result(
-            run=_run(Baseline.B2),
+            run=_run(ThresholdPolicy.LOCAL_THRESHOLD),
             tau_global=0.5,
             eligible_thresholds={"a": 0.3},
             pending_clients=[],
-            b3_metadata=None,
-            b4_metadata=None,
+            cluster_metadata=None,
         )
         ct = next(ct for ct in result.client_thresholds if ct.client_id == "a")
         assert ct.threshold == pytest.approx(0.3)
         assert ct.calibration_pending is False
-        assert ct.strategy == Baseline.B2
+        assert ct.strategy == ThresholdPolicy.LOCAL_THRESHOLD
 
     def test_pending_clients_get_tau_global(self) -> None:
         result = build_threshold_result(
-            run=_run(Baseline.B1),
+            run=_run(ThresholdPolicy.GLOBAL_THRESHOLD),
             tau_global=0.42,
             eligible_thresholds={"a": 0.3},
             pending_clients=["p"],
-            b3_metadata=None,
-            b4_metadata=None,
+            cluster_metadata=None,
         )
         ct = next(ct for ct in result.client_thresholds if ct.client_id == "p")
         assert ct.threshold == pytest.approx(0.42)
         assert ct.calibration_pending is True
-        assert ct.strategy == Baseline.B1
+        assert ct.strategy == ThresholdPolicy.GLOBAL_THRESHOLD
 
     def test_all_eligible_no_pending(self) -> None:
         result = build_threshold_result(
-            run=_run(Baseline.B2),
+            run=_run(ThresholdPolicy.LOCAL_THRESHOLD),
             tau_global=0.5,
             eligible_thresholds={"a": 0.1, "b": 0.2},
             pending_clients=[],
-            b3_metadata=None,
-            b4_metadata=None,
+            cluster_metadata=None,
         )
         assert result.eligible_count == 2
         assert result.pending_count == 0
 
     def test_all_pending_no_eligible(self) -> None:
         result = build_threshold_result(
-            run=_run(Baseline.B1),
+            run=_run(ThresholdPolicy.GLOBAL_THRESHOLD),
             tau_global=0.99,
             eligible_thresholds={},
             pending_clients=["x", "y", "z"],
-            b3_metadata=None,
-            b4_metadata=None,
+            cluster_metadata=None,
         )
         assert result.eligible_count == 0
         assert result.pending_count == 3
@@ -216,41 +208,15 @@ class TestBuildThresholdResult:
             assert ct.calibration_pending is True
             assert ct.threshold == pytest.approx(0.99)
 
-    def test_with_b3_metadata(self) -> None:
-        b3_meta = B3Metadata(
-            family_info=B3FamilyInfoTuple(
-                (
-                    B3FamilyInfo(
-                        family_name="cameras",
-                        tau_family=0.25,
-                        eligible_count=2,
-                        members=("a", "b"),
-                        threshold_variance=0.01,
-                        singleton=False,
-                    ),
-                )
-            )
-        )
-        result = build_threshold_result(
-            run=_run(Baseline.B3),
-            tau_global=0.5,
-            eligible_thresholds={"a": 0.3, "b": 0.7},
-            pending_clients=[],
-            b3_metadata=b3_meta,
-            b4_metadata=None,
-        )
-        assert result.metadata.b3 is b3_meta
-        assert result.metadata.b4 is None
-
-    def test_with_b4_metadata(self) -> None:
-        b4_meta = B4Metadata(
+    def test_with_cluster_metadata(self) -> None:
+        cluster_meta = ClusterMetadata(
             k=2,
-            cluster_info=B4ClusterInfoTuple(
+            cluster_info=ClusterInfoTuple(
                 (
-                    B4ClusterInfo(
+                    ClusterInfo(
                         cluster_id="cluster_0", tau_cluster=0.3, members=("a",)
                     ),
-                    B4ClusterInfo(
+                    ClusterInfo(
                         cluster_id="cluster_1", tau_cluster=0.7, members=("b",)
                     ),
                 )
@@ -282,38 +248,38 @@ class TestBuildThresholdResult:
             ),
         )
         result = build_threshold_result(
-            run=_run(Baseline.B4),
+            run=_run(ThresholdPolicy.CLUSTER_THRESHOLD),
             tau_global=0.5,
             eligible_thresholds={"a": 0.3, "b": 0.7},
             pending_clients=[],
-            b3_metadata=None,
-            b4_metadata=b4_meta,
+            cluster_metadata=cluster_meta,
         )
-        assert result.metadata.b3 is None
-        assert result.metadata.b4 is b4_meta
+        assert result.metadata.cluster is cluster_meta
 
     def test_client_thresholds_is_tuple(self) -> None:
         result = build_threshold_result(
-            run=_run(Baseline.B1),
+            run=_run(ThresholdPolicy.GLOBAL_THRESHOLD),
             tau_global=0.5,
             eligible_thresholds={"a": 0.3},
             pending_clients=["p"],
-            b3_metadata=None,
-            b4_metadata=None,
+            cluster_metadata=None,
         )
         assert isinstance(result.client_thresholds, tuple)
         for ct in result.client_thresholds:
             assert isinstance(ct, ClientThreshold)
 
     def test_strategy_matches_run_baseline(self) -> None:
-        for baseline in (Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4):
+        for policy in (
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ):
             result = build_threshold_result(
-                run=_run(baseline),
+                run=_run(policy),
                 tau_global=0.5,
                 eligible_thresholds={"a": 0.3},
                 pending_clients=[],
-                b3_metadata=None,
-                b4_metadata=None,
+                cluster_metadata=None,
             )
             for ct in result.client_thresholds:
-                assert ct.strategy == baseline
+                assert ct.strategy == policy

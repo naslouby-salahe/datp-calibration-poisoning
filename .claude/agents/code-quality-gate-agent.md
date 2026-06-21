@@ -52,11 +52,8 @@ Before judging quality, read:
 
 1. `CLAUDE.md`
 2. `AGENTS.md`
-3. **CP2 (active):** `docs/tickets/TICKET_INDEX.md`
-4. **CP2 (active):** `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`
-   (DATP journal fallback: `ticket_inventory.md` / `ticket_progress.md`)
-5. The relevant ticket file or ticket files.
-6. `.claude/skills/static-analysis-quality-gate-skill.md`
+3. `docs/DATP_CP_Roadmap.md`
+4. `.claude/skills/static-analysis-quality-gate-skill.md`
 7. `.claude/skills/refactor-clean-code-skill.md`
 8. `.claude/skills/schema-enum-constant-skill.md`
 9. `.claude/skills/test-coverage-skill.md`
@@ -90,7 +87,7 @@ uv run refurb --version
 uv run semgrep --version
 ```
 
-Record the result in the relevant ticket progress entry or audit report.
+Record the result in the audit report.
 
 Do not claim an optional tool was available, installed, or clean unless the command actually ran.
 
@@ -161,7 +158,7 @@ SonarLint/SonarQube findings are blocking only when Sonar actually ran successfu
 Preserve these invariants unless a ticket explicitly and scientifically changes them:
 
 1. Fixed encoder and FedAvg remain fixed where the controlled comparison requires it.
-2. Threshold scope is the controlled scientific variable for B1-B4.
+2. Threshold scope is the controlled scientific variable for GLOBAL_THRESHOLD-CLUSTER_THRESHOLD.
 3. Shared training is preserved for fixed dataset, regime, seed, and alpha.
 4. Scores are reused by thresholds and evaluations.
 5. Thresholding must not retrain upstream models.
@@ -170,7 +167,7 @@ Preserve these invariants unless a ticket explicitly and scientifically changes 
 8. Artifact paths are canonical.
 9. Results, metrics, manifests, and reports are typed and reproducible.
 10. Processed data artifacts remain Parquet-based where required.
-11. CICIoT2023 B-b rejection due to missing metadata remains a formal feasibility outcome if the verified schema lacks the required metadata.
+11. CICIoT2023 is optional stretch contrast only; N-BaIoT is the main dataset.
 12. No privacy, robustness, hardware, concept-drift, poisoning, or deployment claim is introduced unless directly supported.
 
 ---
@@ -357,4 +354,4 @@ Your final report must include:
 21. Remaining issues.
 22. Manual blockers, if any.
 23. Whether the ticket can be marked DONE.
-24. Required `CP2_PROGRESS.md` update with evidence (files changed, commands run, result).
+24. What was fixed, what is blocked, and whether the task can be marked DONE.

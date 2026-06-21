@@ -11,19 +11,19 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datp.artifacts.poison_names import (
-    B4_K,
-    B4_MAX_ITER,
-    B4_N_INIT,
+    CLUSTER_K_NBAIOT,
+    CLUSTER_MAX_ITER,
+    CLUSTER_N_INIT,
     N_MIN,
     TAIL_MASS,
     TRIM_FRACTION_PRIMARY,
 )
 from datp.attacks.constants import (
     ANALYSIS_SEEDS,
-    B4_RANDOM_STATE,
-    BOUNDED_SWEEP_FRACTION_SET,
-    BOUNDED_SWEEP_FRACTIONS,
-    BOUNDED_SWEEP_SOURCES,
+    CLUSTER_RANDOM_STATE,
+    NBAIOT_MAIN_SWEEP_FRACTION_SET,
+    NBAIOT_MAIN_SWEEP_FRACTIONS,
+    NBAIOT_MAIN_SWEEP_SOURCES,
     COMPROMISE_PATTERN_SEED,
     DEFAULT_POLICIES,
     POISONING_SEEDS,
@@ -37,10 +37,10 @@ from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 _DEFAULT_POLICY_SET: frozenset[ThresholdPolicy] = frozenset(DEFAULT_POLICIES)
-_BOUNDED_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(BOUNDED_SWEEP_SOURCES)
+_NBAIOT_MAIN_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(NBAIOT_MAIN_SWEEP_SOURCES)
 
 
 class SeedPools(BaseModel):
@@ -90,31 +90,31 @@ class SeedPools(BaseModel):
         return len(self.training)
 
 
-class B4ClusterConfig(BaseModel):
-    """B4 clustering hyperparameters — locked for N-BaIoT (Regime A).
+class ClusterConfig(BaseModel):
+    """Cluster-threshold hyperparameters locked for N-BaIoT.
 
     Locked per scientific protocol.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    k: int = Field(default=B4_K, gt=0)
-    n_init: int = Field(default=B4_N_INIT, gt=0)
-    max_iter: int = Field(default=B4_MAX_ITER, gt=0)
-    random_state: int = B4_RANDOM_STATE
+    k: int = Field(default=CLUSTER_K_NBAIOT, gt=0)
+    n_init: int = Field(default=CLUSTER_N_INIT, gt=0)
+    max_iter: int = Field(default=CLUSTER_MAX_ITER, gt=0)
+    random_state: int = CLUSTER_RANDOM_STATE
 
     @field_validator("k")
     @classmethod
-    def k_must_be_three_for_regime_a(cls, v: int) -> int:
+    def k_must_be_three_for_primary_training(cls, v: int) -> int:
         if v != 3:
-            raise ValueError(f"B4 k must be 3 for Regime A (N-BaIoT); got {v}")
+            raise ValueError(f"cluster k must be 3 for N-BaIoT; got {v}")
         return v
 
     @field_validator("random_state")
     @classmethod
     def random_state_must_be_42(cls, v: int) -> int:
         if v != 42:
-            raise ValueError(f"B4 random_state must be 42 for Regime A; got {v}")
+            raise ValueError(f"cluster random_state must be 42 for N-BaIoT; got {v}")
         return v
 
 
@@ -123,7 +123,7 @@ class CalibrationPoisoningConfig(BaseModel):
 
     Covers all sweep dimensions: policies, sources, fractions, and seeds.
     Enforces E=1, REPLACE_FIXED_BUDGET injection rule, victim-local reservoirs,
-    and the locked fraction/seed/policy/source grids for each scale.
+    and the locked fraction/seed/policy/source grids for each stage.
 
     Objectives (THRESHOLD_RAISE, THRESHOLD_LOWER) are encoded through source
     strategy semantics: HIGH_SCORE_BENIGN → THRESHOLD_RAISE,
@@ -138,7 +138,7 @@ class CalibrationPoisoningConfig(BaseModel):
 
     # Sweep dimensions — runner reads these fields, not module-level constants.
     policies: tuple[ThresholdPolicy, ...] = DEFAULT_POLICIES
-    sources: tuple[PoisoningSourceStrategy, ...] = BOUNDED_SWEEP_SOURCES
+    sources: tuple[PoisoningSourceStrategy, ...] = NBAIOT_MAIN_SWEEP_SOURCES
 
     injection_rule: CalibrationInjectionRule = (
         CalibrationInjectionRule.REPLACE_FIXED_BUDGET
@@ -149,10 +149,10 @@ class CalibrationPoisoningConfig(BaseModel):
     # Trimmed-calibration symmetric trim fraction; used only when
     # defense == TRIMMED_CALIBRATION. Primary t=5%; t=10% is appendix-only.
     trim_fraction: float = Field(default=TRIM_FRACTION_PRIMARY, ge=0.0, lt=0.5)
-    scale: ExperimentScale
+    stage: ExperimentStage
 
     # Fraction grid: bounded sweep = {0, 0.10, 0.20, 0.40}; Full adds 0.05 (gated).
-    fractions: tuple[float, ...] = BOUNDED_SWEEP_FRACTIONS
+    fractions: tuple[float, ...] = NBAIOT_MAIN_SWEEP_FRACTIONS
 
     # Seed pools
     seeds: SeedPools = SeedPools()
@@ -160,8 +160,8 @@ class CalibrationPoisoningConfig(BaseModel):
     # Eligibility threshold (clients with n_cal < n_min are calibration-pending)
     n_min: int = Field(default=N_MIN, gt=0)
 
-    # B4 hyperparameters
-    b4: B4ClusterConfig = B4ClusterConfig()
+    # Cluster-threshold hyperparameters.
+    cluster: ClusterConfig = ClusterConfig()
 
     # Reservoir: victim-local benign calibration scores; tail_mass fraction.
     tail_mass: float = Field(default=TAIL_MASS, gt=0.0, le=1.0)
@@ -211,53 +211,53 @@ class CalibrationPoisoningConfig(BaseModel):
     @model_validator(mode="after")
     def bounded_scale_requires_single_client(self) -> "CalibrationPoisoningConfig":
         if (
-            self.scale == ExperimentScale.BOUNDED
+            self.stage == ExperimentStage.NBAIOT_MAIN
             and self.target_scope != PoisoningTargetScope.SINGLE_CLIENT
         ):
-            raise ValueError("BOUNDED scale requires SINGLE_CLIENT target scope")
+            raise ValueError("NBAIOT_MAIN stage requires SINGLE_CLIENT target scope")
         return self
 
     @model_validator(mode="after")
     def bounded_scale_requires_all_default_policies(
         self,
     ) -> "CalibrationPoisoningConfig":
-        if self.scale == ExperimentScale.BOUNDED:
+        if self.stage == ExperimentStage.NBAIOT_MAIN:
             if frozenset(self.policies) != _DEFAULT_POLICY_SET:
                 raise ValueError(
-                    f"BOUNDED scale requires exactly policies {_DEFAULT_POLICY_SET}; "
+                    f"NBAIOT_MAIN stage requires exactly policies {_DEFAULT_POLICY_SET}; "
                     f"got {set(self.policies)}"
                 )
         return self
 
     @model_validator(mode="after")
     def bounded_scale_requires_bounded_sources(self) -> "CalibrationPoisoningConfig":
-        if self.scale == ExperimentScale.BOUNDED:
-            if frozenset(self.sources) != _BOUNDED_SOURCE_SET:
+        if self.stage == ExperimentStage.NBAIOT_MAIN:
+            if frozenset(self.sources) != _NBAIOT_MAIN_SOURCE_SET:
                 raise ValueError(
-                    f"BOUNDED scale requires exactly sources {_BOUNDED_SOURCE_SET}; "
+                    f"NBAIOT_MAIN stage requires exactly sources {_NBAIOT_MAIN_SOURCE_SET}; "
                     f"got {set(self.sources)}"
                 )
         return self
 
     @model_validator(mode="after")
     def bounded_scale_requires_locked_fractions(self) -> "CalibrationPoisoningConfig":
-        if self.scale == ExperimentScale.BOUNDED:
-            if frozenset(self.fractions) != BOUNDED_SWEEP_FRACTION_SET:
+        if self.stage == ExperimentStage.NBAIOT_MAIN:
+            if frozenset(self.fractions) != NBAIOT_MAIN_SWEEP_FRACTION_SET:
                 raise ValueError(
-                    f"BOUNDED scale requires exactly fractions {sorted(BOUNDED_SWEEP_FRACTION_SET)}; "
+                    f"NBAIOT_MAIN stage requires exactly fractions {sorted(NBAIOT_MAIN_SWEEP_FRACTION_SET)}; "
                     f"got {sorted(self.fractions)}"
                 )
         return self
 
     @classmethod
-    def for_bounded_mvp(cls) -> "CalibrationPoisoningConfig":
+    def for_bounded_sweep(cls) -> "CalibrationPoisoningConfig":
         """Canonical bounded sweep config — enforces all locked grid parameters."""
         return cls(
             policies=DEFAULT_POLICIES,
-            sources=BOUNDED_SWEEP_SOURCES,
+            sources=NBAIOT_MAIN_SWEEP_SOURCES,
             knowledge=PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
             target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-            scale=ExperimentScale.BOUNDED,
-            fractions=BOUNDED_SWEEP_FRACTIONS,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            fractions=NBAIOT_MAIN_SWEEP_FRACTIONS,
             seeds=SeedPools(),
         )

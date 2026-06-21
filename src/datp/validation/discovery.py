@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,14 +9,11 @@ from datp.artifacts.names import (
     ArtifactFile,
     PathToken,
 )
-from datp.core.enums import (
-    Baseline,
-    Regime,
-)
+from datp.config.stages import ExperimentStage
 from datp.core.identity import (
-    BaselineRunId,
+    PolicyRunId,
     TrainingCellId,
-    parse_alpha_dir,
+    seed_segment,
 )
 
 
@@ -30,46 +28,41 @@ def completed_metric_paths(base_dir: Path) -> list[Path]:
 
 def _parse_seed(parts: tuple[str, ...], seed_idx: int) -> int:
     """Extract seed integer from a ``seed_N`` path segment."""
-    seed_segment = parts[seed_idx]
-    if not seed_segment.startswith(PathToken.SEED_PREFIX):
+    seed_seg = parts[seed_idx]
+    if not seed_seg.startswith(PathToken.SEED_PREFIX):
         raise ValueError(
-            f"Expected seed segment with prefix {PathToken.SEED_PREFIX!r}, got {seed_segment!r}"
+            f"Expected seed segment with prefix {PathToken.SEED_PREFIX!r}, got {seed_seg!r}"
         )
-    return int(seed_segment.removeprefix(PathToken.SEED_PREFIX))
+    return int(seed_seg.removeprefix(PathToken.SEED_PREFIX))
 
 
-def parse_metric_path(base_dir: Path, path: Path) -> BaselineRunId:
-    """Parse ``<results_root>/<regime>/<baseline>/seed_N[/alpha_a]/metrics.json`` into a ``BaselineRunId``."""
+def parse_metric_path(base_dir: Path, path: Path) -> PolicyRunId:
+    """Parse ``<results_root>/<stage>/<policy>/seed_N/metrics.json`` into a ``PolicyRunId``."""
     rel = path.relative_to(base_dir / ArtifactDir.RESULTS)
     parts = rel.parts
-    regime = Regime(parts[0])
-    baseline = Baseline(parts[1])
+    stage = ExperimentStage(parts[0])
+    policy = ThresholdPolicy(parts[1])
     seed = _parse_seed(parts, seed_idx=2)
-    alpha = parse_alpha_dir(parts[3]) if len(parts) > 4 else None
-    return BaselineRunId(
-        cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
-        baseline=baseline,
+    return PolicyRunId(
+        cell=TrainingCellId(stage=stage, seed=seed),
+        policy=policy,
     )
 
 
 @dataclass(frozen=True, slots=True)
 class ScoreCellLocation:
-    """Identifies one score cell on disk: ``<base_dir>/scores/<regime>/seed_N[/alpha_*]/``."""
+    """Identifies one score cell on disk: ``<base_dir>/scores/<stage>/seed_N/``."""
 
     cell: TrainingCellId
     cell_dir: Path
 
     @property
-    def regime(self) -> Regime:
-        return self.cell.regime
+    def stage(self) -> ExperimentStage:
+        return self.cell.stage
 
     @property
     def seed(self) -> int:
         return self.cell.seed
-
-    @property
-    def alpha(self) -> float | None:
-        return self.cell.alpha
 
 
 def iter_score_cells(base_dir: Path) -> list[ScoreCellLocation]:
@@ -82,23 +75,16 @@ def iter_score_cells(base_dir: Path) -> list[ScoreCellLocation]:
         scores_root.glob(f"*/{PathToken.SEED_PREFIX}*/{ArtifactFile.SCORING_MANIFEST}")
     ):
         cells.append(parse_score_cell_dir(scores_root, manifest_path.parent))
-    for manifest_path in sorted(
-        scores_root.glob(
-            f"*/{PathToken.SEED_PREFIX}*/{PathToken.ALPHA_PREFIX}*/{ArtifactFile.SCORING_MANIFEST}"
-        )
-    ):
-        cells.append(parse_score_cell_dir(scores_root, manifest_path.parent))
     return cells
 
 
 def parse_score_cell_dir(scores_root: Path, cell_dir: Path) -> ScoreCellLocation:
-    """Parse ``<scores_root>/<regime>/seed_N[/alpha_*]/`` into a ``ScoreCellLocation``."""
+    """Parse ``<scores_root>/<stage>/seed_N/`` into a ``ScoreCellLocation``."""
     rel = cell_dir.relative_to(scores_root)
     parts = rel.parts
-    regime = Regime(parts[0])
+    stage = ExperimentStage(parts[0])
     seed = _parse_seed(parts, seed_idx=1)
-    alpha = parse_alpha_dir(parts[2]) if len(parts) > 2 else None
     return ScoreCellLocation(
-        cell=TrainingCellId(regime=regime, seed=seed, alpha=alpha),
+        cell=TrainingCellId(stage=stage, seed=seed),
         cell_dir=cell_dir,
     )

@@ -1,13 +1,12 @@
 """Regression tests: audit _threshold_result must equal canonical derive_threshold."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import numpy as np
 import pytest
 
 from datp.config.compose import BASE_CONFIG
-from datp.config.models import DatpConfig
-from datp.core.enums import Baseline, Regime
 from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
 from datp.thresholding.thresholds import _DeriveInput, derive_threshold
 from datp.validation._audit_helpers import _threshold_result
@@ -27,44 +26,35 @@ def _make_cal_errors(
     }
 
 
-def _config_with_b4_mode(mode: str) -> DatpConfig:
-    """Return a config with a specific b4_regime_a_mode."""
-    cfg_dict = BASE_CONFIG.model_dump()
-    cfg_dict["threshold"]["b4_regime_a_mode"] = mode
-    return DatpConfig.model_validate(cfg_dict)
-
-
 @pytest.mark.parametrize(
-    "baseline", [Baseline.B1, Baseline.B2, Baseline.B3, Baseline.B4]
+    "policy", [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
 )
-def test_threshold_result_equals_derive_threshold_regime_a(baseline: Baseline) -> None:
+def test_threshold_result_equals_derive_threshold(policy: ThresholdPolicy) -> None:
     """_threshold_result must delegate to derive_threshold identically."""
     cal_errors = _make_cal_errors()
     tau_global = 0.15
     cfg = BASE_CONFIG
 
     audit_result = _threshold_result(
-        baseline,
-        Regime.A,
+        policy,
         cal_errors,
         tau_global,
         cfg=cfg,
     )
     canonical_result = derive_threshold(
         _DeriveInput(
-            baseline=baseline,
+            policy=policy,
             client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
             q=cfg.threshold.q,
             tau_global=tau_global,
-            regime=Regime.A,
             threshold_cfg=cfg.threshold,
         )
     )
 
-    assert audit_result is not None, f"audit returned None for {baseline}"
+    assert audit_result is not None, f"audit returned None for {policy}"
     assert canonical_result is not None
-    assert audit_result.run.baseline == canonical_result.run.baseline
+    assert audit_result.run.policy == canonical_result.run.policy
     assert audit_result.tau_global == pytest.approx(canonical_result.tau_global)
     assert audit_result.eligible_count == canonical_result.eligible_count
     assert audit_result.pending_count == canonical_result.pending_count
@@ -81,34 +71,32 @@ def test_threshold_result_equals_derive_threshold_regime_a(baseline: Baseline) -
         assert act.strategy == exp.strategy
 
 
-def test_b4_silhouette_mode_parity() -> None:
-    """B4 Regime A with silhouette mode: audit must match canonical."""
+def test_cluster_silhouette_mode_parity() -> None:
+    """CLUSTER_THRESHOLD N-BaIoT main: audit must match canonical."""
     cal_errors = _make_cal_errors()
     tau_global = 0.15
-    cfg = _config_with_b4_mode("silhouette")
+    cfg = BASE_CONFIG
 
     audit_result = _threshold_result(
-        Baseline.B4,
-        Regime.A,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
         cal_errors,
         tau_global,
         cfg=cfg,
     )
     canonical_result = derive_threshold(
         _DeriveInput(
-            baseline=Baseline.B4,
+            policy=ThresholdPolicy.CLUSTER_THRESHOLD,
             client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
             q=cfg.threshold.q,
             tau_global=tau_global,
-            regime=Regime.A,
             threshold_cfg=cfg.threshold,
         )
     )
 
     assert audit_result is not None
     assert canonical_result is not None
-    assert audit_result.run.baseline == canonical_result.run.baseline
+    assert audit_result.run.policy == canonical_result.run.policy
     # Both should agree on tau_global, eligible/pending counts, and per-client thresholds
     assert audit_result.tau_global == pytest.approx(canonical_result.tau_global)
     assert audit_result.eligible_count == canonical_result.eligible_count
@@ -122,27 +110,25 @@ def test_b4_silhouette_mode_parity() -> None:
         assert act.calibration_pending == exp.calibration_pending
 
 
-def test_b4_fixed_mode_parity() -> None:
-    """B4 Regime A with fixed mode: audit must match canonical with explicit k."""
+def test_cluster_fixed_mode_parity() -> None:
+    """CLUSTER_THRESHOLD N-BaIoT main: audit must match canonical with explicit k."""
     cal_errors = _make_cal_errors()
     tau_global = 0.15
-    cfg = _config_with_b4_mode("fixed")
+    cfg = BASE_CONFIG
 
     audit_result = _threshold_result(
-        Baseline.B4,
-        Regime.A,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
         cal_errors,
         tau_global,
         cfg=cfg,
     )
     canonical_result = derive_threshold(
         _DeriveInput(
-            baseline=Baseline.B4,
+            policy=ThresholdPolicy.CLUSTER_THRESHOLD,
             client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
             q=cfg.threshold.q,
             tau_global=tau_global,
-            regime=Regime.A,
             threshold_cfg=cfg.threshold,
         )
     )

@@ -8,7 +8,6 @@ import numpy as np
 
 from datp.core.provenance import (
     MISSING_MANIFEST_HASH,
-    NOT_APPLICABLE_B0_DIRECT_EVAL,
     array_hash,
     git_commit,
     hash_file,
@@ -192,9 +191,3 @@ class TestProvenanceConstants:
         assert isinstance(MISSING_MANIFEST_HASH, str)
         assert "MISSING" in MISSING_MANIFEST_HASH
 
-    def test_not_applicable_b0_direct_eval_is_sentinel_string(self) -> None:
-        assert isinstance(NOT_APPLICABLE_B0_DIRECT_EVAL, str)
-        assert "NOT_APPLICABLE" in NOT_APPLICABLE_B0_DIRECT_EVAL
-
-    def test_sentinels_are_distinct(self) -> None:
-        assert MISSING_MANIFEST_HASH != NOT_APPLICABLE_B0_DIRECT_EVAL

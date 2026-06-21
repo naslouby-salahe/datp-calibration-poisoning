@@ -1,14 +1,14 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
-    BASELINE_THRESHOLD_SOURCE,
-    THRESHOLD_AGGREGATION_BY_BASELINE,
-    Baseline,
-    Regime,
+    POLICY_THRESHOLD_SOURCE,
+    THRESHOLD_AGGREGATION_BY_POLICY,
     RunKind,
     ThresholdAggregationMethod,
     ThresholdSource,
@@ -51,10 +51,9 @@ class SweepMetrics(BaseModel):
     threshold_schema_version: str
     run_id: str
     run_kind: RunKind
-    baseline: Baseline
-    regime: Regime
+    policy: ThresholdPolicy
+    stage: ExperimentStage
     seed: int
-    alpha: float | None
     checkpoint_round: int | None
     dataset: DatasetID
     threshold_scope: ThresholdAggregationMethod
@@ -93,12 +92,10 @@ def build_metrics_dict(
     score_artifact_identity: str,
     checkpoint_round: int | None,
 ) -> SweepMetrics:
-    baseline = eval_result.baseline
-    threshold_scope = THRESHOLD_AGGREGATION_BY_BASELINE[baseline]
-    default_source = BASELINE_THRESHOLD_SOURCE[baseline]
-    run_id = f"{eval_result.regime.value}_{baseline.value}_seed{eval_result.seed}"
-    if eval_result.alpha is not None:
-        run_id += f"_alpha{eval_result.alpha}"
+    policy = eval_result.policy
+    threshold_scope = THRESHOLD_AGGREGATION_BY_POLICY[policy]
+    default_source = POLICY_THRESHOLD_SOURCE[policy]
+    run_id = f"{eval_result.stage.value}_{policy.value}_seed{eval_result.seed}"
     aggregate = {
         MetricName.CV_FPR: eval_result.cv_fpr,
         MetricName.MEAN_FPR: eval_result.mean_fpr,
@@ -118,14 +115,13 @@ def build_metrics_dict(
         threshold_schema_version=THRESHOLD_SCHEMA_VERSION,
         run_id=run_id,
         run_kind=RunKind.CORE_LADDER,
-        baseline=eval_result.baseline,
-        regime=eval_result.regime,
+        policy=eval_result.policy,
+        stage=eval_result.stage,
         seed=eval_result.seed,
-        alpha=eval_result.alpha,
         checkpoint_round=checkpoint_round,
         dataset=eval_result.dataset,
         threshold_scope=threshold_scope,
-        threshold_strategy_name=threshold_result.run.baseline.value,
+        threshold_strategy_name=threshold_result.run.policy.value,
         tau_global=threshold_result.tau_global,
         eligible_ids=eval_result.eligible_ids,
         pending_ids=eval_result.pending_ids,

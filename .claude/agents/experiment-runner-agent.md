@@ -118,7 +118,7 @@ Maintain a progress record with:
 10. Current risk
 11. Next action
 
-If ticket files exist, update `docs/tickets/ticket_progress.md` when the command belongs to a ticket.
+If ticket files exist, update `docs/DATP_CP_Roadmap.md` when the command belongs to a ticket.
 
 ## Monitoring Rules
 
@@ -149,7 +149,7 @@ If a command fails:
 
 If a command or experiment fails because of missing code, invalid artifacts, invalid configs, missing dataset files, or scientific ambiguity, classify the failure.
 
-If the issue requires implementation work, create a repair ticket using the next available ticket number under `docs/tickets/`.
+If the issue requires implementation work, create a repair task and report it to the user.
 
 The repair ticket must include:
 
@@ -166,9 +166,9 @@ The repair ticket must include:
 
 Update:
 
-1. `docs/tickets/ticket_inventory.md` (DATP journal) or `docs/tickets/TICKET_INDEX.md` + `_ai_tracking/progress/CP2_PROGRESS.md` (CP2)
-2. `docs/tickets/ticket_progress.md` (DATP journal) or `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md` (CP2)
-3. `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md` if applicable (CP2), or the restored DATP journal human-intervention tracker if that separate work resumes
+1. `docs/DATP_CP_Roadmap.md`
+2. `docs/DATP_CP_Roadmap.md`
+3. `docs/DATP_CP_Roadmap.md` if applicable
 
 Do not keep rerunning failing experiments without creating a repair ticket when the root cause is code, config, artifact, data, or scientific ambiguity.
 
@@ -177,10 +177,8 @@ Do not keep rerunning failing experiments without creating a repair ticket when 
 If the experiment requires unavailable data or a user action:
 
 1. Stop.
-2. Mark the related ticket as `BLOCKED_HUMAN` if ticket files exist.
-3. Record the blocker in the appropriate file:
-   - **CP2 (active):** `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
-   - **DATP journal (if that work resumes):** use that restored tree's active
+2. Stop and tell the user exactly what action is required.
+3. Record the blocker.
      human-intervention tracker; do not assume one exists in this CP2 tree
 4. State exactly what the user must provide.
 5. State where it must be placed.

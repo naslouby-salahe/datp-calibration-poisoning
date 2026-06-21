@@ -8,7 +8,7 @@ artifact is touched:
       -> ScoreCollection / VictimSet
       -> victim-local reservoir (source strategy)
       -> REPLACE_FIXED_BUDGET injection (no in-place mutation)
-      -> B1 / B2 / B4 threshold recomputation (+ B4 Δτ decomposition)
+      -> GLOBAL_THRESHOLD / LOCAL_THRESHOLD / CLUSTER_THRESHOLD threshold recomputation (+ CLUSTER_THRESHOLD Δτ decomposition)
       -> metric engine (Δτ family, CV(FPR)+coverage, AUROC invariance)
       -> two-layer inference (bootstrap on 5 seed-level aggregates)
       -> run manifest emission / round-trip
@@ -25,13 +25,13 @@ from dataclasses import dataclass
 import numpy as np
 
 from datp.artifacts.poison_names import (
-    B4_K,
-    B4_MAX_ITER,
-    B4_N_INIT,
+    CLUSTER_K_NBAIOT,
+    CLUSTER_MAX_ITER,
+    CLUSTER_N_INIT,
     N_MIN,
     THRESHOLD_QUANTILE,
 )
-from datp.attacks.constants import B4_RANDOM_STATE
+from datp.attacks.constants import CLUSTER_RANDOM_STATE
 from datp.attacks.cell_runner import (
     InjectionOutcome,
     InjectionSpec,
@@ -52,8 +52,8 @@ from datp.attacks.score_containers import (
     build_score_collection,
     build_victim_set,
 )
-from datp.core.enums import Baseline, Regime
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.seeds import SeedPair
 from datp.attacks.enums import (
     PoisoningSourceStrategy,
@@ -61,7 +61,7 @@ from datp.attacks.enums import (
 )
 from datp.testsupport.synthetic_scores import SyntheticScoreSet
 from datp.thresholding.eligibility import compute_client_thresholds, compute_tau_global
-from datp.thresholding.strategies.b4_cluster import compute as b4_compute
+from datp.thresholding.strategies.cluster_threshold import compute as cluster_compute
 
 __all__ = [
     "InjectionOutcome",
@@ -221,24 +221,24 @@ def victim_seed_deltas(
 
 
 # ---------------------------------------------------------------------------
-# B4 cluster-count probe (K must stay fixed at 3)
+# Cluster-count probe (K must stay fixed at 3)
 # ---------------------------------------------------------------------------
 
 
-def b4_cluster_count(
+def cluster_count(
     cal_dict: dict[str, np.ndarray],
     *,
     q: float = THRESHOLD_QUANTILE,
     n_min: int = N_MIN,
     seed: int = 0,
-    k: int = B4_K,
-    n_init: int = B4_N_INIT,
-    max_iter: int = B4_MAX_ITER,
-    random_state: int = B4_RANDOM_STATE,
+    k: int = CLUSTER_K_NBAIOT,
+    n_init: int = CLUSTER_N_INIT,
+    max_iter: int = CLUSTER_MAX_ITER,
+    random_state: int = CLUSTER_RANDOM_STATE,
 ) -> int:
-    """Run B4 on a calibration dict and return the realized cluster count K.
+    """Run CLUSTER_THRESHOLD on a calibration dict and return the realized cluster count K.
 
-    Asserts (via the result) that B4 is never silently overridden to a
+    Asserts (via the result) that CLUSTER_THRESHOLD is never silently overridden to a
     data-adaptive K — the procedure is pinned to k_candidates=[k].
     """
     eligible_ids = [cid for cid, arr in cal_dict.items() if arr.size >= n_min]
@@ -246,23 +246,22 @@ def b4_cluster_count(
         {cid: cal_dict[cid] for cid in eligible_ids}, eligible_ids, q=q
     )
     tau_global = compute_tau_global(taus)
-    cell = TrainingCellId(regime=Regime.A, seed=seed, alpha=None)
-    run = BaselineRunId(cell=cell, baseline=Baseline.B4)
-    result = b4_compute(
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed)
+    run = PolicyRunId(cell=cell, policy=ThresholdPolicy.CLUSTER_THRESHOLD)
+    result = cluster_compute(
         cal_dict,
         n_min=n_min,
         tau_global=tau_global,
         q=q,
         random_state=random_state,
-        k_regime_a=k,
+        cluster_k=k,
         k_candidates=[k],
         n_init=n_init,
         max_iter=max_iter,
         run=run,
-        regime=Regime.A,
     )
-    assert result.metadata.b4 is not None, "B4 metadata must be set after B4 run"
-    return result.metadata.b4.k
+    assert result.metadata.cluster is not None, "cluster metadata must be set after CLUSTER_THRESHOLD run"
+    return result.metadata.cluster.k
 
 
 def build_smoke_victim_set(score_set: SyntheticScoreSet) -> VictimSet:

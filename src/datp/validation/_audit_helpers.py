@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import dataclasses
 import json
@@ -10,21 +11,20 @@ import numpy as np
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile, PathToken
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
-    THRESHOLD_AGGREGATION_BY_BASELINE,
-    Baseline,
-    Regime,
+    THRESHOLD_AGGREGATION_BY_POLICY,
     ScoringStage,
     ThresholdAggregationMethod,
 )
-from datp.core.identity import TrainingCellId, alpha_label
+from datp.core.identity import TrainingCellId
 from datp.core.metric_enums import MetricName, PayloadKey
 from datp.core.provenance import array_hash, hash_file, hash_jsonable
 from datp.core.types import ThresholdResult
 from datp.config.models import DatpConfig
 from datp.data.catalog import DatasetID
-from datp.data.paths import prepared_root_for_regime
-from datp.data.regimes.catalog import dataset_for_regime
+from datp.data.paths import processed_root
+from datp.data.catalog import dataset_for_stage
 from datp.evaluation.artifact_validation import validate_metrics_payload
 from datp.evaluation.ranking import compute_binary_ranking_metrics
 from datp.scoring.loading import read_score_column as _read_scores
@@ -55,47 +55,33 @@ from datp.validation.schemas import (
 
 
 def _load_client_attack_labels(
-    regime: Regime, client_id: str, prepared_data_root: Path
+    stage: ExperimentStage, client_id: str, prepared_data_root: Path
 ) -> "np.ndarray | None":
-    if regime != Regime.B:
-        return None
-    from datp.data.datasets.ciciot2023.spec import (
-        LABEL_COLUMN,
-        TEST_ATTACK_LABELS_ARTIFACT,
-    )  # noqa: PLC0415
-
-    labels_path = prepared_data_root / client_id / TEST_ATTACK_LABELS_ARTIFACT
-    if not labels_path.exists():
-        return None
-    import polars as pl  # noqa: PLC0415
-
-    series = pl.read_parquet(labels_path)[LABEL_COLUMN]
-    if series.is_empty():
-        return np.empty(0, dtype=object)
-    return series.to_numpy().astype(object)
+    # Per-attack-family labels only exist for CICIoT2023 (stretch-only diagnostic),
+    # which is not in scope. Always return None.
+    return None
 
 
-def _lookup_threshold_agg(baseline: Baseline) -> ThresholdAggregationMethod:
+def _lookup_threshold_agg(policy: ThresholdPolicy) -> ThresholdAggregationMethod:
     try:
-        return THRESHOLD_AGGREGATION_BY_BASELINE[baseline]
+        return THRESHOLD_AGGREGATION_BY_POLICY[policy]
     except KeyError:
         return ThresholdAggregationMethod.PER_CLIENT_PERCENTILE
 
 
-def _lookup_dataset(regime: Regime) -> DatasetID:
-    return dataset_for_regime(regime)
+def _lookup_dataset(stage: ExperimentStage) -> DatasetID:
+    return dataset_for_stage(stage)
 
 
 def _partition_manifest_path(
-    regime: Regime,
+    stage: ExperimentStage,
     seed: int,
-    alpha: float | None,
     base_dir: Path,
     data_root: Path | None = None,
 ) -> Path:
     _data_root = data_root if data_root is not None else base_dir
     return (
-        prepared_root_for_regime(regime, base_dir=_data_root, alpha=alpha, seed=seed)
+        processed_root(dataset_for_stage(stage), base_dir=_data_root)
         / ArtifactFile.MANIFEST
     )
 
@@ -199,23 +185,21 @@ def _binary_auc_fields(
 def _recon_summary(
     *,
     run_id: str | None,
-    baseline: Baseline | None,
+    policy: ThresholdPolicy | None,
     seed: int,
-    regime: Regime,
-    alpha: str | None,
+    stage: ExperimentStage,
     client_id: str,
-    stage: ScoringStage,
+    stage_split: ScoringStage,
     arr: np.ndarray,
     overlap: float | None = None,
 ) -> ReconstructionErrorSummaryRecord:
     return ReconstructionErrorSummaryRecord(
         run_id=run_id,
-        baseline=baseline,
+        policy=policy,
         seed=seed,
-        regime=regime,
-        alpha=alpha,
-        client_id=client_id,
         stage=stage,
+        client_id=client_id,
+        stage_split=stage_split,
         count=int(arr.size),
         mean=float(np.mean(arr)) if arr.size else None,
         std=float(np.std(arr, ddof=1)) if arr.size > 1 else None,
@@ -241,35 +225,30 @@ def _load_cal_errors(score_root: Path) -> dict[str, np.ndarray]:
 
 
 def _threshold_result(
-    baseline: Baseline,
-    regime: Regime,
+    policy: ThresholdPolicy,
     cal_errors: dict[str, np.ndarray],
     tau_global: float,
     *,
     cfg: DatpConfig,
     seed: int = 0,
-    alpha: float | None = None,
 ) -> ThresholdResult:
     """Delegate to the canonical derive_threshold so audit and pipeline stay in lock-step."""
     return derive_threshold(
         _DeriveInput(
-            baseline=baseline,
+            policy=policy,
             client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
             q=cfg.threshold.q,
             tau_global=tau_global,
-            regime=regime,
             threshold_cfg=cfg.threshold,
             seed=seed,
-            alpha=alpha,
         )
     )
 
 
 def _build_partition_audit(
     *,
-    regime: Regime,
-    alpha_text: str | None,
+    stage: ExperimentStage,
     seed: int,
     partition_path: Path,
     partition_payload: dict[str, Any],
@@ -279,19 +258,15 @@ def _build_partition_audit(
 ) -> DatasetPartitionAudit:
     file_hash_keys: list[str] = list(partition_payload["file_hashes"].keys())
 
-    nbaiot_per_device: list[NBaIoTDeviceCounts] = []
-    if regime in (Regime.A, Regime.C):
-        processed_root = partition_path.parent
-        nbaiot_per_device = build_nbaiot_per_device(processed_root, file_hash_keys)
+    processed_root_path = partition_path.parent
+    nbaiot_per_device = build_nbaiot_per_device(processed_root_path, file_hash_keys)
 
-    ciciot_protocol = build_ciciot_protocol() if regime == Regime.B else None
-    chrono_ok, gap_ok = chronological_flags_for(regime)
+    chrono_ok, gap_ok = chronological_flags_for(stage)
 
     return DatasetPartitionAudit(
+        stage=stage,
         dataset=partition_payload["dataset"],
-        regime=regime,
-        alpha=alpha_text,
-        seed=seed if regime == Regime.C else None,
+        seed=seed,
         manifest_path=str(partition_path),
         manifest_hash=hash_file(partition_path),
         split_hash=split_hash,
@@ -300,8 +275,8 @@ def _build_partition_audit(
         if "n_clients" in metadata
         else metadata["n_devices"],
         nbaiot_per_device=nbaiot_per_device,
-        ciciot_protocol=ciciot_protocol,
-        confound_summary=confound_summary_for(regime),
+        ciciot_protocol=None,
+        confound_summary=confound_summary_for(stage),
         chronological_split_verified=chrono_ok,
         contiguous_gap_verified=gap_ok,
     )
@@ -344,10 +319,10 @@ class _ThresholdState:
     cal_errors: dict[str, np.ndarray]
 
     @classmethod
-    def empty(cls, baseline: Baseline) -> "_ThresholdState":
+    def empty(cls, policy: ThresholdPolicy) -> "_ThresholdState":
         return cls(
             client_thresholds={},
-            threshold_aggregation_method=_lookup_threshold_agg(baseline),
+            threshold_aggregation_method=_lookup_threshold_agg(policy),
             test_benign_scores={},
             test_attack_scores={},
             cal_errors={},
@@ -409,11 +384,9 @@ def _load_run_context(
 ) -> _RunContext | None:
     """Load and validate all data for a single metrics run. Returns None on schema failure."""
     run_id_obj = _parse_metric_path(base_dir, metrics_path)
-    regime = run_id_obj.regime
-    baseline = run_id_obj.baseline
+    stage = run_id_obj.stage
+    policy = run_id_obj.policy
     seed = run_id_obj.seed
-    alpha = run_id_obj.alpha
-    alpha_text = alpha_label(alpha)
     run_id = run_id_obj.audit_id()
     metrics = _load_json(metrics_path)
     schema_failures = validate_metrics_payload(metrics, module="audit.results")
@@ -423,13 +396,13 @@ def _load_run_context(
 
     _data_root = data_root if data_root is not None else base_dir
     checkpoint_round: int | None = metrics.get("checkpoint_round")
-    cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
-    layout = ArtifactLayout(base_dir=base_dir, regime=regime)
+    cell = TrainingCellId(stage=stage, seed=seed)
+    layout = ArtifactLayout(base_dir=base_dir, stage=stage)
     score_root, checkpoint = _resolve_score_root_and_checkpoint(
         cell, layout, checkpoint_round
     )
     partition_path = _partition_manifest_path(
-        regime, seed, alpha, base_dir, data_root=_data_root
+        stage, seed, base_dir, data_root=_data_root
     )
     partition_payload = _manifest_payload(partition_path)
     metadata = partition_payload.get("metadata", {})
@@ -447,13 +420,11 @@ def _load_run_context(
         metrics
     )
     conv = _convergence_payload(checkpoint)
-    invariant_key = InvariantKey(regime, seed, alpha_text)
+    invariant_key = InvariantKey(stage=stage, seed=seed)
     return _RunContext(
-        regime=regime,
-        baseline=baseline,
+        stage=stage,
+        policy=policy,
         seed=seed,
-        alpha=alpha,
-        alpha_text=alpha_text,
         run_id=run_id,
         metrics=metrics,
         data_root=_data_root,
@@ -506,13 +477,11 @@ def _load_score_arrays(
             for p in _score_stage_files(ctx.score_root, ScoringStage.TEST_ATTACK)
         }
         threshold_result = _threshold_result(
-            ctx.baseline,
-            ctx.regime,
+            ctx.policy,
             cal_errors,
             float(ctx.metrics[MetricName.TAU_GLOBAL]),
             cfg=cfg,
             seed=ctx.seed,
-            alpha=ctx.alpha,
         )
     except Exception as exc:
         acc.warnings.append(

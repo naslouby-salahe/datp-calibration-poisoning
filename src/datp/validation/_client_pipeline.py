@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import dataclasses
 import math
@@ -10,12 +11,9 @@ import numpy as np
 
 from datp.config.models import DatpConfig
 from datp.core.enums import (
-    BASELINE_THRESHOLD_SOURCE,
-    CONTROLLED_BASELINES,
-    B0NormalizationMode,
-    Baseline,
+    POLICY_THRESHOLD_SOURCE,
+    CONTROLLED_POLICIES,
     NormalizationScope,
-    Regime,
     ScoringStage,
     ThresholdAggregationMethod,
     ThresholdSource,
@@ -23,8 +21,6 @@ from datp.core.enums import (
 from datp.core.metric_enums import ConfusionKey, MetricName, PayloadKey
 from datp.core.provenance import array_hash
 from datp.core.types import ThresholdResult
-from datp.data.paths import prepared_root_for_regime
-from datp.evaluation.metrics import compute_per_attack_tpr
 from datp.scoring.loading import read_score_column as _read_scores
 from datp.validation._audit_helpers import (
     _argworst,
@@ -56,13 +52,10 @@ from datp.validation._recomputation import (
     append_recomputation_records,
 )
 from datp.validation.constants import (
-    _AUDIT_RESULTS_COMMAND,
     AUDIT_SCHEMA_VERSION,
     BINARY_ATTACK_LABEL,
     BLOCKED_RESUME_COMMAND,
-    BLOCKED_RESUME_REGIME_A_COMMAND,
     DEFAULT_COVERAGE_RATIO,
-    DIAGNOSTIC_REGIME_A_COMMAND,
     FINGERPRINT_METHOD_BENIGN_RECON_ERROR_HISTOGRAM,
 )
 from datp.validation.datasets import compute_ciciot_homogeneity
@@ -110,29 +103,28 @@ def _build_threshold_records(
             ThresholdRecord(
                 run_id=ctx.run_id,
                 seed=ctx.seed,
-                regime=ctx.regime,
-                baseline=ctx.baseline,
-                alpha=ctx.alpha_text,
-                client_id=ct.client_id,
+                stage=ctx.stage,
+                policy=ctx.policy,
+                                client_id=ct.client_id,
                 threshold_value=float(ct.threshold),
                 threshold_source=(
                     ThresholdSource.TAU_GLOBAL_FALLBACK
                     if ct.calibration_pending
-                    else BASELINE_THRESHOLD_SOURCE[ctx.baseline]
+                    else POLICY_THRESHOLD_SOURCE[ctx.policy]
                 ),
                 calibration_pending=ct.calibration_pending,
                 tau_global=float(threshold_result.tau_global),
-                threshold_aggregation_method=_lookup_threshold_agg(ctx.baseline),
+                threshold_aggregation_method=_lookup_threshold_agg(ctx.policy),
                 local_tau_i=local_taus.get(ct.client_id),
             )
         )
     return client_thresholds
 
 
-def _extract_b4_fingerprint(
+def _extract_cluster_fingerprint(
     fp: Sequence[float],
 ) -> tuple[float | None, float | None, float | None, float | None]:
-    """Extract B4 fingerprint scalars with guard clauses for each position."""
+    """Extract CLUSTER_THRESHOLD fingerprint scalars with guard clauses for each position."""
     n = len(fp)
     return (
         float(fp[0]) if n > 0 else None,
@@ -142,78 +134,57 @@ def _extract_b4_fingerprint(
     )
 
 
-def _b4_silhouette_scores_by_client(scores: Any) -> dict[str, float]:
-    """Normalize B4 silhouette metadata for validation schema export."""
+def _cluster_silhouette_scores_by_client(scores: Any) -> dict[str, float]:
+    """Normalize CLUSTER_THRESHOLD silhouette metadata for validation schema export."""
     if hasattr(scores, "items"):
         return {str(client_id): float(score) for client_id, score in scores.items()}
     return {score.client_id: float(score.score) for score in scores}
 
 
-def _build_b4_cluster_records(
+def _build_cluster_records(
     acc: _AuditAccumulator,
     ctx: _RunContext,
     threshold_result: ThresholdResult,
 ) -> None:
-    """Build ClusterAssignmentRecord entries for B4 baseline."""
-    if ctx.baseline != Baseline.B4 or not threshold_result.metadata.b4:
+    """Build ClusterAssignmentRecord entries for CLUSTER_THRESHOLD baseline."""
+    if ctx.policy != ThresholdPolicy.CLUSTER_THRESHOLD or not threshold_result.metadata.cluster:
         return
-    for cluster_id, info in threshold_result.metadata.b4.cluster_info.items():
+    for cluster_id, info in threshold_result.metadata.cluster.cluster_info.items():
         for client_id in info.members:
-            fp = threshold_result.metadata.b4.fingerprints.get(client_id)
+            fp = threshold_result.metadata.cluster.fingerprints.get(client_id)
             if fp is None:
                 fp = ()
-            fp_mean, fp_std, fp_skew, fp_p95 = _extract_b4_fingerprint(fp)
+            fp_mean, fp_std, fp_skew, fp_p95 = _extract_cluster_fingerprint(fp)
             acc.cluster_records.append(
                 ClusterAssignmentRecord(
                     run_id=ctx.run_id,
                     seed=ctx.seed,
-                    regime=ctx.regime,
-                    alpha=ctx.alpha_text,
-                    client_id=client_id,
+                    stage=ctx.stage,
+                        client_id=client_id,
                     cluster_id=cluster_id,
                     threshold_value=float(info.tau_cluster),
                     fingerprint_mean=fp_mean,
                     fingerprint_std=fp_std,
                     fingerprint_skew=fp_skew,
                     fingerprint_p95=fp_p95,
-                    k_selected=threshold_result.metadata.b4.k,
-                    silhouette=threshold_result.metadata.b4.silhouette,
-                    silhouette_scores=_b4_silhouette_scores_by_client(
-                        threshold_result.metadata.b4.silhouette_scores
+                    k_selected=threshold_result.metadata.cluster.k,
+                    silhouette=threshold_result.metadata.cluster.silhouette,
+                    silhouette_scores=_cluster_silhouette_scores_by_client(
+                        threshold_result.metadata.cluster.silhouette_scores
                     ),
                 )
             )
 
 
-def _emit_b3_dispersion_warnings(
-    acc: _AuditAccumulator,
-    ctx: _RunContext,
-    threshold_result: ThresholdResult,
-    cfg: DatpConfig,
-) -> None:
-    """Emit B3 family dispersion warnings when within-family variance exceeds threshold."""
-    if ctx.baseline != Baseline.B3 or not threshold_result.metadata.b3:
-        return
-    for family, info in threshold_result.metadata.b3.family_info.items():
-        if info.threshold_variance > cfg.quality_gates.b3_dispersion_threshold:
-            acc.warnings.append(
-                WarningRecord(
-                    severity=AuditSeverity.WARNING,
-                    code=WarningCode.B3_TAXONOMY_TOO_COARSE,
-                    message=f"{ctx.run_id} family {family} has high within-family threshold dispersion.",
-                )
-            )
-
-
-def _emit_b1_not_pooled_warning(
+def _emit_global_not_pooled_warning(
     acc: _AuditAccumulator,
     ctx: _RunContext,
     threshold_result: ThresholdResult,
     cal_errors: dict[str, np.ndarray],
     cfg: DatpConfig,
 ) -> None:
-    """Emit B1 warning when tau_global is arithmetic mean, not pooled percentile."""
-    if ctx.baseline != Baseline.B1:
+    """Emit GLOBAL_THRESHOLD warning when tau_global is arithmetic mean, not pooled percentile."""
+    if ctx.policy != ThresholdPolicy.GLOBAL_THRESHOLD:
         return
     pooled = float(
         np.percentile(
@@ -225,7 +196,7 @@ def _emit_b1_not_pooled_warning(
         acc.warnings.append(
             WarningRecord(
                 severity=AuditSeverity.INFO,
-                code=WarningCode.B1_NOT_POOLED_PERCENTILE,
+                code=WarningCode.GLOBAL_NOT_POOLED_PERCENTILE,
                 message=f"{ctx.run_id} tau_global is the arithmetic mean of eligible local tau_i values.",
                 exact_command=None,
             )
@@ -238,14 +209,14 @@ def _process_thresholds(
     cfg: DatpConfig,
 ) -> _ThresholdState:
     """Reconstruct thresholds and build threshold/cluster audit records."""
-    if ctx.baseline not in CONTROLLED_BASELINES:
-        return _ThresholdState.empty(ctx.baseline)
+    if ctx.policy not in CONTROLLED_POLICIES:
+        return _ThresholdState.empty(ctx.policy)
 
     arrays = _load_score_arrays(acc, ctx, cfg)
     if arrays.threshold_result is None:
         return _ThresholdState(
             client_thresholds={},
-            threshold_aggregation_method=_lookup_threshold_agg(ctx.baseline),
+            threshold_aggregation_method=_lookup_threshold_agg(ctx.policy),
             test_benign_scores=arrays.test_benign_scores,
             test_attack_scores=arrays.test_attack_scores,
             cal_errors=arrays.cal_errors,
@@ -254,15 +225,14 @@ def _process_thresholds(
     client_thresholds = _build_threshold_records(
         acc, ctx, arrays.threshold_result, arrays.cal_errors, cfg
     )
-    _build_b4_cluster_records(acc, ctx, arrays.threshold_result)
-    _emit_b3_dispersion_warnings(acc, ctx, arrays.threshold_result, cfg)
-    _emit_b1_not_pooled_warning(
+    _build_cluster_records(acc, ctx, arrays.threshold_result)
+    _emit_global_not_pooled_warning(
         acc, ctx, arrays.threshold_result, arrays.cal_errors, cfg
     )
 
     return _ThresholdState(
         client_thresholds=client_thresholds,
-        threshold_aggregation_method=_lookup_threshold_agg(ctx.baseline),
+        threshold_aggregation_method=_lookup_threshold_agg(ctx.policy),
         test_benign_scores=arrays.test_benign_scores,
         test_attack_scores=arrays.test_attack_scores,
         cal_errors=arrays.cal_errors,
@@ -296,10 +266,9 @@ def _build_client_metric_record(
     return ClientMetricRecord(
         run_id=ctx.run_id,
         seed=ctx.seed,
-        regime=ctx.regime,
-        baseline=ctx.baseline,
-        alpha=ctx.alpha_text,
-        client_id=cmp.client_id,
+        stage=ctx.stage,
+        policy=ctx.policy,
+                client_id=cmp.client_id,
         fpr=float(cmp.row[MetricName.FPR]),
         tpr=float(cmp.row[MetricName.TPR]),
         balanced_accuracy=float(cmp.row[MetricName.BALANCED_ACCURACY]),
@@ -331,10 +300,9 @@ def _build_attack_metric_record(
     return PerAttackMetricRecord(
         run_id=ctx.run_id,
         seed=ctx.seed,
-        regime=ctx.regime,
-        baseline=ctx.baseline,
-        alpha=ctx.alpha_text,
-        client_id=client_id,
+        stage=ctx.stage,
+        policy=ctx.policy,
+                client_id=client_id,
         attack_label=BINARY_ATTACK_LABEL,
         status=(
             DenominatorStatus.EXCLUDED_EVALUATION_INCOMPLETE
@@ -401,10 +369,9 @@ def _append_denominator_record(
         MetricDenominatorAuditRecord(
             run_id=ctx.run_id,
             seed=ctx.seed,
-            regime=ctx.regime,
-            baseline=ctx.baseline,
-            alpha=ctx.alpha_text,
-            client_id=client_id,
+            stage=ctx.stage,
+            policy=ctx.policy,
+                        client_id=client_id,
             fpr_denominator=fpr_den,
             fpr_denominator_expected=n_benign,
             fpr_status=fpr_status,
@@ -455,9 +422,8 @@ def _compute_client_metric_row(
             RecomputationParams(
                 run_id=ctx.run_id,
                 seed=ctx.seed,
-                regime=ctx.regime,
-                baseline=ctx.baseline,
-                alpha=ctx.alpha_text,
+                stage=ctx.stage,
+                policy=ctx.policy,
                 client_id=client_id,
                 tp=tp,
                 fp=fp,
@@ -512,58 +478,8 @@ def _compute_per_attack_families(
     row: dict[str, Any],
     eval_incomplete: bool,
 ) -> None:
-    """Process per-attack-family records for a single client (Regime B / CICIoT2023 only)."""
-    if eval_incomplete:
-        return
-    client_id = str(row[PayloadKey.CLIENT_ID])
-    raw_attack_scores = threshold_state.test_attack_scores.get(client_id)
-    if raw_attack_scores is None:
-        return
-    attack_labels = _load_client_attack_labels(
-        ctx.regime,
-        client_id,
-        prepared_root_for_regime(
-            ctx.regime,
-            base_dir=ctx.data_root,
-            seed=ctx.seed,
-            alpha=ctx.alpha,
-        ),
-    )
-    if attack_labels is None or attack_labels.size == 0:
-        return
-    from datp.data.datasets.ciciot2023.spec import (
-        attack_family as _attack_family,  # noqa: PLC0415
-    )
-
-    threshold_val = threshold_state.client_thresholds.get(client_id)
-    if threshold_val is None:
-        return
-    for pat in compute_per_attack_tpr(
-        client_id,
-        raw_attack_scores,
-        attack_labels,
-        threshold_val,
-        _attack_family,
-    ):
-        pat_status = (
-            DenominatorStatus.FAIL if pat.family is None else DenominatorStatus.PASS
-        )
-        acc.attack_records.append(
-            PerAttackMetricRecord(
-                run_id=ctx.run_id,
-                seed=ctx.seed,
-                regime=ctx.regime,
-                baseline=ctx.baseline,
-                alpha=ctx.alpha_text,
-                client_id=pat.client_id,
-                attack_label=pat.attack_label,
-                status=pat_status,
-                tpr=pat.tpr if math.isfinite(pat.tpr) else None,
-                detected_count=pat.detected_count,
-                denominator=pat.denominator,
-            )
-        )
-
+    """Per-attack-family records for CICIoT2023 (stretch-only diagnostic) only; out of scope."""
+    return
 
 def _collect_eligible_metric_pairs(
     normalized_clients: list[dict[str, Any]],
@@ -689,10 +605,9 @@ def _emit_worst_client_records(
             WorstClientRecord(
                 run_id=ctx.run_id,
                 seed=ctx.seed,
-                regime=ctx.regime,
-                baseline=ctx.baseline,
-                alpha=ctx.alpha_text,
-                metric=metric_name,
+                stage=ctx.stage,
+                policy=ctx.policy,
+                                metric=metric_name,
                 direction=WORST_CLIENT_DIRECTIONS[metric_name],
                 worst_client_id=cid,
                 worst_value=value,
@@ -722,7 +637,7 @@ def _build_cell_panel(
         if cv_tpr_raw is not None and math.isfinite(float(cv_tpr_raw))
         else None
     )
-    acc.cell_panel[(ctx.regime, ctx.seed, ctx.alpha_text, ctx.baseline)] = _CellPanel(
+    acc.cell_panel[(ctx.stage, ctx.seed, ctx.policy)] = _CellPanel(
         cv_fpr=cv_fpr_record_value,
         cv_tpr=cv_tpr_value,
         mean_fpr=mean_fpr_value,
@@ -788,10 +703,9 @@ def _compute_aggregate_stats(
         FPRCompanionRecord(
             run_id=ctx.run_id,
             seed=ctx.seed,
-            regime=ctx.regime,
-            baseline=ctx.baseline,
-            alpha=ctx.alpha_text,
-            cv_fpr=cv_fpr_record_value,
+            stage=ctx.stage,
+            policy=ctx.policy,
+                        cv_fpr=cv_fpr_record_value,
             mean_fpr=mean_fpr_value,
             std_fpr=std_fpr_value,
             iqr_fpr=iqr_fpr_value,
@@ -867,11 +781,10 @@ def _build_run_manifest(
             timestamp=timestamp,
             git_commit_hash=git_commit,
             seed=ctx.seed,
-            dataset=_lookup_dataset(ctx.regime),
-            regime=ctx.regime,
-            baseline=ctx.baseline,
-            alpha=ctx.alpha_text,
-            client_count=ctx.client_count,
+            dataset=_lookup_dataset(ctx.stage),
+            stage=ctx.stage,
+            policy=ctx.policy,
+                        client_count=ctx.client_count,
             split_hash=ctx.split_hash,
             model_hash=ctx.model_hash,
             encoder_hash=ctx.model_hash,
@@ -900,7 +813,7 @@ def _build_run_manifest(
             test_count=ctx.test_count,
         )
     )
-    acc.invariant_inputs[ctx.invariant_key][ctx.baseline] = InvariantHashes(
+    acc.invariant_inputs[ctx.invariant_key][ctx.policy] = InvariantHashes(
         split_hash=ctx.split_hash,
         model_hash=ctx.model_hash,
         encoder_hash=ctx.model_hash,
@@ -909,100 +822,31 @@ def _build_run_manifest(
     )
 
 
-def _process_b0_sanity(
-    acc: _AuditAccumulator,
-    ctx: _RunContext,
-    cfg: DatpConfig,
-) -> None:
-    """Emit B0 sanity-gate warnings."""
-    if ctx.baseline != Baseline.B0:
-        return
-    b0_auroc = (
-        float(ctx.metrics[MetricName.AUROC])
-        if ctx.metrics.get(MetricName.AUROC) is not None
-        else math.nan
-    )
-    b0_pr_auc = (
-        float(ctx.metrics[MetricName.PR_AUC])
-        if ctx.metrics.get(MetricName.PR_AUC) is not None
-        else math.nan
-    )
-    norm_mode = ctx.metrics[PayloadKey.NORMALIZATION_MODE]
-    if not math.isfinite(b0_auroc) or not math.isfinite(b0_pr_auc):
-        acc.warnings.append(
-            WarningRecord(
-                severity=AuditSeverity.BLOCKED_PENDING_RUN,
-                code=WarningCode.B0_SANITY_PR_AUC_PENDING,
-                message=(
-                    f"{ctx.run_id} B0 sanity gate is incomplete because AUROC or "
-                    f"PR-AUC is missing (normalization_mode={norm_mode})."
-                ),
-                exact_command=BLOCKED_RESUME_REGIME_A_COMMAND,
-            )
-        )
-        return
-    if b0_auroc < cfg.quality_gates.b0_sanity_min:
-        code = (
-            WarningCode.B0_SANITY_LOW_AUROC
-            if norm_mode == B0NormalizationMode.POOLED_ZSCORE
-            else WarningCode.B0_WEAK_AUC_BLOCKS_PAPER
-        )
-        acc.warnings.append(
-            WarningRecord(
-                severity=AuditSeverity.FAIL,
-                code=code,
-                message=(
-                    f"{ctx.run_id} B0 AUROC={b0_auroc:.4g} below threshold "
-                    f"(normalization_mode={norm_mode})."
-                ),
-                exact_command=_AUDIT_RESULTS_COMMAND,
-            )
-        )
-    elif b0_pr_auc < cfg.quality_gates.b0_sanity_min:
-        code = (
-            WarningCode.B0_SANITY_LOW_PR_AUC
-            if norm_mode == B0NormalizationMode.POOLED_ZSCORE
-            else WarningCode.B0_WEAK_AUC_BLOCKS_PAPER
-        )
-        acc.warnings.append(
-            WarningRecord(
-                severity=AuditSeverity.FAIL,
-                code=code,
-                message=(
-                    f"{ctx.run_id} B0 PR-AUC={b0_pr_auc:.4g} below threshold "
-                    f"(normalization_mode={norm_mode})."
-                ),
-                exact_command=_AUDIT_RESULTS_COMMAND,
-            )
-        )
-
-
 def _process_score_hashes(
     acc: _AuditAccumulator,
     ctx: _RunContext,
 ) -> None:
     """Compute and store per-client score hashes for controlled baselines."""
-    if ctx.baseline not in CONTROLLED_BASELINES or not ctx.score_root.exists():
+    if ctx.policy not in CONTROLLED_POLICIES or not ctx.score_root.exists():
         return
     cell_hashes: dict[tuple[ScoringStage, str], str] = {}
     for stage in ScoringStage:
         for score_path in _score_stage_files(ctx.score_root, stage):
             arr = _read_scores(score_path)
             cell_hashes[(stage, score_path.stem)] = array_hash(arr)
-            if ctx.baseline == Baseline.B1:
+            if ctx.policy == ThresholdPolicy.GLOBAL_THRESHOLD:
                 acc.recon_records.append(
                     _recon_summary(
                         run_id=ctx.run_id,
-                        baseline=ctx.baseline,
+                        policy=ctx.policy,
                         seed=ctx.seed,
-                        regime=ctx.regime,
-                        alpha=ctx.alpha_text,
+                        stage=ctx.stage,
                         client_id=score_path.stem,
-                        stage=stage,
+                        stage_split=stage,
                         arr=arr,
                     )
                 )
-    acc.score_hashes_by_cell[ctx.invariant_key][ctx.baseline] = cell_hashes
+    acc.score_hashes_by_cell[ctx.invariant_key][ctx.policy] = cell_hashes
 
 
 def _process_homogeneity(
@@ -1011,35 +855,9 @@ def _process_homogeneity(
     cfg: DatpConfig,
     cal_errors: dict[str, np.ndarray],
 ) -> None:
-    """Compute CICIoT homogeneity audit for B1 + Regime B."""
-    is_b1_ciciot = ctx.baseline == Baseline.B1 and ctx.regime == Regime.B
-    scores_available = ctx.score_root.exists() and bool(cal_errors)
-    if not (is_b1_ciciot and scores_available):
-        return
-    payload = compute_ciciot_homogeneity(
-        cal_errors,
-        n_bins=cfg.quality_gates.js_divergence_n_bins,
-        threshold=cfg.quality_gates.ciciot_homogeneity_threshold,
-    )
-    acc.homogeneity_records.append(
-        CICIoTHomogeneityRecord(
-            regime=ctx.regime,
-            seed=ctx.seed,
-            alpha=ctx.alpha_text,
-            baseline=ctx.baseline,
-            n_clients_compared=payload.js_summary.n_compared,
-            n_pairs=payload.js_summary.n_pairs,
-            n_bins=payload.js_summary.n_bins,
-            pairwise_js_mean=payload.js_summary.mean,
-            pairwise_js_std=payload.js_summary.std,
-            pairwise_js_p50=payload.js_summary.p50,
-            pairwise_js_p95=payload.js_summary.p95,
-            pairwise_js_max=payload.js_summary.max,
-            fingerprint_method=FINGERPRINT_METHOD_BENIGN_RECON_ERROR_HISTOGRAM,
-            homogeneity_verdict=payload.verdict,
-        )
-    )
-
+    """Compute CICIoT homogeneity audit for GLOBAL_THRESHOLD (stretch-only diagnostic; out of scope)."""
+    # CICIoT2023 homogeneity is out of scope; always return.
+    return
 
 def _process_partition_audit(
     acc: _AuditAccumulator,
@@ -1047,10 +865,9 @@ def _process_partition_audit(
 ) -> None:
     """Build partition audit record or emit missing-manifest warning."""
     if ctx.partition_path.exists():
-        acc.partition_audits[f"{ctx.regime}:{ctx.seed}:{ctx.alpha_text}"] = (
+        acc.partition_audits[f"{ctx.stage.value}:{ctx.seed}"] = (
             _build_partition_audit(
-                regime=ctx.regime,
-                alpha_text=ctx.alpha_text,
+                stage=ctx.stage,
                 seed=ctx.seed,
                 partition_path=ctx.partition_path,
                 partition_payload=ctx.partition_payload,
@@ -1068,39 +885,7 @@ def _process_partition_audit(
                     f"Partition manifest is missing for {ctx.run_id}: "
                     f"{ctx.partition_path}"
                 ),
-                exact_command=DIAGNOSTIC_REGIME_A_COMMAND,
-            )
-        )
-
-
-def _process_b0_threshold_records(
-    acc: _AuditAccumulator,
-    ctx: _RunContext,
-) -> None:
-    """Build per-client ThresholdRecord entries for B0 (pooled tau from metrics payload)."""
-    if ctx.baseline != Baseline.B0:
-        return
-    tau_key = (
-        PayloadKey.TAU_B0 if PayloadKey.TAU_B0 in ctx.metrics else MetricName.TAU_GLOBAL
-    )
-    tau = float(ctx.metrics[tau_key])
-    pending_ids = ctx.pending_client_ids
-    for row in ctx.normalized_clients:
-        client_id = str(row[PayloadKey.CLIENT_ID])
-        acc.threshold_records.append(
-            ThresholdRecord(
-                run_id=ctx.run_id,
-                seed=ctx.seed,
-                regime=ctx.regime,
-                baseline=ctx.baseline,
-                alpha=ctx.alpha_text,
-                client_id=client_id,
-                threshold_value=tau,
-                threshold_source=ThresholdSource.B0_POOLED,
-                calibration_pending=client_id in pending_ids,
-                tau_global=tau,
-                threshold_aggregation_method=_lookup_threshold_agg(Baseline.B0),
-                local_tau_i=None,
+                exact_command=BLOCKED_RESUME_COMMAND,
             )
         )
 
@@ -1111,10 +896,9 @@ def _append_convergence_record(
 ) -> None:
     acc.convergence_records.append(
         ConvergenceAuditRecord(
-            regime=ctx.regime,
+            stage=ctx.stage,
             seed=ctx.seed,
-            alpha=ctx.alpha_text,
-            checkpoint_path=str(ctx.checkpoint),
+                        checkpoint_path=str(ctx.checkpoint),
             convergence_round=ctx.convergence_round,
             convergence_criterion_value=ctx.convergence_value,
             convergence_status=ctx.convergence_status,
@@ -1143,7 +927,6 @@ def _process_run(
 
     _process_partition_audit(acc, ctx)
     threshold_state = _process_thresholds(acc, ctx, cfg)
-    _process_b0_threshold_records(acc, ctx)
     _process_per_client_metrics(acc, ctx, threshold_state)
     _build_run_manifest(
         acc,
@@ -1155,7 +938,6 @@ def _process_run(
         metrics_hash=metrics_hash,
         threshold_aggregation_method=threshold_state.threshold_aggregation_method,
     )
-    _process_b0_sanity(acc, ctx, cfg)
     _append_convergence_record(acc, ctx)
     _process_score_hashes(acc, ctx)
     _process_homogeneity(acc, ctx, cfg, threshold_state.cal_errors)

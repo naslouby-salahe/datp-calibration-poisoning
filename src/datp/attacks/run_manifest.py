@@ -17,7 +17,7 @@ from datp.attacks.enums import (
     ThresholdPolicy,
 )
 from datp.core.seed_sequence import SeedRecord
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 # Canonical split description — do not vary; this locks split semantics.
 SPLIT_SEMANTICS: str = "chronological_benign_only_60_1_20_1_18"
@@ -63,7 +63,7 @@ class RunManifest(BaseModel):
 
     # Cell identification
     dataset: str
-    scale: ExperimentScale
+    stage: ExperimentStage
     policy: ThresholdPolicy
     objective: AttackerObjective
     source: PoisoningSourceStrategy

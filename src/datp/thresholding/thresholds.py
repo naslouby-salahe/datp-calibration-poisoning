@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 from dataclasses import dataclass
@@ -6,13 +7,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from datp.core.enums import (
-    B4RegimeAMode,
-    Baseline,
-    Regime,
-)
 from datp.core.errors import fmt
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import ThresholdResult
 
 if TYPE_CHECKING:
@@ -23,12 +20,12 @@ _MODULE = "thresholding.thresholds"
 
 @dataclass(frozen=True, slots=True)
 class _DeriveArgs:
-    """Common arguments for baseline threshold derivation."""
+    """Common arguments for policy threshold derivation."""
 
     client_errors: dict[str, np.ndarray]
     n_min: int
     q: float
-    run: BaselineRunId
+    run: PolicyRunId
 
 
 def percentile_threshold(errors: np.ndarray, q: float) -> float:
@@ -83,78 +80,39 @@ def conformal_threshold(errors: np.ndarray, alpha: float) -> float:
     return float(sorted_errors[k - 1])
 
 
-def _derive_b1(args: _DeriveArgs) -> ThresholdResult:
-    from datp.thresholding.strategies import b1_global as b1_mod
+def _derive_global(args: _DeriveArgs) -> ThresholdResult:
+    from datp.thresholding.strategies import global_threshold as global_mod
 
-    return b1_mod.compute(args.client_errors, args.n_min, q=args.q, run=args.run)
+    return global_mod.compute(args.client_errors, args.n_min, q=args.q, run=args.run)
 
 
-def _derive_b2(args: _DeriveArgs, tau_global: float) -> ThresholdResult:
-    from datp.thresholding.strategies import b2_personalized as b2_mod
+def _derive_local(args: _DeriveArgs, tau_global: float) -> ThresholdResult:
+    from datp.thresholding.strategies import local_threshold as local_mod
 
-    return b2_mod.compute(
+    return local_mod.compute(
         args.client_errors, args.n_min, tau_global, q=args.q, run=args.run
     )
 
 
-def _derive_b3(args: _DeriveArgs, tau_global: float, regime: Regime) -> ThresholdResult:
-    from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
-    from datp.thresholding.strategies import b3_family as b3_mod
-
-    family_map: dict[str, str] = {}
-    missing_family: list[str] = []
-    for cid in args.client_errors:
-        family = DEVICE_FAMILY_MAP.get(cid)
-        if family is None:
-            missing_family.append(cid)
-        else:
-            family_map[cid] = family
-    if missing_family:
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "Missing family mapping for client(s)",
-                "all client IDs in DEVICE_FAMILY_MAP",
-                f"{len(missing_family)} unmapped: {sorted(missing_family)[:5]}",
-            )
-        )
-    return b3_mod.compute(
-        args.client_errors,
-        args.n_min,
-        tau_global,
-        family_map,
-        q=args.q,
-        regime=regime,
-        run=args.run,
-    )
-
-
-def _derive_b4(
+def _derive_cluster(
     args: _DeriveArgs,
     tau_global: float,
-    regime: Regime,
     threshold_cfg: "ThresholdConfig",
 ) -> ThresholdResult:
-    from datp.thresholding.strategies import b4_cluster as b4_mod
+    from datp.thresholding.strategies import cluster_threshold as cluster_mod
 
-    mode = threshold_cfg.b4_regime_a_mode
-    k_for_a = (
-        0
-        if regime == Regime.A and mode == B4RegimeAMode.SILHOUETTE
-        else threshold_cfg.b4_k_regime_a
-    )
-    return b4_mod.compute(
+    k_for_a = threshold_cfg.cluster_k_nbaiot
+    return cluster_mod.compute(
         args.client_errors,
         args.n_min,
         tau_global,
         q=args.q,
-        random_state=threshold_cfg.b4_random_state,
-        k_regime_a=k_for_a,
-        k_candidates=threshold_cfg.b4_k_candidates,
-        n_init=threshold_cfg.b4_n_init,
-        max_iter=threshold_cfg.b4_max_iter,
+        random_state=threshold_cfg.cluster_random_state,
+        cluster_k=k_for_a,
+        k_candidates=threshold_cfg.cluster_k_candidates,
+        n_init=threshold_cfg.cluster_n_init,
+        max_iter=threshold_cfg.cluster_max_iter,
         run=args.run,
-        regime=regime,
     )
 
 
@@ -162,40 +120,36 @@ def _derive_b4(
 class _DeriveInput:
     """Bundled inputs for threshold derivation."""
 
-    baseline: Baseline
+    policy: ThresholdPolicy
     client_errors: dict[str, np.ndarray]
     n_min: int
     q: float
     tau_global: float
-    regime: Regime
     threshold_cfg: "ThresholdConfig"
     seed: int = 0
-    alpha: float | None = None
 
 
 def derive_threshold(inputs: _DeriveInput) -> ThresholdResult:
-    run = BaselineRunId(
-        cell=TrainingCellId(regime=inputs.regime, seed=inputs.seed, alpha=inputs.alpha),
-        baseline=inputs.baseline,
+    run = PolicyRunId(
+        cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=inputs.seed),
+        policy=inputs.policy,
     )
     args = _DeriveArgs(
         client_errors=inputs.client_errors, n_min=inputs.n_min, q=inputs.q, run=run
     )
 
-    if inputs.baseline == Baseline.B1:
-        return _derive_b1(args)
-    if inputs.baseline == Baseline.B2:
-        return _derive_b2(args, inputs.tau_global)
-    if inputs.baseline == Baseline.B3:
-        return _derive_b3(args, inputs.tau_global, inputs.regime)
-    if inputs.baseline == Baseline.B4:
-        return _derive_b4(args, inputs.tau_global, inputs.regime, inputs.threshold_cfg)
+    if inputs.policy == ThresholdPolicy.GLOBAL_THRESHOLD:
+        return _derive_global(args)
+    if inputs.policy == ThresholdPolicy.LOCAL_THRESHOLD:
+        return _derive_local(args, inputs.tau_global)
+    if inputs.policy == ThresholdPolicy.CLUSTER_THRESHOLD:
+        return _derive_cluster(args, inputs.tau_global, inputs.threshold_cfg)
 
     raise ValueError(
         fmt(
             "thresholds",
-            "Unknown baseline for threshold derivation",
-            "b1/b2/b3/b4",
-            repr(inputs.baseline),
+            "Unknown policy for threshold derivation",
+            "GLOBAL_THRESHOLD/LOCAL_THRESHOLD/CLUSTER_THRESHOLD",
+            repr(inputs.policy),
         )
     )

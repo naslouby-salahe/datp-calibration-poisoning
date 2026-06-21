@@ -1,17 +1,18 @@
-"""Tests for B4 threshold recomputation and Δτ decomposition ."""
+"""Tests for CLUSTER_THRESHOLD threshold recomputation and Δτ decomposition ."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import pytest
 
 from datp.artifacts.poison_names import THRESHOLD_QUANTILE
-from datp.attacks.b4_recompute import (
-    compute_b4_pair,
+from datp.attacks.cluster_threshold_recompute import (
+    compute_cluster_pair,
 )
 from datp.attacks.injector import inject_fixed_budget
 from datp.attacks.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
-from datp.attacks.enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.seed_sequence import make_seed_rng
 from datp.testsupport.synthetic_scores import make_standard_score_set
 
@@ -46,30 +47,30 @@ def _make_poisoned_cal(col, victim_idx: int = 0, fraction: float = 0.40):
     return poisoned_cal, victim_id
 
 
-class TestB4PairBasics:
-    def test_policy_is_b4(self) -> None:
+class TestClusterThresholdPairBasics:
+    def test_policy_is_cluster(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        assert pair.policy == ThresholdPolicy.B4_CLUSTER
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        assert pair.policy == ThresholdPolicy.CLUSTER_THRESHOLD
 
     def test_eligible_ids_in_result(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         assert set(pair.thresholds_clean.keys()) == set(col.eligible_ids)
         assert set(pair.thresholds_pois.keys()) == set(col.eligible_ids)
 
     def test_decomposition_covers_eligible(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         assert set(pair.decomposition.keys()) == set(col.eligible_ids)
 
     def test_pending_not_in_thresholds(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for pid in col.pending_ids:
             assert pid not in pair.thresholds_clean
             assert pid not in pair.thresholds_pois
@@ -80,7 +81,7 @@ class TestDecompositionIdentity:
         """Δτ_agg + Δτ_churn = Δτ_total exactly."""
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for cid, entry in pair.decomposition.items():
             assert entry.delta_tau_total == pytest.approx(
                 entry.delta_tau_agg + entry.delta_tau_churn, abs=1e-10
@@ -89,7 +90,7 @@ class TestDecompositionIdentity:
     def test_delta_total_matches_effective_thresholds(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for cid, entry in pair.decomposition.items():
             expected = pair.thresholds_pois[cid] - pair.thresholds_clean[cid]
             assert entry.delta_tau_total == pytest.approx(expected, abs=1e-10)
@@ -97,14 +98,14 @@ class TestDecompositionIdentity:
     def test_tau_clean_matches_thresholds_clean(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for cid, entry in pair.decomposition.items():
             assert entry.tau_clean == pytest.approx(pair.thresholds_clean[cid])
 
     def test_tau_pois_matches_thresholds_pois(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for cid, entry in pair.decomposition.items():
             assert entry.tau_pois == pytest.approx(pair.thresholds_pois[cid])
 
@@ -115,7 +116,7 @@ class TestFractionZero:
         col = _make_collection()
         # f=0: poisoned cal equals clean cal for all eligible
         pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for entry in pair.decomposition.values():
             assert entry.delta_tau_total == pytest.approx(0.0, abs=1e-10)
             assert entry.delta_tau_agg == pytest.approx(0.0, abs=1e-10)
@@ -126,8 +127,8 @@ class TestDeterminism:
     def test_same_inputs_same_result(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        p1 = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        p2 = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        p1 = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        p2 = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for cid in col.eligible_ids:
             assert p1.thresholds_clean[cid] == p2.thresholds_clean[cid]
             assert p1.thresholds_pois[cid] == p2.thresholds_pois[cid]
@@ -142,9 +143,9 @@ class TestNoClientLabelComparison:
         """Verify that decomposition entries do not store raw cluster labels."""
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
-        pair = compute_b4_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         for entry in pair.decomposition.values():
-            # B4DecompEntry must not have a 'cluster_label' field.
+            # ClusterDecompEntry must not have a 'cluster_label' field.
             assert not hasattr(entry, "cluster_label"), (
                 "Decomposition entries must not store raw cluster labels."
             )

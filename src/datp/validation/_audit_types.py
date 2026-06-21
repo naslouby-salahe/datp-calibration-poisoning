@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import dataclasses
 from collections import defaultdict
@@ -9,11 +10,8 @@ import numpy as np
 
 if TYPE_CHECKING:
     from datp.checkpointing.enums import ConvergenceStatus
-    from datp.core.enums import (
-        Baseline,
-        Regime,
-        ScoringStage,
-    )
+    from datp.config.stages import ExperimentStage
+    from datp.core.enums import ScoringStage
     from datp.core.types import ThresholdResult
     from datp.validation.invariants import InvariantHashes, InvariantKey
     from datp.validation.schemas import (
@@ -27,7 +25,6 @@ if TYPE_CHECKING:
         MetricRecomputationRecord,
         PerAttackMetricRecord,
         ReconstructionErrorSummaryRecord,
-        RegimeCAlphaAuditRecord,
         RunManifestRecord,
         ThresholdRecord,
         WarningRecord,
@@ -89,22 +86,19 @@ class _AuditAccumulator:
     homogeneity_records: list[CICIoTHomogeneityRecord] = dataclasses.field(
         default_factory=list
     )
-    regime_c_alpha_records: list[RegimeCAlphaAuditRecord] = dataclasses.field(
-        default_factory=list
-    )
     partition_audits: dict[str, DatasetPartitionAudit] = dataclasses.field(
         default_factory=dict
     )
-    invariant_inputs: dict[InvariantKey, dict[Baseline, InvariantHashes]] = (
+    invariant_inputs: dict[InvariantKey, dict[ThresholdPolicy, InvariantHashes]] = (
         dataclasses.field(default_factory=lambda: defaultdict(dict))
     )
     score_hashes_by_cell: dict[
-        InvariantKey, dict[Baseline, dict[tuple[ScoringStage, str], str]]
+        InvariantKey, dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]
     ] = dataclasses.field(default_factory=lambda: defaultdict(dict))
     recomputation_records: list[MetricRecomputationRecord] = dataclasses.field(
         default_factory=list
     )
-    cell_panel: dict[tuple[Regime, int, str | None, Baseline], _CellPanel] = (
+    cell_panel: dict[tuple[ExperimentStage, int, ThresholdPolicy], _CellPanel] = (
         dataclasses.field(default_factory=dict)
     )
     warnings: list[WarningRecord] = dataclasses.field(default_factory=list)
@@ -115,11 +109,9 @@ class _AuditAccumulator:
 class _RunContext:
     """All loaded and validated data for a single metrics run."""
 
-    regime: Regime
-    baseline: Baseline
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     seed: int
-    alpha: float | None
-    alpha_text: str | None
     run_id: str
     metrics: dict[str, Any]
     data_root: Path

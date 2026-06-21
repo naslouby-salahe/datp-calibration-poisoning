@@ -6,21 +6,22 @@ Definitions:
   ASR (Attack Success Rate): fraction of victim instances where |Δτ| > δ_τ,i
     in the intended direction (THRESHOLD_RAISE → Δτ > 0; THRESHOLD_LOWER → Δτ < 0).
   Blast radius: number of clients with |Δτ| > δ_τ,i per single victim/cell.
-    B1: fleet-wide (all eligible clients affected by global shift).
-    B2: victim-local (only the victim's threshold changes).
-    B4: cluster-local (cluster-mates are affected via intra-cluster aggregation).
+    GLOBAL_THRESHOLD: fleet-wide (all eligible clients affected by global shift).
+    LOCAL_THRESHOLD: victim-local (only the victim's threshold changes).
+    CLUSTER_THRESHOLD: cluster-local (cluster-mates are affected via intra-cluster aggregation).
   Spillover: threshold changes on non-victims due to policy propagation.
-    B1: global propagation → all clients experience tau_global shift.
-    B4: cluster spillover → co-cluster non-victims experience Δτ_agg.
-    B2: no spillover by construction (each client's threshold is local).
+    GLOBAL_THRESHOLD: global propagation → all clients experience tau_global shift.
+    CLUSTER_THRESHOLD: cluster spillover → co-cluster non-victims experience Δτ_agg.
+    LOCAL_THRESHOLD: no spillover by construction (each client's threshold is local).
 """
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 
 from datp.attacks.metric_engine import MetricResult
-from datp.attacks.enums import AttackerObjective, ThresholdPolicy
+from datp.attacks.enums import AttackerObjective
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,9 +104,9 @@ def compute_blast_radius(
     """Compute blast radius: number of eligible clients with significant |Δτ|.
 
     victim_id is optional metadata only; it does not filter the count.
-    B1: global → blast radius counts all eligible clients whose threshold shifted.
-    B2: local → blast radius is typically 1 (only the victim).
-    B4: cluster-local → counts cluster-mates with significant agg spillover.
+    GLOBAL_THRESHOLD: global → blast radius counts all eligible clients whose threshold shifted.
+    LOCAL_THRESHOLD: local → blast radius is typically 1 (only the victim).
+    CLUSTER_THRESHOLD: cluster-local → counts cluster-mates with significant agg spillover.
     """
     entries = result.delta_tau
     n_significant = sum(1 for e in entries.values() if e.is_significant)
@@ -128,9 +129,9 @@ def compute_spillover(
     """Compute spillover: non-victim clients with significant |Δτ|.
 
     Spillover is mechanistic (policy propagation), not an independence violation.
-    B2: no spillover expected (each client's threshold is local to their cal).
-    B1: all non-victims can experience spillover via tau_global shift.
-    B4: cluster-mates of the victim can experience agg spillover.
+    LOCAL_THRESHOLD: no spillover expected (each client's threshold is local to their cal).
+    GLOBAL_THRESHOLD: all non-victims can experience spillover via tau_global shift.
+    CLUSTER_THRESHOLD: cluster-mates of the victim can experience agg spillover.
     """
     entries = result.delta_tau
     spillover_ids = [

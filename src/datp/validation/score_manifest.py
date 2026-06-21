@@ -19,15 +19,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile, PathToken
+from datp.config.stages import ExperimentStage, get_stage_config
 from datp.core.enums import (
     SCORING_STAGES,
-    Regime,
     ScoringStage,
 )
 from datp.core.identity import TrainingCellId
 from datp.core.provenance import hash_file
 from datp.data.catalog import dataset_spec
-from datp.data.regimes.catalog import dataset_for_regime
 from datp.scoring.schema import SCORE_COLUMN, SCORING_MANIFEST_NOT_PROVIDED
 from datp.validation.constants import (
     SCORE_CELL_VERIFICATION_INDEX_JSON,
@@ -43,9 +42,7 @@ from datp.validation.schemas import ValidationCheck
 
 _REQUIRED_MANIFEST_FIELDS: tuple[str, ...] = (
     "dataset",
-    "regime",
     "seed",
-    "alpha",
     "expected_client_ids",
     "model_checkpoint_hash",
     "model_checkpoint_path",
@@ -64,7 +61,7 @@ class ScoreCheckCode(enum.StrEnum):
     MANIFEST_FIELDS_PRESENT = "manifest_fields_present"
     MANIFEST_COMPLETION_STATUS = "manifest_completion_status"
     SCORING_SENTINEL_PRESENT = "scoring_sentinel_present"
-    REGIME_MATCH = "regime_match"
+    STAGE_MATCH = "stage_match"
     SEED_MATCH = "seed_match"
     DATASET_MATCH = "dataset_match"
     CLIENT_IDS_MATCH_PARTITION = "client_ids_match_partition"
@@ -91,30 +88,16 @@ class ScoreCellVerification(BaseModel):
 def _expected_partition_clients(
     data_root: Path, location: ScoreCellLocation
 ) -> tuple[str, ...] | None:
-    """Return the client-id set expected by the partition on disk; None when partition is missing.
+    """Return the client-id set expected by the partition on disk; None when partition is missing."""
+    from datp.data.paths import processed_root  # noqa: PLC0415
 
-    ``data_root`` is the repo root containing ``data/processed/``. For Regime A/B the dataset
-    spec is authoritative. For Regime C we read the per-cell partition's per-client
-    subdirectories (virtual client_NN ids that depend on seed/alpha).
-    """
-    from datp.data.paths import prepared_root_for_regime  # noqa: PLC0415
-
-    if location.regime == Regime.C:
-        prepared_root = prepared_root_for_regime(
-            location.regime,
-            base_dir=data_root,
-            alpha=location.alpha,
-            seed=location.seed,
-        )
-        if not prepared_root.exists():
-            return None
-        return tuple(sorted(p.name for p in prepared_root.iterdir() if p.is_dir()))
-
-    spec = dataset_spec(dataset_for_regime(location.regime))
+    stage_cfg = get_stage_config(location.cell.stage)
+    if stage_cfg.dataset is None:
+        return None
+    spec = dataset_spec(stage_cfg.dataset)
     if spec.device_ids:
         return tuple(sorted(spec.device_ids))
-
-    prepared_root = prepared_root_for_regime(location.regime, base_dir=data_root)
+    prepared_root = processed_root(stage_cfg.dataset, base_dir=data_root)
     if not prepared_root.exists():
         return None
     return tuple(sorted(p.name for p in prepared_root.iterdir() if p.is_dir()))
@@ -200,13 +183,13 @@ def _check_sentinel(cell_dir: Path) -> ValidationCheck:
     )
 
 
-def _check_regime(
+def _check_stage(
     manifest: dict[str, Any], location: ScoreCellLocation
 ) -> ValidationCheck:
     return _exact_match(
-        ScoreCheckCode.REGIME_MATCH,
-        actual=manifest.get("regime"),
-        expected=location.regime.value,
+        ScoreCheckCode.STAGE_MATCH,
+        actual=manifest.get("stage"),
+        expected=location.cell.stage.value,
     )
 
 
@@ -223,13 +206,14 @@ def _check_seed(
 def _check_dataset(
     manifest: dict[str, Any], location: ScoreCellLocation
 ) -> ValidationCheck:
-    expected = dataset_for_regime(location.regime)
+    stage_cfg = get_stage_config(location.cell.stage)
+    expected = stage_cfg.dataset.value if stage_cfg.dataset is not None else None
     actual = manifest.get("dataset")
     if actual != expected:
         return ValidationCheck(
             code=ScoreCheckCode.DATASET_MATCH,
             status=AuditStatus.FAIL,
-            detail=f"dataset {actual!r} does not match expected {expected!r} for {location.regime}",
+            detail=f"dataset {actual!r} does not match expected {expected!r} for {location.cell.stage}",
         )
     return ValidationCheck(code=ScoreCheckCode.DATASET_MATCH, status=AuditStatus.PASS)
 
@@ -328,7 +312,7 @@ def _check_per_client_split_files(
         return ValidationCheck(
             code=ScoreCheckCode.PER_CLIENT_SPLIT_FILES_PRESENT,
             status=AuditStatus.FAIL,
-            detail=f"missing per-client split files: {missing[:5]}{'…' if len(missing) > 5 else ''}",
+            detail=f"missing per-client split files: {missing[:5]}{'...' if len(missing) > 5 else ''}",
         )
     return ValidationCheck(
         code=ScoreCheckCode.PER_CLIENT_SPLIT_FILES_PRESENT, status=AuditStatus.PASS
@@ -475,7 +459,7 @@ def _check_checkpoint(
     )
 
     canonical = (
-        ArtifactLayout(base_dir=base_dir, regime=location.regime).checkpoint_dir(
+        ArtifactLayout(base_dir=base_dir, stage=location.cell.stage).checkpoint_dir(
             location.cell
         )
         / ArtifactFile.MODEL_CHECKPOINT
@@ -532,7 +516,7 @@ def verify_score_cell(
     """Verify one score cell directory and return a structured per-cell report.
 
     ``base_dir`` is the experiment root (e.g. ``outputs/``); ``cell_dir`` is the cell directory
-    under ``<base_dir>/scores/<regime>/seed_N[/alpha_*]/``. ``data_root`` defaults to
+    under ``<base_dir>/scores/<stage>/seed_N/``. ``data_root`` defaults to
     ``base_dir.parent`` (repo root containing ``data/processed/``).
     """
     cell_dir = cell_dir.resolve()
@@ -554,7 +538,7 @@ def _append_full_manifest_checks(
     expected_client_ids = list(map(str, manifest["expected_client_ids"]))
     expected_splits = list(map(str, manifest["expected_splits"]))
     checks.append(_check_completion_status(manifest))
-    checks.append(_check_regime(manifest, location))
+    checks.append(_check_stage(manifest, location))
     checks.append(_check_seed(manifest, location))
     checks.append(_check_dataset(manifest, location))
     checks.append(

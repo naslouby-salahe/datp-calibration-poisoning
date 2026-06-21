@@ -8,9 +8,9 @@ import pytest
 
 from datp.artifacts.poison_layout import CellId, PoisonLayout
 from datp.artifacts.poison_names import (
-    B4_K,
-    B4_MAX_ITER,
-    B4_N_INIT,
+    CLUSTER_K_NBAIOT,
+    CLUSTER_MAX_ITER,
+    CLUSTER_N_INIT,
     CALIBRATION_POISONING_OUTPUT_ROOT,
     MATERIALITY_FACTOR,
     N_MIN,
@@ -19,8 +19,8 @@ from datp.artifacts.poison_names import (
     RunFile,
 )
 from datp.attacks.constants import (
-    B4_RANDOM_STATE,
-    BOUNDED_SWEEP_FRACTIONS,
+    CLUSTER_RANDOM_STATE,
+    NBAIOT_MAIN_SWEEP_FRACTIONS,
     COMPROMISE_PATTERN_SEED,
 )
 from datp.attacks.enums import (
@@ -31,7 +31,7 @@ from datp.attacks.enums import (
 )
 from datp.data.catalog import DatasetID
 from datp.core.seeds import SeedPair
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 def _cell(
@@ -40,9 +40,9 @@ def _cell(
     poisoning_seed: int = 100,
 ) -> CellId:
     return CellId(
-        scale=ExperimentScale.BOUNDED,
+        stage=ExperimentStage.NBAIOT_MAIN,
         dataset=DatasetID.NBAIOT,
-        policy=ThresholdPolicy.B1_GLOBAL,
+        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         objective=AttackerObjective.THRESHOLD_RAISE,
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
         fraction=fraction,
@@ -64,7 +64,7 @@ class TestLayout:
 
     def test_run_dir_contains_scale(self) -> None:
         d = _LAYOUT.run_dir(_cell())
-        assert "bounded" in d.parts
+        assert "nbaiot_main" in d.parts
 
     def test_run_dir_contains_dataset(self) -> None:
         d = _LAYOUT.run_dir(_cell())
@@ -72,7 +72,7 @@ class TestLayout:
 
     def test_run_dir_contains_policy(self) -> None:
         d = _LAYOUT.run_dir(_cell())
-        assert "b1_global" in d.parts
+        assert "global_threshold" in d.parts
 
     def test_run_dir_contains_objective(self) -> None:
         d = _LAYOUT.run_dir(_cell())
@@ -154,8 +154,8 @@ class TestManifestPaths:
         assert p.parent == _LAYOUT.poison_output_root
         assert p.name == ManifestFile.CLEAN_SCORE_ARTIFACTS
 
-    def test_nbaiot_bounded_sweep_manifest_under_root(self) -> None:
-        p = _LAYOUT.nbaiot_bounded_sweep_manifest()
+    def test_nbaiot_main_manifest_under_root(self) -> None:
+        p = _LAYOUT.nbaiot_main_manifest()
         assert p.parent == _LAYOUT.poison_output_root
 
     def test_paper_figure_manifest_under_root(self) -> None:
@@ -167,9 +167,9 @@ class TestCellId:
     def test_fraction_outside_bounds_raises(self) -> None:
         with pytest.raises(ValueError, match="outside"):
             CellId(
-                scale=ExperimentScale.BOUNDED,
+                stage=ExperimentStage.NBAIOT_MAIN,
                 dataset=DatasetID.NBAIOT,
-                policy=ThresholdPolicy.B1_GLOBAL,
+                policy=ThresholdPolicy.GLOBAL_THRESHOLD,
                 objective=AttackerObjective.THRESHOLD_RAISE,
                 source=PoisoningSourceStrategy.RANDOM_BENIGN,
                 fraction=1.5,
@@ -195,23 +195,23 @@ class TestConstants:
     def test_materiality_factor(self) -> None:
         assert abs(MATERIALITY_FACTOR - 0.1) < 1e-9
 
-    def test_b4_k(self) -> None:
-        assert B4_K == 3
+    def test_cluster_k(self) -> None:
+        assert CLUSTER_K_NBAIOT == 3
 
-    def test_b4_n_init(self) -> None:
-        assert B4_N_INIT == 10
+    def test_cluster_n_init(self) -> None:
+        assert CLUSTER_N_INIT == 10
 
-    def test_b4_max_iter(self) -> None:
-        assert B4_MAX_ITER == 300
+    def test_cluster_max_iter(self) -> None:
+        assert CLUSTER_MAX_ITER == 300
 
-    def test_b4_random_state(self) -> None:
-        assert B4_RANDOM_STATE == 42
+    def test_cluster_random_state(self) -> None:
+        assert CLUSTER_RANDOM_STATE == 42
 
     def test_compromise_pattern_seed(self) -> None:
         assert COMPROMISE_PATTERN_SEED == 400
 
     def test_bounded_fraction_grid(self) -> None:
-        assert BOUNDED_SWEEP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
+        assert NBAIOT_MAIN_SWEEP_FRACTIONS == (0.0, 0.10, 0.20, 0.40)
 
     def test_output_root_name(self) -> None:
         assert CALIBRATION_POISONING_OUTPUT_ROOT == "conference_calibration_poisoning"
@@ -220,8 +220,8 @@ class TestConstants:
         assert ManifestFile.PROJECT_AUDIT_REPORT == "project_audit_report.json"
         assert ManifestFile.CLEAN_SCORE_ARTIFACTS == "clean_score_artifacts.json"
         assert (
-            ManifestFile.NBAIOT_BOUNDED_SWEEP_MANIFEST
-            == "nbaiot_bounded_sweep_manifest.json"
+            ManifestFile.NBAIOT_MAIN_MANIFEST
+            == "nbaiot_main_manifest.json"
         )
         assert ManifestFile.PAPER_FIGURE_MANIFEST == "paper_figure_manifest.json"
 

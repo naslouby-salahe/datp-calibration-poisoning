@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 from collections.abc import Iterable
@@ -10,10 +11,7 @@ from datp.checkpointing.enums import (
     CheckpointSelectionVerdict,
     PrimaryCheckpointSelectionRule,
 )
-from datp.core.enums import (
-    Baseline,
-    Regime,
-)
+from datp.config.stages import ExperimentStage
 from datp.core.errors import fmt
 from datp.statistics.bootstrap import BootstrapResult, bca_ci
 from datp.statistics.effect_size import CliffsDeltaResult, cliffs_delta
@@ -26,9 +24,9 @@ _COLLAPSE_TPR_THRESHOLD = 0.9
 
 
 @dataclass(frozen=True, slots=True)
-class CheckpointBaselineSummary:
-    regime: Regime
-    baseline: Baseline
+class CheckpointPolicySummary:
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     checkpoint_round: int
     seed_count: int
     mean_fpr: float
@@ -45,7 +43,7 @@ class CheckpointBaselineSummary:
 
 
 @dataclass(frozen=True, slots=True)
-class CheckpointRegimeAComparison:
+class CheckpointPrimaryTrainingComparison:
     checkpoint_round: int
     cv_fpr_deltas: tuple[float, ...]
     worst_client_fpr_deltas: tuple[float, ...]
@@ -60,10 +58,10 @@ class CheckpointRegimeAComparison:
 class GlobalCheckpointSelection:
     selected_round: int
     verdict: CheckpointSelectionVerdict
-    regime: Regime
+    stage: ExperimentStage
     rule: PrimaryCheckpointSelectionRule
-    comparisons: tuple[CheckpointRegimeAComparison, ...]
-    summaries: tuple[CheckpointBaselineSummary, ...]
+    comparisons: tuple[CheckpointPrimaryTrainingComparison, ...]
+    summaries: tuple[CheckpointPolicySummary, ...]
 
 
 def _aggregate_fpr_stats(items: list[SweepMetrics]) -> tuple[float, float, float]:
@@ -80,17 +78,17 @@ def _aggregate_tpr_stats(items: list[SweepMetrics]) -> tuple[float, float, float
     return mean_tpr, cv_tpr, worst_client_tpr
 
 
-def _build_baseline_summary(
-    regime: Regime,
-    baseline: Baseline,
+def _build_policy_summary(
+    stage: ExperimentStage,
+    policy: ThresholdPolicy,
     checkpoint_round: int,
     items: list[SweepMetrics],
-) -> CheckpointBaselineSummary:
+) -> CheckpointPolicySummary:
     mean_fpr, cv_fpr, worst_client_fpr = _aggregate_fpr_stats(items)
     mean_tpr, cv_tpr, worst_client_tpr = _aggregate_tpr_stats(items)
-    return CheckpointBaselineSummary(
-        regime=regime,
-        baseline=baseline,
+    return CheckpointPolicySummary(
+        stage=stage,
+        policy=policy,
         checkpoint_round=checkpoint_round,
         seed_count=len(items),
         mean_fpr=mean_fpr,
@@ -109,52 +107,52 @@ def _build_baseline_summary(
 
 def summarize_checkpoint_metrics(
     metrics: tuple[SweepMetrics, ...],
-) -> tuple[CheckpointBaselineSummary, ...]:
-    grouped: dict[tuple[Regime, Baseline, int], list[SweepMetrics]] = {}
+) -> tuple[CheckpointPolicySummary, ...]:
+    grouped: dict[tuple[ExperimentStage, ThresholdPolicy, int], list[SweepMetrics]] = {}
     for item in metrics:
         if item.checkpoint_round is None:
             raise ValueError(
                 fmt(_MODULE, "Metric lacks checkpoint_round", "int", item.run_id)
             )
-        key = (item.regime, item.baseline, item.checkpoint_round)
+        key = (item.stage, item.policy, item.checkpoint_round)
         grouped.setdefault(key, []).append(item)
     return tuple(
-        _build_baseline_summary(regime, baseline, checkpoint_round, items)
-        for (regime, baseline, checkpoint_round), items in sorted(grouped.items())
+        _build_policy_summary(stage, policy, checkpoint_round, items)
+        for (stage, policy, checkpoint_round), items in sorted(grouped.items())
     )
 
 
 def _eligible_rounds(
-    comparisons: tuple[CheckpointRegimeAComparison, ...],
-    b2_by_round: dict[int, CheckpointBaselineSummary],
+    comparisons: tuple[CheckpointPrimaryTrainingComparison, ...],
+    local_by_round: dict[int, CheckpointPolicySummary],
 ) -> list[int]:
     rounds: list[int] = []
     for comparison in comparisons:
-        b2_summary = b2_by_round.get(comparison.checkpoint_round)
-        if b2_summary is None:
+        local_summary = local_by_round.get(comparison.checkpoint_round)
+        if local_summary is None:
             continue
         if comparison.cv_fpr_bca95.mean_delta <= 0.0:
             continue
         if _mean(comparison.worst_client_fpr_deltas) <= 0.0:
             continue
-        if b2_summary.coverage_ratio < 1.0:
+        if local_summary.coverage_ratio < 1.0:
             continue
         rounds.append(comparison.checkpoint_round)
     return rounds
 
 
-def _validate_regime_a_metrics(metrics: tuple[SweepMetrics, ...]) -> None:
+def _validate_primary_training_metrics(metrics: tuple[SweepMetrics, ...]) -> None:
     if not metrics:
         raise ValueError(
-            fmt(_MODULE, "No checkpoint metrics supplied", "Regime A metrics", "empty")
+            fmt(_MODULE, "No checkpoint metrics supplied", "primary training metrics", "empty")
         )
-    if any(metric.regime != Regime.A for metric in metrics):
+    if any(metric.stage != ExperimentStage.NBAIOT_MAIN for metric in metrics):
         raise ValueError(
             fmt(
                 _MODULE,
-                "Selection input must be Regime A only",
-                "regime a",
-                "mixed regimes",
+                "Selection input must be NBAIOT_MAIN only",
+                "stage.nbaiot_main",
+                "mixed stages",
             )
         )
 
@@ -165,46 +163,46 @@ def select_global_primary_checkpoint(
     n_bootstrap: int,
     bootstrap_seed: int,
 ) -> GlobalCheckpointSelection:
-    _validate_regime_a_metrics(metrics)
+    _validate_primary_training_metrics(metrics)
     summaries = summarize_checkpoint_metrics(metrics)
-    b2_by_round = {
+    local_by_round = {
         summary.checkpoint_round: summary
         for summary in summaries
-        if summary.baseline == Baseline.B2
+        if summary.policy == ThresholdPolicy.LOCAL_THRESHOLD
     }
-    comparisons = _regime_a_comparisons(
+    comparisons = _primary_training_comparisons(
         metrics=metrics,
         n_bootstrap=n_bootstrap,
         bootstrap_seed=bootstrap_seed,
     )
-    eligible = _eligible_rounds(comparisons, b2_by_round)
+    eligible = _eligible_rounds(comparisons, local_by_round)
     if not eligible:
         raise ValueError(
             fmt(
                 _MODULE,
-                "No checkpoint satisfies Regime A selection constraints",
-                "B2 CV(FPR), worst-FPR, and coverage advantages",
+                "No checkpoint satisfies primary training selection constraints",
+                "LOCAL_THRESHOLD CV(FPR), worst-FPR, and coverage advantages",
                 "none",
             )
         )
     selected = min(
         eligible,
-        key=lambda r: (-_lower_tail_tradeoff(b2_by_round[r]), r),
+        key=lambda r: (-_lower_tail_tradeoff(local_by_round[r]), r),
     )
     return GlobalCheckpointSelection(
         selected_round=selected,
         verdict=CheckpointSelectionVerdict.SELECTED,
-        regime=Regime.A,
-        rule=PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_REGIME_A,
+        stage=ExperimentStage.NBAIOT_MAIN,
+        rule=PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_NBAIOT_MAIN,
         comparisons=comparisons,
         summaries=summaries,
     )
 
 
 def summaries_for_global_primary_checkpoint(
-    summaries: tuple[CheckpointBaselineSummary, ...],
+    summaries: tuple[CheckpointPolicySummary, ...],
     selection: GlobalCheckpointSelection,
-) -> tuple[CheckpointBaselineSummary, ...]:
+) -> tuple[CheckpointPolicySummary, ...]:
     """Return main-table summaries at the one globally selected checkpoint round."""
     return tuple(
         summary
@@ -215,12 +213,12 @@ def summaries_for_global_primary_checkpoint(
 
 def _build_round_comparison(
     checkpoint_round: int,
-    b1: dict[int, SweepMetrics],
-    b2: dict[int, SweepMetrics],
+    global_seeds: dict[int, SweepMetrics],
+    local_seeds: dict[int, SweepMetrics],
     n_bootstrap: int,
     bootstrap_seed: int,
-) -> CheckpointRegimeAComparison:
-    seeds = tuple(sorted(set(b1) & set(b2)))
+) -> CheckpointPrimaryTrainingComparison:
+    seeds = tuple(sorted(set(global_seeds) & set(local_seeds)))
     if len(seeds) < 3:
         raise ValueError(
             fmt(
@@ -230,13 +228,13 @@ def _build_round_comparison(
                 str(len(seeds)),
             )
         )
-    cv_deltas = tuple(b1[seed].cv_fpr - b2[seed].cv_fpr for seed in seeds)
+    cv_deltas = tuple(global_seeds[seed].cv_fpr - local_seeds[seed].cv_fpr for seed in seeds)
     worst_deltas = tuple(
-        b1[seed].worst_client_fpr - b2[seed].worst_client_fpr for seed in seeds
+        global_seeds[seed].worst_client_fpr - local_seeds[seed].worst_client_fpr for seed in seeds
     )
-    b1_cv = np.array([b1[seed].cv_fpr for seed in seeds], dtype=np.float64)
-    b2_cv = np.array([b2[seed].cv_fpr for seed in seeds], dtype=np.float64)
-    return CheckpointRegimeAComparison(
+    global_cv = np.array([global_seeds[seed].cv_fpr for seed in seeds], dtype=np.float64)
+    local_cv = np.array([local_seeds[seed].cv_fpr for seed in seeds], dtype=np.float64)
+    return CheckpointPrimaryTrainingComparison(
         checkpoint_round=checkpoint_round,
         cv_fpr_deltas=cv_deltas,
         worst_client_fpr_deltas=worst_deltas,
@@ -248,42 +246,42 @@ def _build_round_comparison(
         ),
         cv_fpr_sign_consistency=_positive_fraction(cv_deltas),
         worst_fpr_sign_consistency=_positive_fraction(worst_deltas),
-        wilcoxon=wilcoxon_test(b1_cv, b2_cv),
-        cliffs_delta=cliffs_delta(b1_cv, b2_cv),
+        wilcoxon=wilcoxon_test(global_cv, local_cv),
+        cliffs_delta=cliffs_delta(global_cv, local_cv),
     )
 
 
-def _regime_a_comparisons(
+def _primary_training_comparisons(
     *,
     metrics: tuple[SweepMetrics, ...],
     n_bootstrap: int,
     bootstrap_seed: int,
-) -> tuple[CheckpointRegimeAComparison, ...]:
-    grouped: dict[int, dict[Baseline, dict[int, SweepMetrics]]] = {}
+) -> tuple[CheckpointPrimaryTrainingComparison, ...]:
+    grouped: dict[int, dict[ThresholdPolicy, dict[int, SweepMetrics]]] = {}
     for metric in metrics:
         if metric.checkpoint_round is None:
             raise ValueError(
                 fmt(_MODULE, "Metric lacks checkpoint_round", "int", metric.run_id)
             )
-        baseline_map = grouped.setdefault(metric.checkpoint_round, {})
-        seed_map = baseline_map.setdefault(metric.baseline, {})
+        policy_map = grouped.setdefault(metric.checkpoint_round, {})
+        seed_map = policy_map.setdefault(metric.policy, {})
         seed_map[metric.seed] = metric
 
-    comparisons: list[CheckpointRegimeAComparison] = []
-    for checkpoint_round, baseline_map in sorted(grouped.items()):
-        b1 = baseline_map.get(Baseline.B1)
-        b2 = baseline_map.get(Baseline.B2)
-        if b1 is None or b2 is None:
+    comparisons: list[CheckpointPrimaryTrainingComparison] = []
+    for checkpoint_round, policy_map in sorted(grouped.items()):
+        global_seeds = policy_map.get(ThresholdPolicy.GLOBAL_THRESHOLD)
+        local_seeds = policy_map.get(ThresholdPolicy.LOCAL_THRESHOLD)
+        if global_seeds is None or local_seeds is None:
             continue
         comparisons.append(
             _build_round_comparison(
-                checkpoint_round, b1, b2, n_bootstrap, bootstrap_seed
+                checkpoint_round, global_seeds, local_seeds, n_bootstrap, bootstrap_seed
             )
         )
     return tuple(comparisons)
 
 
-def _lower_tail_tradeoff(summary: CheckpointBaselineSummary) -> float:
+def _lower_tail_tradeoff(summary: CheckpointPolicySummary) -> float:
     return min(summary.p10_macro_f1, summary.worst_client_balanced_accuracy)
 
 

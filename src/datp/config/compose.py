@@ -1,6 +1,7 @@
 """Hydra-backed config composition with Pydantic validation."""
 
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from pathlib import Path
 from typing import Any, NoReturn
@@ -14,10 +15,9 @@ from pydantic_core import ErrorDetails
 
 from datp.artifacts.names import ArtifactFile
 from datp.config.models import DatpConfig
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
-    REGIME_BASELINES,
-    Baseline,
-    Regime,
+    CONTROLLED_POLICIES,
 )
 from datp.core.errors import fmt
 
@@ -33,37 +33,32 @@ class ComposeRequest(BaseModel):
     """External request to compose an experiment config."""
 
     model_config = ConfigDict(frozen=True)
-    regime: Regime
-    baseline: Baseline
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     seed: int
-    alpha: float | None = None
 
     @model_validator(mode="before")
     @classmethod
     def preprocess(cls, data: Any) -> Any:
         if isinstance(data, dict):
             # Coerce to lowercase for consistent enum parsing.
-            if "regime" in data and isinstance(data["regime"], str):
-                data["regime"] = data["regime"].lower()
-            if "baseline" in data and isinstance(data["baseline"], str):
-                data["baseline"] = data["baseline"].lower()
+            if "stage" in data and isinstance(data["stage"], str):
+                data["stage"] = data["stage"].lower()
+            if "policy" in data and isinstance(data["policy"], str):
+                data["policy"] = data["policy"].lower()
         return data
 
     @model_validator(mode="after")
     def validate_scientific_constraints(self) -> "ComposeRequest":
-        if self.regime == Regime.C and self.alpha is None:
-            raise ValueError(
-                fmt("config", "alpha is required for regime c", "a float", "None")
-            )
-        valid_baselines = REGIME_BASELINES.get(self.regime, frozenset())
-        if self.baseline not in valid_baselines:
-            allowed = sorted(b.value for b in valid_baselines)
+        valid_policies = frozenset(CONTROLLED_POLICIES)
+        if self.policy not in valid_policies:
+            allowed = sorted(p.value for p in valid_policies)
             raise ValueError(
                 fmt(
                     "config",
-                    f"{self.baseline.value} is not valid for regime {self.regime.value}",
+                    f"{self.policy.value} is not valid for stage {self.stage.value}",
                     f"one of {allowed}",
-                    self.baseline.value,
+                    self.policy.value,
                 )
             )
         return self
@@ -71,41 +66,41 @@ class ComposeRequest(BaseModel):
 
 def _raise_enum_compose_error(
     err: ErrorDetails,
-    regime_input: object,
-    baseline_input: object,
+    stage_input: object,
+    policy_input: object,
     exc: ValidationError,
 ) -> None:
-    if "regime" in err["loc"]:
-        valid_regimes = sorted(r.value for r in Regime)
+    if "stage" in err["loc"]:
+        valid_stages = sorted(s.value for s in ExperimentStage)
         raise ComposeError(
             fmt(
                 "config",
-                "Invalid regime",
-                f"one of {valid_regimes}",
-                repr(regime_input),
+                "Invalid stage",
+                f"one of {valid_stages}",
+                repr(stage_input),
             )
         ) from exc
-    if "baseline" in err["loc"]:
-        valid_baselines = sorted(b.value for b in Baseline)
+    if "policy" in err["loc"]:
+        valid_policies = sorted(p.value for p in ThresholdPolicy)
         raise ComposeError(
             fmt(
                 "config",
-                "Invalid baseline",
-                f"one of {valid_baselines}",
-                repr(baseline_input),
+                "Invalid policy",
+                f"one of {valid_policies}",
+                repr(policy_input),
             )
         ) from exc
 
 
 def _raise_compose_error_from_validation(
     exc: ValidationError,
-    regime_input: object,
-    baseline_input: object,
+    stage_input: object,
+    policy_input: object,
 ) -> NoReturn:
     """Inspect Pydantic ValidationError and raise the appropriate ComposeError."""
     for err in exc.errors():
         if err["type"] == "enum":
-            _raise_enum_compose_error(err, regime_input, baseline_input, exc)
+            _raise_enum_compose_error(err, stage_input, policy_input, exc)
         if err["type"] == "value_error":
             raise ComposeError(err["msg"]) from exc
     raise ComposeError(str(exc)) from exc
@@ -113,17 +108,16 @@ def _raise_compose_error_from_validation(
 
 def _normalize_request(
     *,
-    regime: Regime | str,
-    baseline: Baseline | str,
+    stage: ExperimentStage | str,
+    policy: ThresholdPolicy | str,
     seed: int,
-    alpha: float | None,
 ) -> ComposeRequest:
     try:
         return ComposeRequest.model_validate(
-            {"regime": regime, "baseline": baseline, "seed": seed, "alpha": alpha}
+            {"stage": stage, "policy": policy, "seed": seed}
         )
     except ValidationError as exc:
-        _raise_compose_error_from_validation(exc, regime, baseline)
+        _raise_compose_error_from_validation(exc, stage, policy)
 
 
 def _compose_hydra_config(*, overrides: list[str]) -> DictConfig:
@@ -155,28 +149,24 @@ def _validate_resolved_config(cfg: DictConfig) -> DatpConfig:
 
 def _build_overrides(
     *,
-    regime: Regime,
-    baseline: Baseline,
+    stage: ExperimentStage,
+    policy: ThresholdPolicy,
     seed: int,
-    alpha: float | None,
 ) -> list[str]:
     overrides = [
-        f"regime={regime}",
-        f"baseline={baseline}",
+        f"stage={stage}",
+        f"policy={policy}",
         f"seed={seed}",
     ]
-    if alpha is not None:
-        overrides.append(f"alpha={alpha}")
     return overrides
 
 
 def _compose_and_validate(req: ComposeRequest) -> tuple[DictConfig, DatpConfig]:
     cfg = _compose_hydra_config(
         overrides=_build_overrides(
-            regime=req.regime,
-            baseline=req.baseline,
+            stage=req.stage,
+            policy=req.policy,
             seed=req.seed,
-            alpha=req.alpha,
         )
     )
     return cfg, _validate_resolved_config(cfg)
@@ -203,18 +193,17 @@ def write_resolved_config(
 
 def compose_config(
     *,
-    regime: Regime | str,
-    baseline: Baseline | str,
+    stage: ExperimentStage | str,
+    policy: ThresholdPolicy | str,
     seed: int,
-    alpha: float | None = None,
 ) -> DatpConfig:
     """Build a validated runtime config from Hydra-composed defaults + overrides.
 
-    Accepts ``Regime``/``Baseline`` enum values or string representations
-    (case-insensitive) at the public boundary. Strings are normalized to enums
-    via :class:`ComposeRequest` before internal processing.
+    Accepts ``ExperimentStage``/``ThresholdPolicy`` enum values or string
+    representations (case-insensitive) at the public boundary. Strings are
+    normalized to enums via :class:`ComposeRequest` before internal processing.
     """
-    req = _normalize_request(regime=regime, baseline=baseline, seed=seed, alpha=alpha)
+    req = _normalize_request(stage=stage, policy=policy, seed=seed)
     _, cfg = _compose_and_validate(req)
     return cfg
 
@@ -226,8 +215,8 @@ def compose_analysis_config() -> DatpConfig:
     """Return the base config for post-hoc analysis modules.
 
     Analysis functions operate over all verified cells and do not have a single
-    regime, baseline, or seed. This function returns scalar threshold/analysis
-    parameters (q, n_min, b4_random_state, cal_sweep_n_cal, …) from canonical
+    stage or seed. This function returns scalar threshold/analysis parameters
+    (q, n_min, cluster_random_state, cal_sweep_n_cal, …) from canonical
     defaults without attaching misleading experiment context.
     """
     return BASE_CONFIG

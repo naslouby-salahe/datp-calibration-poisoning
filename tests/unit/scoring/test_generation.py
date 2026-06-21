@@ -10,7 +10,8 @@ import torch
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile, PathToken
-from datp.core.enums import Activation, DeviceType, Regime, ScoringStage
+from datp.config.stages import ExperimentStage
+from datp.core.enums import Activation, DeviceType, ScoringStage
 from datp.core.identity import TrainingCellId
 from datp.core.seeds import set_seeds
 from datp.data.splits import Split
@@ -21,8 +22,8 @@ _SEED = 0
 
 
 def _score_base(tmp_path: Path) -> Path:
-    cell = TrainingCellId(regime=Regime.A, seed=_SEED, alpha=None)
-    return ArtifactLayout(base_dir=tmp_path, regime=Regime.A).score_cell(cell).score_dir
+    cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=_SEED)
+    return ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN).score_cell(cell).score_dir
 
 
 def _write_sentinel(score_base: Path) -> None:
@@ -330,9 +331,8 @@ class TestScoreClients:
             model=model,
             client_data=client_data,
             score_base=score_base,
-            regime=Regime.A,
+            stage=ExperimentStage.NBAIOT_MAIN,
             seed=0,
-            alpha=None,
             dataset=DatasetID.NBAIOT,
             checkpoint_path=ckpt_dir / "model.pt",
             checkpoint_round=None,
@@ -362,9 +362,8 @@ class TestScoreClients:
             model=model,
             client_data={},
             score_base=score_base,
-            regime=Regime.A,
+            stage=ExperimentStage.NBAIOT_MAIN,
             seed=0,
-            alpha=None,
             dataset=DatasetID.NBAIOT,
             checkpoint_path=None,
             checkpoint_round=None,

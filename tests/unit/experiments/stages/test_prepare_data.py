@@ -5,13 +5,15 @@ from unittest.mock import Mock
 
 from datp.artifacts.names import ArtifactFile
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.data.manifests import ManifestMetadata, create_manifest
 from datp.data.splits import Split, filename_for_split
 from datp.experiments.stages.prepare_data import (
     PreparedDataRequest,
     ensure_prepared_data,
 )
+
+_STAGE = ExperimentStage.NBAIOT_MAIN
 
 
 def _write_raw_file(raw_dir: Path) -> Path:
@@ -40,13 +42,8 @@ def _write_manifest(prepared_dir: Path, raw_dir: Path, raw_file: Path) -> None:
 
 
 def _patch_paths(monkeypatch, prepared_dir: Path, raw_dir: Path) -> None:
-    """Patch path helpers so tests don't need real data directory structures.
-
-    Must patch the exact module where the function is imported, not the source module.
-    """
     import datp.experiments.stages.prepare_data as mod
 
-    monkeypatch.setattr(mod, "prepared_root_for_regime", lambda *a, **kw: prepared_dir)
     monkeypatch.setattr(mod, "processed_root", lambda *a, **kw: prepared_dir)
     monkeypatch.setattr(mod, "raw_root", lambda *a, **kw: raw_dir)
 
@@ -64,16 +61,15 @@ def test_existing_processed_data_is_verified_and_reused(
 
     prepare_mock = Mock()
     monkeypatch.setattr(
-        "datp.experiments.stages.prepare_data.prepare_regime_data", prepare_mock
+        "datp.experiments.stages.prepare_data.prepare_nbaiot", prepare_mock
     )
 
     result = ensure_prepared_data(
         PreparedDataRequest(
-            regime=Regime.A,
+            stage=_STAGE,
             seed=0,
             cfg=BASE_CONFIG,
             base_dir=tmp_path,
-            alpha=None,
         )
     )
 
@@ -90,23 +86,21 @@ def test_missing_processed_data_runs_preparation_then_verifies(
     prepared_dir = tmp_path / "processed" / "nbaiot"
     _patch_paths(monkeypatch, prepared_dir, raw_dir)
 
-    def prepare(*, regime, raw_dir, output_dir, **kwargs) -> None:
-        assert regime == Regime.A
+    def prepare(*, raw_dir, output_dir, **kwargs) -> None:
         _write_processed_client(prepared_dir)
         _write_manifest(prepared_dir, raw_dir, raw_file)
 
     prepare_mock = Mock(side_effect=prepare)
     monkeypatch.setattr(
-        "datp.experiments.stages.prepare_data.prepare_regime_data", prepare_mock
+        "datp.experiments.stages.prepare_data.prepare_nbaiot", prepare_mock
     )
 
     result = ensure_prepared_data(
         PreparedDataRequest(
-            regime=Regime.A,
+            stage=_STAGE,
             seed=0,
             cfg=BASE_CONFIG,
             base_dir=tmp_path,
-            alpha=None,
         )
     )
 

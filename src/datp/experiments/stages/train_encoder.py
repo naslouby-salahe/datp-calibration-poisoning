@@ -27,13 +27,12 @@ def ensure_fl_checkpoint(
 ) -> None:
     """Run FL training iff the shared checkpoint is missing; holds a per-checkpoint-directory file lock to prevent duplicate training across parallel sweep processes."""
     key = request.key
-    layout = ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
+    layout = ArtifactLayout(base_dir=request.base_dir, stage=key.stage)
     ckpt_dir = layout.checkpoint_dir(key)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     ckpt_file = ckpt_dir / ArtifactFile.MODEL_CHECKPOINT
 
-    alpha_label = f" alpha={key.alpha:g}" if key.alpha is not None else ""
-    label = f"regime={key.regime} seed={key.seed}{alpha_label}"
+    label = f"stage={key.stage} seed={key.seed}"
 
     if step_fn is not None:
         step_fn(SweepStep.CHECK_CHECKPOINT, label)
@@ -83,13 +82,13 @@ def _score_only_recovery(
     """Score-only recovery when checkpoint exists but scoring was interrupted."""
     import torch
 
-    from datp.data.regimes.catalog import dataset_for_regime
+    from datp.data.catalog import dataset_for_stage
     from datp.federated.data_loading import ALL_SPLITS, load_client_data
     from datp.scoring.generation import load_model_from_checkpoint, score_clients
 
     key = request.key
     score_base = (
-        ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
+        ArtifactLayout(base_dir=request.base_dir, stage=key.stage)
         .score_cell(key)
         .score_dir
     )
@@ -105,10 +104,9 @@ def _score_only_recovery(
         model=model,
         client_data=scoring_data,
         score_base=score_base,
-        regime=key.regime,
+        stage=key.stage,
         seed=key.seed,
-        alpha=key.alpha,
-        dataset=dataset_for_regime(key.regime),
+        dataset=dataset_for_stage(key.stage),
         checkpoint_path=ckpt_file,
         checkpoint_round=request.checkpoint_round,
         scoring_batch_size=request.cfg.machine.scoring_batch_size,
@@ -125,7 +123,7 @@ def _handle_non_protocol_checkpoint(
 
     key = request.key
     score_base = (
-        ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
+        ArtifactLayout(base_dir=request.base_dir, stage=key.stage)
         .score_cell(key)
         .score_dir
     )
@@ -133,18 +131,16 @@ def _handle_non_protocol_checkpoint(
         validate_scoring_manifest(score_base)
         logger.info(
             "checkpoint exists, skipping training",
-            regime=key.regime,
+            stage=key.stage,
             seed=key.seed,
-            alpha=key.alpha,
-        )
+            )
         return
     except (FileNotFoundError, ValueError):
         pass
     logger.info(
         "checkpoint exists but scoring incomplete; running score-only recovery",
-        regime=key.regime,
+        stage=key.stage,
         seed=key.seed,
-        alpha=key.alpha,
     )
     _score_only_recovery(request, ckpt_dir, ckpt_file)
 
@@ -172,7 +168,6 @@ def _run_fl_training(
         request.cfg,
         client_data,
         key.seed,
-        key.alpha,
         base_dir=request.base_dir,
         prepared_dir=request.prepared_dir,
     )
@@ -197,10 +192,9 @@ def _ensure_fl_checkpoint_locked(
     if protocol_enabled and _checkpoint_protocol_complete(request, layout):
         logger.info(
             "checkpoint protocol artifacts exist, skipping training",
-            regime=key.regime,
+            stage=key.stage,
             seed=key.seed,
-            alpha=key.alpha,
-        )
+            )
         return
 
     if protocol_enabled and _checkpoint_protocol_checkpoints_exist(request, layout):
@@ -255,7 +249,7 @@ def _recover_checkpoint_protocol_scores(
 ) -> None:
     import torch
 
-    from datp.data.regimes.catalog import dataset_for_regime
+    from datp.data.catalog import dataset_for_stage
     from datp.federated.data_loading import ALL_SPLITS, load_client_data
     from datp.scoring.generation import (
         load_model_from_checkpoint,
@@ -284,10 +278,9 @@ def _recover_checkpoint_protocol_scores(
             model=model,
             client_data=scoring_data,
             score_base=score_base,
-            regime=key.regime,
+            stage=key.stage,
             seed=key.seed,
-            alpha=key.alpha,
-            dataset=dataset_for_regime(key.regime),
+            dataset=dataset_for_stage(key.stage),
             checkpoint_path=round_ckpt_dir / ArtifactFile.MODEL_CHECKPOINT,
             checkpoint_round=checkpoint_round,
             scoring_batch_size=request.cfg.machine.scoring_batch_size,

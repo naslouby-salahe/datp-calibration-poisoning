@@ -32,7 +32,6 @@ class ProvenanceCheckCode(enum.StrEnum):
     LOCAL_EPOCHS_E1 = "local_epochs_e1"
     PIPELINE_GENERATED_FLAG = "pipeline_generated_flag"
     SPLIT_SEMANTICS = "split_semantics"
-    POLICY_NOT_B3 = "policy_not_b3"
     CAL_SCORES_PRESENT = "cal_scores_present"
     TEST_SCORES_PRESENT = "test_scores_present"
 
@@ -151,20 +150,6 @@ def _check_split_semantics(manifest: RunManifest) -> ValidationCheck:
     )
 
 
-def _check_policy_not_b3(manifest: RunManifest) -> ValidationCheck:
-    """Defence-in-depth: B3 is excluded from the ThresholdPolicy enum."""
-    policy_str = str(manifest.policy)
-    if "b3" in policy_str.lower():
-        return ValidationCheck(
-            code=ProvenanceCheckCode.POLICY_NOT_B3,
-            status=AuditStatus.FAIL,
-            detail=f"B3 is excluded; policy={policy_str!r}",
-        )
-    return ValidationCheck(
-        code=ProvenanceCheckCode.POLICY_NOT_B3,
-        status=AuditStatus.PASS,
-    )
-
 
 def _check_scores_present(
     score_root: Path | None,
@@ -231,7 +216,6 @@ def _run_gate(
     checks.append(_check_local_epochs_e1(manifest))
     checks.append(_check_pipeline_generated_flag(manifest))
     checks.append(_check_split_semantics(manifest))
-    checks.append(_check_policy_not_b3(manifest))
     checks.append(_check_cal_scores_present(score_root))
     checks.append(_check_test_scores_present(score_root))
 

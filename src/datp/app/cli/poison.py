@@ -13,7 +13,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from datp.attacks.bounded_sweep_run import write_nbaiot_bounded_sweep_manifest
+from datp.attacks.bounded_sweep_run import write_nbaiot_main_manifest
 from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.stages import (
     ExperimentStage,
@@ -37,7 +37,6 @@ def _stage_config_as_dict(cfg: ExperimentStageConfig) -> dict[str, object]:
     d = dataclasses.asdict(cfg)
     # Convert enum values to their string representations.
     d["stage"] = str(cfg.stage)
-    d["scale"] = str(cfg.scale) if cfg.scale is not None else None
     d["dataset"] = cfg.dataset.value if cfg.dataset is not None else None
     return d
 
@@ -45,7 +44,7 @@ def _stage_config_as_dict(cfg: ExperimentStageConfig) -> dict[str, object]:
 @app.command("preview")
 def preview(
     stage: ExperimentStage = typer.Option(
-        ExperimentStage.NBAIOT_BOUNDED, help="stage to preview"
+        ExperimentStage.NBAIOT_MAIN, help="stage to preview"
     ),
 ) -> None:
     """Print the stage configuration as JSON; does not execute any run."""
@@ -61,19 +60,18 @@ def preview(
 @app.command("dry-run")
 def dry_run(
     stage: ExperimentStage = typer.Option(
-        ExperimentStage.NBAIOT_BOUNDED, help="stage to enumerate"
+        ExperimentStage.NBAIOT_MAIN, help="stage to enumerate"
     ),
 ) -> None:
     """Enumerate cells for the stage without executing any experiment."""
     cfg = get_stage_config(stage)
     _stdout.print(f"[bold]dry-run[/bold]: stage={stage!r}")
-    _stdout.print(f" scale : {cfg.scale}")
     _stdout.print(f" dataset : {cfg.dataset.value if cfg.dataset else 'none'}")
     _stdout.print(f" allow_run : {cfg.allow_run}")
     _stdout.print(f" gate : {cfg.gate or 'none'}")
     _stdout.print(f" description: {cfg.description}")
-    if stage == ExperimentStage.NBAIOT_BOUNDED:
-        config = CalibrationPoisoningConfig.for_bounded_mvp()
+    if stage == ExperimentStage.NBAIOT_MAIN:
+        config = CalibrationPoisoningConfig.for_bounded_sweep()
         cells_per_victim = (
             len(config.policies)
             * len(config.sources)
@@ -102,9 +100,8 @@ def dry_run(
 @app.command("smoke")
 def smoke() -> None:
     """Show the smoke stage config; no experiment is launched."""
-    cfg = get_stage_config(ExperimentStage.NBAIOT_SMOKE)
+    cfg = get_stage_config(ExperimentStage.SYNTHETIC_SMOKE)
     _stdout.print(f"[bold]smoke stage[/bold]: {cfg.description}")
-    _stdout.print(f" scale : {cfg.scale}")
     _stdout.print(f" dataset: {cfg.dataset.value if cfg.dataset else 'none'}")
     _stderr.print(f"[yellow]{_EXECUTION_GATE_NOTICE}[/yellow]")
 
@@ -117,19 +114,19 @@ def run_bounded_sweep(
 ) -> None:
     """Execute the locked bounded N-BaIoT matrix and write its manifest.
 
-    This is the single CLI run path for ``ExperimentStage.NBAIOT_BOUNDED``: it refuses
+    This is the single CLI run path for ``ExperimentStage.NBAIOT_MAIN``: it refuses
     to run unless that stage's ``allow_run`` is True (bounded-run gate
-    satisfied), and it only ever produces ``nbaiot_bounded_sweep_manifest.json`` —
+    satisfied), and it only ever produces ``nbaiot_main_manifest.json`` —
     nothing outside the locked 1620-cell matrix.
     """
-    cfg = get_stage_config(ExperimentStage.NBAIOT_BOUNDED)
+    cfg = get_stage_config(ExperimentStage.NBAIOT_MAIN)
     if not cfg.allow_run:
         _stderr.print(
-            f"[red]Refusing to run:[/red] {ExperimentStage.NBAIOT_BOUNDED!r} allow_run is "
+            f"[red]Refusing to run:[/red] {ExperimentStage.NBAIOT_MAIN!r} allow_run is "
             f"False (gate {cfg.gate!r} not satisfied)."
         )
         raise typer.Exit(code=1)
-    out_path = write_nbaiot_bounded_sweep_manifest(base_dir)
+    out_path = write_nbaiot_main_manifest(base_dir)
     _stdout.print(f"[bold green]Wrote bounded-sweep manifest:[/bold green] {out_path}")
 
 
@@ -141,6 +138,5 @@ def stages() -> None:
         gate_label = f"gate={cfg.gate!r}" if cfg.gate else "no gate"
         run_label = "BLOCKED" if not cfg.allow_run else "RUNNABLE"
         _stdout.print(
-            f" {str(cfg.stage):<22} scale={str(cfg.scale) if cfg.scale else 'N/A':<8}"
-            f" {run_label:<8} {gate_label}"
+            f" {str(cfg.stage):<30} {run_label:<8} {gate_label}"
         )

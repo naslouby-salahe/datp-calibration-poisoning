@@ -24,11 +24,7 @@ class MechanismWording(enum.StrEnum):
 
 
 class HeterogeneityContextResult(enum.StrEnum):
-    """Result of the heterogeneity context check for Regime A primary endpoint.
-
-    Evaluates whether the Regime C IID comparison and the primary B1-minus-B2
-    bootstrap CI together provide supporting context for the heterogeneity narrative.
-    """
+    """Result of the heterogeneity context check."""
 
     CONTEXT_SUPPORTS = "CONTEXT_SUPPORTS_HETEROGENEITY"
     PARTIAL_CONTEXT = "PARTIAL_CONTEXT"
@@ -38,9 +34,9 @@ class HeterogeneityContextResult(enum.StrEnum):
 class ComparisonLabel(enum.StrEnum):
     """Canonical baseline-comparison labels used in statistics payloads and CSV."""
 
-    B1_VS_B2 = "b1_vs_b2"
-    B1_VS_B4 = "b1_vs_b4"
-    B4_VS_B2 = "b4_vs_b2"
+    GLOBAL_VS_LOCAL = "global_vs_local"
+    GLOBAL_VS_CLUSTER = "global_vs_cluster"
+    CLUSTER_VS_LOCAL = "cluster_vs_local"
 
 
 class SidecarField(enum.StrEnum):
@@ -49,7 +45,7 @@ class SidecarField(enum.StrEnum):
     FIGURE = "figure"
     TITLE = "title"
     DATASET = "dataset"
-    REGIME = "regime"
+    STAGE = "stage"
     SEED = "seed"
     SEEDS = "seeds"
     SOURCE_METRICS_FILES = "source_metrics_files"
@@ -64,8 +60,8 @@ class SidecarField(enum.StrEnum):
     SEED_SCOPE = "seed_scope"
     NOT_CONFIRMATORY_WARNING = "not_confirmatory_warning"
     VALIDATION_STATUS = "validation_status"
-    BASELINES = "baselines"
-    BASELINE_ORDER = "baseline_order"
+    POLICIES = "policies"
+    POLICY_ORDER = "policy_order"
     ELIGIBILITY_POLICY = "eligibility_policy"
     AXIS_LABELS = "axis_labels"
     CLIENTS = "clients"
@@ -73,6 +69,6 @@ class SidecarField(enum.StrEnum):
     CLIENT_IDS = "client_ids"
     VALUES = "values"
     SEED_AGGREGATION_POLICY = "seed_aggregation_policy"
-    PAIRED_SEED_CV_FPR_DELTA = "paired_seed_cv_fpr_delta_b1_minus_b2"
+    PAIRED_SEED_CV_FPR_DELTA = "paired_seed_cv_fpr_delta_global_minus_local"
     TAU_GLOBAL = "tau_global"
     MAX_POINTS_PER_CLIENT = "max_points_per_client"

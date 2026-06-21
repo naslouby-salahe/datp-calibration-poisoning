@@ -1,4 +1,4 @@
-"""B4 — Cluster-mean threshold: k-means on eligible [mean, std, skew, p95] fingerprints; Calibration-Pending clients never enter k-means and receive τ_global."""
+"""Cluster-mean threshold: k-means on eligible [mean, std, skew, p95] fingerprints; Calibration-Pending clients never enter k-means and receive τ_global."""
 
 from __future__ import annotations
 
@@ -11,15 +11,14 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
-from datp.core.enums import B4_FINGERPRINT_FEATURES, Regime
+from datp.core.enums import CLUSTER_FINGERPRINT_FEATURES
 from datp.core.errors import fmt
-from datp.core.identity import BaselineRunId
+from datp.core.identity import PolicyRunId
 from datp.core.logging import get_logger
-from datp.core.regime import enforce_regime
 from datp.core.types import (
-    B4ClusterInfo,
-    B4ClusterInfoTuple,
-    B4Metadata,
+    ClusterInfo,
+    ClusterInfoTuple,
+    ClusterMetadata,
     ClientFingerprint,
     ClientFingerprintTuple,
     ClientSilhouetteScore,
@@ -35,41 +34,40 @@ from datp.thresholding.thresholds import arithmetic_mean_threshold
 
 logger = get_logger(__name__)
 
-_MODULE = "thresholding.b4_cluster"
+_MODULE = "thresholding.cluster_threshold"
 _MIN_CLUSTER_ELIGIBLE = 2
 
-# Verify B4_FINGERPRINT_FEATURES matches the 4-element fingerprint order.
-assert len(B4_FINGERPRINT_FEATURES) == 4, (
-    f"B4_FINGERPRINT_FEATURES must have exactly 4 elements, got {len(B4_FINGERPRINT_FEATURES)}"
+# Verify CLUSTER_FINGERPRINT_FEATURES matches the 4-element fingerprint order.
+assert len(CLUSTER_FINGERPRINT_FEATURES) == 4, (
+    f"CLUSTER_FINGERPRINT_FEATURES must have exactly 4 elements, got {len(CLUSTER_FINGERPRINT_FEATURES)}"
 )
 
 
 @dataclass(frozen=True, slots=True)
-class _B4MetadataInput:
+class _ClusterMetadataInput:
     k: int
-    cluster_info: dict[str, B4ClusterInfo]
+    cluster_info: dict[str, ClusterInfo]
     silhouette: float
     silhouette_scores: dict[int, float]
     fingerprints: dict[str, np.ndarray]
 
 
 @dataclass(frozen=True, slots=True)
-class _B4ComputationRequest:
+class _ClusterComputationRequest:
     client_errors: dict[str, np.ndarray]
     eligible: list[str]
     q: float
-    regime: Regime
     random_state: int
-    k_regime_a: int
+    cluster_k: int
     k_candidates: list[int]
     n_init: int
     max_iter: int
 
 
 @dataclass(frozen=True, slots=True)
-class _B4ComputationResult:
+class _ClusterComputationResult:
     eligible_map: dict[str, float]
-    metadata: B4Metadata
+    metadata: ClusterMetadata
 
 
 def compute_fingerprints(
@@ -120,7 +118,7 @@ def _silhouette_scores_by_k(
         score = float(silhouette_score(x_scaled, labels, random_state=random_state))
         if not np.isfinite(score):
             continue
-        logger.info("B4 silhouette", k=k, score=score)
+        logger.info("CLUSTER silhouette", k=k, score=score)
         scores[k] = score
     return scores
 
@@ -176,54 +174,34 @@ def _validate_fingerprint_matrix(fingerprint_matrix: np.ndarray) -> None:
         )
 
 
-def _select_regime_a_k(
+def _select_cluster_k(
     *,
-    k_regime_a: int,
+    cluster_k: int,
     eligible_count: int,
     silhouette_scores: dict[int, float],
 ) -> tuple[int, float]:
-    if k_regime_a <= 0:
+    if cluster_k <= 0:
         return _select_best_k(silhouette_scores)
-    if k_regime_a >= eligible_count:
+    if cluster_k >= eligible_count:
         raise ValueError(
             fmt(
                 _MODULE,
-                "Invalid Regime A k",
+                "Invalid cluster k",
                 f"2 <= k < eligible_count ({eligible_count})",
-                str(k_regime_a),
+                str(cluster_k),
             )
         )
-    silhouette = silhouette_scores.get(k_regime_a)
+    silhouette = silhouette_scores.get(cluster_k)
     if silhouette is None:
         raise ValueError(
             fmt(
                 _MODULE,
-                "Regime A k has no valid silhouette score",
+                "Cluster k has no valid silhouette score",
                 "non-degenerate clustering",
-                str(k_regime_a),
+                str(cluster_k),
             )
         )
-    return k_regime_a, silhouette
-
-
-def _select_b4_k(
-    *,
-    regime: Regime,
-    k_regime_a: int,
-    eligible_count: int,
-    silhouette_scores: dict[int, float],
-) -> tuple[int, float]:
-    # @enforce_regime on compute() guarantees regime ∈ {A, B, C}.
-    if regime == Regime.A:
-        return _select_regime_a_k(
-            k_regime_a=k_regime_a,
-            eligible_count=eligible_count,
-            silhouette_scores=silhouette_scores,
-        )
-    # Regime B or C: silhouette-based K selection.
-    k, silhouette = _select_best_k(silhouette_scores)
-    logger.info("B4 selected K", k=k, silhouette=silhouette, regime=regime)
-    return k, silhouette
+    return cluster_k, silhouette
 
 
 def _scaled_fingerprints(
@@ -300,9 +278,9 @@ def _cluster_info(
     eligible_ids: list[str],
     client_cluster: dict[str, int],
     tau_per_cluster: dict[int, float],
-) -> dict[str, B4ClusterInfo]:
+) -> dict[str, ClusterInfo]:
     return {
-        f"cluster_{cluster}": B4ClusterInfo(
+        f"cluster_{cluster}": ClusterInfo(
             cluster_id=f"cluster_{cluster}",
             tau_cluster=tau_per_cluster[cluster],
             members=tuple(
@@ -320,19 +298,19 @@ def _log_clustering(
     silhouette: float,
 ) -> None:
     logger.info(
-        "B4 clustering complete",
+        "CLUSTER clustering complete",
         k=k,
         cluster_sizes=[len(cluster_taus_map[c]) for c in sorted(cluster_taus_map)],
         silhouette=silhouette,
     )
 
 
-def _b4_metadata(
-    metadata_input: _B4MetadataInput, *, eligible_ids: list[str]
-) -> B4Metadata:
-    return B4Metadata(
+def _cluster_metadata(
+    metadata_input: _ClusterMetadataInput, *, eligible_ids: list[str]
+) -> ClusterMetadata:
+    return ClusterMetadata(
         k=metadata_input.k,
-        cluster_info=B4ClusterInfoTuple(metadata_input.cluster_info.values()),
+        cluster_info=ClusterInfoTuple(metadata_input.cluster_info.values()),
         silhouette=metadata_input.silhouette,
         silhouette_scores=ClientSilhouetteScoreTuple(
             ClientSilhouetteScore(client_id=str(k), score=v)
@@ -351,25 +329,24 @@ def _b4_metadata(
     )
 
 
-def _build_b4_threshold_result(
+def _build_cluster_threshold_result(
     *,
-    run: BaselineRunId,
+    run: PolicyRunId,
     tau_global: float,
     eligible_map: dict[str, float],
     pending: list[str],
-    metadata: B4Metadata,
+    metadata: ClusterMetadata,
 ) -> ThresholdResult:
     return build_threshold_result(
         run=run,
         tau_global=tau_global,
         eligible_thresholds=eligible_map,
         pending_clients=pending,
-        b3_metadata=None,
-        b4_metadata=metadata,
+        cluster_metadata=metadata,
     )
 
 
-def _compute_b4_thresholds(request: _B4ComputationRequest) -> _B4ComputationResult:
+def _compute_cluster_thresholds(request: _ClusterComputationRequest) -> _ClusterComputationResult:
     valid_k_candidates = _validate_k_candidates(request.k_candidates)
     client_taus = compute_client_thresholds(
         request.client_errors, request.eligible, q=request.q
@@ -387,9 +364,8 @@ def _compute_b4_thresholds(request: _B4ComputationRequest) -> _B4ComputationResu
         n_init=request.n_init,
         max_iter=request.max_iter,
     )
-    k, _ = _select_b4_k(
-        regime=request.regime,
-        k_regime_a=request.k_regime_a,
+    k, _ = _select_cluster_k(
+        cluster_k=request.cluster_k,
         eligible_count=len(request.eligible),
         silhouette_scores=silhouette_scores,
     )
@@ -415,12 +391,12 @@ def _compute_b4_thresholds(request: _B4ComputationRequest) -> _B4ComputationResu
         cluster_taus_map=cluster_taus_map,
         silhouette=final_silhouette,
     )
-    return _B4ComputationResult(
+    return _ClusterComputationResult(
         eligible_map={
             cid: tau_per_cluster[client_cluster[cid]] for cid in eligible_ids
         },
-        metadata=_b4_metadata(
-            _B4MetadataInput(
+        metadata=_cluster_metadata(
+            _ClusterMetadataInput(
                 k=k,
                 cluster_info=_cluster_info(
                     eligible_ids=eligible_ids,
@@ -436,23 +412,19 @@ def _compute_b4_thresholds(request: _B4ComputationRequest) -> _B4ComputationResu
     )
 
 
-@enforce_regime(Regime.A, Regime.B, Regime.C)
 def compute(
     client_errors: dict[str, np.ndarray],
     n_min: int,
     tau_global: float,
     q: float,
     random_state: int,
-    k_regime_a: int,
+    cluster_k: int,
     k_candidates: list[int],
     n_init: int,
     max_iter: int,
-    run: BaselineRunId,
-    *,
-    regime: Regime,  # noqa: ARG001 - consumed by @enforce_regime decorator
+    run: PolicyRunId,
 ) -> ThresholdResult:
-    # Regime A: K=k_regime_a fixed (or silhouette if k_regime_a=0);
-    # Regime B/C: K selected by silhouette.
+    # cluster_k > 0: fixed K; cluster_k == 0: silhouette-based K selection.
     # Calibration-Pending clients receive tau_global unconditionally.
     eligible, pending = identify_eligible(client_errors, n_min=n_min)
 
@@ -466,21 +438,20 @@ def compute(
             )
         )
 
-    result = _compute_b4_thresholds(
-        _B4ComputationRequest(
+    result = _compute_cluster_thresholds(
+        _ClusterComputationRequest(
             client_errors=client_errors,
             eligible=eligible,
             q=q,
-            regime=regime,
             random_state=random_state,
-            k_regime_a=k_regime_a,
+            cluster_k=cluster_k,
             k_candidates=k_candidates,
             n_init=n_init,
             max_iter=max_iter,
         )
     )
 
-    return _build_b4_threshold_result(
+    return _build_cluster_threshold_result(
         run=run,
         tau_global=tau_global,
         eligible_map=result.eligible_map,

@@ -5,7 +5,7 @@ construction across modules — import and call from here.
 
 Canonical path structure:
     outputs/conference_calibration_poisoning/
-        <scale>/
+        <stage>/
             <dataset>/
                 <policy>/
                     <objective>/
@@ -35,7 +35,7 @@ from datp.attacks.enums import (
 from datp.core.enums import PathToken
 from datp.core.seeds import SeedPair
 from datp.data.catalog import DatasetID
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,10 +43,10 @@ class CellId:
     """Identity of one experiment cell.
 
     A cell = one (policy, objective, source, fraction, scope, training_seed,
-    poisoning_seed) tuple under a fixed (scale, dataset).
+    poisoning_seed) tuple under a fixed (stage, dataset).
     """
 
-    scale: ExperimentScale
+    stage: ExperimentStage
     dataset: DatasetID
     policy: ThresholdPolicy
     objective: AttackerObjective
@@ -114,7 +114,7 @@ class PoisonLayout:
         """Return the canonical run directory for one experiment cell."""
         return (
             self.poison_output_root
-            / cell.scale.value
+            / cell.stage.value
             / cell.dataset.value
             / cell.policy.value
             / cell.objective.value
@@ -146,8 +146,8 @@ class PoisonLayout:
     def clean_score_artifacts_manifest(self) -> Path:
         return self.poison_output_root / ManifestFile.CLEAN_SCORE_ARTIFACTS
 
-    def nbaiot_bounded_sweep_manifest(self) -> Path:
-        return self.poison_output_root / ManifestFile.NBAIOT_BOUNDED_SWEEP_MANIFEST
+    def nbaiot_main_manifest(self) -> Path:
+        return self.poison_output_root / ManifestFile.NBAIOT_MAIN_MANIFEST
 
     def paper_figure_manifest(self) -> Path:
         return self.poison_output_root / ManifestFile.PAPER_FIGURE_MANIFEST

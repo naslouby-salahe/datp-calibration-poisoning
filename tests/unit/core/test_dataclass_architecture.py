@@ -61,7 +61,6 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("validation/_audit_types.py", "_AuditAccumulator", "companion_records"),
         ("validation/_audit_types.py", "_AuditAccumulator", "worst_client_records"),
         ("validation/_audit_types.py", "_AuditAccumulator", "homogeneity_records"),
-        ("validation/_audit_types.py", "_AuditAccumulator", "regime_c_alpha_records"),
         ("validation/_audit_types.py", "_AuditAccumulator", "partition_audits"),
         ("validation/_audit_types.py", "_AuditAccumulator", "invariant_inputs"),
         ("validation/_audit_types.py", "_AuditAccumulator", "score_hashes_by_cell"),
@@ -74,11 +73,11 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("experiments/sweep.py", "SweepResult", "completed"),
         ("experiments/sweep.py", "SweepResult", "skipped"),
         ("experiments/sweep.py", "SweepResult", "failed"),
-        # _StatusReport/_RegimeReport: mutable CLI accumulator
-        ("app/cli/status.py", "_RegimeReport", "complete"),
-        ("app/cli/status.py", "_RegimeReport", "missing"),
-        ("app/cli/status.py", "_RegimeReport", "aborted"),
-        ("app/cli/status.py", "_StatusReport", "regime_reports"),
+        # _StatusReport/_StageReport: mutable CLI accumulator
+        ("app/cli/status.py", "_StageReport", "complete"),
+        ("app/cli/status.py", "_StageReport", "missing"),
+        ("app/cli/status.py", "_StageReport", "aborted"),
+        ("app/cli/status.py", "_StatusReport", "stage_reports"),
         # ResultTable: mutable builder pattern
         ("reporting/tables.py", "ResultTable", "rows"),
         ("reporting/tables.py", "ResultTable", "footnote"),
@@ -86,13 +85,6 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/score_containers.py", "ScoreCollection", "_eligible_result"),
         # TrackingPayload (if any)
         ("core/tracking.py", "_TrackingPayload", "payload"),
-        # DiagnosticInlineIdentity: canonical provenance sentinel strings (genuinely domain-invariant)
-        ("experiments/diagnostic.py", "DiagnosticInlineIdentity", "config"),
-        ("experiments/diagnostic.py", "DiagnosticInlineIdentity", "split_manifest"),
-        ("experiments/diagnostic.py", "DiagnosticInlineIdentity", "model_checkpoint"),
-        ("experiments/diagnostic.py", "DiagnosticInlineIdentity", "score_artifact"),
-        # DiagnosticExtras: None = "no contingency decision" is a real domain state
-        ("experiments/diagnostic.py", "DiagnosticExtras", "contingency"),
         # ScoreCellPaths/BaselineRunPaths: None = "standard run, not a checkpoint-protocol run"
         # checkpoint_round is set only for checkpoint-protocol cells; None is the normal case
         ("artifacts/layout.py", "ScoreCellPaths", "checkpoint_round"),
@@ -119,12 +111,12 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # MetricEngineInput: None defaults represent "not yet locked/computed"
         ("attacks/types.py", "MetricEngineInput", "mu_flag_threshold"),
         ("attacks/types.py", "MetricEngineInput", "auroc_set"),
-        # SweepCellConfig: per-training-seed runtime config; scope_idx/q/b4_seed
+        # SweepCellConfig: per-training-seed runtime config; scope_idx/q/cluster_seed
         # are protocol-constant hyperparams; auroc_set is lazy-computed
         ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "auroc_set"),
         ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "scope_idx"),
         ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "q"),
-        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "b4_seed"),
+        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "cluster_seed"),
         # InjectionSpec: scope_idx/tail_mass are protocol-constant defaults
         ("attacks/cell_runner.py", "InjectionSpec", "scope_idx"),
         ("attacks/cell_runner.py", "InjectionSpec", "tail_mass"),
@@ -150,7 +142,7 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/run_logger.py", "ManifestBuildRequest", "injection_rule"),
         ("attacks/run_logger.py", "ManifestBuildRequest", "reservoir_mode"),
         # _ResultPathKey/_LoadResultsParams: alpha=None is the domain sentinel for
-        # Regime A/B (non-alpha-sweep); Regime C callers always supply a label.
+        # runs without an alpha sweep; alpha-sweep callers always supply a label.
         ("reporting/build.py", "_ResultPathKey", "alpha"),
         ("reporting/build.py", "_LoadResultsParams", "alpha"),
         # ClientFactoryConfig: optional overrides — None means "use the protocol default";

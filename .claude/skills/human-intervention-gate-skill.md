@@ -16,48 +16,20 @@ Human intervention is required for:
 6. Approving scientific scope changes.
 7. Choosing between unresolved scientific alternatives.
 8. Supplying raw CICIoT2023 CSV files.
-9. Supplying Edge-IIoTset files.
-10. Confirming a long expensive experiment if not already authorized.
+9. Confirming a long expensive experiment if not already authorized.
 
 ## Required Behavior
 
 If human intervention is needed:
 
 1. Stop the task.
-2. Mark the ticket `BLOCKED_HUMAN`.
-3. Add an entry to the appropriate decision/intervention file:
-   - **CP2 (active):** `docs/tickets/_ai_tracking/decisions/CP2_DECISION_LOG.md`
-   - **DATP journal (if that work resumes):** use that restored tree's active
-     human-intervention tracker; do not assume one exists in this CP2 tree
-4. State exactly what the user must do.
-5. State where to place the required file or decision.
-6. State which ticket becomes unblocked afterward.
-7. Do not implement around the missing human action.
-8. Do not create fake data.
-9. Do not create placeholder success artifacts.
-10. Do not continue with assumptions.
-
-## Human Intervention Entry Format
-
-Each entry must include:
-
-1. ID
-2. Related ticket
-3. Required user action
-4. Required path or decision
-5. Why it is required
-6. What remains blocked
-7. How to verify completion
-8. Status
-
-## Allowed Status Values
-
-1. `OPEN`
-2. `WAITING_FOR_USER`
-3. `USER_PROVIDED`
-4. `VERIFIED`
-5. `CLOSED`
-6. `CANCELLED_WITH_REASON`
+2. State exactly what the user must do.
+3. State where to place the required file or decision.
+4. State what work becomes unblocked afterward.
+5. Do not implement around the missing human action.
+6. Do not create fake data.
+7. Do not create placeholder success artifacts.
+8. Do not continue with assumptions.
 
 ## Stop Rule
 

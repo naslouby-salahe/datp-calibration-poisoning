@@ -31,7 +31,7 @@ from datp.attacks.enums import (
 )
 from datp.core.seed_sequence import SeedRecord
 from datp.core.seeds import SeedPair
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 class ManifestEmissionError(ValueError):
@@ -43,7 +43,7 @@ class ManifestBuildRequest:
     """Inputs needed to build a run manifest."""
 
     dataset: str
-    scale: ExperimentScale
+    stage: ExperimentStage
     policy: ThresholdPolicy
     objective: AttackerObjective
     source: PoisoningSourceStrategy
@@ -85,7 +85,7 @@ def build_manifest(request: ManifestBuildRequest) -> RunManifest:
     )
     return RunManifest(
         dataset=request.dataset,
-        scale=request.scale,
+        stage=request.stage,
         policy=request.policy,
         objective=request.objective,
         source=request.source,

@@ -1,21 +1,14 @@
 # Paper Claim Discipline Skill
 
-> **CP2 active.** This repo is executing the CP2 program — **calibration-channel
-> poisoning only**. Locks: `CLAUDE.md` + `docs/tickets/README.md` §9. Workflow:
-> `docs/tickets/TICKET_INDEX.md`; progress in
-> `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`. No backward compatibility
-> by default. Run `graphify update .` where applicable. Tests: unit → integration
-> → e2e (`tests/`). Manuscript evidence →
-> `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md`.
+> **datp-cp active.** Protocol of record: `docs/DATP_CP_Roadmap.md`.
+> No backward compatibility by default. Tests: unit → integration (`tests/`).
 > Forbidden: training/model/aggregation/test-data poisoning, Edge-IIoTset,
-> FedProx/Ditto/FedRep/FedPer/Laridi/B-FedStatsBenign, conformal/temporal
-> recalibration, journal-extension scope. Default policies
-> `{B1_GLOBAL, B2_PERSONALIZED, B4_CLUSTER}` — B3 excluded. CP2 do-not-claim:
-> privacy/DP, deployment/hardware, broad FL robustness, generic poisoning.
+> conformal/temporal recalibration, journal-extension scope.
+> Canonical policies: `GLOBAL_THRESHOLD`, `LOCAL_THRESHOLD`, `CLUSTER_THRESHOLD`.
 
-Use this skill for every manuscript, abstract, conclusion, caption, table title, README, report, audit, ticket, or documentation update that mentions DATP scientific findings.
+Use this skill for every manuscript, abstract, conclusion, caption, table title, README, report, or documentation update that mentions datp-cp scientific findings.
 
-The goal is to ensure every claim is narrower than the evidence.
+The goal is to ensure every claim is narrower than the evidence. Protocol of record: `docs/DATP_CP_Roadmap.md`.
 
 ---
 
@@ -24,18 +17,16 @@ The goal is to ensure every claim is narrower than the evidence.
 Before editing or auditing claims, inspect:
 
 1. Active result artifacts.
-2. Active `docs/journal/POST_EXPERIMENT_PLAN.md`.
-3. Active `docs/journal/EXPERIMENT_PLAN.md`.
-4. Relevant metrics files.
-5. Relevant table and figure sidecars.
-6. Relevant paper section.
-7. Relevant ticket or audit report.
+2. `docs/DATP_CP_Roadmap.md` §18 (Claims and Safe Wording) and §19 (Kill and Pivot Criteria).
+3. Relevant metrics files.
+4. Relevant table and figure sidecars.
+5. Relevant paper section.
 
 Do not update claims from memory.
 
 Do not update claims from planned experiments.
 
-Do not update claims before result freeze when the active plan forbids it.
+Do not write outcome language before outcome evidence exists.
 
 ---
 
@@ -45,206 +36,48 @@ Classify every claim:
 
 | Level | Meaning |
 |---|---|
-| `DIRECT` | Directly supported by DATP result artifacts under the stated protocol. |
-| `SUPPORTIVE` | Supported by secondary regime, stress test, sensitivity, or mechanism analysis. |
-| `BOUNDARY` | Shows where DATP does not improve or does not apply. |
-| `EXPLORATORY` | Useful but not confirmatory. |
-| `QUALITATIVE` | Literature- or design-based, not a DATP empirical result. |
+| `DIRECT` | Directly supported by paired clean-vs-poisoned datp-cp result artifacts. |
+| `SUPPORTIVE` | Supported by secondary analysis (cluster decomposition, diagnostic variants). |
+| `BOUNDARY` | Shows where the attack does not apply or fails. |
+| `EXPLORATORY` | Useful context but not confirmatory. |
+| `QUALITATIVE` | Literature- or design-based, not an empirical datp-cp result. |
 | `FORBIDDEN` | Not supported and must be removed or rewritten. |
 
 No claim may remain unclassified.
 
 ---
 
-## 3. Core Claim Template
+## 3. Positive Result Wording (roadmap §18.1)
 
-Preferred core wording:
+If the primary claim gate is met:
 
-```text
-Under the tested fixed-FedAvg autoencoder protocol, device-aware per-client threshold calibration reduces cross-client FPR dispersion relative to a shared threshold in the Regime A N-BaIoT physical-device partition.
-```
-
-Acceptable shorter wording:
-
-```text
-DATP reduces FPR dispersion under the tested fixed-encoder threshold-calibration protocol.
-```
-
-Required qualifiers when relevant:
-
-1. Tested protocol.
-2. Fixed encoder.
-3. Fixed training protocol.
-4. Threshold calibration scope.
-5. Regime A.
-6. N-BaIoT physical-device partition.
-7. Eligible clients.
-8. Coverage ratio.
-9. Seed count.
-10. Detection-quality tradeoff.
+> datp-cp shows that poisoning only benign threshold-calibration data can materially shift threshold policies in federated IoT anomaly detection while training, aggregation, model parameters, and test data remain clean. Under the tested N-BaIoT setting, threshold-raising attacks degrade victim detection, threshold-lowering attacks degrade alarm-burden predictability, and global, local, and cluster threshold policies exhibit distinct vulnerability profiles.
 
 ---
 
-## 4. Journal Claim Template
+## 4. Mixed Result Wording (roadmap §18.2)
 
-Preferred journal wording:
-
-```text
-The journal extension tests whether DATP's threshold-scope effect survives a stronger protocol with external validation, matched federated-threshold comparators, and stress tests, while preserving the fixed-encoder threshold-calibration identity.
-```
-
-Use only after the relevant experiments and result-freeze evidence exist.
-
-Before result freeze, write:
-
-```text
-The journal extension is designed to test whether DATP's threshold-scope effect survives a stronger protocol...
-```
-
-Do not write outcome language before outcome evidence exists.
+> Under the tested N-BaIoT setting, calibration-channel poisoning produced bounded and policy-dependent effects. The observed harm was consistent for the supported objective or policy subset, while the remaining cells did not meet the pre-registered claim gate.
 
 ---
 
-## 5. Required Claim Boundaries
+## 5. Negative Result Wording (roadmap §18.3)
 
-### Regime A
-
-Allowed:
-
-```text
-Confirmatory evidence.
-```
-
-Required:
-
-1. Dataset.
-2. Physical-device partition.
-3. Seed count.
-4. Coverage ratio.
-5. B1 vs B2 delta.
-6. Detection-quality tradeoff.
-
-### Regime B-a
-
-Allowed:
-
-```text
-Near-homogeneous boundary condition under file-level pseudo-clients.
-```
-
-Forbidden:
-
-```text
-Physical-device validation.
-```
-
-### Regime B-b
-
-Allowed only after feasibility and results:
-
-```text
-Conditional device-MAC or device-group CICIoT2023 validation.
-```
-
-Forbidden before feasibility:
-
-```text
-CICIoT2023 device-level validation.
-```
-
-### Regime C
-
-Allowed:
-
-```text
-Supportive severity-sweep evidence.
-```
-
-Forbidden:
-
-```text
-Primary confirmatory proof.
-```
-
-### Regime D
-
-Allowed only after feasibility and results:
-
-```text
-External validation on Edge-IIoTset under the verified client partition.
-```
-
-Forbidden before feasibility:
-
-```text
-External device validation is confirmed.
-```
+> Under the tested gray-box score-level setting and poison fractions, calibration-only poisoning did not produce material, correctly signed threshold shifts with interpretable downstream movement. The result bounds this attack instantiation rather than proving general robustness of threshold calibration.
 
 ---
 
-## 6. Comparator Claim Boundaries
+## 6. Required Claim Qualifiers
 
-### FedProx
+Every result claim must include:
 
-Allowed:
-
-```text
-Aggregation-side stress test.
-```
-
-Forbidden:
-
-```text
-Part of the same causal ladder as B1–B4.
-```
-
-### Ditto
-
-Allowed only if faithful:
-
-```text
-Ditto stress test.
-```
-
-If not faithful, use:
-
-```text
-FedRep-AE/FedPer-AE fallback stress test.
-```
-
-Forbidden:
-
-```text
-Ditto-like custom method called Ditto.
-```
-
-### B-FedStatsBenign
-
-Allowed:
-
-```text
-DATP-compatible benign-only federated-statistics threshold comparator.
-```
-
-Forbidden:
-
-```text
-Faithful Laridi reproduction.
-```
-
-### B-LaridiFaithful
-
-Allowed only when implemented with anomaly-labeled summaries:
-
-```text
-Relaxed anomaly-labeled comparator outside DATP's benign-only calibration assumption.
-```
-
-Forbidden:
-
-```text
-DATP-compatible benign-only method.
-```
+1. Dataset: N-BaIoT.
+2. Attack surface: calibration-channel only.
+3. Fixed training: shared model parameters, aggregation, splits, and test data.
+4. Threshold policy named explicitly.
+5. Seed count (5 paired seeds).
+6. Eligible client count and coverage.
+7. Whether result is confirmatory (NBAIOT_MAIN), optional (NBAIOT_FULL_OPTIONAL), or diagnostic (STRETCH_DIAGNOSTIC_ONLY).
 
 ---
 
@@ -252,26 +85,20 @@ DATP-compatible benign-only method.
 
 Remove or rewrite any claim that says or implies:
 
-1. DATP is globally better at anomaly detection.
-2. DATP is universally better than all thresholding methods.
-3. DATP is formally privacy-preserving.
-4. B4 preserves privacy.
-5. DATP is robust to poisoning.
-6. DATP is robust to backdoors.
-7. DATP is robust to evasion.
-8. DATP handles concept drift.
-9. DATP is deployment-ready.
-10. DATP is hardware validated.
-11. DATP reduces communication cost.
-12. DATP has production-grade runtime evidence.
-13. CICIoT2023 file-level pseudo-clients are physical devices.
-14. Regime C is confirmatory.
-15. Stress tests are core baselines.
-16. Five-seed bootstrap CIs are high-powered population inference.
-17. Null or failed outcomes do not matter.
-18. Dataset feasibility is obvious without evidence.
-19. Post-hoc changes were pre-specified.
-20. Conference and journal papers have no overlap.
+1. Universal threshold vulnerability or universal robustness.
+2. Raw-traffic attack realizability.
+3. Broad FL robustness.
+4. Formal privacy preservation.
+5. Deployment readiness.
+6. Robustness to poisoning, backdoors, or evasion.
+7. Hardware validation.
+8. Concept drift handling.
+9. Training-data poisoning results.
+10. Model-poisoning or aggregation-poisoning results.
+11. Multi-client compromise from single-client data.
+12. Results from diagnostic-only variants as main evidence.
+13. Claims stronger than pre-registered primary claim gate.
+14. Post-hoc changes presented as pre-specified.
 
 ---
 
@@ -279,22 +106,20 @@ Remove or rewrite any claim that says or implies:
 
 Every figure/table caption must identify:
 
-1. Dataset or regime.
-2. Baseline/comparator set.
+1. Dataset or stage.
+2. Policy or policy set.
 3. Seed count.
-4. Whether result is confirmatory, supportive, exploratory, boundary, or stress-test.
+4. Whether result is confirmatory, supportive, or diagnostic.
 5. Metric definition when needed.
-6. Coverage ratio when CV(FPR) is shown.
+6. Coverage when CV(FPR) is shown.
 7. Whether shown result is illustrative or multi-seed.
 
 Forbidden captions:
 
 1. Captions claiming broad superiority.
-2. Captions omitting regime.
-3. Captions omitting illustrative-only status.
-4. Captions calling stress tests core baselines.
-5. Captions hiding null or mixed outcomes.
-6. Captions that mismatch the visual type.
+2. Captions omitting stage or policy.
+3. Captions hiding null or mixed outcomes.
+4. Captions that mismatch the visual type.
 
 ---
 
@@ -304,14 +129,13 @@ Update abstract and conclusion last.
 
 Before editing abstract or conclusion, verify:
 
-1. Result freeze passed.
-2. Claim-survival wording selected.
-3. Tables and figures finalized.
+1. Result artifacts are frozen.
+2. Claim-survival wording is selected.
+3. Tables and figures are finalized.
 4. Limitations are explicit.
 5. Null outcomes are disclosed.
-6. Stress tests are scoped correctly.
-7. Conference overlap disclosure is ready.
-8. No forbidden claim remains.
+6. Diagnostic variants are clearly labeled.
+7. No forbidden claim remains.
 
 The abstract must include limits if it includes results.
 
@@ -320,8 +144,6 @@ The conclusion must not be stronger than the results section.
 ---
 
 ## 10. Required Output
-
-Use this format:
 
 ```text
 # Claim Discipline Audit
@@ -353,7 +175,6 @@ Required limitations:
 
 ## Final Decision
 Can publish/update:
-Can mark DONE:
 Reason:
 Invalidation rule:
 ```

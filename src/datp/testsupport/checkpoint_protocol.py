@@ -1,8 +1,8 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
-    Baseline,
-    Regime,
     RunKind,
     ThresholdAggregationMethod,
     ThresholdSource,
@@ -27,7 +27,7 @@ def build_fake_checkpoint_metrics(
         for seed in seeds:
             metrics.append(
                 _fake_metric(
-                    baseline=Baseline.B1,
+                    policy=ThresholdPolicy.GLOBAL_THRESHOLD,
                     seed=seed,
                     checkpoint_round=checkpoint_round,
                     cv_fpr=0.30 + 0.01 * seed,
@@ -38,7 +38,7 @@ def build_fake_checkpoint_metrics(
             )
             metrics.append(
                 _fake_metric(
-                    baseline=Baseline.B2,
+                    policy=ThresholdPolicy.LOCAL_THRESHOLD,
                     seed=seed,
                     checkpoint_round=checkpoint_round,
                     cv_fpr=0.20 + 0.01 * seed,
@@ -52,7 +52,7 @@ def build_fake_checkpoint_metrics(
 
 def _fake_metric(
     *,
-    baseline: Baseline,
+    policy: ThresholdPolicy,
     seed: int,
     checkpoint_round: int,
     cv_fpr: float,
@@ -89,18 +89,17 @@ def _fake_metric(
         schema_version=METRICS_SCHEMA_VERSION,
         metric_schema_version=METRIC_SCHEMA_VERSION,
         threshold_schema_version=THRESHOLD_SCHEMA_VERSION,
-        run_id=f"a_{baseline.value}_seed{seed}_round{checkpoint_round}",
+        run_id=f"nbaiot_main_{policy.value}_seed{seed}_round{checkpoint_round}",
         run_kind=RunKind.CORE_LADDER,
-        baseline=baseline,
-        regime=Regime.A,
+        policy=policy,
+        stage=ExperimentStage.NBAIOT_MAIN,
         seed=seed,
-        alpha=None,
         checkpoint_round=checkpoint_round,
         dataset=DatasetID.NBAIOT,
         threshold_scope=ThresholdAggregationMethod.PER_CLIENT_PERCENTILE
-        if baseline == Baseline.B2
+        if policy == ThresholdPolicy.LOCAL_THRESHOLD
         else ThresholdAggregationMethod.ELIGIBLE_CLIENT_ARITHMETIC_MEAN,
-        threshold_strategy_name=baseline.value,
+        threshold_strategy_name=policy.value,
         tau_global=0.5,
         eligible_ids=("c1", "c2"),
         pending_ids=(),
@@ -159,5 +158,5 @@ def _client_detail(
         calibration_pending=False,
         evaluation_incomplete=False,
         threshold_value=0.5,
-        threshold_source=ThresholdSource.B2_PER_CLIENT,
+        threshold_source=ThresholdSource.LOCAL,
     )

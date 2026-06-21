@@ -17,21 +17,21 @@ from datp.attacks.enums import (
     ThresholdPolicy,
 )
 from datp.config.attack_config import CalibrationPoisoningConfig, SeedPools
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 _VICTIMS: tuple[str, ...] = ("c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8")
 _VICTIMS_BY_SEED: dict[int, tuple[str, ...]] = dict.fromkeys((0, 1, 2, 3, 4), _VICTIMS)
 
 
 def _bounded_config() -> CalibrationPoisoningConfig:
-    return CalibrationPoisoningConfig.for_bounded_mvp()
+    return CalibrationPoisoningConfig.for_bounded_sweep()
 
 
 def _full_config(**overrides: object) -> CalibrationPoisoningConfig:
-    from datp.attacks.constants import FULL_SWEEP_FRACTIONS
+    from datp.attacks.constants import NBAIOT_FULL_OPTIONAL_SWEEP_FRACTIONS
 
     defaults: dict[str, object] = {
-        "policies": (ThresholdPolicy.B1_GLOBAL, ThresholdPolicy.B2_PERSONALIZED, ThresholdPolicy.B4_CLUSTER),
+        "policies": (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
         "sources": (
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -39,20 +39,20 @@ def _full_config(**overrides: object) -> CalibrationPoisoningConfig:
         ),
         "knowledge": PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
         "target_scope": PoisoningTargetScope.SINGLE_CLIENT,
-        "scale": ExperimentScale.FULL,
-        "fractions": FULL_SWEEP_FRACTIONS,
+        "stage": ExperimentStage.NBAIOT_FULL_OPTIONAL,
+        "fractions": NBAIOT_FULL_OPTIONAL_SWEEP_FRACTIONS,
     }
     defaults.update(overrides)
     return CalibrationPoisoningConfig(**defaults)  # type: ignore[arg-type]
 
 
 def test_bounded_enumerator_rejects_full_config():
-    with pytest.raises(ValueError, match="ExperimentScale.BOUNDED"):
+    with pytest.raises(ValueError, match="ExperimentStage.NBAIOT_MAIN"):
         enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _full_config())
 
 
 def test_full_enumerator_rejects_bounded_config():
-    with pytest.raises(ValueError, match="ExperimentScale.FULL"):
+    with pytest.raises(ValueError, match="ExperimentStage.NBAIOT_FULL_OPTIONAL"):
         enumerate_full_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
 
 
@@ -64,9 +64,9 @@ def test_matrix_size_is_exactly_1620():
 def test_matrix_policies_are_exactly_default_three():
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
     assert {c.policy for c in cells} == {
-        ThresholdPolicy.B1_GLOBAL,
-        ThresholdPolicy.B2_PERSONALIZED,
-        ThresholdPolicy.B4_CLUSTER,
+        ThresholdPolicy.GLOBAL_THRESHOLD,
+        ThresholdPolicy.LOCAL_THRESHOLD,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
     }
 
 
@@ -156,12 +156,12 @@ def test_full_matrix_missing_seed_raises_keyerror():
 
 def test_enumerator_uses_config_policies_not_constants():
     """Only the policies in config appear in cells — no other policies leak in."""
-    config = _full_config(policies=(ThresholdPolicy.B1_GLOBAL,))
+    config = _full_config(policies=(ThresholdPolicy.GLOBAL_THRESHOLD,))
     cells = enumerate_full_sweep_matrix(_VICTIMS_BY_SEED, config)
-    assert all(c.policy == ThresholdPolicy.B1_GLOBAL for c in cells)
+    assert all(c.policy == ThresholdPolicy.GLOBAL_THRESHOLD for c in cells)
     policies_seen = {c.policy for c in cells}
-    assert ThresholdPolicy.B2_PERSONALIZED not in policies_seen
-    assert ThresholdPolicy.B4_CLUSTER not in policies_seen
+    assert ThresholdPolicy.LOCAL_THRESHOLD not in policies_seen
+    assert ThresholdPolicy.CLUSTER_THRESHOLD not in policies_seen
 
 
 def test_enumerator_uses_config_fractions_not_constants():

@@ -10,16 +10,16 @@ from datp.attacks.guardrails import (
     assert_bounded_scale_requires_single_client,
     assert_fractions_in_locked_grid,
     assert_no_inplace_mutation,
-    assert_policy_not_b3,
+    assert_valid_policy,
     assert_reservoir_not_test_or_training,
 )
-from datp.attacks.constants import BOUNDED_SWEEP_FRACTIONS
+from datp.attacks.constants import NBAIOT_MAIN_SWEEP_FRACTIONS
 from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
 from datp.core.enums import ScoringStage
-from datp.experiments.enums import ExperimentScale
+from datp.config.stages import ExperimentStage
 
 
 class TestNoInplaceMutation:
@@ -57,82 +57,77 @@ class TestReservoirNotTestOrTraining:
             assert_reservoir_not_test_or_training(ScoringStage.TEST_BENIGN)
 
 
-class TestPolicyNotB3:
-    def test_b1_global_passes(self) -> None:
-        assert_policy_not_b3(ThresholdPolicy.B1_GLOBAL)
+class TestAssertValidPolicy:
+    def test_global_threshold_passes(self) -> None:
+        assert_valid_policy(ThresholdPolicy.GLOBAL_THRESHOLD)
 
-    def test_b2_personalized_passes(self) -> None:
-        assert_policy_not_b3(ThresholdPolicy.B2_PERSONALIZED)
+    def test_local_threshold_passes(self) -> None:
+        assert_valid_policy(ThresholdPolicy.LOCAL_THRESHOLD)
 
-    def test_b4_cluster_passes(self) -> None:
-        assert_policy_not_b3(ThresholdPolicy.B4_CLUSTER)
-
-    def test_b3_enum_cannot_be_created(self) -> None:
-        # ThresholdPolicy cannot represent B3 — assert no "b3" value exists.
-        assert all("b3" not in v for v in ThresholdPolicy)
+    def test_cluster_threshold_passes(self) -> None:
+        assert_valid_policy(ThresholdPolicy.CLUSTER_THRESHOLD)
 
 
 class TestFractionsInLockedGrid:
     def test_bounded_fractions_all_pass(self) -> None:
         assert_fractions_in_locked_grid(
-            BOUNDED_SWEEP_FRACTIONS, ExperimentScale.BOUNDED
+            NBAIOT_MAIN_SWEEP_FRACTIONS, ExperimentStage.NBAIOT_MAIN
         )
 
     def test_zero_fraction_passes(self) -> None:
-        assert_fractions_in_locked_grid([0.0], ExperimentScale.BOUNDED)
+        assert_fractions_in_locked_grid([0.0], ExperimentStage.NBAIOT_MAIN)
 
     def test_010_fraction_passes(self) -> None:
-        assert_fractions_in_locked_grid([0.10], ExperimentScale.BOUNDED)
+        assert_fractions_in_locked_grid([0.10], ExperimentStage.NBAIOT_MAIN)
 
     def test_invalid_fraction_raises(self) -> None:
         with pytest.raises(GuardrailError, match="0.3"):
-            assert_fractions_in_locked_grid([0.3], ExperimentScale.BOUNDED)
+            assert_fractions_in_locked_grid([0.3], ExperimentStage.NBAIOT_MAIN)
 
     def test_005_not_in_bounded_grid(self) -> None:
         with pytest.raises(GuardrailError, match="0.05"):
-            assert_fractions_in_locked_grid([0.05], ExperimentScale.BOUNDED)
+            assert_fractions_in_locked_grid([0.05], ExperimentStage.NBAIOT_MAIN)
 
     def test_005_allowed_in_full_scale(self) -> None:
-        assert_fractions_in_locked_grid([0.05], ExperimentScale.FULL)
+        assert_fractions_in_locked_grid([0.05], ExperimentStage.NBAIOT_FULL_OPTIONAL)
 
     def test_bounded_fractions_allowed_in_full_scale(self) -> None:
         assert_fractions_in_locked_grid(
-            list(BOUNDED_SWEEP_FRACTIONS), ExperimentScale.FULL
+            list(NBAIOT_MAIN_SWEEP_FRACTIONS), ExperimentStage.NBAIOT_FULL_OPTIONAL
         )
 
     def test_empty_fractions_pass(self) -> None:
-        assert_fractions_in_locked_grid([], ExperimentScale.BOUNDED)
+        assert_fractions_in_locked_grid([], ExperimentStage.NBAIOT_MAIN)
 
     def test_error_message_includes_allowed_grid(self) -> None:
         with pytest.raises(GuardrailError, match="locked grid"):
-            assert_fractions_in_locked_grid([0.99], ExperimentScale.BOUNDED)
+            assert_fractions_in_locked_grid([0.99], ExperimentStage.NBAIOT_MAIN)
 
 
 class TestBoundedScaleRequiresSingleClient:
     def test_bounded_with_single_client_passes(self) -> None:
         assert_bounded_scale_requires_single_client(
-            ExperimentScale.BOUNDED, PoisoningTargetScope.SINGLE_CLIENT
+            ExperimentStage.NBAIOT_MAIN, PoisoningTargetScope.SINGLE_CLIENT
         )
 
     def test_bounded_with_multi_client_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
             assert_bounded_scale_requires_single_client(
-                ExperimentScale.BOUNDED, PoisoningTargetScope.MULTI_CLIENT
+                ExperimentStage.NBAIOT_MAIN, PoisoningTargetScope.MULTI_CLIENT
             )
 
-    def test_bounded_with_all_clients_raises(self) -> None:
+    def test_bounded_with_all_clients_diagnostic_only_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
             assert_bounded_scale_requires_single_client(
-                ExperimentScale.BOUNDED, PoisoningTargetScope.ALL_CLIENTS
+                ExperimentStage.NBAIOT_MAIN, PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY
             )
 
     def test_full_scale_multi_client_passes(self) -> None:
-        # Non-bounded scales are not gated by this guardrail.
         assert_bounded_scale_requires_single_client(
-            ExperimentScale.FULL, PoisoningTargetScope.MULTI_CLIENT
+            ExperimentStage.NBAIOT_FULL_OPTIONAL, PoisoningTargetScope.MULTI_CLIENT
         )
 
     def test_smoke_scale_multi_client_passes(self) -> None:
         assert_bounded_scale_requires_single_client(
-            ExperimentScale.SMOKE, PoisoningTargetScope.MULTI_CLIENT
+            ExperimentStage.SYNTHETIC_SMOKE, PoisoningTargetScope.MULTI_CLIENT
         )

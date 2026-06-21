@@ -1,11 +1,11 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import math
 
 import numpy as np
 import pytest
 
-from datp.core.enums import Baseline
 from datp.core.types import ClientThreshold
 from datp.evaluation.metrics import compute_client_record
 
@@ -15,7 +15,7 @@ def _ct(threshold: float = 0.5) -> ClientThreshold:
         client_id="test",
         threshold=threshold,
         calibration_pending=False,
-        strategy=Baseline.B1,
+        strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
 
 

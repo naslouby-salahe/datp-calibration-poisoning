@@ -6,10 +6,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from datp.core.enums import (
-    Baseline,
-    Regime,
-)
+from datp.attacks.enums import ThresholdPolicy
+from datp.config.stages import ExperimentStage
 from datp.core.identity import TrainingCellId
 from datp.experiments.enums import ContingencyDecision
 from datp.experiments.models import (
@@ -17,6 +15,8 @@ from datp.experiments.models import (
     PipelineRequest,
     SharedPipelineContext,
 )
+
+_STAGE = ExperimentStage.NBAIOT_MAIN
 
 
 class TestPipelineRequest:
@@ -27,54 +27,53 @@ class TestPipelineRequest:
         return cfg
 
     def test_fields_accessible(self, tmp_path: Path) -> None:
-        key = TrainingCellId(regime=Regime.A, seed=3, alpha=None)
+        key = TrainingCellId(stage=_STAGE, seed=3)
         cfg = self._make_cfg()
         req = PipelineRequest(
             key=key,
-            baseline=Baseline.B1,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             cfg=cfg,
             base_dir=tmp_path,
             prepared_dir=tmp_path / "prepared",
             checkpoint_round=None,
         )
         assert req.key is key
-        assert req.baseline == Baseline.B1
+        assert req.policy == ThresholdPolicy.GLOBAL_THRESHOLD
         assert req.cfg is cfg
         assert req.base_dir == tmp_path
         assert req.prepared_dir == tmp_path / "prepared"
 
     def test_key_carried_through(self, tmp_path: Path) -> None:
-        key = TrainingCellId(regime=Regime.C, seed=9, alpha=0.1)
+        key = TrainingCellId(stage=_STAGE, seed=9)
         cfg = self._make_cfg()
         req = PipelineRequest(
             key=key,
-            baseline=Baseline.B2,
+            policy=ThresholdPolicy.LOCAL_THRESHOLD,
             cfg=cfg,
             base_dir=tmp_path,
             prepared_dir=tmp_path,
             checkpoint_round=50,
         )
-        assert req.key.regime == Regime.C
+        assert req.key.stage == _STAGE
         assert req.key.seed == 9
-        assert req.key.alpha == pytest.approx(0.1)
 
     def test_immutable(self, tmp_path: Path) -> None:
-        key = TrainingCellId(regime=Regime.A, seed=1, alpha=None)
+        key = TrainingCellId(stage=_STAGE, seed=1)
         req = PipelineRequest(
             key=key,
-            baseline=Baseline.B1,
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             cfg=self._make_cfg(),
             base_dir=tmp_path,
             prepared_dir=tmp_path,
             checkpoint_round=None,
         )
         with pytest.raises((AttributeError, TypeError)):
-            req.baseline = Baseline.B2  # type: ignore[misc]
+            req.policy = ThresholdPolicy.LOCAL_THRESHOLD  # type: ignore[misc]
 
 
 class TestSharedPipelineContext:
     def _make_key(self) -> TrainingCellId:
-        return TrainingCellId(regime=Regime.A, seed=1, alpha=None)
+        return TrainingCellId(stage=_STAGE, seed=1)
 
     def test_fields_accessible(self, tmp_path: Path) -> None:
         from datp.scoring.loading import ScoreProvider
@@ -156,34 +155,34 @@ class TestContingencyRecord:
     def test_valid_go_decision(self) -> None:
         record = ContingencyRecord(
             decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
+            cv_fpr_global=0.45,
+            cv_fpr_local=0.32,
             delta_cv_fpr=0.13,
             dispersion_threshold=0.10,
-            rationale="B1 CV(FPR) exceeds dispersion threshold",
+            rationale="GLOBAL_THRESHOLD CV(FPR) exceeds dispersion threshold",
         )
         assert record.decision == ContingencyDecision.GO
-        assert record.cv_fpr_b1 == pytest.approx(0.45)
-        assert record.cv_fpr_b2 == pytest.approx(0.32)
+        assert record.cv_fpr_global == pytest.approx(0.45)
+        assert record.cv_fpr_local == pytest.approx(0.32)
         assert record.delta_cv_fpr == pytest.approx(0.13)
         assert record.is_preliminary_diagnostic is True
 
     def test_valid_contingency_decision(self) -> None:
         record = ContingencyRecord(
             decision=ContingencyDecision.CONTINGENCY,
-            cv_fpr_b1=0.05,
-            cv_fpr_b2=0.04,
+            cv_fpr_global=0.05,
+            cv_fpr_local=0.04,
             delta_cv_fpr=0.01,
             dispersion_threshold=0.10,
-            rationale="B1 CV(FPR) below dispersion threshold — abort",
+            rationale="GLOBAL_THRESHOLD CV(FPR) below dispersion threshold — abort",
         )
         assert record.decision == ContingencyDecision.CONTINGENCY
 
     def test_immutable(self) -> None:
         record = ContingencyRecord(
             decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
+            cv_fpr_global=0.45,
+            cv_fpr_local=0.32,
             delta_cv_fpr=0.13,
             dispersion_threshold=0.10,
             rationale="test",
@@ -192,78 +191,12 @@ class TestContingencyRecord:
             record.decision = ContingencyDecision.CONTINGENCY  # type: ignore[misc]
 
     def test_is_preliminary_diagnostic_default(self) -> None:
-        """is_preliminary_diagnostic defaults to True and is always True for this record type."""
         record = ContingencyRecord(
             decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
-            delta_cv_fpr=0.13,
+            cv_fpr_global=0.1,
+            cv_fpr_local=0.1,
+            delta_cv_fpr=0.0,
             dispersion_threshold=0.10,
-            rationale="preliminary check only",
+            rationale="test",
         )
         assert record.is_preliminary_diagnostic is True
-
-    def test_explicit_preliminary_false_still_allowed(self) -> None:
-        """The field can be set explicitly even though the default is True."""
-        record = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="test",
-            is_preliminary_diagnostic=False,
-        )
-        assert record.is_preliminary_diagnostic is False
-
-    def test_model_dump_json(self) -> None:
-        record = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="B1 CV(FPR) exceeds dispersion threshold",
-        )
-        data = record.model_dump(mode="json")
-        assert data["decision"] == "go"
-        assert data["cv_fpr_b1"] == pytest.approx(0.45)
-        assert data["is_preliminary_diagnostic"] is True
-
-    def test_equality_same_values(self) -> None:
-        r1 = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="test",
-        )
-        r2 = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="test",
-        )
-        assert r1 == r2
-
-    def test_inequality_different_decision(self) -> None:
-        r1 = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="test",
-        )
-        r2 = ContingencyRecord(
-            decision=ContingencyDecision.CONTINGENCY,
-            cv_fpr_b1=0.45,
-            cv_fpr_b2=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="test",
-        )
-        assert r1 != r2

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from datp.core.enums import Regime
+from datp.config.stages import ExperimentStage
 from datp.data.common.audit import audit_partitions
 from datp.data.contracts import PartitionResult
 from datp.data.datasets.nbaiot import DEVICE_DIRS
@@ -45,10 +45,10 @@ class TestAuditJsonSchema:
     def test_audit_writes_json_with_all_devices(self, tmp_path: Path) -> None:
         results = _make_nbaiot_partition_results()
         audit = audit_partitions(
-            results, regime=Regime.A, output_dir=tmp_path, n_min=100
+            results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100
         )
 
-        audit_file = tmp_path / "data_audit" / "a_audit.json"
+        audit_file = tmp_path / "data_audit" / "nbaiot_main_audit.json"
         assert audit_file.exists()
 
         assert audit.n_clients == N_EXPECTED_DEVICES
@@ -60,7 +60,7 @@ class TestAuditJsonSchema:
     def test_audit_per_client_required_fields(self, tmp_path: Path) -> None:
         results = _make_nbaiot_partition_results()
         audit = audit_partitions(
-            results, regime=Regime.A, output_dir=tmp_path, n_min=100
+            results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100
         )
 
         for client_id, client_info in audit.clients.items():
@@ -72,7 +72,7 @@ class TestAuditJsonSchema:
     def test_audit_field_types(self, tmp_path: Path) -> None:
         results = _make_nbaiot_partition_results()
         audit = audit_partitions(
-            results, regime=Regime.A, output_dir=tmp_path, n_min=100
+            results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100
         )
 
         for client_id, info in audit.clients.items():
@@ -85,12 +85,12 @@ class TestAuditJsonSchema:
 
     def test_audit_json_roundtrip(self, tmp_path: Path) -> None:
         results = _make_nbaiot_partition_results()
-        audit_partitions(results, regime=Regime.A, output_dir=tmp_path, n_min=100)
+        audit_partitions(results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100)
 
-        audit_file = tmp_path / "data_audit" / "a_audit.json"
+        audit_file = tmp_path / "data_audit" / "nbaiot_main_audit.json"
         loaded = json.loads(audit_file.read_text())
 
-        assert loaded["regime"] == "a"
+        assert loaded["stage"] == "nbaiot_main"
         assert loaded["n_clients"] == N_EXPECTED_DEVICES
         assert loaded["n_min"] == 100
         assert "summary" in loaded
@@ -107,7 +107,7 @@ class TestAuditJsonSchema:
     def test_audit_calibration_pending_flag(self, tmp_path: Path) -> None:
         results = _make_nbaiot_partition_results(cal_count=50)
         audit = audit_partitions(
-            results, regime=Regime.A, output_dir=tmp_path, n_min=100
+            results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100
         )
 
         for client_id, info in audit.clients.items():
@@ -122,7 +122,7 @@ class TestAuditJsonSchema:
     def test_audit_summary_totals_match(self, tmp_path: Path) -> None:
         results = _make_nbaiot_partition_results()
         audit = audit_partitions(
-            results, regime=Regime.A, output_dir=tmp_path, n_min=100
+            results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100
         )
 
         clients = audit.clients

@@ -1,4 +1,4 @@
-"""B1/B2/B3/B4 all derive thresholds from the same shared score artifacts produced by one FL training run per (regime, seed, alpha)."""
+"""Controlled threshold policies derive from shared score artifacts for one FL training run."""
 
 from __future__ import annotations
 
@@ -9,9 +9,8 @@ from datp.artifacts.io import write_metrics_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.lifecycle import RunLifecycle
 from datp.artifacts.names import ArtifactFile
-from datp.core.enums import Baseline
 from datp.core.errors import fmt
-from datp.core.identity import BaselineRunId
+from datp.core.identity import PolicyRunId
 from datp.core.logging import get_logger
 from datp.core.provenance import MISSING_MANIFEST_HASH, hash_file, hash_jsonable
 from datp.core.tracking import (
@@ -20,7 +19,8 @@ from datp.core.tracking import (
     TrackingMetrics,
     log_metrics,
 )
-from datp.evaluation.metrics import evaluate_baseline
+from datp.config.stages import ExperimentStage
+from datp.evaluation.metrics import evaluate_policy_run
 from datp.experiments.enums import SweepStep
 from datp.experiments.models import PipelineRequest, SharedPipelineContext
 from datp.experiments.stages.train_encoder import ensure_fl_checkpoint
@@ -65,9 +65,8 @@ class SharedTrainingExecutor:
 
         self._step(SweepStep.LOAD_CAL_SCORES)
         client_errors = load_main_cal_errors(
-            key.regime,
+            key.stage,
             key.seed,
-            key.alpha,
             request.base_dir,
             request.checkpoint_round,
         )
@@ -82,7 +81,7 @@ class SharedTrainingExecutor:
         tau_global = compute_tau_global(client_taus)
 
         self._step(SweepStep.INIT_SCORE_PROVIDER)
-        layout = ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
+        layout = ArtifactLayout(base_dir=request.base_dir, stage=key.stage)
         score_cell = (
             layout.score_cell_for_round(key, request.checkpoint_round)
             if request.checkpoint_round is not None
@@ -115,51 +114,48 @@ class ThresholdEvaluationExecutor:
         request: PipelineRequest,
         ctx: SharedPipelineContext,
     ) -> SweepMetrics:
-        baseline = request.baseline
+        policy = request.policy
         cfg = request.cfg
-        layout = ArtifactLayout(base_dir=request.base_dir, regime=ctx.key.regime)
-        run = BaselineRunId(cell=ctx.key, baseline=baseline)
+        layout = ArtifactLayout(base_dir=request.base_dir, stage=ctx.key.stage)
+        run = PolicyRunId(cell=ctx.key, policy=policy)
         run_paths = (
-            layout.baseline_run_for_round(run, ctx.checkpoint_round)
+            layout.policy_run_for_round(run, ctx.checkpoint_round)
             if ctx.checkpoint_round is not None
-            else layout.baseline_run(run)
+            else layout.policy_run(run)
         )
         res_dir = run_paths.result_dir
 
-        with RunLifecycle(res_dir, baseline=baseline, seed=ctx.key.seed):
-            self._step(SweepStep.DERIVE_THRESHOLD, baseline)
+        with RunLifecycle(res_dir, policy=policy, seed=ctx.key.seed):
+            self._step(SweepStep.DERIVE_THRESHOLD, policy)
             threshold_result = derive_threshold(
                 _DeriveInput(
-                    baseline=baseline,
+                    policy=policy,
                     client_errors=ctx.client_errors,
                     n_min=cfg.threshold.n_min,
                     q=cfg.threshold.q,
                     tau_global=ctx.tau_global,
-                    regime=ctx.key.regime,
                     threshold_cfg=cfg.threshold,
                     seed=ctx.key.seed,
-                    alpha=ctx.key.alpha,
                 )
             )
             logger.info(
                 "threshold derivation complete",
-                baseline=baseline,
+                policy=policy,
                 tau_global=threshold_result.tau_global,
                 eligible=threshold_result.eligible_count,
                 pending=threshold_result.pending_count,
             )
 
-            self._step(SweepStep.EVALUATE, baseline)
-            eval_result = evaluate_baseline(
+            self._step(SweepStep.EVALUATE, policy)
+            eval_result = evaluate_policy_run(
                 threshold_result.client_thresholds,
                 ctx.score_provider.score_root,
-                ctx.key.regime,
+                ctx.key.stage,
                 ctx.key.seed,
-                ctx.key.alpha,
                 score_provider=ctx.score_provider,
             )
 
-            self._step(SweepStep.WRITE_METRICS, baseline)
+            self._step(SweepStep.WRITE_METRICS, policy)
             score_paths = (
                 layout.score_cell_for_round(ctx.key, ctx.checkpoint_round)
                 if ctx.checkpoint_round is not None
@@ -190,18 +186,18 @@ class ThresholdEvaluationExecutor:
             log_metrics(
                 TrackingMetrics(
                     (
-                        TrackingMetric.for_baseline(
-                            baseline,
+                        TrackingMetric.for_policy(
+                            policy,
                             TrackingMetricKey.ELIGIBLE,
                             threshold_result.eligible_count,
                         ),
-                        TrackingMetric.for_baseline(
-                            baseline,
+                        TrackingMetric.for_policy(
+                            policy,
                             TrackingMetricKey.PENDING,
                             threshold_result.pending_count,
                         ),
-                        TrackingMetric.for_baseline(
-                            baseline,
+                        TrackingMetric.for_policy(
+                            policy,
                             TrackingMetricKey.TAU_GLOBAL,
                             threshold_result.tau_global,
                         ),
@@ -221,59 +217,3 @@ class ThresholdEvaluationExecutor:
                 "",
             )
         )
-
-
-class IsolatedBaselineExecutor:
-    def __init__(self, *, step_fn: Callable[[SweepStep, str], None] | None) -> None:
-        self._step_fn = step_fn
-
-    def _step(self, step: SweepStep, detail: str = "") -> None:
-        if self._step_fn is not None:
-            self._step_fn(step, detail)
-
-    def run(self, request: PipelineRequest) -> None:
-        from datp.core.enums import ISOLATED_BASELINES
-        from datp.experiments.baselines.b0_centralized import B0RunRequest, run_b0
-
-        baseline = request.baseline
-        key = request.key
-        cfg = request.cfg
-
-        if baseline not in ISOLATED_BASELINES:
-            raise ValueError(
-                fmt(
-                    "pipeline.executor",
-                    "Not an isolated baseline",
-                    str(sorted(ISOLATED_BASELINES)),
-                    baseline,
-                )
-            )
-
-        out_dir = (
-            ArtifactLayout(base_dir=request.base_dir, regime=key.regime)
-            .baseline_run(BaselineRunId(cell=key, baseline=baseline))
-            .result_dir
-        )
-
-        if baseline == Baseline.B0:
-            self._step(SweepStep.RUN_B0, key.label())
-            run_b0(
-                B0RunRequest(
-                    prepared_dir=request.prepared_dir,
-                    output_dir=out_dir,
-                    seed=key.seed,
-                    input_dim=cfg.model.input_dim,
-                    hidden_dims=cfg.model.encoder_dims,
-                    n_min=cfg.threshold.n_min,
-                    q=cfg.threshold.q,
-                    epochs=cfg.model.epochs,
-                    patience=cfg.model.patience,
-                    lr=cfg.model.lr,
-                    batch_size=cfg.machine.batch_size_train,
-                    activation=cfg.model.activation,
-                    use_bn=cfg.model.use_bn,
-                    training_progress_interval=cfg.logging.training_progress_interval,
-                    val_fraction=cfg.dataset.b0_val_fraction,
-                    regime=key.regime,
-                )
-            )

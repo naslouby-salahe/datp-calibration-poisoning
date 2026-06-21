@@ -30,7 +30,7 @@ def _payload(*, cv_fpr: float = math.nan, pending: list[str] | None = None) -> d
             "calibration_pending": False,
             "evaluation_incomplete": False,
             "threshold_value": 0.5,
-            "threshold_source": "b1",
+            "threshold_source": "global_threshold",
         },
         {
             "client_id": "c2",
@@ -51,7 +51,7 @@ def _payload(*, cv_fpr: float = math.nan, pending: list[str] | None = None) -> d
             "calibration_pending": "c2" in pending_ids,
             "evaluation_incomplete": False,
             "threshold_value": 0.5,
-            "threshold_source": "tau_global_fallback" if "c2" in pending_ids else "b1",
+            "threshold_source": "tau_global_fallback" if "c2" in pending_ids else "global_threshold",
         },
     ]
     eligible = 2 - len(pending_ids)
@@ -59,14 +59,13 @@ def _payload(*, cv_fpr: float = math.nan, pending: list[str] | None = None) -> d
         "schema_version": "2",
         "metric_schema_version": "2",
         "threshold_schema_version": "1",
-        "run_id": "a_b1_seed0",
+        "run_id": "a_global_threshold_seed0",
         "dataset": "nbaiot",
-        "baseline": "b1",
-        "regime": "a",
+        "policy": "global_threshold",
+        "stage": "nbaiot_main",
         "seed": 0,
-        "alpha": None,
         "threshold_scope": "eligible_client_arithmetic_mean",
-        "threshold_strategy_name": "b1",
+        "threshold_strategy_name": "global_threshold",
         "per_client": per_client,
         "eligible_ids": [
             row["client_id"]
@@ -126,7 +125,7 @@ def test_reporting_loader_rejects_missing_eligible_ids() -> None:
 def test_eligible_intersection_rejects_mismatched_sets() -> None:
     left = _evaluation_from_payload(_payload(pending=[]), metric_tol=1e-9)
     right_payload = _payload(pending=["c2"])
-    right_payload["baseline"] = "b2"
+    right_payload["policy"] = "local_threshold"
     right_payload["std_fpr"] = math.nan
     right_payload["iqr_fpr"] = math.nan
     right_payload["cv_tpr"] = math.nan

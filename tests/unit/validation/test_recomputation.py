@@ -1,8 +1,9 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 import pytest
 
-from datp.core.enums import Baseline, Regime
+from datp.config.stages import ExperimentStage
 from datp.core.metric_enums import MetricName
 from datp.validation._recomputation import (
     RecomputationParams,
@@ -15,9 +16,8 @@ def _base_params(**overrides: object) -> RecomputationParams:
     defaults: dict = {
         "run_id": "a_b1_seed0",
         "seed": 0,
-        "regime": Regime.A,
-        "baseline": Baseline.B1,
-        "alpha": None,
+        "stage": ExperimentStage.NBAIOT_MAIN,
+        "policy": ThresholdPolicy.GLOBAL_THRESHOLD,
         "client_id": "c1",
         "tp": 10,
         "fp": 0,

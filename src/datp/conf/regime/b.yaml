@@ -1,9 +1,0 @@
-# @package _global_
-regime: b
-
-model:
-  input_dim: 39
-  encoder_dims: [32, 16, 8]
-
-dataset:
-  feature_count: 39

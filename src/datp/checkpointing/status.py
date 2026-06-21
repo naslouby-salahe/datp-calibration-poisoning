@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,23 +7,19 @@ from pathlib import Path
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
 from datp.checkpointing.enums import CheckpointArtifactStatus
-from datp.core.enums import (
-    Baseline,
-    Regime,
-    controlled_baselines_for_regime,
-)
-from datp.core.identity import BaselineRunId, TrainingCellId
+from datp.config.stages import ExperimentStage
+from datp.core.enums import CONTROLLED_POLICIES
+from datp.core.identity import PolicyRunId, TrainingCellId
 
 
 @dataclass(frozen=True, slots=True)
 class CheckpointArtifactCellStatus:
-    regime: Regime
+    stage: ExperimentStage
     seed: int
-    alpha: float | None
     checkpoint_round: int
     checkpoint: CheckpointArtifactStatus
     scores: CheckpointArtifactStatus
-    results: tuple[tuple[Baseline, CheckpointArtifactStatus], ...]
+    results: tuple[tuple[ThresholdPolicy, CheckpointArtifactStatus], ...]
 
     @property
     def complete(self) -> bool:
@@ -39,29 +36,27 @@ class CheckpointArtifactCellStatus:
 def checkpoint_artifact_status(
     *,
     artifact_root: Path,
-    regime: Regime,
+    stage: ExperimentStage,
     seed: int,
-    alpha: float | None,
     checkpoint_round: int,
-    baselines: tuple[Baseline, ...] | None = None,
+    policies: tuple[ThresholdPolicy, ...] | None = None,
 ) -> CheckpointArtifactCellStatus:
-    cell = TrainingCellId(regime=regime, seed=seed, alpha=alpha)
-    layout = ArtifactLayout(base_dir=artifact_root, regime=regime)
-    expected_baselines = baselines or controlled_baselines_for_regime(regime)
+    cell = TrainingCellId(stage=stage, seed=seed)
+    layout = ArtifactLayout(base_dir=artifact_root, stage=stage)
+    expected_policies = policies or CONTROLLED_POLICIES
     checkpoint_path = (
         layout.checkpoint_dir_for_round(cell, checkpoint_round)
         / ArtifactFile.MODEL_CHECKPOINT
     )
     score_manifest = layout.score_cell_for_round(cell, checkpoint_round).manifest_path
-    result_statuses: list[tuple[Baseline, CheckpointArtifactStatus]] = []
-    for baseline in expected_baselines:
-        run = BaselineRunId(cell=cell, baseline=baseline)
-        metrics_path = layout.baseline_run_for_round(run, checkpoint_round).metrics_path
-        result_statuses.append((baseline, _file_status(metrics_path)))
+    result_statuses: list[tuple[ThresholdPolicy, CheckpointArtifactStatus]] = []
+    for policy in expected_policies:
+        run = PolicyRunId(cell=cell, policy=policy)
+        metrics_path = layout.policy_run_for_round(run, checkpoint_round).metrics_path
+        result_statuses.append((policy, _file_status(metrics_path)))
     return CheckpointArtifactCellStatus(
-        regime=regime,
+        stage=stage,
         seed=seed,
-        alpha=alpha,
         checkpoint_round=checkpoint_round,
         checkpoint=_file_status(checkpoint_path),
         scores=_file_status(score_manifest),

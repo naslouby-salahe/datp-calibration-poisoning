@@ -1,16 +1,10 @@
 # results-audit-agent
 
-> **CP2 active.** This repo is executing the CP2 program — **calibration-channel
-> poisoning only**. Locks: `CLAUDE.md` + `docs/tickets/README.md` §9. Workflow:
-> `docs/tickets/TICKET_INDEX.md`; progress in
-> `docs/tickets/_ai_tracking/progress/CP2_PROGRESS.md`. No backward compatibility
-> by default. Run `graphify update .` where applicable. Tests: unit → integration
-> → e2e (`tests/`). Manuscript evidence →
-> `docs/tickets/_ai_tracking/paper_notes/CP2_PAPER_NOTES_CONSOLIDATED.md`.
+> **datp-cp active.** Protocol of record: `docs/DATP_CP_Roadmap.md`.
+> No backward compatibility by default. Tests: unit → integration (`tests/`).
 > Forbidden: training/model/aggregation/test-data poisoning, Edge-IIoTset,
-> FedProx/Ditto/FedRep/FedPer/Laridi/B-FedStatsBenign, conformal/temporal
-> recalibration, journal-extension scope. Default policies
-> `{B1_GLOBAL, B2_PERSONALIZED, B4_CLUSTER}` — B3 excluded.
+> conformal/temporal recalibration, journal-extension scope.
+> Canonical policies: `GLOBAL_THRESHOLD`, `LOCAL_THRESHOLD`, `CLUSTER_THRESHOLD`.
 
 ## Role
 
@@ -95,7 +89,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 7. Validate Macro-F1 reporting.
 8. Validate worst-client balanced accuracy.
 9. Validate seed completeness.
-10. Validate regime and baseline consistency.
+10. Validate policy and stage consistency.
 
 ## Required Checks
 
@@ -103,8 +97,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 2. Are result files non-empty?
 3. Are temporary files ignored?
 4. Are all seeds present?
-5. Are baseline labels canonical?
-6. Are B1, B2, B3, and B4 derived from shared scores?
+5. Are policy labels canonical (GLOBAL_THRESHOLD, LOCAL_THRESHOLD, CLUSTER_THRESHOLD)?
+6. Are GLOBAL_THRESHOLD, LOCAL_THRESHOLD, and CLUSTER_THRESHOLD derived from shared scores?
 7. Is CV(FPR) accompanied by coverage ratio?
 8. Are bootstrap confidence intervals present where required?
 9. Are missing clients handled correctly?
@@ -112,16 +106,16 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Scientific Red Flags
 
-1. B2 improves global detection claims beyond threshold-scope evidence.
-2. B5 appears in core claims.
-3. Regime B is treated as confirmatory.
-4. Regime C is treated as confirmatory.
-5. Missing coverage ratio beside CV(FPR).
-6. Results exist without score provenance.
-7. Baseline paths imply retraining per baseline.
-8. Seeds are incomplete.
-9. Bootstrap outputs are missing.
-10. Paper text overclaims results.
+1. LOCAL_THRESHOLD results presented as global detection improvements.
+2. STRETCH_DIAGNOSTIC_ONLY results treated as confirmatory.
+3. Missing coverage ratio beside CV(FPR).
+4. CV(FPR) reported when mean FPR is zero.
+5. Results exist without score provenance.
+6. Seeds are incomplete.
+7. Bootstrap outputs are missing.
+8. Paper text overclaims results.
+9. AUROC changed materially (must be zero under calibration-only attack).
+10. Invalid source-objective combination in result files.
 
 ## Output Format
 

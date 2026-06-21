@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datp.attacks.enums import ThresholdPolicy
 
 from collections.abc import Mapping
 from typing import Literal
@@ -6,25 +7,20 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from datp.checkpointing.enums import ConvergenceStatus
+from datp.config.stages import ExperimentStage
 from datp.core.enums import (
-    Baseline,
     NormalizationScope,
-    Regime,
     ScoringStage,
     ThresholdAggregationMethod,
     ThresholdSource,
 )
 from datp.core.metric_enums import MetricName
 from datp.data.catalog import ClientIdentity, DatasetID
-from datp.validation.constants import REGIME_C_SCOPE_NOTE
 from datp.validation.enums import (
     AuditSeverity,
     AuditStatus,
     DenominatorStatus,
     HomogeneityVerdict,
-    OutcomeVariable,
-    SeverityTrendStatus,
-    SeverityVariable,
     WarningCode,
     WorstDirection,
 )
@@ -46,9 +42,8 @@ class RunManifestRecord(AuditModel):
     git_commit_hash: str
     seed: int
     dataset: DatasetID
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     client_count: int
     split_hash: str
     model_hash: str
@@ -77,9 +72,8 @@ class RunManifestRecord(AuditModel):
 class ThresholdRecord(AuditModel):
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     client_id: str
     threshold_value: float
     threshold_source: ThresholdSource
@@ -92,9 +86,8 @@ class ThresholdRecord(AuditModel):
 class ClientMetricRecord(AuditModel):
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     client_id: str
     fpr: float
     tpr: float
@@ -117,9 +110,8 @@ class ClientMetricRecord(AuditModel):
 class PerAttackMetricRecord(AuditModel):
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     client_id: str
     attack_label: str
     status: DenominatorStatus
@@ -130,12 +122,11 @@ class PerAttackMetricRecord(AuditModel):
 
 class ReconstructionErrorSummaryRecord(AuditModel):
     run_id: str | None = None
-    baseline: Baseline | None = None
+    policy: ThresholdPolicy | None = None
     seed: int
-    regime: Regime
-    alpha: str | None
+    stage: ExperimentStage
     client_id: str
-    stage: ScoringStage
+    stage_split: ScoringStage
     count: int
     mean: float | None
     std: float | None
@@ -177,8 +168,7 @@ class CICIoTProtocolAudit(AuditModel):
 
 class DatasetPartitionAudit(AuditModel):
     dataset: DatasetID
-    regime: Regime
-    alpha: str | None
+    stage: ExperimentStage
     seed: int | None
     manifest_path: str
     manifest_hash: str
@@ -195,9 +185,8 @@ class DatasetPartitionAudit(AuditModel):
 class MetricDenominatorAuditRecord(AuditModel):
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     client_id: str
     fpr_denominator: int
     fpr_denominator_expected: int
@@ -212,9 +201,8 @@ class MetricDenominatorAuditRecord(AuditModel):
 class MetricRecomputationRecord(AuditModel):
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     client_id: str
     metric: MetricName
     saved_value: float | None
@@ -223,13 +211,12 @@ class MetricRecomputationRecord(AuditModel):
     status: DenominatorStatus
 
 
-class BaselineInvariantResult(AuditModel):
-    regime: Regime
+class PolicyInvariantResult(AuditModel):
+    stage: ExperimentStage
     seed: int
-    alpha: str | None
     status: AuditStatus
-    checked_baselines: list[Baseline]
-    missing_baselines: list[Baseline] = Field(default_factory=list)
+    checked_policies: list[ThresholdPolicy]
+    missing_policies: list[ThresholdPolicy] = Field(default_factory=list)
     split_hash_shared: bool
     model_or_encoder_hash_shared: bool
     reconstruction_error_hashes_shared: bool
@@ -246,9 +233,8 @@ class WarningRecord(AuditModel):
 
 
 class ConvergenceAuditRecord(AuditModel):
-    regime: Regime
+    stage: ExperimentStage
     seed: int
-    alpha: str | None
     checkpoint_path: str
     convergence_round: int | None
     convergence_criterion_value: float | None
@@ -257,66 +243,65 @@ class ConvergenceAuditRecord(AuditModel):
 
 
 class SeedDeltaRecord(AuditModel):
-    """Per-(regime, alpha, seed) raw metric values and B1−B2 / B1−B4 deltas; required for bootstrap CI generation."""
+    """Per-(stage, seed) raw metric values and GLOBAL_THRESHOLD-LOCAL_THRESHOLD / GLOBAL_THRESHOLD-CLUSTER_THRESHOLD deltas; required for bootstrap CI generation."""
 
-    regime: Regime
-    alpha: str | None
+    stage: ExperimentStage
     seed: int
-    b1_cv_fpr: float | None
-    b2_cv_fpr: float | None
-    b4_cv_fpr: float | None
-    b1_cv_tpr: float | None
-    b2_cv_tpr: float | None
-    b4_cv_tpr: float | None
-    b1_macro_f1_mean: float | None
-    b2_macro_f1_mean: float | None
-    b4_macro_f1_mean: float | None
-    b1_macro_f1_p10: float | None
-    b2_macro_f1_p10: float | None
-    b4_macro_f1_p10: float | None
-    b1_auroc_mean: float | None
-    b2_auroc_mean: float | None
-    b4_auroc_mean: float | None
-    b1_pr_auc_mean: float | None
-    b2_pr_auc_mean: float | None
-    b4_pr_auc_mean: float | None
-    b1_mean_fpr: float | None
-    b2_mean_fpr: float | None
-    b4_mean_fpr: float | None
-    b1_std_fpr: float | None
-    b2_std_fpr: float | None
-    b4_std_fpr: float | None
-    b1_iqr_fpr: float | None
-    b2_iqr_fpr: float | None
-    b4_iqr_fpr: float | None
-    b1_worst_client_fpr: float | None
-    b2_worst_client_fpr: float | None
-    b4_worst_client_fpr: float | None
-    b1_worst_client_tpr: float | None
-    b2_worst_client_tpr: float | None
-    b4_worst_client_tpr: float | None
-    b1_worst_client_macro_f1: float | None
-    b2_worst_client_macro_f1: float | None
-    b4_worst_client_macro_f1: float | None
-    b1_worst_client_balanced_accuracy: float | None
-    b2_worst_client_balanced_accuracy: float | None
-    b4_worst_client_balanced_accuracy: float | None
-    delta_cv_fpr_b1_minus_b2: float | None
-    delta_cv_fpr_b1_minus_b4: float | None
-    delta_cv_tpr_b1_minus_b2: float | None
-    delta_cv_tpr_b1_minus_b4: float | None
-    delta_macro_f1_b1_minus_b2: float | None
-    delta_macro_f1_b1_minus_b4: float | None
-    delta_pr_auc_b1_minus_b2: float | None
-    delta_pr_auc_b1_minus_b4: float | None
-    delta_auroc_b1_minus_b2: float | None
-    delta_auroc_b1_minus_b4: float | None
-    b1_convergence_round: int | None
-    b2_convergence_round: int | None
-    b4_convergence_round: int | None
-    b1_tau_global: float | None
-    b2_tau_global: float | None
-    b4_tau_global: float | None
+    global_cv_fpr: float | None
+    local_cv_fpr: float | None
+    cluster_cv_fpr: float | None
+    global_cv_tpr: float | None
+    local_cv_tpr: float | None
+    cluster_cv_tpr: float | None
+    global_macro_f1_mean: float | None
+    local_macro_f1_mean: float | None
+    cluster_macro_f1_mean: float | None
+    global_macro_f1_p10: float | None
+    local_macro_f1_p10: float | None
+    cluster_macro_f1_p10: float | None
+    global_auroc_mean: float | None
+    local_auroc_mean: float | None
+    cluster_auroc_mean: float | None
+    global_pr_auc_mean: float | None
+    local_pr_auc_mean: float | None
+    cluster_pr_auc_mean: float | None
+    global_mean_fpr: float | None
+    local_mean_fpr: float | None
+    cluster_mean_fpr: float | None
+    global_std_fpr: float | None
+    local_std_fpr: float | None
+    cluster_std_fpr: float | None
+    global_iqr_fpr: float | None
+    local_iqr_fpr: float | None
+    cluster_iqr_fpr: float | None
+    global_worst_client_fpr: float | None
+    local_worst_client_fpr: float | None
+    cluster_worst_client_fpr: float | None
+    global_worst_client_tpr: float | None
+    local_worst_client_tpr: float | None
+    cluster_worst_client_tpr: float | None
+    global_worst_client_macro_f1: float | None
+    local_worst_client_macro_f1: float | None
+    cluster_worst_client_macro_f1: float | None
+    global_worst_client_balanced_accuracy: float | None
+    local_worst_client_balanced_accuracy: float | None
+    cluster_worst_client_balanced_accuracy: float | None
+    delta_cv_fpr_global_minus_local: float | None
+    delta_cv_fpr_global_minus_cluster: float | None
+    delta_cv_tpr_global_minus_local: float | None
+    delta_cv_tpr_global_minus_cluster: float | None
+    delta_macro_f1_global_minus_local: float | None
+    delta_macro_f1_global_minus_cluster: float | None
+    delta_pr_auc_global_minus_local: float | None
+    delta_pr_auc_global_minus_cluster: float | None
+    delta_auroc_global_minus_local: float | None
+    delta_auroc_global_minus_cluster: float | None
+    global_convergence_round: int | None
+    local_convergence_round: int | None
+    cluster_convergence_round: int | None
+    global_tau_global: float | None
+    local_tau_global: float | None
+    cluster_tau_global: float | None
     coverage_ratio: str
     status: AuditStatus
 
@@ -326,9 +311,8 @@ class FPRCompanionRecord(AuditModel):
 
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     cv_fpr: float | None
     mean_fpr: float | None
     std_fpr: float | None
@@ -342,10 +326,9 @@ class FPRCompanionRecord(AuditModel):
 class CICIoTHomogeneityRecord(AuditModel):
     """Artifact claims may only describe CICIoT2023 clients as homogeneous when verdict is HOMOGENEOUS; HETEROGENEOUS or BLOCKED_PENDING_RUN blocks that claim."""
 
-    regime: Regime
+    stage: ExperimentStage
     seed: int
-    alpha: str | None
-    baseline: Baseline
+    policy: ThresholdPolicy
     n_clients_compared: int
     n_pairs: int
     n_bins: int
@@ -363,9 +346,8 @@ class WorstClientRecord(AuditModel):
 
     run_id: str
     seed: int
-    regime: Regime
-    baseline: Baseline
-    alpha: str | None
+    stage: ExperimentStage
+    policy: ThresholdPolicy
     metric: MetricName
     direction: WorstDirection
     worst_client_id: str | None
@@ -376,8 +358,7 @@ class WorstClientRecord(AuditModel):
 class ClusterAssignmentRecord(AuditModel):
     run_id: str
     seed: int
-    regime: Regime
-    alpha: str | None
+    stage: ExperimentStage
     client_id: str
     cluster_id: str
     threshold_value: float
@@ -390,53 +371,8 @@ class ClusterAssignmentRecord(AuditModel):
     silhouette_scores: dict[str, float] = Field(default_factory=dict)
 
 
-class RegimeCAlphaAuditRecord(AuditModel):
-    """Per-(alpha, seed) Regime C structural audit; Regime C is severity/context only, not confirmatory for the primary Regime A B1-vs-B2 claim."""
-
-    alpha: str
-    seed: int
-    n_clients: int
-    n_eligible: int
-    n_calibration_pending: int
-    coverage_ratio: str
-    js_divergence_mean: float | None
-    device_mixture_proportions: Mapping[str, Mapping[str, float]] = Field(
-        default_factory=dict
-    )
-    pending_client_ids: list[str] = Field(default_factory=list)
-    device_mixture_js_mean: float | None = None
-    device_mixture_js_std: float | None = None
-    device_mixture_js_p50: float | None = None
-    device_mixture_js_p95: float | None = None
-    device_mixture_js_max: float | None = None
-    recon_error_js_mean: float | None = None
-    recon_error_js_std: float | None = None
-    recon_error_js_p50: float | None = None
-    recon_error_js_p95: float | None = None
-    recon_error_js_max: float | None = None
-    b1_cv_fpr: float | None = None
-    b2_cv_fpr: float | None = None
-    b4_cv_fpr: float | None = None
-    delta_b1_b2: float | None = None
-    delta_b1_b4: float | None = None
-    eligible_only_cv_fpr: float | None = None
-    scope_note: str = REGIME_C_SCOPE_NOTE
-
-
-class RegimeCSeverityTrendRecord(AuditModel):
-    """Spearman trend between a severity variable and B1-B2 delta."""
-
-    severity_variable: SeverityVariable
-    comparison: OutcomeVariable
-    n_cells: int
-    spearman_rho: float | None
-    p_value: float | None
-    status: SeverityTrendStatus
-
-
-class B4ClusterStabilityRecord(AuditModel):
-    regime: Regime
-    alpha: str | None
+class ClusterStabilityRecord(AuditModel):
+    stage: ExperimentStage
     seed_a: int
     seed_b: int
     adjusted_rand_index: float
