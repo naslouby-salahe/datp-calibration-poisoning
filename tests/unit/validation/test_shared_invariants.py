@@ -79,7 +79,11 @@ class TestInvariantPass:
         assert results[0].disallowed_differences == []
 
     def test_synthetic_smoke_controlled_policies_pass(self) -> None:
-        baselines = [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
+        baselines = [
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ]
         results = build_invariant_results(
             _inputs(_CELL_B, baselines),
             _score_hashes(_CELL_B, baselines),
@@ -87,7 +91,11 @@ class TestInvariantPass:
         assert results[0].status == AuditStatus.PASS
 
     def test_nbaiot_full_controlled_policies_pass(self) -> None:
-        baselines = [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
+        baselines = [
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ]
         results = build_invariant_results(
             _inputs(_CELL_C, baselines),
             _score_hashes(_CELL_C, baselines),
@@ -136,7 +144,11 @@ class TestInvariantFail:
         assert results[0].model_or_encoder_hash_shared is False
 
     def test_score_array_hash_differs_marks_fail(self) -> None:
-        baselines = [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
+        baselines = [
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ]
         score_hashes: dict[
             InvariantKey, dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]
         ] = {

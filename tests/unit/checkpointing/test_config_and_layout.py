@@ -71,7 +71,18 @@ def test_round_aware_paths_include_round(tmp_path: Path) -> None:
     score_dir = layout.score_cell_for_round(cell, 50).score_dir
     result_dir = layout.policy_run_for_round(run, 50).result_dir
 
-    assert checkpoint_dir == tmp_path / "checkpoints" / "nbaiot_main" / "seed_7" / "round_50"
+    assert (
+        checkpoint_dir
+        == tmp_path / "checkpoints" / "nbaiot_main" / "seed_7" / "round_50"
+    )
     assert score_dir == tmp_path / "scores" / "nbaiot_main" / "seed_7" / "round_50"
-    assert result_dir == tmp_path / "results" / "nbaiot_main" / "local_threshold" / "seed_7" / "round_50"
+    assert (
+        result_dir
+        == tmp_path
+        / "results"
+        / "nbaiot_main"
+        / "local_threshold"
+        / "seed_7"
+        / "round_50"
+    )
     assert "outputs" not in checkpoint_dir.parts

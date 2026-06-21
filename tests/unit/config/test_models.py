@@ -333,7 +333,7 @@ class TestQualityGateConfig:
             ciciot_homogeneity_threshold=0.05,
             js_divergence_n_bins=32,
         )
-        assert qg.ciciot_homogeneity_threshold == 0.05
+        assert qg.ciciot_homogeneity_threshold == pytest.approx(0.05)
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
@@ -479,7 +479,9 @@ class TestReportingConfig:
                     figsize_single_col=(3.5, 2.5),
                     figsize_double_col=(7.16, 3.0),
                     policy_colors={ThresholdPolicy.GLOBAL_THRESHOLD: "#1f77b4"},
-                    policy_labels={ThresholdPolicy.GLOBAL_THRESHOLD: "GLOBAL_THRESHOLD"},
+                    policy_labels={
+                        ThresholdPolicy.GLOBAL_THRESHOLD: "GLOBAL_THRESHOLD"
+                    },
                 ),
                 bogus=1,  # type: ignore[call-arg]
             )

@@ -96,7 +96,9 @@ class TestPoisoningKnowledge:
         assert PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS == "gray_box_score_access"
 
     def test_white_box_diagnostic_only_value(self) -> None:
-        assert PoisoningKnowledge.WHITE_BOX_DIAGNOSTIC_ONLY == "white_box_diagnostic_only"
+        assert (
+            PoisoningKnowledge.WHITE_BOX_DIAGNOSTIC_ONLY == "white_box_diagnostic_only"
+        )
 
     def test_exactly_two_members(self) -> None:
         assert len(PoisoningKnowledge) == 2
@@ -110,7 +112,10 @@ class TestPoisoningTargetScope:
         assert PoisoningTargetScope.MULTI_CLIENT == "multi_client"
 
     def test_all_clients_diagnostic_only_value(self) -> None:
-        assert PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY == "all_clients_diagnostic_only"
+        assert (
+            PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY
+            == "all_clients_diagnostic_only"
+        )
 
 
 class TestPoisoningDefense:
@@ -135,10 +140,7 @@ class TestExperimentStage:
         assert ExperimentStage.NBAIOT_FULL_OPTIONAL == "nbaiot_full_optional"
 
     def test_stretch_diagnostic_value(self) -> None:
-        assert (
-            ExperimentStage.STRETCH_DIAGNOSTIC_ONLY
-            == "stretch_diagnostic_only"
-        )
+        assert ExperimentStage.STRETCH_DIAGNOSTIC_ONLY == "stretch_diagnostic_only"
 
     def test_exactly_five_members(self) -> None:
         assert len(ExperimentStage) == 5

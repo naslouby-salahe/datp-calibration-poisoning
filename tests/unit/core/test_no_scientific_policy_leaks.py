@@ -67,8 +67,8 @@ class TestNoLocalStatsBaselines:
             matches = self._PATTERN.findall(src)
             assert not matches, (
                 f"{path.relative_to(_SRC_ROOT)}: "
-                f"found local _STATS_BASELINES*: {matches!r}. "
-                "Use STATS_REPORTING_BASELINES from datp.core.enums."
+                f"found stale _STATS_BASELINES* constant: {matches!r}. "
+                "Remove — policy iteration uses ThresholdPolicy directly."
             )
 
     def test_no_local_stats_baselines_in_validation(self) -> None:
@@ -77,8 +77,8 @@ class TestNoLocalStatsBaselines:
             matches = self._PATTERN.findall(src)
             assert not matches, (
                 f"{path.relative_to(_SRC_ROOT)}: "
-                f"found local _STATS_BASELINES*: {matches!r}. "
-                "Use STATS_REPORTING_BASELINES from datp.core.enums."
+                f"found stale _STATS_BASELINES* constant: {matches!r}. "
+                "Remove — policy iteration uses ThresholdPolicy directly."
             )
 
 
@@ -178,7 +178,7 @@ class TestAttrsRemovedFromDependencies:
 class TestReportingUsesCorePolicies:
     """reporting/build.py imports policies from datp.core, not locally."""
 
-    def test_build_imports_controlled_baselines(self) -> None:
+    def test_build_uses_threshold_policy_not_controlled_baselines(self) -> None:
         build_py = _SRC_ROOT / "reporting" / "build.py"
         src = _source(build_py)
         assert "CONTROLLED_BASELINES" not in src, (

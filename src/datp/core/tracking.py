@@ -80,9 +80,7 @@ class TrackingMetric:
         key: TrackingMetricKey,
         value: float | int,
     ) -> "TrackingMetric":
-        return cls(
-            key=PolicyTrackingMetricKey(policy=policy, key=key), value=value
-        )
+        return cls(key=PolicyTrackingMetricKey(policy=policy, key=key), value=value)
 
 
 @dataclass(frozen=True, slots=True)

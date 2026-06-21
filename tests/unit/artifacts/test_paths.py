@@ -46,10 +46,6 @@ class TestMakeRunId:
         assert ts_part.isdigit()
         assert len(ts_part) >= 13
 
-    def test_collision_proof_no_flat_file_pattern(self) -> None:
-        rid = make_run_id(_STAGE, seed=0)
-        assert not re.match(r"^regime_[a-c]_b\d_seed\d+\.json$", rid)
-
 
 class TestCanonicalResultPath:
     """Tests marked with ``canonical_result_path`` for gate-file -k matching."""

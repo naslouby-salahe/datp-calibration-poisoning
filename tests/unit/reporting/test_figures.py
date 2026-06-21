@@ -48,9 +48,15 @@ def test_figure2_creates_png(tmp_path: Path) -> None:
 
 def test_figure3_creates_png(tmp_path: Path) -> None:
     fpr_by_baseline = {
-        ThresholdPolicy.GLOBAL_THRESHOLD: [RNG.uniform(0.01, 0.10, size=8) for _ in range(5)],
-        ThresholdPolicy.LOCAL_THRESHOLD: [RNG.uniform(0.005, 0.08, size=8) for _ in range(5)],
-        ThresholdPolicy.CLUSTER_THRESHOLD: [RNG.uniform(0.008, 0.09, size=8) for _ in range(5)],
+        ThresholdPolicy.GLOBAL_THRESHOLD: [
+            RNG.uniform(0.01, 0.10, size=8) for _ in range(5)
+        ],
+        ThresholdPolicy.LOCAL_THRESHOLD: [
+            RNG.uniform(0.005, 0.08, size=8) for _ in range(5)
+        ],
+        ThresholdPolicy.CLUSTER_THRESHOLD: [
+            RNG.uniform(0.008, 0.09, size=8) for _ in range(5)
+        ],
     }
     path = generate_figure3(
         fpr_by_baseline, tmp_path, style=BASE_CONFIG.reporting.style
@@ -63,9 +69,15 @@ def test_figure3_creates_png(tmp_path: Path) -> None:
 def test_figure4_creates_png(tmp_path: Path) -> None:
     alphas = ["0.1", "0.3", "0.5", "1.0", "10.0", "iid"]
     cv_fpr_by_baseline = {
-        ThresholdPolicy.GLOBAL_THRESHOLD: {a: list(RNG.uniform(0.2, 0.8, size=5)) for a in alphas},
-        ThresholdPolicy.LOCAL_THRESHOLD: {a: list(RNG.uniform(0.1, 0.5, size=5)) for a in alphas},
-        ThresholdPolicy.CLUSTER_THRESHOLD: {a: list(RNG.uniform(0.15, 0.6, size=5)) for a in alphas},
+        ThresholdPolicy.GLOBAL_THRESHOLD: {
+            a: list(RNG.uniform(0.2, 0.8, size=5)) for a in alphas
+        },
+        ThresholdPolicy.LOCAL_THRESHOLD: {
+            a: list(RNG.uniform(0.1, 0.5, size=5)) for a in alphas
+        },
+        ThresholdPolicy.CLUSTER_THRESHOLD: {
+            a: list(RNG.uniform(0.15, 0.6, size=5)) for a in alphas
+        },
     }
     path = generate_figure4(
         cv_fpr_by_baseline, tmp_path, style=BASE_CONFIG.reporting.style

@@ -19,14 +19,24 @@ class TestResultsExist:
         rdir.mkdir(parents=True)
         (rdir / "metrics.json").write_text(json.dumps(valid_metrics_dict()))
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is True
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is True
+        )
 
     def test_stale_pre_schema_payload_returns_false(self, tmp_path: Path) -> None:
         rdir = tmp_path / "results" / "nbaiot_main" / "global_threshold" / "seed_42"
         rdir.mkdir(parents=True)
         (rdir / "metrics.json").write_text(json.dumps({"auroc": 0.99}))
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )
 
     def test_unknown_provenance_returns_false(self, tmp_path: Path) -> None:
         rdir = tmp_path / "results" / "nbaiot_main" / "global_threshold" / "seed_42"
@@ -35,7 +45,12 @@ class TestResultsExist:
         payload["provenance"]["config_identity"] = "UNKNOWN"
         (rdir / "metrics.json").write_text(json.dumps(payload))
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )
 
     def test_missing_hash_provenance_returns_false(self, tmp_path: Path) -> None:
         rdir = tmp_path / "results" / "nbaiot_main" / "global_threshold" / "seed_42"
@@ -44,7 +59,12 @@ class TestResultsExist:
         payload["provenance"]["score_artifact_identity"] = "MISSING_SCORE_HASH"
         (rdir / "metrics.json").write_text(json.dumps(payload))
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )
 
     @pytest.mark.parametrize(
         "missing_key",
@@ -63,29 +83,59 @@ class TestResultsExist:
         del payload[missing_key]
         (rdir / "metrics.json").write_text(json.dumps(payload))
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )
 
     def test_missing_metrics(self, tmp_path: Path) -> None:
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )
 
     def test_empty_metrics(self, tmp_path: Path) -> None:
         rdir = tmp_path / "results" / "nbaiot_main" / "global_threshold" / "seed_42"
         rdir.mkdir(parents=True)
         (rdir / "metrics.json").touch()
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )
 
     def test_tmp_placeholder_not_counted(self, tmp_path: Path) -> None:
         rdir = tmp_path / "results" / "nbaiot_main" / "global_threshold" / "seed_42"
         rdir.mkdir(parents=True)
         (rdir / "metrics.json.tmp").write_text('{"partial": true}')
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )
 
     def test_different_policy_not_found(self, tmp_path: Path) -> None:
         rdir = tmp_path / "results" / "nbaiot_main" / "global_threshold" / "seed_42"
         rdir.mkdir(parents=True)
         (rdir / "metrics.json").write_text(json.dumps(valid_metrics_dict()))
 
-        assert results_exist(ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is True
-        assert results_exist(ThresholdPolicy.LOCAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path) is False
+        assert (
+            results_exist(
+                ThresholdPolicy.GLOBAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is True
+        )
+        assert (
+            results_exist(
+                ThresholdPolicy.LOCAL_THRESHOLD, _STAGE, 42, base_dir=tmp_path
+            )
+            is False
+        )

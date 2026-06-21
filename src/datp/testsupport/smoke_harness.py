@@ -260,7 +260,9 @@ def cluster_count(
         max_iter=max_iter,
         run=run,
     )
-    assert result.metadata.cluster is not None, "cluster metadata must be set after CLUSTER_THRESHOLD run"
+    assert result.metadata.cluster is not None, (
+        "cluster metadata must be set after CLUSTER_THRESHOLD run"
+    )
     return result.metadata.cluster.k
 
 

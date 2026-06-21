@@ -233,9 +233,7 @@ class TestArtifactPathContracts:
         from datp.artifacts.layout import PolicyRunPaths
 
         field_names = {f.name for f in dataclasses.fields(PolicyRunPaths)}
-        assert "result_dir" in field_names, (
-            "PolicyRunPaths must have result_dir field"
-        )
+        assert "result_dir" in field_names, "PolicyRunPaths must have result_dir field"
         assert "log_dir" in field_names, "PolicyRunPaths must have log_dir field"
 
     def test_score_cell_paths_has_cell(self) -> None:

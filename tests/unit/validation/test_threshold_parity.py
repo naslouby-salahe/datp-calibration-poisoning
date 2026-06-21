@@ -27,7 +27,13 @@ def _make_cal_errors(
 
 
 @pytest.mark.parametrize(
-    "policy", [ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD]
+    "policy",
+    [
+        ThresholdPolicy.GLOBAL_THRESHOLD,
+        ThresholdPolicy.LOCAL_THRESHOLD,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
+    ],
 )
 def test_threshold_result_equals_derive_threshold(policy: ThresholdPolicy) -> None:
     """_threshold_result must delegate to derive_threshold identically."""

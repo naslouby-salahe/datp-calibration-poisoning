@@ -23,9 +23,7 @@ def _make_collection():
     return build_score_collection(raw)
 
 
-def _make_spec(
-    col, *, victim_id, policy, source, fraction, training_seed, poisoning_seed
-):
+def _make_spec(*, victim_id, policy, source, fraction, training_seed, poisoning_seed):
     return SweepCellSpec(
         seed_pair=SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
         victim_id=victim_id,
@@ -35,7 +33,7 @@ def _make_spec(
     )
 
 
-def test_lock_mu_flag_threshold_is_deterministic_and_b1_derived():
+def test_lock_mu_flag_threshold_is_deterministic():
     col = _make_collection()
     mu_a = lock_mu_flag_threshold(col)
     mu_b = lock_mu_flag_threshold(col)
@@ -48,7 +46,6 @@ def test_run_sweep_cell_zero_fraction_gives_zero_delta():
     mu_flag = lock_mu_flag_threshold(col)
     victim_id = col.eligible_ids[0]
     spec = _make_spec(
-        col,
         victim_id=victim_id,
         policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         source=PoisoningSourceStrategy.RANDOM_BENIGN,
@@ -68,7 +65,6 @@ def test_run_sweep_cell_high_source_raises_threshold():
     mu_flag = lock_mu_flag_threshold(col)
     victim_id = col.eligible_ids[0]
     spec = _make_spec(
-        col,
         victim_id=victim_id,
         policy=ThresholdPolicy.LOCAL_THRESHOLD,
         source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -89,7 +85,6 @@ def test_run_sweep_cell_uses_passed_mu_flag_not_recomputed():
     real_mu = lock_mu_flag_threshold(col)
     sentinel_mu = real_mu + 999.0
     spec = _make_spec(
-        col,
         victim_id=victim_id,
         policy=ThresholdPolicy.CLUSTER_THRESHOLD,
         source=PoisoningSourceStrategy.LOW_SCORE_BENIGN,

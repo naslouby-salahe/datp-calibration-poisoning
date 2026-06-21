@@ -133,7 +133,7 @@ def _handle_non_protocol_checkpoint(
             "checkpoint exists, skipping training",
             stage=key.stage,
             seed=key.seed,
-            )
+        )
         return
     except (FileNotFoundError, ValueError):
         pass
@@ -194,7 +194,7 @@ def _ensure_fl_checkpoint_locked(
             "checkpoint protocol artifacts exist, skipping training",
             stage=key.stage,
             seed=key.seed,
-            )
+        )
         return
 
     if protocol_enabled and _checkpoint_protocol_checkpoints_exist(request, layout):

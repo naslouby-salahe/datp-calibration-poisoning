@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile, PathToken
-from datp.config.stages import ExperimentStage, get_stage_config
+from datp.config.stages import get_stage_config
 from datp.core.enums import (
     SCORING_STAGES,
     ScoringStage,

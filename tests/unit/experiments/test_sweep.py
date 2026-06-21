@@ -93,9 +93,7 @@ class TestCheckpointProtocolCompletion:
             policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         )
         legacy_dir = (
-            ArtifactLayout(base_dir=tmp_path, stage=_STAGE)
-            .policy_run(run)
-            .result_dir
+            ArtifactLayout(base_dir=tmp_path, stage=_STAGE).policy_run(run).result_dir
         )
         legacy_dir.mkdir(parents=True, exist_ok=True)
         (legacy_dir / "metrics.json").write_text(
@@ -149,19 +147,17 @@ class TestRunSweep:
             policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         )
         metrics_path = (
-            ArtifactLayout(base_dir=tmp_path, stage=_STAGE)
-            .policy_run(run)
-            .metrics_path
+            ArtifactLayout(base_dir=tmp_path, stage=_STAGE).policy_run(run).metrics_path
         )
         metrics_path.parent.mkdir(parents=True, exist_ok=True)
-        metrics_path.write_text(json.dumps(valid_metrics_dict("global_threshold", "nbaiot_main", 0)))
+        metrics_path.write_text(
+            json.dumps(valid_metrics_dict("global_threshold", "nbaiot_main", 0))
+        )
 
         _fail = RuntimeError("no data — mocked for unit test")
-        with (
-            patch(
-                "datp.experiments.executor.SharedTrainingExecutor.build_context",
-                side_effect=_fail,
-            )
+        with patch(
+            "datp.experiments.executor.SharedTrainingExecutor.build_context",
+            side_effect=_fail,
         ):
             result = run_sweep(dry_run=False, base_dir=tmp_path)
 
@@ -170,7 +166,5 @@ class TestRunSweep:
 
     def test_data_root_passed_through(self, tmp_path: Path):
         """data_root parameter is accepted without error in dry-run mode."""
-        result = run_sweep(
-            dry_run=True, base_dir=tmp_path, data_root=tmp_path
-        )
+        result = run_sweep(dry_run=True, base_dir=tmp_path, data_root=tmp_path)
         assert result.total == _TOTAL_CELLS

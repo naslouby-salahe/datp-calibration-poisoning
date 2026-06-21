@@ -40,7 +40,9 @@ from datp.attacks.enums import (
 from datp.config.stages import ExperimentStage
 
 _DEFAULT_POLICY_SET: frozenset[ThresholdPolicy] = frozenset(DEFAULT_POLICIES)
-_NBAIOT_MAIN_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(NBAIOT_MAIN_SWEEP_SOURCES)
+_NBAIOT_MAIN_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(
+    NBAIOT_MAIN_SWEEP_SOURCES
+)
 
 
 class SeedPools(BaseModel):

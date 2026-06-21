@@ -96,8 +96,8 @@ class TestBasicComputation:
             poisoned_threshold=0.85,
             client_scores=scores,
         )
-        expected_tpr_clean = 1.0   # 0.7 > 0.5, 0.9 > 0.5
-        expected_tpr_pois = 0.5    # only 0.9 > 0.85
+        expected_tpr_clean = 1.0  # 0.7 > 0.5, 0.9 > 0.5
+        expected_tpr_pois = 0.5  # only 0.9 > 0.85
         assert result.tpr_clean == pytest.approx(expected_tpr_clean)
         assert result.tpr_poisoned == pytest.approx(expected_tpr_pois)
         assert result.delta_tpr == pytest.approx(expected_tpr_pois - expected_tpr_clean)
@@ -138,7 +138,7 @@ class TestThresholdDirectionInvariants:
         # benign all below; attack: [0.6, 0.7, 0.8, 0.9]
         scores = _scores(benign=[0.1, 0.2, 0.3], attack=[0.6, 0.7, 0.8, 0.9])
         result = compute_victim_downstream_metrics(
-            clean_threshold=0.55,   # 4/4 attack hits
+            clean_threshold=0.55,  # 4/4 attack hits
             poisoned_threshold=0.75,  # 2/4 attack hits (only 0.8, 0.9)
             client_scores=scores,
         )

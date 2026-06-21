@@ -112,13 +112,19 @@ def test_metrics_serialization_contains_eligibility_threshold_and_provenance_fie
     from datp.evaluation.metrics import compute_client_record as _ccr
 
     ct_eligible = ClientThreshold(
-        client_id="c1", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
+        client_id="c1",
+        threshold=0.5,
+        calibration_pending=False,
+        strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     c1_rec = _ccr(
         "c1", np.array([0.01, 0.02, 0.07]), np.array([0.08, 0.09, 0.10]), ct_eligible
     )
     ct_pending = ClientThreshold(
-        client_id="c2", threshold=0.5, calibration_pending=True, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
+        client_id="c2",
+        threshold=0.5,
+        calibration_pending=True,
+        strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     c2_rec = ClientEvaluationRecord(
         client_id="c2",

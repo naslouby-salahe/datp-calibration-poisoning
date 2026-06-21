@@ -69,7 +69,8 @@ def emit_worst_client_stability_warnings(
     warnings: list[WarningRecord],
 ) -> None:
     grouped: dict[
-        tuple[ExperimentStage, ThresholdPolicy, MetricName], list[tuple[int, str | None]]
+        tuple[ExperimentStage, ThresholdPolicy, MetricName],
+        list[tuple[int, str | None]],
     ] = defaultdict(list)
     for record in worst_client_records:
         grouped[(record.stage, record.policy, record.metric)].append(

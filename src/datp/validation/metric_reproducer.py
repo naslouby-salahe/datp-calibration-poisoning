@@ -679,9 +679,7 @@ def reproduce_cell_metrics(
         policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         seed=seed,
     )
-    tau_global_ref = _compute_global_tau_global(
-        cal_errors, cfg, seed=seed
-    )
+    tau_global_ref = _compute_global_tau_global(cal_errors, cfg, seed=seed)
 
     policy_results: list[PolicyReproductionResult] = []
     missing_policies: list[ThresholdPolicy] = []
@@ -694,9 +692,7 @@ def reproduce_cell_metrics(
         else:
             policy_results.append(result)
 
-    overall = _aggregate_overall(
-        [pr.status for pr in policy_results], missing_policies
-    )
+    overall = _aggregate_overall([pr.status for pr in policy_results], missing_policies)
     return CellReproductionResult(
         cell=TrainingCellId(stage=stage, seed=seed),
         overall_status=overall,

@@ -17,7 +17,9 @@ _STAGE = ExperimentStage.NBAIOT_MAIN
 
 
 def _ct(
-    client_id: str, strategy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD, threshold: float = 0.5
+    client_id: str,
+    strategy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD,
+    threshold: float = 0.5,
 ) -> ClientThreshold:
     return ClientThreshold(
         client_id=client_id,
@@ -29,9 +31,7 @@ def _ct(
 
 def test_evaluate_policy_run_rejects_empty_thresholds() -> None:
     with pytest.raises(ValueError, match="empty"):
-        evaluate_policy_run(
-            [], Path("/nonexistent"), _STAGE, 0, score_provider=None
-        )
+        evaluate_policy_run([], Path("/nonexistent"), _STAGE, 0, score_provider=None)
 
 
 def test_evaluate_policy_run_rejects_duplicate_client_ids() -> None:
@@ -56,9 +56,7 @@ def test_evaluate_policy_run_rejects_missing_preloaded_client() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         provider = ScoreProvider(Path(tmpdir))
         with pytest.raises(FileNotFoundError):
-            evaluate_policy_run(
-                [ct], Path(tmpdir), _STAGE, 0, score_provider=provider
-            )
+            evaluate_policy_run([ct], Path(tmpdir), _STAGE, 0, score_provider=provider)
 
 
 def test_evaluate_policy_run_accepts_score_provider_and_marks_eval_incomplete(
@@ -92,7 +90,10 @@ def test_attack_empty_valid_artifact_is_eval_incomplete() -> None:
     benign = np.array([0.5, 0.6, 0.7])
     attack = np.array([], dtype=np.float64)
     ct = ClientThreshold(
-        client_id="test", threshold=0.8, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
+        client_id="test",
+        threshold=0.8,
+        calibration_pending=False,
+        strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     result = compute_client_record("test", benign, attack, ct)
     assert result.n_attack == 0

@@ -107,7 +107,10 @@ def _validate_checkpoint_milestones(
 def _validate_checkpoint_selection(
     rule: PrimaryCheckpointSelectionRule,
 ) -> None:
-    if rule != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_NBAIOT_MAIN:
+    if (
+        rule
+        != PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_NBAIOT_MAIN
+    ):
         raise ValueError("unsupported primary checkpoint selection rule")
 
 

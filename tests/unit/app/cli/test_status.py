@@ -31,13 +31,11 @@ class TestCompleteDetected:
             cell=TrainingCellId(stage=stage, seed=0),
             policy=ThresholdPolicy.GLOBAL_THRESHOLD,
         )
-        rp = (
-            ArtifactLayout(base_dir=tmp_path, stage=stage)
-            .policy_run(run)
-            .result_dir
-        )
+        rp = ArtifactLayout(base_dir=tmp_path, stage=stage).policy_run(run).result_dir
         rp.mkdir(parents=True, exist_ok=True)
-        (rp / "metrics.json").write_text(valid_metrics_json("global_threshold", "nbaiot_main", 0))
+        (rp / "metrics.json").write_text(
+            valid_metrics_json("global_threshold", "nbaiot_main", 0)
+        )
 
         report = get_status(base_dir=tmp_path)
         rr = report.stage_reports[ExperimentStage.NBAIOT_MAIN.value]
@@ -54,11 +52,7 @@ class TestAbortedDetected:
             cell=TrainingCellId(stage=stage, seed=1),
             policy=ThresholdPolicy.LOCAL_THRESHOLD,
         )
-        rp = (
-            ArtifactLayout(base_dir=tmp_path, stage=stage)
-            .policy_run(run)
-            .result_dir
-        )
+        rp = ArtifactLayout(base_dir=tmp_path, stage=stage).policy_run(run).result_dir
         rp.mkdir(parents=True, exist_ok=True)
         (rp / ArtifactFile.RUN_ABORTED).write_text("OOM error")
 

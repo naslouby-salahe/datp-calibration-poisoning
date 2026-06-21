@@ -85,7 +85,9 @@ class TestAuditJsonSchema:
 
     def test_audit_json_roundtrip(self, tmp_path: Path) -> None:
         results = _make_nbaiot_partition_results()
-        audit_partitions(results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100)
+        audit_partitions(
+            results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100
+        )
 
         audit_file = tmp_path / "data_audit" / "nbaiot_main_audit.json"
         loaded = json.loads(audit_file.read_text())

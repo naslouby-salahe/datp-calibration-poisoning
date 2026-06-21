@@ -126,7 +126,9 @@ def _metrics_payload(policy: ThresholdPolicy) -> dict:
         "eligible_ids": list(_CLIENTS),
         "pending_ids": [],
         "eval_incomplete_ids": [],
-        "aggregate_metrics": {"cv_fpr": 0.0 if policy == ThresholdPolicy.LOCAL_THRESHOLD else 0.1},
+        "aggregate_metrics": {
+            "cv_fpr": 0.0 if policy == ThresholdPolicy.LOCAL_THRESHOLD else 0.1
+        },
         "provenance": {
             "config_identity": "fixture",
             "split_manifest_identity": "fixture",
@@ -159,7 +161,12 @@ def _write_minimal_outputs(root: Path) -> None:
     ckpt = root / "checkpoints/nbaiot_main/seed_0/model.pt"
     ckpt.parent.mkdir(parents=True, exist_ok=True)
     ckpt.write_bytes(b"fixture-model")
-    for policy in (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD):
+    for policy in (
+        ThresholdPolicy.GLOBAL_THRESHOLD,
+        ThresholdPolicy.LOCAL_THRESHOLD,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
+    ):
         result_dir = root / "results/nbaiot_main" / policy.value / "seed_0"
         result_dir.mkdir(parents=True, exist_ok=True)
         (result_dir / ArtifactFile.METRICS).write_text(
@@ -201,8 +208,10 @@ def test_results_audit_generates_core_artifacts(tmp_path: Path) -> None:
     thresholds = pd.read_csv(audit_dir / THRESHOLD_VALUES_CSV)
     assert "threshold_aggregation_method" in thresholds.columns
     assert "local_tau_i" in thresholds.columns
-    b1_rows = thresholds[thresholds["policy"] == ThresholdPolicy.GLOBAL_THRESHOLD.value]
-    assert set(b1_rows["threshold_aggregation_method"]) == {
+    global_rows = thresholds[
+        thresholds["policy"] == ThresholdPolicy.GLOBAL_THRESHOLD.value
+    ]
+    assert set(global_rows["threshold_aggregation_method"]) == {
         "eligible_client_arithmetic_mean"
     }
 
@@ -314,7 +323,12 @@ def test_naked_cv_fpr_emits_fail_warning(tmp_path: Path) -> None:
     audit_dir = tmp_path / "audit"
 
     _write_minimal_outputs(outputs)
-    result_dir = outputs / "results/nbaiot_main" / ThresholdPolicy.GLOBAL_THRESHOLD.value / "seed_0"
+    result_dir = (
+        outputs
+        / "results/nbaiot_main"
+        / ThresholdPolicy.GLOBAL_THRESHOLD.value
+        / "seed_0"
+    )
     payload = json.loads((result_dir / ArtifactFile.METRICS).read_text("utf-8"))
     del payload["mean_fpr"]
     del payload["std_fpr"]

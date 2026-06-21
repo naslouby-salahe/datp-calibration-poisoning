@@ -23,7 +23,11 @@ _SEED = 0
 
 def _score_base(tmp_path: Path) -> Path:
     cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=_SEED)
-    return ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN).score_cell(cell).score_dir
+    return (
+        ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN)
+        .score_cell(cell)
+        .score_dir
+    )
 
 
 def _write_sentinel(score_base: Path) -> None:

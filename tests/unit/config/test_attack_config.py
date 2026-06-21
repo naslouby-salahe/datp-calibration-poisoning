@@ -95,7 +95,11 @@ class TestClusterConfig:
 
 def _valid_config(**overrides: object) -> CalibrationPoisoningConfig:
     defaults: dict[str, object] = {
-        "policies": (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
+        "policies": (
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ),
         "sources": (
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -134,7 +138,9 @@ class TestConfigValid:
 
     def test_has_no_singular_objective_field(self) -> None:
         cfg = _valid_config()
-        assert not hasattr(cfg, "objective"), "singular 'objective' field must not exist"
+        assert not hasattr(cfg, "objective"), (
+            "singular 'objective' field must not exist"
+        )
 
     def test_default_seeds_are_locked_pools(self) -> None:
         cfg = _valid_config()
@@ -262,11 +268,15 @@ class TestConfigFractionValidation:
 
     def test_bounded_scale_rejects_005_fraction(self) -> None:
         with pytest.raises(ValidationError, match="requires exactly fractions"):
-            _valid_config(stage=ExperimentStage.NBAIOT_MAIN, fractions=(0.0, 0.05, 0.10))
+            _valid_config(
+                stage=ExperimentStage.NBAIOT_MAIN, fractions=(0.0, 0.05, 0.10)
+            )
 
     def test_bounded_scale_rejects_partial_fraction_subset(self) -> None:
         with pytest.raises(ValidationError, match="requires exactly fractions"):
-            _valid_config(stage=ExperimentStage.NBAIOT_MAIN, fractions=(0.10, 0.20, 0.40))
+            _valid_config(
+                stage=ExperimentStage.NBAIOT_MAIN, fractions=(0.10, 0.20, 0.40)
+            )
 
 
 # ── Injection rule ──────────────────────────────────────────────────────
@@ -274,7 +284,9 @@ class TestConfigFractionValidation:
 
 class TestConfigInjectionRule:
     def test_replace_fixed_budget_accepted(self) -> None:
-        cfg = _valid_config(injection_rule=CalibrationInjectionRule.REPLACE_FIXED_BUDGET)
+        cfg = _valid_config(
+            injection_rule=CalibrationInjectionRule.REPLACE_FIXED_BUDGET
+        )
         assert cfg.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
 
 
@@ -290,28 +302,39 @@ class TestConfigBoundedScaleConstraints:
         assert cfg.stage == ExperimentStage.NBAIOT_MAIN
 
     def test_bounded_multi_client_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires SINGLE_CLIENT"):
+        with pytest.raises(
+            ValidationError, match="NBAIOT_MAIN stage requires SINGLE_CLIENT"
+        ):
             _valid_config(
                 stage=ExperimentStage.NBAIOT_MAIN,
                 target_scope=PoisoningTargetScope.MULTI_CLIENT,
             )
 
     def test_bounded_requires_all_three_policies(self) -> None:
-        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires exactly policies"):
+        with pytest.raises(
+            ValidationError, match="NBAIOT_MAIN stage requires exactly policies"
+        ):
             _valid_config(
                 stage=ExperimentStage.NBAIOT_MAIN,
-                policies=(ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD),
+                policies=(
+                    ThresholdPolicy.GLOBAL_THRESHOLD,
+                    ThresholdPolicy.LOCAL_THRESHOLD,
+                ),
             )
 
     def test_bounded_rejects_incomplete_policies(self) -> None:
-        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires exactly policies"):
+        with pytest.raises(
+            ValidationError, match="NBAIOT_MAIN stage requires exactly policies"
+        ):
             _valid_config(
                 stage=ExperimentStage.NBAIOT_MAIN,
                 policies=(ThresholdPolicy.GLOBAL_THRESHOLD,),
             )
 
     def test_bounded_requires_exactly_three_bounded_sources(self) -> None:
-        with pytest.raises(ValidationError, match="NBAIOT_MAIN stage requires exactly sources"):
+        with pytest.raises(
+            ValidationError, match="NBAIOT_MAIN stage requires exactly sources"
+        ):
             _valid_config(
                 stage=ExperimentStage.NBAIOT_MAIN,
                 sources=(PoisoningSourceStrategy.RANDOM_BENIGN,),
@@ -330,7 +353,11 @@ class TestConfigBoundedScaleConstraints:
         cfg = _valid_config(
             stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
             target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-            policies=(ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
+            policies=(
+                ThresholdPolicy.GLOBAL_THRESHOLD,
+                ThresholdPolicy.LOCAL_THRESHOLD,
+                ThresholdPolicy.CLUSTER_THRESHOLD,
+            ),
             sources=(
                 PoisoningSourceStrategy.RANDOM_BENIGN,
                 PoisoningSourceStrategy.HIGH_SCORE_BENIGN,

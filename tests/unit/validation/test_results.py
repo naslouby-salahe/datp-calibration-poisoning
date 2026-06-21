@@ -25,7 +25,7 @@ from datp.artifacts.names import ArtifactFile
 
 def test_manifest_schema_validation() -> None:
     record = RunManifestRecord(
-        run_id="a_b1_seed0",
+        run_id="nbaiot_main_global_threshold_seed0",
         timestamp="2026-04-26T00:00:00+00:00",
         git_commit_hash="abc",
         seed=0,
@@ -72,7 +72,10 @@ def test_split_hash_stability(tmp_path: Path) -> None:
 
 def test_fpr_and_tpr_denominators() -> None:
     ct = ClientThreshold(
-        client_id="c", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
+        client_id="c",
+        threshold=0.5,
+        calibration_pending=False,
+        strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     rec = compute_client_record("c", np.array([0.1, 0.9]), np.array([0.8, 0.2]), ct)
     assert rec.confusion.fp + rec.confusion.tn == rec.n_benign
@@ -83,7 +86,10 @@ def test_binary_macro_f1_ignores_multiclass_attack_names() -> None:
     benign = np.array([0.1, 0.2])
     attack = np.array([0.9, 0.3])
     ct = ClientThreshold(
-        client_id="c", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
+        client_id="c",
+        threshold=0.5,
+        calibration_pending=False,
+        strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     rec = compute_client_record("c", benign, attack, ct)
     expected = f1_score(
@@ -105,7 +111,10 @@ def test_binary_macro_f1_ignores_multiclass_attack_names() -> None:
 
 def test_evaluation_incomplete_exclusion() -> None:
     ct = ClientThreshold(
-        client_id="c", threshold=0.5, calibration_pending=False, strategy=ThresholdPolicy.GLOBAL_THRESHOLD
+        client_id="c",
+        threshold=0.5,
+        calibration_pending=False,
+        strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     rec = compute_client_record("c", np.array([0.1, 0.9]), np.array([]), ct)
     assert np.isnan(rec.metrics.tpr)

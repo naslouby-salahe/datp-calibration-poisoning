@@ -56,8 +56,12 @@ class ResultTable:
     footnote: str = MANDATORY_FOOTNOTE
 
     def to_latex(self) -> str:
-        best_cv_fpr = min(self.rows, key=lambda r: r.cv_fpr_mean).policy if self.rows else None
-        best_cv_tpr = min(self.rows, key=lambda r: r.cv_tpr_mean).policy if self.rows else None
+        best_cv_fpr = (
+            min(self.rows, key=lambda r: r.cv_fpr_mean).policy if self.rows else None
+        )
+        best_cv_tpr = (
+            min(self.rows, key=lambda r: r.cv_tpr_mean).policy if self.rows else None
+        )
 
         labels = self.style.policy_labels
         template_rows: list[LatexTableRow] = []

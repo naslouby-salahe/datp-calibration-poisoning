@@ -119,7 +119,8 @@ class TestBoundedScaleRequiresSingleClient:
     def test_bounded_with_all_clients_diagnostic_only_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
             assert_bounded_scale_requires_single_client(
-                ExperimentStage.NBAIOT_MAIN, PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY
+                ExperimentStage.NBAIOT_MAIN,
+                PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY,
             )
 
     def test_full_scale_multi_client_passes(self) -> None:

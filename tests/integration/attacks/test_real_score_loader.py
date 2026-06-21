@@ -67,9 +67,7 @@ def test_load_real_score_collection_matches_trained_clients(tmp_path) -> None:
     client_data = _make_client_data(n_clients=3)
     client_ids = sorted(client_data.keys())
 
-    run_fl_training(
-        cfg=cfg, client_data=client_data, seed=_SEED, base_dir=tmp_path
-    )
+    run_fl_training(cfg=cfg, client_data=client_data, seed=_SEED, base_dir=tmp_path)
 
     collection = load_real_score_collection(
         stage=ExperimentStage.NBAIOT_MAIN, seed=_SEED, base_dir=tmp_path
@@ -88,4 +86,6 @@ def test_load_real_score_collection_matches_trained_clients(tmp_path) -> None:
 @pytest.mark.integration
 def test_load_real_score_collection_missing_cell_raises(tmp_path) -> None:
     with pytest.raises(FileNotFoundError):
-        load_real_score_collection(stage=ExperimentStage.NBAIOT_MAIN, seed=999, base_dir=tmp_path)
+        load_real_score_collection(
+            stage=ExperimentStage.NBAIOT_MAIN, seed=999, base_dir=tmp_path
+        )

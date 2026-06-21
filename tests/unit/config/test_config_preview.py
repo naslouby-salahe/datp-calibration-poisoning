@@ -48,9 +48,7 @@ class TestComposeRequest:
 
     def test_invalid_policy_raises(self) -> None:
         with pytest.raises(ValueError):
-            ComposeRequest.model_validate(
-                {"stage": _STAGE, "policy": "b9", "seed": 0}
-            )
+            ComposeRequest.model_validate({"stage": _STAGE, "policy": "b9", "seed": 0})
 
     def test_all_controlled_policies_pass(self) -> None:
         for policy in CONTROLLED_POLICIES:
@@ -62,7 +60,9 @@ class TestComposeRequest:
 
 class TestComposeConfig:
     def test_basic_composition(self) -> None:
-        cfg = compose_config(stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0)
+        cfg = compose_config(
+            stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0
+        )
         assert cfg.stage is _STAGE
         assert cfg.policy is ThresholdPolicy.GLOBAL_THRESHOLD
         assert cfg.seed == 0
@@ -84,8 +84,12 @@ class TestComposeConfig:
         assert cfg.policy is ThresholdPolicy.GLOBAL_THRESHOLD
 
     def test_deep_copy_isolation(self) -> None:
-        cfg1 = compose_config(stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0)
-        cfg2 = compose_config(stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=1)
+        cfg1 = compose_config(
+            stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0
+        )
+        cfg2 = compose_config(
+            stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=1
+        )
         with pytest.raises(Exception):
             cfg1.model.input_dim = 999
         assert cfg2.model.input_dim == 115
@@ -93,14 +97,18 @@ class TestComposeConfig:
 
 class TestResolvedConfigYaml:
     def test_yaml_output_from_pydantic_config(self) -> None:
-        cfg = compose_config(stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0)
+        cfg = compose_config(
+            stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0
+        )
         yaml_text = resolved_config_yaml(cfg)
         assert "stage: nbaiot_main" in yaml_text
         assert "policy: global_threshold" in yaml_text
         assert "seed: 0" in yaml_text
 
     def test_yaml_output_roundtrips(self) -> None:
-        cfg = compose_config(stage=_STAGE, policy=ThresholdPolicy.LOCAL_THRESHOLD, seed=42)
+        cfg = compose_config(
+            stage=_STAGE, policy=ThresholdPolicy.LOCAL_THRESHOLD, seed=42
+        )
         yaml_text = resolved_config_yaml(cfg)
         parsed = yaml.safe_load(yaml_text)
         assert parsed["stage"] == "nbaiot_main"
@@ -110,7 +118,9 @@ class TestResolvedConfigYaml:
 
 class TestWriteResolvedConfig:
     def test_writes_file(self, tmp_path: Path) -> None:
-        cfg = compose_config(stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0)
+        cfg = compose_config(
+            stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0
+        )
         dest = write_resolved_config(cfg, tmp_path)
         assert dest.exists()
         assert dest.name == "resolved_config.yaml"
@@ -118,7 +128,9 @@ class TestWriteResolvedConfig:
         assert content["stage"] == "nbaiot_main"
 
     def test_creates_parent_directories(self, tmp_path: Path) -> None:
-        cfg = compose_config(stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0)
+        cfg = compose_config(
+            stage=_STAGE, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0
+        )
         nested = tmp_path / "deep" / "nested"
         dest = write_resolved_config(cfg, nested)
         assert dest.parent == nested
@@ -144,7 +156,9 @@ class TestPreviewConfig:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
-        dest = preview_config(stage=_STAGE, policy=ThresholdPolicy.LOCAL_THRESHOLD, seed=42)
+        dest = preview_config(
+            stage=_STAGE, policy=ThresholdPolicy.LOCAL_THRESHOLD, seed=42
+        )
         assert "nbaiot_main" in str(dest)
         assert "local_threshold" in str(dest)
         assert "seed_42" in str(dest)
@@ -156,7 +170,10 @@ class TestPreviewConfig:
 
     def test_yaml_is_valid(self, tmp_path: Path) -> None:
         dest = preview_config(
-            stage=_STAGE, policy=ThresholdPolicy.CLUSTER_THRESHOLD, seed=7, output_dir=tmp_path
+            stage=_STAGE,
+            policy=ThresholdPolicy.CLUSTER_THRESHOLD,
+            seed=7,
+            output_dir=tmp_path,
         )
         content = yaml.safe_load(dest.read_text())
         assert isinstance(content, dict)

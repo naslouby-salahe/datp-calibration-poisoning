@@ -6,7 +6,7 @@ import typing
 from pathlib import Path
 
 
-def test_baseline_types_importable():
+def test_threshold_result_types_importable():
     import typing
 
     from datp.core.types import (
@@ -37,7 +37,7 @@ def test_evaluation_result_is_frozen_dataclass():
     assert EvaluationResult.__dataclass_params__.frozen  # type: ignore[attr-defined]
 
 
-def test_baseline_result_required_keys():
+def test_threshold_result_required_keys():
     from datp.core.types import ThresholdResult
 
     hints = typing.get_type_hints(ThresholdResult)
@@ -207,7 +207,9 @@ def test_path_contracts_compose_with_identity(tmp_path: Path):
     from datp.core.identity import PolicyRunId, TrainingCellId
 
     cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=1)
-    layout = ArtifactLayout(base_dir=tmp_path / "out", stage=ExperimentStage.NBAIOT_MAIN)
+    layout = ArtifactLayout(
+        base_dir=tmp_path / "out", stage=ExperimentStage.NBAIOT_MAIN
+    )
 
     sc_paths = layout.score_cell(cell)
     assert "seed_1" in str(sc_paths.checkpoint_dir)

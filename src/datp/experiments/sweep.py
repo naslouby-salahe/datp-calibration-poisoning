@@ -173,9 +173,7 @@ def _cell_is_done(cell: PolicyRunId, base_dir: Path) -> bool:
             layout.policy_run_for_round(cell, checkpoint_round).metrics_path.exists()
             for checkpoint_round in ckpt_proto.milestones  # type: ignore[union-attr]
         )
-    return results_exist(
-        cell.policy, cell.stage, cell.seed, base_dir=base_dir
-    )
+    return results_exist(cell.policy, cell.stage, cell.seed, base_dir=base_dir)
 
 
 def _account_skip(cell: PolicyRunId, result: SweepResult) -> None:
@@ -368,6 +366,7 @@ def _run_shared_fl_group(
     cfg = pre_composed_configs[first_cell]
     from datp.data.paths import processed_root
     from datp.data.catalog import dataset_for_stage
+
     prepared_dir = processed_root(dataset_for_stage(stage), base_dir=_data_root)
 
     checkpoint_rounds = _enabled_checkpoint_rounds(cfg)

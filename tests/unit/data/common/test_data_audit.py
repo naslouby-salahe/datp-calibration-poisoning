@@ -40,7 +40,9 @@ def _make_partition_results(
 class TestAuditWritesJson:
     def test_audit_writes_json(self, tmp_path: Path) -> None:
         results = _make_partition_results()
-        audit_partitions(results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100)
+        audit_partitions(
+            results, stage=ExperimentStage.NBAIOT_MAIN, output_dir=tmp_path, n_min=100
+        )
         audit_file = tmp_path / "data_audit" / "nbaiot_main_audit.json"
         assert audit_file.exists()
         data = json.loads(audit_file.read_text())
@@ -52,7 +54,10 @@ class TestAuditSummaryCounts:
     def test_audit_summary_counts(self, tmp_path: Path) -> None:
         results = _make_partition_results(n_clients=4, cal_count=150)
         audit = audit_partitions(
-            results, stage=ExperimentStage.STRETCH_DIAGNOSTIC_ONLY, output_dir=tmp_path, n_min=100
+            results,
+            stage=ExperimentStage.STRETCH_DIAGNOSTIC_ONLY,
+            output_dir=tmp_path,
+            n_min=100,
         )
 
         assert audit.summary.total_benign_train == sum(
@@ -99,7 +104,10 @@ class TestAuditRequiredFields:
     def test_audit_includes_all_required_fields(self, tmp_path: Path) -> None:
         results = _make_partition_results(n_clients=2, cal_count=300)
         audit = audit_partitions(
-            results, stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, output_dir=tmp_path, n_min=100
+            results,
+            stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
+            output_dir=tmp_path,
+            n_min=100,
         )
 
         for client_id, client_info in audit.clients.items():

@@ -93,8 +93,12 @@ def compute_global_pair(
     tau_global_pois = compute_tau_global(taus_pois)
 
     # GLOBAL_THRESHOLD: all eligible clients share tau_global; per-client dict is uniform.
-    thresholds_clean = _uniform_thresholds(eligible_ids, tau_global_clean, ThresholdPolicy.GLOBAL_THRESHOLD)
-    thresholds_pois = _uniform_thresholds(eligible_ids, tau_global_pois, ThresholdPolicy.GLOBAL_THRESHOLD)
+    thresholds_clean = _uniform_thresholds(
+        eligible_ids, tau_global_clean, ThresholdPolicy.GLOBAL_THRESHOLD
+    )
+    thresholds_pois = _uniform_thresholds(
+        eligible_ids, tau_global_pois, ThresholdPolicy.GLOBAL_THRESHOLD
+    )
 
     return ThresholdPair(
         policy=ThresholdPolicy.GLOBAL_THRESHOLD,

@@ -49,8 +49,13 @@ def preview_config(
 
 @app.command("preview")
 def preview(
-    stage: ExperimentStage = typer.Option(..., help="Experiment stage (nbaiot_main, synthetic_smoke, ...)"),
-    policy: ThresholdPolicy = typer.Option(..., help="ThresholdPolicy (global_threshold, local_threshold, cluster_threshold)"),
+    stage: ExperimentStage = typer.Option(
+        ..., help="Experiment stage (nbaiot_main, synthetic_smoke, ...)"
+    ),
+    policy: ThresholdPolicy = typer.Option(
+        ...,
+        help="ThresholdPolicy (global_threshold, local_threshold, cluster_threshold)",
+    ),
     seed: int = typer.Option(..., help="Random seed"),
     output_dir: Path | None = typer.Option(None, help="Override output directory"),
 ) -> None:

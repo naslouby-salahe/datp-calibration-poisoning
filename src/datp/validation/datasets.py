@@ -230,13 +230,11 @@ def compute_ciciot_homogeneity(
     )
 
 
-def confound_summary_for(stage: ExperimentStage) -> str | None:
+def confound_summary_for() -> str | None:
     return NBAIOT_CONFOUND_SUMMARY
 
 
-def chronological_flags_for(
-    stage: ExperimentStage,
-) -> tuple[bool | None, bool | None]:
+def chronological_flags_for() -> tuple[bool | None, bool | None]:
     # All active N-BaIoT stages use chronological split.
     _ = NBAIOT_SPEC  # Explicitly tie the claim to canonical spec ownership.
     return True, True

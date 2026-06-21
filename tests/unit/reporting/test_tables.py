@@ -35,7 +35,9 @@ _ELIGIBLE_IDS = _DEVICE_IDS[:5]
 _PENDING_IDS = _DEVICE_IDS[5:]
 
 
-def _make_client_record(client_id: str, policy: ThresholdPolicy) -> ClientEvaluationRecord:
+def _make_client_record(
+    client_id: str, policy: ThresholdPolicy
+) -> ClientEvaluationRecord:
     fpr = float(RNG.uniform(0.01, 0.15))
     tpr = float(RNG.uniform(0.85, 0.99))
     tnr = 1.0 - fpr
@@ -138,13 +140,21 @@ _STYLE = BASE_CONFIG.reporting.style
 
 def _synthetic_results() -> dict[ThresholdPolicy, list[EvaluationResult]]:
     data: dict[ThresholdPolicy, list[EvaluationResult]] = {}
-    for bl in (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD):
+    for bl in (
+        ThresholdPolicy.GLOBAL_THRESHOLD,
+        ThresholdPolicy.LOCAL_THRESHOLD,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
+    ):
         data[bl] = [_make_eval_result(bl, seed) for seed in range(2)]
     return data
 
 
 def _synthetic_results_single_seed() -> dict[ThresholdPolicy, list[EvaluationResult]]:
-    return {ThresholdPolicy.GLOBAL_THRESHOLD: [_make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, 0)]}
+    return {
+        ThresholdPolicy.GLOBAL_THRESHOLD: [
+            _make_eval_result(ThresholdPolicy.GLOBAL_THRESHOLD, 0)
+        ]
+    }
 
 
 # ── generate_table3 ──────────────────────────────────────────────

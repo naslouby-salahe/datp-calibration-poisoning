@@ -15,7 +15,8 @@ from datp.thresholding.strategies.cluster_threshold import compute, compute_fing
 
 def _run() -> PolicyRunId:
     return PolicyRunId(
-        cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=0), policy=ThresholdPolicy.CLUSTER_THRESHOLD
+        cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=0),
+        policy=ThresholdPolicy.CLUSTER_THRESHOLD,
     )
 
 

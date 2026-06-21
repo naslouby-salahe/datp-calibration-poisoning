@@ -190,4 +190,3 @@ class TestProvenanceConstants:
     def test_missing_manifest_hash_is_sentinel_string(self) -> None:
         assert isinstance(MISSING_MANIFEST_HASH, str)
         assert "MISSING" in MISSING_MANIFEST_HASH
-

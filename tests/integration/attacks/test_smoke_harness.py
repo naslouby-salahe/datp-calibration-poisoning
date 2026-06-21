@@ -541,7 +541,7 @@ def test_roadmap_global_shift_less_than_local_shift(collection):
 # ---------------------------------------------------------------------------
 
 
-def test_roadmap_b4_k_fixed_at_three(collection):
+def test_roadmap_cluster_threshold_k_fixed_at_three(collection):
     clean_cal = collection.cal_dict()
     assert cluster_count(clean_cal) == CLUSTER_K_NBAIOT == 3
 

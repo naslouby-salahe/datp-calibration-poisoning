@@ -64,13 +64,17 @@ def test_print_policy_result_done() -> None:
 
 def test_print_policy_result_skipped() -> None:
     with patch.object(console, "print") as mock_print:
-        print_policy_result(ThresholdPolicy.LOCAL_THRESHOLD, PolicyRunStatus.SKIPPED, 0.0)
+        print_policy_result(
+            ThresholdPolicy.LOCAL_THRESHOLD, PolicyRunStatus.SKIPPED, 0.0
+        )
     assert mock_print.called
 
 
 def test_print_policy_result_failed() -> None:
     with patch.object(console, "print") as mock_print:
-        print_policy_result(ThresholdPolicy.GLOBAL_THRESHOLD, PolicyRunStatus.FAILED, 0.0)
+        print_policy_result(
+            ThresholdPolicy.GLOBAL_THRESHOLD, PolicyRunStatus.FAILED, 0.0
+        )
     assert mock_print.called
 
 

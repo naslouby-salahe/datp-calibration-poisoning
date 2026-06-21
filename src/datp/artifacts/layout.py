@@ -82,9 +82,7 @@ class ArtifactLayout:
     def checkpoint_dir_for_round(
         self, cell: TrainingCellId, checkpoint_round: int
     ) -> Path:
-        return self._checkpoint_root / _round_aware_segment(
-            cell.seed, checkpoint_round
-        )
+        return self._checkpoint_root / _round_aware_segment(cell.seed, checkpoint_round)
 
     def _score_cell_paths(
         self, cell: TrainingCellId, seg: Path, checkpoint_round: int | None = None
@@ -139,7 +137,7 @@ class ArtifactLayout:
     ) -> Path:
         """Return the canonical path for a client's score parquet file.
 
-        Scores are shared across GLOBAL_THRESHOLD-CLUSTER_THRESHOLD (no baseline dimension).
+        Scores are shared across all three threshold policies (no policy dimension on score paths).
         Path: <score_dir>/<stage>/<client_id>.parquet
         """
         return (

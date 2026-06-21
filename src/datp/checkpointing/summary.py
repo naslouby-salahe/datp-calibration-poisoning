@@ -144,7 +144,12 @@ def _eligible_rounds(
 def _validate_primary_training_metrics(metrics: tuple[SweepMetrics, ...]) -> None:
     if not metrics:
         raise ValueError(
-            fmt(_MODULE, "No checkpoint metrics supplied", "primary training metrics", "empty")
+            fmt(
+                _MODULE,
+                "No checkpoint metrics supplied",
+                "primary training metrics",
+                "empty",
+            )
         )
     if any(metric.stage != ExperimentStage.NBAIOT_MAIN for metric in metrics):
         raise ValueError(
@@ -228,11 +233,16 @@ def _build_round_comparison(
                 str(len(seeds)),
             )
         )
-    cv_deltas = tuple(global_seeds[seed].cv_fpr - local_seeds[seed].cv_fpr for seed in seeds)
-    worst_deltas = tuple(
-        global_seeds[seed].worst_client_fpr - local_seeds[seed].worst_client_fpr for seed in seeds
+    cv_deltas = tuple(
+        global_seeds[seed].cv_fpr - local_seeds[seed].cv_fpr for seed in seeds
     )
-    global_cv = np.array([global_seeds[seed].cv_fpr for seed in seeds], dtype=np.float64)
+    worst_deltas = tuple(
+        global_seeds[seed].worst_client_fpr - local_seeds[seed].worst_client_fpr
+        for seed in seeds
+    )
+    global_cv = np.array(
+        [global_seeds[seed].cv_fpr for seed in seeds], dtype=np.float64
+    )
     local_cv = np.array([local_seeds[seed].cv_fpr for seed in seeds], dtype=np.float64)
     return CheckpointPrimaryTrainingComparison(
         checkpoint_round=checkpoint_round,

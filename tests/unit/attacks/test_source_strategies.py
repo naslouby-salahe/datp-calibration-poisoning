@@ -30,7 +30,9 @@ class TestIsDiagnosticSource:
             assert not is_diagnostic_source(source)
 
     def test_diagnostic_source_flagged(self) -> None:
-        assert is_diagnostic_source(PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY)
+        assert is_diagnostic_source(
+            PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+        )
 
 
 class TestSelectReservoirBoundedSources:
@@ -78,7 +80,10 @@ class TestDiagnosticGate:
             tail_mass=_TAIL_MASS,
             allow_diagnostic=True,
         )
-        assert res.source == PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+        assert (
+            res.source
+            == PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
+        )
 
     def test_diagnostic_source_default_blocked(self) -> None:
         """Default allow_diagnostic=False blocks diagnostic source."""

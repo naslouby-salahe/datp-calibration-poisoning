@@ -38,7 +38,6 @@ from datp.validation._audit_types import (
 )
 from datp.validation.convergence import convergence_payload as _convergence_payload
 from datp.validation.datasets import (
-    build_ciciot_protocol,
     build_nbaiot_per_device,
     chronological_flags_for,
     confound_summary_for,
@@ -48,18 +47,9 @@ from datp.validation.enums import AuditSeverity, WarningCode, WorstDirection
 from datp.validation.invariants import InvariantKey
 from datp.validation.schemas import (
     DatasetPartitionAudit,
-    NBaIoTDeviceCounts,
     ReconstructionErrorSummaryRecord,
     WarningRecord,
 )
-
-
-def _load_client_attack_labels(
-    stage: ExperimentStage, client_id: str, prepared_data_root: Path
-) -> "np.ndarray | None":
-    # Per-attack-family labels only exist for CICIoT2023 (stretch-only diagnostic),
-    # which is not in scope. Always return None.
-    return None
 
 
 def _lookup_threshold_agg(policy: ThresholdPolicy) -> ThresholdAggregationMethod:
@@ -75,7 +65,6 @@ def _lookup_dataset(stage: ExperimentStage) -> DatasetID:
 
 def _partition_manifest_path(
     stage: ExperimentStage,
-    seed: int,
     base_dir: Path,
     data_root: Path | None = None,
 ) -> Path:
@@ -261,7 +250,7 @@ def _build_partition_audit(
     processed_root_path = partition_path.parent
     nbaiot_per_device = build_nbaiot_per_device(processed_root_path, file_hash_keys)
 
-    chrono_ok, gap_ok = chronological_flags_for(stage)
+    chrono_ok, gap_ok = chronological_flags_for()
 
     return DatasetPartitionAudit(
         stage=stage,
@@ -276,7 +265,7 @@ def _build_partition_audit(
         else metadata["n_devices"],
         nbaiot_per_device=nbaiot_per_device,
         ciciot_protocol=None,
-        confound_summary=confound_summary_for(stage),
+        confound_summary=confound_summary_for(),
         chronological_split_verified=chrono_ok,
         contiguous_gap_verified=gap_ok,
     )
@@ -401,9 +390,7 @@ def _load_run_context(
     score_root, checkpoint = _resolve_score_root_and_checkpoint(
         cell, layout, checkpoint_round
     )
-    partition_path = _partition_manifest_path(
-        stage, seed, base_dir, data_root=_data_root
-    )
+    partition_path = _partition_manifest_path(stage, base_dir, data_root=_data_root)
     partition_payload = _manifest_payload(partition_path)
     metadata = partition_payload.get("metadata", {})
     feature_count = metadata.get("n_features")

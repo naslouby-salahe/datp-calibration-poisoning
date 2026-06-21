@@ -303,13 +303,26 @@ All critical cleanup actions have been completed. The following items remain for
 
 | Status | Item | Notes |
 |--------|------|-------|
+| done | Remove experiments/baselines/ ghost directory | Removed — was empty except __pycache__ |
+| done | Rename test_roadmap_b4_k_fixed_at_three | → test_roadmap_cluster_threshold_k_fixed_at_three |
+| done | Rename test_lock_mu_flag_threshold_is_deterministic_and_b1_derived | → test_lock_mu_flag_threshold_is_deterministic |
+| done | Replace stale run_id="a_b1_seed0" fixtures | → "nbaiot_main_global_threshold_seed0" |
+| done | Fix 'baseline cell' message in validation/results.py | → 'clean run cell' |
+| done | Fix 'no baseline dimension' comment in artifacts/layout.py | → canonical wording |
+| done | Rename test_build_imports_controlled_baselines | → test_build_uses_threshold_policy_not_controlled_baselines |
+| done | Fix stale STATS_REPORTING_BASELINES error messages | Now refer to ThresholdPolicy directly |
+| done | Rename TestBaselineEnum + methods | → TestThresholdPolicyEnum, canonical method names |
+| done | Remove test_b0_not_present and test_deprecated_policy_not_present | Old-name rejection tests; set equality already covers this |
+| done | Remove test_collision_proof_no_flat_file_pattern | Old format rejection test; format is already positively asserted |
+| done | Rename test_baseline_types_importable, test_baseline_result_required_keys | → test_threshold_result_* |
+| done | Rename test_all_baselines_accepted, test_b0_accepted, test_rejects_non_baseline_value | → canonical policy names |
+| done | Rename b1_rows variable in test_results_audit.py | → global_rows |
 | remaining | Verify §8.4 output root path template | Check config/attack_config.py |
 | remaining | Verify §9.5 clean artifact manifest schema | Check run_manifest.py |
 | remaining | Verify §17.12 all 29 smoke invariants covered | Check test_smoke_harness.py |
 | remaining | Verify §20.5 Table 1–7 hooks complete | Check reporting/tables.py |
 | remaining | Verify §20.6 Figure 1–7 hooks complete | Check reporting/figures.py + build.py |
-| remaining | Remove experiments/baselines/ ghost directory | Empty dir, safe to remove |
 
 ---
 
-*Last updated: Phase 1 cleanup — all stale naming eliminated. Static inspection clean.*
+*Last updated: Phase 2 cleanup — test stale naming eliminated. Static inspection and ruff/pyright clean.*

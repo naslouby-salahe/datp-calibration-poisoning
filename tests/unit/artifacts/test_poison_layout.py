@@ -219,10 +219,7 @@ class TestConstants:
     def test_manifest_file_names(self) -> None:
         assert ManifestFile.PROJECT_AUDIT_REPORT == "project_audit_report.json"
         assert ManifestFile.CLEAN_SCORE_ARTIFACTS == "clean_score_artifacts.json"
-        assert (
-            ManifestFile.NBAIOT_MAIN_MANIFEST
-            == "nbaiot_main_manifest.json"
-        )
+        assert ManifestFile.NBAIOT_MAIN_MANIFEST == "nbaiot_main_manifest.json"
         assert ManifestFile.PAPER_FIGURE_MANIFEST == "paper_figure_manifest.json"
 
     def test_run_file_names(self) -> None:

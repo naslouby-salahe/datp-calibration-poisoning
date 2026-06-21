@@ -10,7 +10,9 @@ from tests.fixtures.fl_training import SEED, make_client_data, make_fl_cfg
 
 @pytest.mark.integration
 def test_synthetic_smoke(tmp_path) -> None:
-    cfg = make_fl_cfg(stage=ExperimentStage.SYNTHETIC_SMOKE, rounds=2, encoder_dims=[8, 4, 8])
+    cfg = make_fl_cfg(
+        stage=ExperimentStage.SYNTHETIC_SMOKE, rounds=2, encoder_dims=[8, 4, 8]
+    )
     client_data = make_client_data(n_clients=2)
 
     result = run_fl_training(
@@ -32,8 +34,10 @@ def test_nbaiot_full_loop(tmp_path) -> None:
     alpha_levels = [0.1, 0.5, 1.0, 5.0, 10.0, float("inf")]
     n_virtual_clients = 4  # Reduced from 20 for test speed
 
-    for alpha in alpha_levels:
-        cfg = make_fl_cfg(stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, rounds=2, encoder_dims=[8, 4, 8])
+    for _ in alpha_levels:
+        cfg = make_fl_cfg(
+            stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, rounds=2, encoder_dims=[8, 4, 8]
+        )
         client_data = make_client_data(n_clients=n_virtual_clients, seed=SEED)
 
         result = run_fl_training(
@@ -53,7 +57,9 @@ def test_nbaiot_full_loop(tmp_path) -> None:
 @pytest.mark.integration
 def test_nbaiot_main_smoke(tmp_path) -> None:
     set_seeds(SEED)
-    cfg = make_fl_cfg(stage=ExperimentStage.NBAIOT_MAIN, rounds=2, encoder_dims=[8, 4, 8])
+    cfg = make_fl_cfg(
+        stage=ExperimentStage.NBAIOT_MAIN, rounds=2, encoder_dims=[8, 4, 8]
+    )
     client_data = make_client_data(n_clients=9)
 
     result = run_fl_training(
@@ -72,7 +78,9 @@ def test_nbaiot_main_smoke(tmp_path) -> None:
 @pytest.mark.integration
 def test_convergence_round_logged(tmp_path) -> None:
     set_seeds(SEED)
-    cfg = make_fl_cfg(stage=ExperimentStage.NBAIOT_MAIN, rounds=2, encoder_dims=[8, 4, 8])
+    cfg = make_fl_cfg(
+        stage=ExperimentStage.NBAIOT_MAIN, rounds=2, encoder_dims=[8, 4, 8]
+    )
     client_data = make_client_data(n_clients=2)
 
     result = run_fl_training(

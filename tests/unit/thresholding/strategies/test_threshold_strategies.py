@@ -47,14 +47,24 @@ class TestGlobalThreshold:
     def test_all_clients_get_tau_global(
         self, client_errors: dict[str, np.ndarray]
     ) -> None:
-        result = global_threshold.compute(client_errors, n_min=N_MIN, q=0.95, run=_run(ThresholdPolicy.GLOBAL_THRESHOLD))
+        result = global_threshold.compute(
+            client_errors,
+            n_min=N_MIN,
+            q=0.95,
+            run=_run(ThresholdPolicy.GLOBAL_THRESHOLD),
+        )
         assert isinstance(result, ThresholdResult)
         assert result.run.policy == ThresholdPolicy.GLOBAL_THRESHOLD
         for ct in result.client_thresholds:
             assert ct.threshold == pytest.approx(result.tau_global)
 
     def test_pending_flagged(self, client_errors: dict[str, np.ndarray]) -> None:
-        result = global_threshold.compute(client_errors, n_min=N_MIN, q=0.95, run=_run(ThresholdPolicy.GLOBAL_THRESHOLD))
+        result = global_threshold.compute(
+            client_errors,
+            n_min=N_MIN,
+            q=0.95,
+            run=_run(ThresholdPolicy.GLOBAL_THRESHOLD),
+        )
         pending_cts = [ct for ct in result.client_thresholds if ct.calibration_pending]
         assert len(pending_cts) == 1
         assert pending_cts[0].client_id == "client_d"
@@ -67,7 +77,12 @@ class TestGlobalThreshold:
         eligible, _ = identify_eligible(client_errors, n_min=N_MIN)
         taus = compute_client_thresholds(client_errors, eligible, q=0.95)
         expected = sum(taus.values()) / len(taus)
-        result = global_threshold.compute(client_errors, n_min=N_MIN, q=0.95, run=_run(ThresholdPolicy.GLOBAL_THRESHOLD))
+        result = global_threshold.compute(
+            client_errors,
+            n_min=N_MIN,
+            q=0.95,
+            run=_run(ThresholdPolicy.GLOBAL_THRESHOLD),
+        )
         assert result.tau_global == pytest.approx(expected)
 
     def test_arithmetic_mean_differs_from_pooled_percentile(self) -> None:
@@ -75,7 +90,9 @@ class TestGlobalThreshold:
             "small_high": np.array([10.0, 11.0, 12.0], dtype=np.float64),
             "large_low": np.linspace(0.0, 1.0, 100, dtype=np.float64),
         }
-        result = global_threshold.compute(errors, n_min=1, q=0.95, run=_run(ThresholdPolicy.GLOBAL_THRESHOLD))
+        result = global_threshold.compute(
+            errors, n_min=1, q=0.95, run=_run(ThresholdPolicy.GLOBAL_THRESHOLD)
+        )
         pooled = float(np.percentile(np.concatenate(list(errors.values())), 95))
         assert result.tau_global != pytest.approx(pooled)
 
@@ -127,7 +144,11 @@ class TestLocalThreshold:
 
     def test_return_type(self, client_errors: dict[str, np.ndarray]) -> None:
         result = local_threshold.compute(
-            client_errors, n_min=N_MIN, tau_global=0.5, q=0.95, run=_run(ThresholdPolicy.LOCAL_THRESHOLD)
+            client_errors,
+            n_min=N_MIN,
+            tau_global=0.5,
+            q=0.95,
+            run=_run(ThresholdPolicy.LOCAL_THRESHOLD),
         )
         assert isinstance(result, ThresholdResult)
         assert result.run.policy == ThresholdPolicy.LOCAL_THRESHOLD
@@ -187,9 +208,7 @@ class TestClusterThreshold:
         assert result.metadata.cluster is not None
         assert result.metadata.cluster.k == 3
 
-    def test_silhouette_k_selection(
-        self, large_errors: dict[str, np.ndarray]
-    ) -> None:
+    def test_silhouette_k_selection(self, large_errors: dict[str, np.ndarray]) -> None:
         result = cluster_threshold.compute(
             large_errors,
             n_min=N_MIN,

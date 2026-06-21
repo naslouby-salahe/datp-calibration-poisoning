@@ -272,4 +272,3 @@ class PolicyResult(FrozenModel):
     per_client: dict[str, ClientEvalResult]
     n_clients: int
     calibration_pending_clients: tuple[str, ...]
-

@@ -137,6 +137,4 @@ def stages() -> None:
     for cfg in all_cfgs:
         gate_label = f"gate={cfg.gate!r}" if cfg.gate else "no gate"
         run_label = "BLOCKED" if not cfg.allow_run else "RUNNABLE"
-        _stdout.print(
-            f" {str(cfg.stage):<30} {run_label:<8} {gate_label}"
-        )
+        _stdout.print(f" {str(cfg.stage):<30} {run_label:<8} {gate_label}")

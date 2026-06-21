@@ -50,7 +50,9 @@ def run_fl_training(
         cfg,
         client_data,
         seed,
-        model_cls=__import__('datp.modeling.autoencoder', fromlist=['Autoencoder']).Autoencoder,
+        model_cls=__import__(
+            "datp.modeling.autoencoder", fromlist=["Autoencoder"]
+        ).Autoencoder,
         ckpt_dir=layout.checkpoint_dir(cell),
         score_base=layout.score_cell(cell).score_dir,
         label="FL",

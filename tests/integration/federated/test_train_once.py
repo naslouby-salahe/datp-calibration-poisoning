@@ -14,11 +14,18 @@ from datp.core.identity import TrainingCellId
 
 @pytest.mark.integration
 def test_same_artifact_path_all_baselines() -> None:
-    layout = ArtifactLayout(base_dir=Path(ArtifactDir.OUTPUTS), stage=ExperimentStage.NBAIOT_MAIN)
+    layout = ArtifactLayout(
+        base_dir=Path(ArtifactDir.OUTPUTS), stage=ExperimentStage.NBAIOT_MAIN
+    )
     cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=0)
     paths = [
         layout.score_cell(cell).score_dir
-        for _ in (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD)
+        for _ in (
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        )
     ]
 
     assert len(set(paths)) == 1, f"Expected one unique path, got {set(paths)}"

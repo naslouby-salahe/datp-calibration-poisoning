@@ -62,9 +62,9 @@ def test_artifact_schema(tmp_path) -> None:
     )
 
     cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=SEED)
-    parquet_file = ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN).score_file(
-        cell, ScoringStage.CAL, first_cid
-    )
+    parquet_file = ArtifactLayout(
+        base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN
+    ).score_file(cell, ScoringStage.CAL, first_cid)
     df = pd.read_parquet(parquet_file)
 
     assert list(df.columns) == ["reconstruction_error"], (
@@ -78,7 +78,9 @@ def test_artifact_schema(tmp_path) -> None:
 def test_scoring_manifest_validation_fails_when_missing(tmp_path) -> None:
     cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=SEED)
     score_base = (
-        ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN).score_cell(cell).score_dir
+        ArtifactLayout(base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN)
+        .score_cell(cell)
+        .score_dir
     )
     score_base.mkdir(parents=True)
     (score_base / ArtifactFile.SCORING_MANIFEST).write_text(

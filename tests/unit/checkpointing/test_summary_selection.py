@@ -1,9 +1,7 @@
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
 
 import pytest
 
-from datp.checkpointing.enums import PrimaryCheckpointSelectionRule
 from datp.checkpointing.summary import (
     select_global_primary_checkpoint,
     summaries_for_global_primary_checkpoint,

@@ -172,7 +172,9 @@ def compute_tau_global(
 ) -> float:
     """tau_global = (1/K_elig)×Στᵢ (GLOBAL_THRESHOLD formula); never sample-weighted; raises ValueError if client_taus is empty."""
     if not isinstance(thresholds, ClientThresholdsCollection):
-        thresholds = ClientThresholdsCollection.from_mapping(thresholds, ThresholdPolicy.LOCAL_THRESHOLD)
+        thresholds = ClientThresholdsCollection.from_mapping(
+            thresholds, ThresholdPolicy.LOCAL_THRESHOLD
+        )
     if not thresholds.entries:
         raise ValueError(
             fmt(

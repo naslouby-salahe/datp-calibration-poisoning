@@ -141,9 +141,7 @@ MAIN_BODY_POLICIES: frozenset[ThresholdPolicy] = frozenset(
     }
 )
 
-THRESHOLD_AGGREGATION_BY_POLICY: dict[
-    ThresholdPolicy, ThresholdAggregationMethod
-] = {
+THRESHOLD_AGGREGATION_BY_POLICY: dict[ThresholdPolicy, ThresholdAggregationMethod] = {
     ThresholdPolicy.GLOBAL_THRESHOLD: ThresholdAggregationMethod.ELIGIBLE_CLIENT_ARITHMETIC_MEAN,
     ThresholdPolicy.LOCAL_THRESHOLD: ThresholdAggregationMethod.PER_CLIENT_PERCENTILE,
     ThresholdPolicy.CLUSTER_THRESHOLD: ThresholdAggregationMethod.ELIGIBLE_CLUSTER_ARITHMETIC_MEAN,

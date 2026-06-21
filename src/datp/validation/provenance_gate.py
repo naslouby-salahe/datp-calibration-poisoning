@@ -150,7 +150,6 @@ def _check_split_semantics(manifest: RunManifest) -> ValidationCheck:
     )
 
 
-
 def _check_scores_present(
     score_root: Path | None,
     check_code: "ProvenanceCheckCode",

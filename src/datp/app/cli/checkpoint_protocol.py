@@ -173,7 +173,10 @@ def _load_metrics(
     for seed in seeds:
         cell = TrainingCellId(stage=stage, seed=seed)
         for checkpoint_round in rounds:
-            for policy in (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD):
+            for policy in (
+                ThresholdPolicy.GLOBAL_THRESHOLD,
+                ThresholdPolicy.LOCAL_THRESHOLD,
+            ):
                 path = layout.policy_run_for_round(
                     PolicyRunId(cell=cell, policy=policy), checkpoint_round
                 ).metrics_path

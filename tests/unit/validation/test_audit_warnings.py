@@ -115,7 +115,9 @@ def test_worst_client_varies_info_when_different() -> None:
 # ── LOCAL_THRESHOLD utility tradeoff warnings ─────────────────────────────────
 
 
-def test_check_local_threshold_utility_tradeoff_warns_when_local_improves_cv_fpr_but_worsens_utility() -> None:
+def test_check_local_threshold_utility_tradeoff_warns_when_local_improves_cv_fpr_but_worsens_utility() -> (
+    None
+):
     from datp.validation._warnings import check_local_threshold_utility_tradeoff
 
     warnings_out: list[WarningRecord] = []
@@ -125,7 +127,9 @@ def test_check_local_threshold_utility_tradeoff_warns_when_local_improves_cv_fpr
     local_panel = _CellPanel(
         cv_fpr=0.2, macro_f1_mean=0.80, pr_auc_mean=0.88, auroc_mean=0.91, cv_tpr=0.78
     )
-    check_local_threshold_utility_tradeoff((_STAGE, 0), global_panel, local_panel, warnings_out)
+    check_local_threshold_utility_tradeoff(
+        (_STAGE, 0), global_panel, local_panel, warnings_out
+    )
     codes = [w.code for w in warnings_out]
     assert WarningCode.LOCAL_UTILITY_TRADEOFF in codes
     msg = warnings_out[0].message
@@ -133,23 +137,35 @@ def test_check_local_threshold_utility_tradeoff_warns_when_local_improves_cv_fpr
     assert "pr_auc" in msg
 
 
-def test_check_local_threshold_utility_tradeoff_no_warning_when_cv_fpr_not_improved() -> None:
+def test_check_local_threshold_utility_tradeoff_no_warning_when_cv_fpr_not_improved() -> (
+    None
+):
     from datp.validation._warnings import check_local_threshold_utility_tradeoff
 
     warnings_out: list[WarningRecord] = []
     global_panel = _CellPanel(cv_fpr=0.2, macro_f1_mean=0.80)
     local_panel = _CellPanel(cv_fpr=0.3, macro_f1_mean=0.85)
-    check_local_threshold_utility_tradeoff((_STAGE, 0), global_panel, local_panel, warnings_out)
+    check_local_threshold_utility_tradeoff(
+        (_STAGE, 0), global_panel, local_panel, warnings_out
+    )
     assert len(warnings_out) == 0
 
 
-def test_check_local_threshold_utility_tradeoff_no_warning_when_no_utility_worsened() -> None:
+def test_check_local_threshold_utility_tradeoff_no_warning_when_no_utility_worsened() -> (
+    None
+):
     from datp.validation._warnings import check_local_threshold_utility_tradeoff
 
     warnings_out: list[WarningRecord] = []
-    global_panel = _CellPanel(cv_fpr=0.3, macro_f1_mean=0.80, auroc_mean=0.90, cv_tpr=0.75)
-    local_panel = _CellPanel(cv_fpr=0.2, macro_f1_mean=0.85, auroc_mean=0.92, cv_tpr=0.80)
-    check_local_threshold_utility_tradeoff((_STAGE, 0), global_panel, local_panel, warnings_out)
+    global_panel = _CellPanel(
+        cv_fpr=0.3, macro_f1_mean=0.80, auroc_mean=0.90, cv_tpr=0.75
+    )
+    local_panel = _CellPanel(
+        cv_fpr=0.2, macro_f1_mean=0.85, auroc_mean=0.92, cv_tpr=0.80
+    )
+    check_local_threshold_utility_tradeoff(
+        (_STAGE, 0), global_panel, local_panel, warnings_out
+    )
     assert len(warnings_out) == 0
 
 

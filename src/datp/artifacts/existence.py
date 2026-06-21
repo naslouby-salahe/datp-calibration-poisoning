@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 from datp.artifacts.layout import ArtifactLayout
-from datp.artifacts.names import ArtifactFile
 from datp.config.stages import ExperimentStage
 from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.metric_enums import PayloadKey

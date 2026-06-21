@@ -10,7 +10,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from datp.artifacts.layout import ArtifactLayout
-from datp.attacks.enums import ThresholdPolicy
 from datp.config.stages import ExperimentStage
 from datp.core.identity import TrainingCellId
 from datp.federated.protocols.fedavg import run_fl_training

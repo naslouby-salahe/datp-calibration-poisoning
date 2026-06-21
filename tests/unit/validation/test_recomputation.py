@@ -14,7 +14,7 @@ from datp.validation.enums import DenominatorStatus
 
 def _base_params(**overrides: object) -> RecomputationParams:
     defaults: dict = {
-        "run_id": "a_b1_seed0",
+        "run_id": "nbaiot_main_global_threshold_seed0",
         "seed": 0,
         "stage": ExperimentStage.NBAIOT_MAIN,
         "policy": ThresholdPolicy.GLOBAL_THRESHOLD,

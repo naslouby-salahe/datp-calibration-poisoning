@@ -47,7 +47,9 @@ def _make_setup(fraction: float = 0.40):
     }
 
     global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
-    local_pair = compute_local_pair(col, pois_cal, THRESHOLD_QUANTILE, global_pair.tau_global_clean)
+    local_pair = compute_local_pair(
+        col, pois_cal, THRESHOLD_QUANTILE, global_pair.tau_global_clean
+    )
     global_result = compute_metrics(
         MetricEngineInput(collection=col, pair=global_pair, mu_flag_threshold=None)
     )
@@ -61,28 +63,36 @@ class TestAsr:
     def test_asr_in_0_1(self) -> None:
         _, global_result, _, victim_id = _make_setup()
         asr = compute_asr(
-            global_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            global_result,
+            victim_id=victim_id,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         assert 0.0 <= asr.asr <= 1.0
 
     def test_asr_victim_id_recorded(self) -> None:
         _, _, local_result, victim_id = _make_setup()
         asr = compute_asr(
-            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            local_result,
+            victim_id=victim_id,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         assert asr.victim_id == victim_id
 
     def test_asr_policy_recorded(self) -> None:
         _, _, local_result, victim_id = _make_setup()
         asr = compute_asr(
-            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            local_result,
+            victim_id=victim_id,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         assert asr.policy == ThresholdPolicy.LOCAL_THRESHOLD
 
     def test_asr_raise_counts_positive_significant(self) -> None:
         _, _, local_result, victim_id = _make_setup()
         asr = compute_asr(
-            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_RAISE
+            local_result,
+            victim_id=victim_id,
+            objective=AttackerObjective.THRESHOLD_RAISE,
         )
         # Victim should have significant positive delta (HIGH_SCORE injection).
         assert asr.n_significant >= 1
@@ -92,7 +102,9 @@ class TestAsr:
         _, _, local_result, victim_id = _make_setup()
         # LOCAL_THRESHOLD: only victim changes, direction is RAISE → no LOWER significant clients.
         asr_lower = compute_asr(
-            local_result, victim_id=victim_id, objective=AttackerObjective.THRESHOLD_LOWER
+            local_result,
+            victim_id=victim_id,
+            objective=AttackerObjective.THRESHOLD_LOWER,
         )
         # No clients should have Δτ < -scale since we raised the threshold.
         assert asr_lower.n_significant == 0
@@ -146,7 +158,9 @@ class TestSpillover:
         """LOCAL_THRESHOLD single-victim attack: only victim threshold changes → no spillover."""
         _, _, local_result, victim_id = _make_setup()
         sp = compute_spillover(local_result, victim_id=victim_id)
-        assert sp.n_spillover == 0, "LOCAL_THRESHOLD should have no spillover for single victim"
+        assert sp.n_spillover == 0, (
+            "LOCAL_THRESHOLD should have no spillover for single victim"
+        )
         assert len(sp.spillover_client_ids) == 0
 
     def test_spillover_does_not_include_victim(self) -> None:

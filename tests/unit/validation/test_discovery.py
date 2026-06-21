@@ -41,7 +41,9 @@ def test_parse_score_cell_dir_with_alpha(tmp_path: Path) -> None:
     scores_root = tmp_path / ArtifactDir.SCORES
     cell_dir = scores_root / ExperimentStage.NBAIOT_FULL_OPTIONAL.value / "seed_7"
     location = parse_score_cell_dir(scores_root, cell_dir)
-    assert location.cell == TrainingCellId(stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, seed=7)
+    assert location.cell == TrainingCellId(
+        stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, seed=7
+    )
     assert location.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
     assert location.seed == 7
 
@@ -76,7 +78,9 @@ def test_iter_score_cells_empty(tmp_path: Path) -> None:
 
 
 def test_iter_score_cells_no_alpha(tmp_path: Path) -> None:
-    scores_root = tmp_path / ArtifactDir.SCORES / ExperimentStage.NBAIOT_MAIN.value / "seed_0"
+    scores_root = (
+        tmp_path / ArtifactDir.SCORES / ExperimentStage.NBAIOT_MAIN.value / "seed_0"
+    )
     _write_dummy_file(scores_root / ArtifactFile.SCORING_MANIFEST)
     cells = iter_score_cells(tmp_path)
     assert len(cells) == 1
@@ -85,7 +89,12 @@ def test_iter_score_cells_no_alpha(tmp_path: Path) -> None:
 
 
 def test_iter_score_cells_with_alpha(tmp_path: Path) -> None:
-    scores_root = tmp_path / ArtifactDir.SCORES / ExperimentStage.NBAIOT_FULL_OPTIONAL.value / "seed_1"
+    scores_root = (
+        tmp_path
+        / ArtifactDir.SCORES
+        / ExperimentStage.NBAIOT_FULL_OPTIONAL.value
+        / "seed_1"
+    )
     _write_dummy_file(scores_root / ArtifactFile.SCORING_MANIFEST)
     cells = iter_score_cells(tmp_path)
     assert len(cells) == 1
@@ -95,17 +104,27 @@ def test_iter_score_cells_with_alpha(tmp_path: Path) -> None:
 
 def test_iter_score_cells_mixed(tmp_path: Path) -> None:
     _write_dummy_file(
-        tmp_path / ArtifactDir.SCORES / ExperimentStage.NBAIOT_MAIN.value / "seed_0" / ArtifactFile.SCORING_MANIFEST
+        tmp_path
+        / ArtifactDir.SCORES
+        / ExperimentStage.NBAIOT_MAIN.value
+        / "seed_0"
+        / ArtifactFile.SCORING_MANIFEST
     )
     _write_dummy_file(
-        tmp_path / ArtifactDir.SCORES / ExperimentStage.NBAIOT_FULL_OPTIONAL.value / "seed_0" / ArtifactFile.SCORING_MANIFEST
+        tmp_path
+        / ArtifactDir.SCORES
+        / ExperimentStage.NBAIOT_FULL_OPTIONAL.value
+        / "seed_0"
+        / ArtifactFile.SCORING_MANIFEST
     )
     cells = iter_score_cells(tmp_path)
     assert len(cells) == 2
 
 
 def test_iter_score_cells_ignores_dirs_without_manifest(tmp_path: Path) -> None:
-    (tmp_path / ArtifactDir.SCORES / ExperimentStage.NBAIOT_MAIN.value / "seed_0").mkdir(parents=True)
+    (
+        tmp_path / ArtifactDir.SCORES / ExperimentStage.NBAIOT_MAIN.value / "seed_0"
+    ).mkdir(parents=True)
     assert iter_score_cells(tmp_path) == []
 
 
@@ -114,7 +133,13 @@ def test_iter_score_cells_ignores_dirs_without_manifest(tmp_path: Path) -> None:
 
 def test_parse_metric_path_no_alpha(tmp_path: Path) -> None:
     results_root = tmp_path / ArtifactDir.RESULTS
-    path = results_root / ExperimentStage.NBAIOT_MAIN.value / ThresholdPolicy.GLOBAL_THRESHOLD.value / "seed_42" / ArtifactFile.METRICS
+    path = (
+        results_root
+        / ExperimentStage.NBAIOT_MAIN.value
+        / ThresholdPolicy.GLOBAL_THRESHOLD.value
+        / "seed_42"
+        / ArtifactFile.METRICS
+    )
     run_id = parse_metric_path(tmp_path, path)
     assert isinstance(run_id, PolicyRunId)
     assert run_id.stage == ExperimentStage.NBAIOT_MAIN
@@ -124,7 +149,13 @@ def test_parse_metric_path_no_alpha(tmp_path: Path) -> None:
 
 def test_parse_metric_path_with_alpha(tmp_path: Path) -> None:
     results_root = tmp_path / ArtifactDir.RESULTS
-    path = results_root / ExperimentStage.NBAIOT_FULL_OPTIONAL.value / ThresholdPolicy.LOCAL_THRESHOLD.value / "seed_7" / ArtifactFile.METRICS
+    path = (
+        results_root
+        / ExperimentStage.NBAIOT_FULL_OPTIONAL.value
+        / ThresholdPolicy.LOCAL_THRESHOLD.value
+        / "seed_7"
+        / ArtifactFile.METRICS
+    )
     run_id = parse_metric_path(tmp_path, path)
     assert run_id.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
     assert run_id.policy == ThresholdPolicy.LOCAL_THRESHOLD
@@ -133,14 +164,26 @@ def test_parse_metric_path_with_alpha(tmp_path: Path) -> None:
 
 def test_parse_metric_path_invalid_seed_raises(tmp_path: Path) -> None:
     results_root = tmp_path / ArtifactDir.RESULTS
-    path = results_root / ExperimentStage.NBAIOT_MAIN.value / ThresholdPolicy.GLOBAL_THRESHOLD.value / "bad" / ArtifactFile.METRICS
+    path = (
+        results_root
+        / ExperimentStage.NBAIOT_MAIN.value
+        / ThresholdPolicy.GLOBAL_THRESHOLD.value
+        / "bad"
+        / ArtifactFile.METRICS
+    )
     with pytest.raises(ValueError, match="Expected seed segment"):
         parse_metric_path(tmp_path, path)
 
 
 def test_parse_metric_path_invalid_stage_raises(tmp_path: Path) -> None:
     results_root = tmp_path / ArtifactDir.RESULTS
-    path = results_root / "x" / ThresholdPolicy.GLOBAL_THRESHOLD.value / "seed_1" / ArtifactFile.METRICS
+    path = (
+        results_root
+        / "x"
+        / ThresholdPolicy.GLOBAL_THRESHOLD.value
+        / "seed_1"
+        / ArtifactFile.METRICS
+    )
     with pytest.raises(ValueError):
         parse_metric_path(tmp_path, path)
 
@@ -154,8 +197,20 @@ def test_completed_metric_paths_empty(tmp_path: Path) -> None:
 
 def test_completed_metric_paths_finds_metrics(tmp_path: Path) -> None:
     results = tmp_path / ArtifactDir.RESULTS
-    _write_dummy_file(results / ExperimentStage.NBAIOT_MAIN.value / ThresholdPolicy.GLOBAL_THRESHOLD.value / "seed_0" / ArtifactFile.METRICS)
-    _write_dummy_file(results / ExperimentStage.NBAIOT_MAIN.value / ThresholdPolicy.LOCAL_THRESHOLD.value / "seed_0" / ArtifactFile.METRICS)
+    _write_dummy_file(
+        results
+        / ExperimentStage.NBAIOT_MAIN.value
+        / ThresholdPolicy.GLOBAL_THRESHOLD.value
+        / "seed_0"
+        / ArtifactFile.METRICS
+    )
+    _write_dummy_file(
+        results
+        / ExperimentStage.NBAIOT_MAIN.value
+        / ThresholdPolicy.LOCAL_THRESHOLD.value
+        / "seed_0"
+        / ArtifactFile.METRICS
+    )
     paths = completed_metric_paths(tmp_path)
     assert len(paths) == 2
 
@@ -163,7 +218,11 @@ def test_completed_metric_paths_finds_metrics(tmp_path: Path) -> None:
 def test_completed_metric_paths_with_alpha(tmp_path: Path) -> None:
     results = tmp_path / ArtifactDir.RESULTS
     _write_dummy_file(
-        results / ExperimentStage.NBAIOT_FULL_OPTIONAL.value / ThresholdPolicy.GLOBAL_THRESHOLD.value / "seed_0" / ArtifactFile.METRICS
+        results
+        / ExperimentStage.NBAIOT_FULL_OPTIONAL.value
+        / ThresholdPolicy.GLOBAL_THRESHOLD.value
+        / "seed_0"
+        / ArtifactFile.METRICS
     )
     paths = completed_metric_paths(tmp_path)
     assert len(paths) == 1

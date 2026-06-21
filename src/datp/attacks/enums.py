@@ -26,7 +26,9 @@ class PoisoningSourceStrategy(enum.StrEnum):
     RANDOM_BENIGN = "random_benign"
     HIGH_SCORE_BENIGN = "high_score_benign"
     LOW_SCORE_BENIGN = "low_score_benign"
-    LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY = "low_score_targeted_removal_diagnostic_only"
+    LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY = (
+        "low_score_targeted_removal_diagnostic_only"
+    )
 
 
 class CalibrationInjectionRule(enum.StrEnum):

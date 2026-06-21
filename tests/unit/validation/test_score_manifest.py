@@ -62,7 +62,9 @@ def _build_cell(
     for score_stage in SCORING_STAGES:
         for client_id in clients:
             arr = np.linspace(0.01, 0.05, 25, dtype=np.float32)
-            _write_score_parquet(cell_dir / score_stage.value / f"{client_id}.parquet", arr)
+            _write_score_parquet(
+                cell_dir / score_stage.value / f"{client_id}.parquet", arr
+            )
 
     if write_partition:
         partition_root = data_root / "data" / "processed" / dataset
@@ -219,7 +221,13 @@ def test_missing_checkpoint_file_fails(tmp_path: Path) -> None:
     base_dir = tmp_path / "outputs"
     cell = _build_cell(base_dir=base_dir, data_root=tmp_path)
     # Remove the actual checkpoint file.
-    (base_dir / "checkpoints" / ExperimentStage.NBAIOT_MAIN.value / "seed_0" / ArtifactFile.MODEL_CHECKPOINT).unlink()
+    (
+        base_dir
+        / "checkpoints"
+        / ExperimentStage.NBAIOT_MAIN.value
+        / "seed_0"
+        / ArtifactFile.MODEL_CHECKPOINT
+    ).unlink()
 
     report = verify_score_cell(cell, base_dir, data_root=tmp_path)
 
@@ -337,11 +345,18 @@ def test_client_mismatch_vs_partition_fails(tmp_path: Path) -> None:
 
 def test_iter_score_cells_and_verify_all(tmp_path: Path) -> None:
     base_dir = tmp_path / "outputs"
-    _build_cell(base_dir=base_dir, data_root=tmp_path, stage=ExperimentStage.NBAIOT_MAIN, seed=0)
-    _build_cell(base_dir=base_dir, data_root=tmp_path, stage=ExperimentStage.NBAIOT_MAIN, seed=1)
+    _build_cell(
+        base_dir=base_dir, data_root=tmp_path, stage=ExperimentStage.NBAIOT_MAIN, seed=0
+    )
+    _build_cell(
+        base_dir=base_dir, data_root=tmp_path, stage=ExperimentStage.NBAIOT_MAIN, seed=1
+    )
 
     cells = iter_score_cells(base_dir)
-    assert {(c.stage, c.seed) for c in cells} == {(ExperimentStage.NBAIOT_MAIN, 0), (ExperimentStage.NBAIOT_MAIN, 1)}
+    assert {(c.stage, c.seed) for c in cells} == {
+        (ExperimentStage.NBAIOT_MAIN, 0),
+        (ExperimentStage.NBAIOT_MAIN, 1),
+    }
 
     reports = verify_all_score_cells(base_dir, data_root=tmp_path, write_reports=True)
     assert len(reports) == 2

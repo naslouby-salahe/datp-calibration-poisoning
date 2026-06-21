@@ -149,9 +149,7 @@ def validate_stage(cfg: DatpConfig) -> ExperimentStage:
     stage = cfg.stage
     if stage is None:
         raise ValueError(
-            fmt(
-                _MODULE, "stage must be set in config", "non-null stage", repr(stage)
-            )
+            fmt(_MODULE, "stage must be set in config", "non-null stage", repr(stage))
         )
     return stage
 

@@ -32,19 +32,19 @@ def test_round_comm_multiple_clients() -> None:
 
 class TestThresholdComm:
     def test_global_comm(self) -> None:
-        tc = compute_threshold_comm(ThresholdPolicy.GLOBAL_THRESHOLD, k_eligible=9, n_families=0)
+        tc = compute_threshold_comm(ThresholdPolicy.GLOBAL_THRESHOLD, k_eligible=9)
         assert tc.policy == ThresholdPolicy.GLOBAL_THRESHOLD
         assert tc.server_uplink_payload_bytes == 36  # 9 × 4
         assert tc.server_downlink_payload_bytes == 36  # 9 × 4
 
     def test_local_comm_zero(self) -> None:
-        tc = compute_threshold_comm(ThresholdPolicy.LOCAL_THRESHOLD, k_eligible=9, n_families=0)
+        tc = compute_threshold_comm(ThresholdPolicy.LOCAL_THRESHOLD, k_eligible=9)
         assert tc.policy == ThresholdPolicy.LOCAL_THRESHOLD
         assert tc.server_uplink_payload_bytes == 0
         assert tc.server_downlink_payload_bytes == 0
 
     def test_cluster_comm(self) -> None:
-        tc = compute_threshold_comm(ThresholdPolicy.CLUSTER_THRESHOLD, k_eligible=9, n_families=0)
+        tc = compute_threshold_comm(ThresholdPolicy.CLUSTER_THRESHOLD, k_eligible=9)
         assert tc.policy == ThresholdPolicy.CLUSTER_THRESHOLD
         assert (
             tc.server_uplink_payload_bytes == 144
@@ -58,7 +58,6 @@ def test_build_comm_summary_structure() -> None:
         model_bytes=1000,
         num_clients=9,
         k_eligible=7,
-        n_families=3,
     )
 
     training = summary.training
@@ -71,14 +70,20 @@ def test_build_comm_summary_structure() -> None:
     assert training.total_downlink_bytes == 90000
 
     tc = summary.threshold_calibration
-    assert tc[ThresholdPolicy.GLOBAL_THRESHOLD].server_uplink_payload_bytes == 28  # 7 × 4
-    assert tc[ThresholdPolicy.GLOBAL_THRESHOLD].server_downlink_payload_bytes == 28  # 7 × 4
+    assert (
+        tc[ThresholdPolicy.GLOBAL_THRESHOLD].server_uplink_payload_bytes == 28
+    )  # 7 × 4
+    assert (
+        tc[ThresholdPolicy.GLOBAL_THRESHOLD].server_downlink_payload_bytes == 28
+    )  # 7 × 4
     assert tc[ThresholdPolicy.LOCAL_THRESHOLD].server_uplink_payload_bytes == 0
     assert tc[ThresholdPolicy.LOCAL_THRESHOLD].server_downlink_payload_bytes == 0
     assert (
         tc[ThresholdPolicy.CLUSTER_THRESHOLD].server_uplink_payload_bytes == 112
     )  # 7 × 4 fingerprint floats × 4 bytes
-    assert tc[ThresholdPolicy.CLUSTER_THRESHOLD].server_downlink_payload_bytes == 56  # 7 × 2 × 4
+    assert (
+        tc[ThresholdPolicy.CLUSTER_THRESHOLD].server_downlink_payload_bytes == 56
+    )  # 7 × 2 × 4
 
 
 def test_build_comm_summary_all_baselines_present() -> None:
@@ -87,7 +92,6 @@ def test_build_comm_summary_all_baselines_present() -> None:
         model_bytes=100,
         num_clients=2,
         k_eligible=2,
-        n_families=1,
     )
     baselines = summary.threshold_calibration
     assert set(baselines.keys()) == {

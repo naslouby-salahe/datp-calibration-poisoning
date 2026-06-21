@@ -139,7 +139,9 @@ def _run_cluster(
         for ct in result.client_thresholds
         if not ct.calibration_pending
     }
-    assert result.metadata.cluster is not None, "CLUSTER_THRESHOLD metadata must be set after CLUSTER_THRESHOLD run"
+    assert result.metadata.cluster is not None, (
+        "CLUSTER_THRESHOLD metadata must be set after CLUSTER_THRESHOLD run"
+    )
     return eff, result.metadata.cluster
 
 
@@ -307,7 +309,9 @@ def compute_cluster_pair(
         pois_full_cal, q, tau_global_pois, **hyperparams
     )
 
-    decomposition = _build_cluster_decomposition(eligible_ids, eff_clean, tau_agg, eff_pois)
+    decomposition = _build_cluster_decomposition(
+        eligible_ids, eff_clean, tau_agg, eff_pois
+    )
 
     return ClusterThresholdPair(
         policy=ThresholdPolicy.CLUSTER_THRESHOLD,
@@ -316,6 +320,8 @@ def compute_cluster_pair(
         thresholds_clean=ClientThresholdsCollection.from_mapping(
             eff_clean, ThresholdPolicy.CLUSTER_THRESHOLD
         ),
-        thresholds_pois=ClientThresholdsCollection.from_mapping(eff_pois, ThresholdPolicy.CLUSTER_THRESHOLD),
+        thresholds_pois=ClientThresholdsCollection.from_mapping(
+            eff_pois, ThresholdPolicy.CLUSTER_THRESHOLD
+        ),
         decomposition=decomposition,
     )

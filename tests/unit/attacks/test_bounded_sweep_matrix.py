@@ -31,7 +31,11 @@ def _full_config(**overrides: object) -> CalibrationPoisoningConfig:
     from datp.attacks.constants import NBAIOT_FULL_OPTIONAL_SWEEP_FRACTIONS
 
     defaults: dict[str, object] = {
-        "policies": (ThresholdPolicy.GLOBAL_THRESHOLD, ThresholdPolicy.LOCAL_THRESHOLD, ThresholdPolicy.CLUSTER_THRESHOLD),
+        "policies": (
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            ThresholdPolicy.CLUSTER_THRESHOLD,
+        ),
         "sources": (
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
@@ -177,7 +181,13 @@ def test_enumerator_uses_config_seeds_not_constants():
     config = _full_config(seeds=single_seed_pool)
     cells = enumerate_full_sweep_matrix(_VICTIMS_BY_SEED, config)
     # 1 seed × 9 victims × 3 policies × 3 sources × 5 fractions
-    expected = 1 * len(_VICTIMS) * len(config.policies) * len(config.sources) * len(config.fractions)
+    expected = (
+        1
+        * len(_VICTIMS)
+        * len(config.policies)
+        * len(config.sources)
+        * len(config.fractions)
+    )
     assert len(cells) == expected
     pairs = {(c.training_seed, c.poisoning_seed) for c in cells}
     assert pairs == {(0, 100)}

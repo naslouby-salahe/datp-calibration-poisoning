@@ -26,7 +26,9 @@ def test_checkpoint_protocol_smoke_cli_uses_temp_root(tmp_path: Path) -> None:
     assert payload["rounds"] == [25, 50]
     assert payload["selected_round"] in {25, 50}
     assert (tmp_path / "scores" / "a" / "seed_0" / "round_25").is_dir()
-    assert (tmp_path / "results" / "a" / "global_threshold" / "seed_0" / "round_25").is_dir()
+    assert (
+        tmp_path / "results" / "a" / "global_threshold" / "seed_0" / "round_25"
+    ).is_dir()
     assert "outputs" not in tmp_path.parts
 
 

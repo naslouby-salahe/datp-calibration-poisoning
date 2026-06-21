@@ -5,7 +5,9 @@ import json
 from datp.core.metric_enums import PayloadKey
 
 
-def valid_metrics_dict(policy: str = "global_threshold", stage: str = "nbaiot_main", seed: int = 0) -> dict:
+def valid_metrics_dict(
+    policy: str = "global_threshold", stage: str = "nbaiot_main", seed: int = 0
+) -> dict:
     client = {
         PayloadKey.CLIENT_ID: "c1",
         "fpr": 0.0,
@@ -72,5 +74,7 @@ def valid_metrics_dict(policy: str = "global_threshold", stage: str = "nbaiot_ma
     }
 
 
-def valid_metrics_json(policy: str = "global_threshold", stage: str = "nbaiot_main", seed: int = 0) -> str:
+def valid_metrics_json(
+    policy: str = "global_threshold", stage: str = "nbaiot_main", seed: int = 0
+) -> str:
     return json.dumps(valid_metrics_dict(policy, stage, seed))

@@ -18,27 +18,21 @@ from datp.experiments.enums import SweepStep
 from datp.reporting.enums import FigureName
 
 
-class TestBaselineEnum:
-    def test_main_baselines_present(self) -> None:
+class TestThresholdPolicyEnum:
+    def test_canonical_policies_present(self) -> None:
         assert set(ThresholdPolicy) == {
             ThresholdPolicy.GLOBAL_THRESHOLD,
             ThresholdPolicy.LOCAL_THRESHOLD,
             ThresholdPolicy.CLUSTER_THRESHOLD,
         }
 
-    def test_baseline_values_are_lowercase(self) -> None:
+    def test_policy_values_are_lowercase(self) -> None:
         for b in ThresholdPolicy:
             assert b.value == b.value.lower()
 
-    def test_baseline_is_str_compatible(self) -> None:
+    def test_policy_is_str_compatible(self) -> None:
         assert ThresholdPolicy.GLOBAL_THRESHOLD == "global_threshold"
         assert str(ThresholdPolicy.LOCAL_THRESHOLD) == "local_threshold"
-
-    def test_b0_not_present(self) -> None:
-        assert not hasattr(ThresholdPolicy, "B0")
-
-    def test_deprecated_policy_not_present(self) -> None:
-        assert not hasattr(ThresholdPolicy, "B3")
 
 
 class TestDatasetIDEnum:

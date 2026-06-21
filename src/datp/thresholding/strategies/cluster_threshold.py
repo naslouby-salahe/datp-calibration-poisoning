@@ -346,7 +346,9 @@ def _build_cluster_threshold_result(
     )
 
 
-def _compute_cluster_thresholds(request: _ClusterComputationRequest) -> _ClusterComputationResult:
+def _compute_cluster_thresholds(
+    request: _ClusterComputationRequest,
+) -> _ClusterComputationResult:
     valid_k_candidates = _validate_k_candidates(request.k_candidates)
     client_taus = compute_client_thresholds(
         request.client_errors, request.eligible, q=request.q

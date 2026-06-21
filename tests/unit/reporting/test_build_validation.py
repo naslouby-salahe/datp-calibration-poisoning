@@ -51,7 +51,9 @@ def _payload(*, cv_fpr: float = math.nan, pending: list[str] | None = None) -> d
             "calibration_pending": "c2" in pending_ids,
             "evaluation_incomplete": False,
             "threshold_value": 0.5,
-            "threshold_source": "tau_global_fallback" if "c2" in pending_ids else "global_threshold",
+            "threshold_source": "tau_global_fallback"
+            if "c2" in pending_ids
+            else "global_threshold",
         },
     ]
     eligible = 2 - len(pending_ids)

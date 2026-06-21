@@ -62,7 +62,6 @@ from datp.validation.datasets import (
     compute_cluster_stability,
 )
 from datp.validation.discovery import completed_metric_paths as _completed_metric_paths
-from datp.validation.discovery import parse_metric_path as _parse_metric_path
 from datp.validation.enums import (
     AuditSeverity,
     AuditStatus,
@@ -196,16 +195,36 @@ def _build_seed_delta_record(
         global_worst_client_balanced_accuracy=global_panel.worst_client_balanced_accuracy,
         local_worst_client_balanced_accuracy=local_panel.worst_client_balanced_accuracy,
         cluster_worst_client_balanced_accuracy=cluster_panel.worst_client_balanced_accuracy,
-        delta_cv_fpr_global_minus_local=_safe_diff(global_panel.cv_fpr, local_panel.cv_fpr),
-        delta_cv_fpr_global_minus_cluster=_safe_diff(global_panel.cv_fpr, cluster_panel.cv_fpr),
-        delta_cv_tpr_global_minus_local=_safe_diff(global_panel.cv_tpr, local_panel.cv_tpr),
-        delta_cv_tpr_global_minus_cluster=_safe_diff(global_panel.cv_tpr, cluster_panel.cv_tpr),
-        delta_macro_f1_global_minus_local=_safe_diff(global_panel.macro_f1_mean, local_panel.macro_f1_mean),
-        delta_macro_f1_global_minus_cluster=_safe_diff(global_panel.macro_f1_mean, cluster_panel.macro_f1_mean),
-        delta_pr_auc_global_minus_local=_safe_diff(global_panel.pr_auc_mean, local_panel.pr_auc_mean),
-        delta_pr_auc_global_minus_cluster=_safe_diff(global_panel.pr_auc_mean, cluster_panel.pr_auc_mean),
-        delta_auroc_global_minus_local=_safe_diff(global_panel.auroc_mean, local_panel.auroc_mean),
-        delta_auroc_global_minus_cluster=_safe_diff(global_panel.auroc_mean, cluster_panel.auroc_mean),
+        delta_cv_fpr_global_minus_local=_safe_diff(
+            global_panel.cv_fpr, local_panel.cv_fpr
+        ),
+        delta_cv_fpr_global_minus_cluster=_safe_diff(
+            global_panel.cv_fpr, cluster_panel.cv_fpr
+        ),
+        delta_cv_tpr_global_minus_local=_safe_diff(
+            global_panel.cv_tpr, local_panel.cv_tpr
+        ),
+        delta_cv_tpr_global_minus_cluster=_safe_diff(
+            global_panel.cv_tpr, cluster_panel.cv_tpr
+        ),
+        delta_macro_f1_global_minus_local=_safe_diff(
+            global_panel.macro_f1_mean, local_panel.macro_f1_mean
+        ),
+        delta_macro_f1_global_minus_cluster=_safe_diff(
+            global_panel.macro_f1_mean, cluster_panel.macro_f1_mean
+        ),
+        delta_pr_auc_global_minus_local=_safe_diff(
+            global_panel.pr_auc_mean, local_panel.pr_auc_mean
+        ),
+        delta_pr_auc_global_minus_cluster=_safe_diff(
+            global_panel.pr_auc_mean, cluster_panel.pr_auc_mean
+        ),
+        delta_auroc_global_minus_local=_safe_diff(
+            global_panel.auroc_mean, local_panel.auroc_mean
+        ),
+        delta_auroc_global_minus_cluster=_safe_diff(
+            global_panel.auroc_mean, cluster_panel.auroc_mean
+        ),
         global_convergence_round=global_panel.convergence_round,
         local_convergence_round=local_panel.convergence_round,
         cluster_convergence_round=cluster_panel.convergence_round,
@@ -231,11 +250,23 @@ def _build_seed_deltas(
     # Side effect: emits LOCAL_UTILITY_TRADEOFF warnings.
     out: list[SeedDeltaRecord] = []
     for stage, seed in sorted({(s, sd) for s, sd, _ in cell_panel}):
-        global_panel = cell_panel.get((stage, seed, ThresholdPolicy.GLOBAL_THRESHOLD), _CellPanel.empty())
-        local_panel = cell_panel.get((stage, seed, ThresholdPolicy.LOCAL_THRESHOLD), _CellPanel.empty())
-        cluster_panel = cell_panel.get((stage, seed, ThresholdPolicy.CLUSTER_THRESHOLD), _CellPanel.empty())
-        out.append(_build_seed_delta_record(stage, seed, global_panel, local_panel, cluster_panel))
-        _check_local_threshold_utility_tradeoff((stage, seed), global_panel, local_panel, warnings)
+        global_panel = cell_panel.get(
+            (stage, seed, ThresholdPolicy.GLOBAL_THRESHOLD), _CellPanel.empty()
+        )
+        local_panel = cell_panel.get(
+            (stage, seed, ThresholdPolicy.LOCAL_THRESHOLD), _CellPanel.empty()
+        )
+        cluster_panel = cell_panel.get(
+            (stage, seed, ThresholdPolicy.CLUSTER_THRESHOLD), _CellPanel.empty()
+        )
+        out.append(
+            _build_seed_delta_record(
+                stage, seed, global_panel, local_panel, cluster_panel
+            )
+        )
+        _check_local_threshold_utility_tradeoff(
+            (stage, seed), global_panel, local_panel, warnings
+        )
     return out
 
 
@@ -255,7 +286,8 @@ def _emit_structural_warnings(
             )
         )
     if not any(
-        row.stage == ExperimentStage.NBAIOT_MAIN and row.status == AuditStatus.PASS for row in seed_deltas
+        row.stage == ExperimentStage.NBAIOT_MAIN and row.status == AuditStatus.PASS
+        for row in seed_deltas
     ):
         acc.warnings.append(
             WarningRecord(
@@ -278,7 +310,7 @@ def _emit_structural_warnings(
         WarningRecord(
             severity=AuditSeverity.BLOCKED_PENDING_RUN,
             code=WarningCode.FIXED_OPERATING_POINT_METRICS_PENDING,
-            message="FPR at fixed TPR and TPR at fixed FPR require persisted score arrays and operating-point configuration for every completed baseline cell.",
+            message="FPR at fixed TPR and TPR at fixed FPR require persisted score arrays and operating-point configuration for every completed clean run cell.",
             exact_command=_AUDIT_RESULTS_COMMAND,
         )
     )
@@ -299,13 +331,7 @@ def _cluster_stability_from_cluster_records(
     stability: list[ClusterStabilityRecord] = []
     stage_keys = sorted({row[0] for row in keyed_assignments})
     for stage in stage_keys:
-        seed_keys = sorted(
-            {
-                row[1]
-                for row in keyed_assignments
-                if row[0] == stage
-            }
-        )
+        seed_keys = sorted({row[1] for row in keyed_assignments if row[0] == stage})
         assignments = tuple(
             ClusterAssignments(
                 seed=seed,
@@ -454,7 +480,6 @@ def _audit_output_paths(audit_dir: Path) -> AuditOutputPaths:
                 AuditOutputName.WORST_CLIENT_TRACKING,
                 audit_dir / WORST_CLIENT_TRACKING_CSV,
             ),
-
             AuditOutputPath(
                 AuditOutputName.CLUSTER_STABILITY,
                 audit_dir / CLUSTER_STABILITY_CSV,
@@ -503,7 +528,9 @@ def run_results_audit(
         data_root=data_root,
     )
 
-    cluster_stability_records = _cluster_stability_from_cluster_records(acc.cluster_records)
+    cluster_stability_records = _cluster_stability_from_cluster_records(
+        acc.cluster_records
+    )
     invariant_results = build_invariant_results(
         acc.invariant_inputs, acc.score_hashes_by_cell
     )

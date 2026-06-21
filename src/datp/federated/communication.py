@@ -72,7 +72,6 @@ def compute_round_comm(
 def compute_threshold_comm(
     policy: ThresholdPolicy,
     k_eligible: int,
-    n_families: int,
 ) -> ThresholdComm:
     if policy == ThresholdPolicy.GLOBAL_THRESHOLD:
         return ThresholdComm(
@@ -114,7 +113,6 @@ def build_comm_summary(
     model_bytes: int,
     num_clients: int,
     k_eligible: int,
-    n_families: int,
 ) -> CommSummary:
     training = TrainingCommSummary(
         model_bytes=model_bytes,
@@ -128,7 +126,7 @@ def build_comm_summary(
 
     threshold_calibration: dict[ThresholdPolicy, ThresholdComm] = {}
     for bl in ThresholdPolicy:
-        threshold_calibration[bl] = compute_threshold_comm(bl, k_eligible, n_families)
+        threshold_calibration[bl] = compute_threshold_comm(bl, k_eligible)
 
     return CommSummary(
         training=training,

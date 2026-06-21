@@ -84,7 +84,6 @@ def test_run_nbaiot_main_sweep_end_to_end(tmp_path) -> None:
             cfg=cfg,
             client_data=client_data,
             seed=training_seed,
-            alpha=None,
             base_dir=tmp_path,
         )
 
@@ -92,9 +91,15 @@ def test_run_nbaiot_main_sweep_end_to_end(tmp_path) -> None:
 
     assert manifest.n_cells == len(_CONFIG.seeds.training) * _N_CLIENTS * 3 * 3 * 4
     assert len(manifest.results) == manifest.n_cells
-    assert set(manifest.mu_flag_threshold_by_training_seed) == set(_CONFIG.seeds.training)
-    assert tuple(sorted(manifest.training_seeds)) == tuple(sorted(_CONFIG.seeds.training))
-    assert tuple(sorted(manifest.poisoning_seeds)) == tuple(sorted(_CONFIG.seeds.poisoning))
+    assert set(manifest.mu_flag_threshold_by_training_seed) == set(
+        _CONFIG.seeds.training
+    )
+    assert tuple(sorted(manifest.training_seeds)) == tuple(
+        sorted(_CONFIG.seeds.training)
+    )
+    assert tuple(sorted(manifest.poisoning_seeds)) == tuple(
+        sorted(_CONFIG.seeds.poisoning)
+    )
     assert manifest.provenance.local_epochs == 1
 
     # Calibration-channel-only invariant: every cell's test scores were untouched.
@@ -143,7 +148,6 @@ def test_write_nbaiot_main_manifest_writes_canonical_path(tmp_path) -> None:
             cfg=cfg,
             client_data=client_data,
             seed=training_seed,
-            alpha=None,
             base_dir=tmp_path,
         )
 
@@ -156,6 +160,7 @@ def test_write_nbaiot_main_manifest_writes_canonical_path(tmp_path) -> None:
 def test_run_nbaiot_main_sweep_config_is_required() -> None:
     """config must be a required parameter with no default fallback."""
     import inspect
+
     sig = inspect.signature(run_nbaiot_main)
     config_param = sig.parameters["config"]
     assert config_param.default is inspect.Parameter.empty, (
