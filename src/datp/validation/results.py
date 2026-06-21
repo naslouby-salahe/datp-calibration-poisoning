@@ -146,100 +146,105 @@ class DatasetPartitionAuditPayload:
     partitions: tuple[object, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _PoliciesPanel:
+    global_panel: _CellPanel
+    local_panel: _CellPanel
+    cluster_panel: _CellPanel
+
+
+def _per_policy_fields(panels: _PoliciesPanel) -> dict[str, object]:
+    g, loc, c = panels.global_panel, panels.local_panel, panels.cluster_panel
+    return {
+        "global_cv_fpr": g.cv_fpr,
+        "local_cv_fpr": loc.cv_fpr,
+        "cluster_cv_fpr": c.cv_fpr,
+        "global_cv_tpr": g.cv_tpr,
+        "local_cv_tpr": loc.cv_tpr,
+        "cluster_cv_tpr": c.cv_tpr,
+        "global_macro_f1_mean": g.macro_f1_mean,
+        "local_macro_f1_mean": loc.macro_f1_mean,
+        "cluster_macro_f1_mean": c.macro_f1_mean,
+        "global_macro_f1_p10": g.macro_f1_p10,
+        "local_macro_f1_p10": loc.macro_f1_p10,
+        "cluster_macro_f1_p10": c.macro_f1_p10,
+        "global_auroc_mean": g.auroc_mean,
+        "local_auroc_mean": loc.auroc_mean,
+        "cluster_auroc_mean": c.auroc_mean,
+        "global_pr_auc_mean": g.pr_auc_mean,
+        "local_pr_auc_mean": loc.pr_auc_mean,
+        "cluster_pr_auc_mean": c.pr_auc_mean,
+        "global_mean_fpr": g.mean_fpr,
+        "local_mean_fpr": loc.mean_fpr,
+        "cluster_mean_fpr": c.mean_fpr,
+        "global_std_fpr": g.std_fpr,
+        "local_std_fpr": loc.std_fpr,
+        "cluster_std_fpr": c.std_fpr,
+        "global_iqr_fpr": g.iqr_fpr,
+        "local_iqr_fpr": loc.iqr_fpr,
+        "cluster_iqr_fpr": c.iqr_fpr,
+        "global_worst_client_fpr": g.worst_client_fpr,
+        "local_worst_client_fpr": loc.worst_client_fpr,
+        "cluster_worst_client_fpr": c.worst_client_fpr,
+        "global_worst_client_tpr": g.worst_client_tpr,
+        "local_worst_client_tpr": loc.worst_client_tpr,
+        "cluster_worst_client_tpr": c.worst_client_tpr,
+        "global_worst_client_macro_f1": g.worst_client_macro_f1,
+        "local_worst_client_macro_f1": loc.worst_client_macro_f1,
+        "cluster_worst_client_macro_f1": c.worst_client_macro_f1,
+        "global_worst_client_balanced_accuracy": g.worst_client_balanced_accuracy,
+        "local_worst_client_balanced_accuracy": loc.worst_client_balanced_accuracy,
+        "cluster_worst_client_balanced_accuracy": c.worst_client_balanced_accuracy,
+        "global_convergence_round": g.convergence_round,
+        "local_convergence_round": loc.convergence_round,
+        "cluster_convergence_round": c.convergence_round,
+        "global_tau_global": g.tau_global,
+        "local_tau_global": loc.tau_global,
+        "cluster_tau_global": c.tau_global,
+    }
+
+
+def _delta_fields(panels: _PoliciesPanel) -> dict[str, object]:
+    g, loc, c = panels.global_panel, panels.local_panel, panels.cluster_panel
+    return {
+        "delta_cv_fpr_global_minus_local": _safe_diff(g.cv_fpr, loc.cv_fpr),
+        "delta_cv_fpr_global_minus_cluster": _safe_diff(g.cv_fpr, c.cv_fpr),
+        "delta_cv_tpr_global_minus_local": _safe_diff(g.cv_tpr, loc.cv_tpr),
+        "delta_cv_tpr_global_minus_cluster": _safe_diff(g.cv_tpr, c.cv_tpr),
+        "delta_macro_f1_global_minus_local": _safe_diff(
+            g.macro_f1_mean, loc.macro_f1_mean
+        ),
+        "delta_macro_f1_global_minus_cluster": _safe_diff(
+            g.macro_f1_mean, c.macro_f1_mean
+        ),
+        "delta_pr_auc_global_minus_local": _safe_diff(g.pr_auc_mean, loc.pr_auc_mean),
+        "delta_pr_auc_global_minus_cluster": _safe_diff(g.pr_auc_mean, c.pr_auc_mean),
+        "delta_auroc_global_minus_local": _safe_diff(g.auroc_mean, loc.auroc_mean),
+        "delta_auroc_global_minus_cluster": _safe_diff(g.auroc_mean, c.auroc_mean),
+    }
+
+
 def _build_seed_delta_record(
     stage: ExperimentStage,
     seed: int,
-    global_panel: _CellPanel,
-    local_panel: _CellPanel,
-    cluster_panel: _CellPanel,
+    panels: _PoliciesPanel,
 ) -> SeedDeltaRecord:
-    return SeedDeltaRecord(
-        stage=stage,
-        seed=seed,
-        global_cv_fpr=global_panel.cv_fpr,
-        local_cv_fpr=local_panel.cv_fpr,
-        cluster_cv_fpr=cluster_panel.cv_fpr,
-        global_cv_tpr=global_panel.cv_tpr,
-        local_cv_tpr=local_panel.cv_tpr,
-        cluster_cv_tpr=cluster_panel.cv_tpr,
-        global_macro_f1_mean=global_panel.macro_f1_mean,
-        local_macro_f1_mean=local_panel.macro_f1_mean,
-        cluster_macro_f1_mean=cluster_panel.macro_f1_mean,
-        global_macro_f1_p10=global_panel.macro_f1_p10,
-        local_macro_f1_p10=local_panel.macro_f1_p10,
-        cluster_macro_f1_p10=cluster_panel.macro_f1_p10,
-        global_auroc_mean=global_panel.auroc_mean,
-        local_auroc_mean=local_panel.auroc_mean,
-        cluster_auroc_mean=cluster_panel.auroc_mean,
-        global_pr_auc_mean=global_panel.pr_auc_mean,
-        local_pr_auc_mean=local_panel.pr_auc_mean,
-        cluster_pr_auc_mean=cluster_panel.pr_auc_mean,
-        global_mean_fpr=global_panel.mean_fpr,
-        local_mean_fpr=local_panel.mean_fpr,
-        cluster_mean_fpr=cluster_panel.mean_fpr,
-        global_std_fpr=global_panel.std_fpr,
-        local_std_fpr=local_panel.std_fpr,
-        cluster_std_fpr=cluster_panel.std_fpr,
-        global_iqr_fpr=global_panel.iqr_fpr,
-        local_iqr_fpr=local_panel.iqr_fpr,
-        cluster_iqr_fpr=cluster_panel.iqr_fpr,
-        global_worst_client_fpr=global_panel.worst_client_fpr,
-        local_worst_client_fpr=local_panel.worst_client_fpr,
-        cluster_worst_client_fpr=cluster_panel.worst_client_fpr,
-        global_worst_client_tpr=global_panel.worst_client_tpr,
-        local_worst_client_tpr=local_panel.worst_client_tpr,
-        cluster_worst_client_tpr=cluster_panel.worst_client_tpr,
-        global_worst_client_macro_f1=global_panel.worst_client_macro_f1,
-        local_worst_client_macro_f1=local_panel.worst_client_macro_f1,
-        cluster_worst_client_macro_f1=cluster_panel.worst_client_macro_f1,
-        global_worst_client_balanced_accuracy=global_panel.worst_client_balanced_accuracy,
-        local_worst_client_balanced_accuracy=local_panel.worst_client_balanced_accuracy,
-        cluster_worst_client_balanced_accuracy=cluster_panel.worst_client_balanced_accuracy,
-        delta_cv_fpr_global_minus_local=_safe_diff(
-            global_panel.cv_fpr, local_panel.cv_fpr
-        ),
-        delta_cv_fpr_global_minus_cluster=_safe_diff(
-            global_panel.cv_fpr, cluster_panel.cv_fpr
-        ),
-        delta_cv_tpr_global_minus_local=_safe_diff(
-            global_panel.cv_tpr, local_panel.cv_tpr
-        ),
-        delta_cv_tpr_global_minus_cluster=_safe_diff(
-            global_panel.cv_tpr, cluster_panel.cv_tpr
-        ),
-        delta_macro_f1_global_minus_local=_safe_diff(
-            global_panel.macro_f1_mean, local_panel.macro_f1_mean
-        ),
-        delta_macro_f1_global_minus_cluster=_safe_diff(
-            global_panel.macro_f1_mean, cluster_panel.macro_f1_mean
-        ),
-        delta_pr_auc_global_minus_local=_safe_diff(
-            global_panel.pr_auc_mean, local_panel.pr_auc_mean
-        ),
-        delta_pr_auc_global_minus_cluster=_safe_diff(
-            global_panel.pr_auc_mean, cluster_panel.pr_auc_mean
-        ),
-        delta_auroc_global_minus_local=_safe_diff(
-            global_panel.auroc_mean, local_panel.auroc_mean
-        ),
-        delta_auroc_global_minus_cluster=_safe_diff(
-            global_panel.auroc_mean, cluster_panel.auroc_mean
-        ),
-        global_convergence_round=global_panel.convergence_round,
-        local_convergence_round=local_panel.convergence_round,
-        cluster_convergence_round=cluster_panel.convergence_round,
-        global_tau_global=global_panel.tau_global,
-        local_tau_global=local_panel.tau_global,
-        cluster_tau_global=cluster_panel.tau_global,
-        coverage_ratio=str(
-            global_panel.coverage_ratio
-            or local_panel.coverage_ratio
-            or cluster_panel.coverage_ratio
-            or DEFAULT_COVERAGE_RATIO
-        ),
-        status=AuditStatus.PASS
-        if (global_panel.cv_fpr is not None and local_panel.cv_fpr is not None)
-        else AuditStatus.BLOCKED_PENDING_RUN,
+    g, loc, c = panels.global_panel, panels.local_panel, panels.cluster_panel
+    coverage = str(
+        g.coverage_ratio
+        or loc.coverage_ratio
+        or c.coverage_ratio
+        or DEFAULT_COVERAGE_RATIO
+    )
+    status = (
+        AuditStatus.PASS
+        if (g.cv_fpr is not None and loc.cv_fpr is not None)
+        else AuditStatus.BLOCKED_PENDING_RUN
+    )
+    return SeedDeltaRecord.model_validate(
+        {"stage": stage, "seed": seed, "coverage_ratio": coverage, "status": status}
+        | _per_policy_fields(panels)
+        | _delta_fields(panels)
     )
 
 
@@ -261,7 +266,13 @@ def _build_seed_deltas(
         )
         out.append(
             _build_seed_delta_record(
-                stage, seed, global_panel, local_panel, cluster_panel
+                stage,
+                seed,
+                _PoliciesPanel(
+                    global_panel=global_panel,
+                    local_panel=local_panel,
+                    cluster_panel=cluster_panel,
+                ),
             )
         )
         _check_local_threshold_utility_tradeoff(

@@ -240,30 +240,69 @@ def _run_lightning_training(
     return checkpoint_callback
 
 
+@dataclass(frozen=True, slots=True)
+class TrainAEConfig:
+    """Hyperparameters and runtime options for train_ae."""
+
+    epochs: int
+    patience: int
+    lr: float
+    batch_size: int
+    tracking_namespace: str | None
+    training_progress_interval: int
+
+
+def _restore_best_checkpoint(
+    lightning_module: _AELightningModule,
+    checkpoint_callback: ModelCheckpoint,
+) -> None:
+    if not checkpoint_callback.best_model_path:
+        return
+    checkpoint = torch.load(
+        checkpoint_callback.best_model_path,
+        map_location=DeviceType.CPU,
+        weights_only=True,
+    )
+    lightning_module.load_state_dict(checkpoint["state_dict"])
+
+
+def _log_training_summary(
+    epochs_run: int,
+    best_val_loss: float | None,
+    tracking_namespace: str | None,
+) -> None:
+    if tracking_namespace is None:
+        return
+    summary_metrics = [TrackingMetric(TrackingMetricKey.EPOCHS_RUN, epochs_run)]
+    if best_val_loss is not None:
+        summary_metrics.append(
+            TrackingMetric(TrackingMetricKey.BEST_VAL_LOSS, best_val_loss)
+        )
+    log_metrics(
+        TrackingMetrics(tuple(summary_metrics)),
+        step=epochs_run,
+        prefix=tracking_namespace,
+    )
+
+
 def train_ae(
     model: Autoencoder,
     train_tensor: torch.Tensor,
     val_tensor: torch.Tensor,
-    epochs: int,
-    patience: int,
-    lr: float,
-    batch_size: int,
     device: torch.device,
-    *,
-    tracking_namespace: str | None,
-    training_progress_interval: int,
+    config: TrainAEConfig,
 ) -> tuple[Autoencoder, int]:
     logger.info(
         "starting ae training",
         backend=_TRAINING_BACKEND,
-        epochs=epochs,
-        patience=patience,
-        batch_size=batch_size,
+        epochs=config.epochs,
+        patience=config.patience,
+        batch_size=config.batch_size,
         device=str(device),
     )
 
     train_loader, val_loader = _build_data_loaders(
-        train_tensor, val_tensor, batch_size, device
+        train_tensor, val_tensor, config.batch_size, device
     )
     _suppress_lightning_warnings()
     _quiet_lightning_console_logging()
@@ -271,10 +310,10 @@ def train_ae(
     lightning_module = _AELightningModule(
         model=model.cpu(),
         config=_AEModuleConfig(
-            lr=lr,
-            max_epochs=epochs,
-            tracking_namespace=tracking_namespace,
-            training_progress_interval=training_progress_interval,
+            lr=config.lr,
+            max_epochs=config.epochs,
+            tracking_namespace=config.tracking_namespace,
+            training_progress_interval=config.training_progress_interval,
         ),
     )
 
@@ -283,32 +322,16 @@ def train_ae(
             lightning_module,
             train_loader,
             val_loader,
-            epochs,
-            patience,
+            config.epochs,
+            config.patience,
             device,
             tmp_dir,
         )
-        if checkpoint_callback.best_model_path:
-            checkpoint = torch.load(
-                checkpoint_callback.best_model_path,
-                map_location=DeviceType.CPU,
-                weights_only=True,
-            )
-            lightning_module.load_state_dict(checkpoint["state_dict"])
+        _restore_best_checkpoint(lightning_module, checkpoint_callback)
 
     best_val_loss = _metric_value(checkpoint_callback.best_model_score)
     epochs_run = lightning_module.completed_epochs
-    if tracking_namespace is not None:
-        summary_metrics = [TrackingMetric(TrackingMetricKey.EPOCHS_RUN, epochs_run)]
-        if best_val_loss is not None:
-            summary_metrics.append(
-                TrackingMetric(TrackingMetricKey.BEST_VAL_LOSS, best_val_loss)
-            )
-        log_metrics(
-            TrackingMetrics(tuple(summary_metrics)),
-            step=epochs_run,
-            prefix=tracking_namespace,
-        )
+    _log_training_summary(epochs_run, best_val_loss, config.tracking_namespace)
 
     logger.info(
         "ae training complete",

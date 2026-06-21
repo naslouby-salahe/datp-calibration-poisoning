@@ -296,12 +296,14 @@ class TestExecuteFlowerSimulation:
         monkeypatch.setattr(sim_mod, "_run_simulation", fake_run_simulation)
 
         sim_mod._execute_flower_simulation(
-            BASE_CONFIG,
-            lambda _ctx: None,  # type: ignore[arg-type]
-            7,
-            None,
-            "test",
-            BASE_CONFIG.federation.convergence.rounds_max,
+            sim_mod._FlowerSimParams(
+                cfg=BASE_CONFIG,
+                client_fn=lambda _ctx: None,  # type: ignore[arg-type]
+                num_clients=7,
+                strategy=None,
+                label="test",
+                effective_rounds_max=BASE_CONFIG.federation.convergence.rounds_max,
+            )
         )
 
         assert called.get("num_supernodes") == 7
@@ -332,10 +334,12 @@ class TestExecuteFlowerSimulation:
 
         with pytest.raises(RuntimeError, match="sim-boom"):
             sim_mod._execute_flower_simulation(
-                BASE_CONFIG,
-                lambda _ctx: None,  # type: ignore[arg-type]
-                1,
-                None,
-                "test",
-                BASE_CONFIG.federation.convergence.rounds_max,
+                sim_mod._FlowerSimParams(
+                    cfg=BASE_CONFIG,
+                    client_fn=lambda _ctx: None,  # type: ignore[arg-type]
+                    num_clients=1,
+                    strategy=None,
+                    label="test",
+                    effective_rounds_max=BASE_CONFIG.federation.convergence.rounds_max,
+                )
             )

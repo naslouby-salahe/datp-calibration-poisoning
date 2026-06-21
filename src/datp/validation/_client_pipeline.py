@@ -77,22 +77,29 @@ from datp.validation.schemas import (
 )
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _ThresholdBuildParams:
+    """Inputs shared by threshold-record and global-not-pooled-warning builders."""
+
+    threshold_result: ThresholdResult
+    cal_errors: dict[str, np.ndarray]
+    cfg: DatpConfig
+
+
 def _build_threshold_records(
     acc: _AuditAccumulator,
     ctx: _RunContext,
-    threshold_result: ThresholdResult,
-    cal_errors: dict[str, np.ndarray],
-    cfg: DatpConfig,
+    params: _ThresholdBuildParams,
 ) -> dict[str, float]:
     """Build ThresholdRecord entries and return client_id → threshold mapping."""
     local_taus = {
-        cid: float(np.percentile(errors, cfg.threshold.q * 100))
-        for cid, errors in cal_errors.items()
-        if errors.size >= cfg.threshold.n_min
+        cid: float(np.percentile(errors, params.cfg.threshold.q * 100))
+        for cid, errors in params.cal_errors.items()
+        if errors.size >= params.cfg.threshold.n_min
     }
     client_thresholds: dict[str, float] = {}
     for ct in sorted(
-        threshold_result.client_thresholds, key=lambda item: item.client_id
+        params.threshold_result.client_thresholds, key=lambda item: item.client_id
     ):
         client_thresholds[ct.client_id] = float(ct.threshold)
         acc.threshold_records.append(
@@ -109,7 +116,7 @@ def _build_threshold_records(
                     else POLICY_THRESHOLD_SOURCE[ctx.policy]
                 ),
                 calibration_pending=ct.calibration_pending,
-                tau_global=float(threshold_result.tau_global),
+                tau_global=float(params.threshold_result.tau_global),
                 threshold_aggregation_method=_lookup_threshold_agg(ctx.policy),
                 local_tau_i=local_taus.get(ct.client_id),
             )
@@ -178,20 +185,18 @@ def _build_cluster_records(
 def _emit_global_not_pooled_warning(
     acc: _AuditAccumulator,
     ctx: _RunContext,
-    threshold_result: ThresholdResult,
-    cal_errors: dict[str, np.ndarray],
-    cfg: DatpConfig,
+    params: _ThresholdBuildParams,
 ) -> None:
     """Emit GLOBAL_THRESHOLD warning when tau_global is arithmetic mean, not pooled percentile."""
     if ctx.policy != ThresholdPolicy.GLOBAL_THRESHOLD:
         return
     pooled = float(
         np.percentile(
-            np.concatenate(list(cal_errors.values())),
-            cfg.threshold.q * 100,
+            np.concatenate(list(params.cal_errors.values())),
+            params.cfg.threshold.q * 100,
         )
     )
-    if not math.isclose(float(threshold_result.tau_global), pooled):
+    if not math.isclose(float(params.threshold_result.tau_global), pooled):
         acc.warnings.append(
             WarningRecord(
                 severity=AuditSeverity.INFO,
@@ -221,13 +226,14 @@ def _process_thresholds(
             cal_errors=arrays.cal_errors,
         )
 
-    client_thresholds = _build_threshold_records(
-        acc, ctx, arrays.threshold_result, arrays.cal_errors, cfg
+    params = _ThresholdBuildParams(
+        threshold_result=arrays.threshold_result,
+        cal_errors=arrays.cal_errors,
+        cfg=cfg,
     )
+    client_thresholds = _build_threshold_records(acc, ctx, params)
     _build_cluster_records(acc, ctx, arrays.threshold_result)
-    _emit_global_not_pooled_warning(
-        acc, ctx, arrays.threshold_result, arrays.cal_errors, cfg
-    )
+    _emit_global_not_pooled_warning(acc, ctx, params)
 
     return _ThresholdState(
         client_thresholds=client_thresholds,
@@ -287,13 +293,20 @@ def _build_client_metric_record(
     )
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _AttackMetricParams:
+    """Per-client inputs needed to build a PerAttackMetricRecord."""
+
+    client_id: str
+    row: dict[str, Any]
+    eval_incomplete: bool
+    tp: int
+    n_attack: int
+
+
 def _build_attack_metric_record(
     ctx: _RunContext,
-    client_id: str,
-    row: dict[str, Any],
-    eval_incomplete: bool,
-    tp: int,
-    n_attack: int,
+    params: _AttackMetricParams,
 ) -> PerAttackMetricRecord:
     """Build a PerAttackMetricRecord with eval_incomplete guard clauses."""
     return PerAttackMetricRecord(
@@ -301,16 +314,16 @@ def _build_attack_metric_record(
         seed=ctx.seed,
         stage=ctx.stage,
         policy=ctx.policy,
-        client_id=client_id,
+        client_id=params.client_id,
         attack_label=BINARY_ATTACK_LABEL,
         status=(
             DenominatorStatus.EXCLUDED_EVALUATION_INCOMPLETE
-            if eval_incomplete
+            if params.eval_incomplete
             else DenominatorStatus.PASS
         ),
-        tpr=None if eval_incomplete else float(row[MetricName.TPR]),
-        detected_count=None if eval_incomplete else tp,
-        denominator=None if eval_incomplete else n_attack,
+        tpr=None if params.eval_incomplete else float(params.row[MetricName.TPR]),
+        detected_count=None if params.eval_incomplete else params.tp,
+        denominator=None if params.eval_incomplete else params.n_attack,
     )
 
 
@@ -382,6 +395,76 @@ def _append_denominator_record(
     )
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _ClientRowData:
+    """Extracted scalar values from a single per-client metrics row."""
+
+    client_id: str
+    n_benign: int
+    n_attack: int
+    tp: int
+    fp: int
+    tn: int
+    fn: int
+    has_confusion: bool
+    eval_incomplete: bool
+
+
+def _extract_client_row_data(
+    row: dict[str, Any],
+    incomplete: frozenset[str],
+) -> _ClientRowData:
+    """Parse confusion matrix and counts from a per-client metrics row."""
+    cm = row[PayloadKey.CONFUSION_MATRIX] if PayloadKey.CONFUSION_MATRIX in row else {}
+    tp, fp, tn, fn = (int(cm[k]) if k in cm else 0 for k in tuple(ConfusionKey))
+    client_id = str(row[PayloadKey.CLIENT_ID])
+    n_benign = int(row[PayloadKey.N_BENIGN])
+    n_attack = int(row[PayloadKey.N_ATTACK])
+    return _ClientRowData(
+        client_id=client_id,
+        n_benign=n_benign,
+        n_attack=n_attack,
+        tp=tp,
+        fp=fp,
+        tn=tn,
+        fn=fn,
+        has_confusion=bool(cm),
+        eval_incomplete=client_id in incomplete or n_attack == 0,
+    )
+
+
+def _append_recomputation_if_needed(
+    acc: _AuditAccumulator,
+    ctx: _RunContext,
+    rd: _ClientRowData,
+    row: dict[str, Any],
+) -> None:
+    if not rd.has_confusion:
+        return
+    append_recomputation_records(
+        acc.recomputation_records,
+        RecomputationParams(
+            run_id=ctx.run_id,
+            seed=ctx.seed,
+            stage=ctx.stage,
+            policy=ctx.policy,
+            client_id=rd.client_id,
+            tp=rd.tp,
+            fp=rd.fp,
+            tn=rd.tn,
+            fn=rd.fn,
+            n_benign=rd.n_benign,
+            n_attack=rd.n_attack,
+            saved_fpr=_float_or_none(row.get(MetricName.FPR)),
+            saved_tpr=_float_or_none(row.get(MetricName.TPR)),
+            saved_balanced_accuracy=_float_or_none(
+                row.get(MetricName.BALANCED_ACCURACY)
+            ),
+            saved_macro_f1=_float_or_none(row.get(MetricName.MACRO_F1)),
+        ),
+    )
+
+
 def _compute_client_metric_row(
     acc: _AuditAccumulator,
     ctx: _RunContext,
@@ -390,83 +473,63 @@ def _compute_client_metric_row(
     rpc: _RowProcessingCtx,
 ) -> None:
     """Process a single client row: denominator audit, recomputation, client/attack records."""
-    cm = row[PayloadKey.CONFUSION_MATRIX] if PayloadKey.CONFUSION_MATRIX in row else {}
-    tp, fp, tn, fn = (int(cm[k]) if k in cm else 0 for k in tuple(ConfusionKey))
-    client_id = str(row[PayloadKey.CLIENT_ID])
-    n_benign = int(row[PayloadKey.N_BENIGN])
-    n_attack = int(row[PayloadKey.N_ATTACK])
-    eval_incomplete = client_id in rpc.incomplete or n_attack == 0
-    has_confusion = bool(cm)
+    rd = _extract_client_row_data(row, rpc.incomplete)
 
-    if not has_confusion:
+    if not rd.has_confusion:
         _emit_missing_confusion_warning(acc, ctx.run_id)
 
     _append_denominator_record(
         acc,
         ctx,
-        client_id=client_id,
-        n_benign=n_benign,
-        n_attack=n_attack,
-        tp=tp,
-        fp=fp,
-        tn=tn,
-        fn=fn,
-        has_confusion=has_confusion,
-        eval_incomplete=eval_incomplete,
+        client_id=rd.client_id,
+        n_benign=rd.n_benign,
+        n_attack=rd.n_attack,
+        tp=rd.tp,
+        fp=rd.fp,
+        tn=rd.tn,
+        fn=rd.fn,
+        has_confusion=rd.has_confusion,
+        eval_incomplete=rd.eval_incomplete,
     )
-
-    if has_confusion:
-        append_recomputation_records(
-            acc.recomputation_records,
-            RecomputationParams(
-                run_id=ctx.run_id,
-                seed=ctx.seed,
-                stage=ctx.stage,
-                policy=ctx.policy,
-                client_id=client_id,
-                tp=tp,
-                fp=fp,
-                tn=tn,
-                fn=fn,
-                n_benign=n_benign,
-                n_attack=n_attack,
-                saved_fpr=_float_or_none(row.get(MetricName.FPR)),
-                saved_tpr=_float_or_none(row.get(MetricName.TPR)),
-                saved_balanced_accuracy=_float_or_none(
-                    row.get(MetricName.BALANCED_ACCURACY)
-                ),
-                saved_macro_f1=_float_or_none(row.get(MetricName.MACRO_F1)),
-            ),
-        )
+    _append_recomputation_if_needed(acc, ctx, rd, row)
 
     auroc, pr_auc = _binary_auc_fields(
         row,
-        threshold_state.test_benign_scores.get(client_id),
-        threshold_state.test_attack_scores.get(client_id),
+        threshold_state.test_benign_scores.get(rd.client_id),
+        threshold_state.test_attack_scores.get(rd.client_id),
     )
     acc.client_records.append(
         _build_client_metric_record(
             ctx,
             _ClientMetricParams(
-                client_id=client_id,
+                client_id=rd.client_id,
                 row=row,
-                n_benign=n_benign,
-                n_attack=n_attack,
-                tp=tp,
-                fp=fp,
-                tn=tn,
-                fn=fn,
+                n_benign=rd.n_benign,
+                n_attack=rd.n_attack,
+                tp=rd.tp,
+                fp=rd.fp,
+                tn=rd.tn,
+                fn=rd.fn,
                 auroc=auroc,
                 pr_auc=pr_auc,
-                eligible=client_id in rpc.eligible_ids,
-                calibration_pending=client_id in rpc.pending_ids,
-                evaluation_incomplete=eval_incomplete,
+                eligible=rd.client_id in rpc.eligible_ids,
+                calibration_pending=rd.client_id in rpc.pending_ids,
+                evaluation_incomplete=rd.eval_incomplete,
                 coverage_ratio=rpc.coverage_ratio,
             ),
         )
     )
     acc.attack_records.append(
-        _build_attack_metric_record(ctx, client_id, row, eval_incomplete, tp, n_attack)
+        _build_attack_metric_record(
+            ctx,
+            _AttackMetricParams(
+                client_id=rd.client_id,
+                row=row,
+                eval_incomplete=rd.eval_incomplete,
+                tp=rd.tp,
+                n_attack=rd.n_attack,
+            ),
+        )
     )
 
 
@@ -664,16 +727,25 @@ def _build_cell_panel(
     )
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _AggregateStatsParams:
+    """Eligibility and coverage inputs for per-run aggregate statistics."""
+
+    eligible_ids: frozenset[str]
+    incomplete: frozenset[str]
+    coverage_ratio: str
+
+
 def _compute_aggregate_stats(
     acc: _AuditAccumulator,
     ctx: _RunContext,
-    eligible_ids: frozenset[str],
-    incomplete: frozenset[str],
-    coverage_ratio: str,
+    params: _AggregateStatsParams,
 ) -> None:
     """Compute companion records, worst clients, and cell panel for a single run."""
     eligible_pairs_fpr, tprs, macro_f1s, balanced_accuracies = (
-        _collect_eligible_metric_pairs(ctx.normalized_clients, eligible_ids, incomplete)
+        _collect_eligible_metric_pairs(
+            ctx.normalized_clients, params.eligible_ids, params.incomplete
+        )
     )
 
     eligible_fpr_values = [v for _, v in eligible_pairs_fpr]
@@ -699,9 +771,9 @@ def _compute_aggregate_stats(
             std_fpr=std_fpr_value,
             iqr_fpr=iqr_fpr_value,
             worst_client_fpr=worst.fpr_value,
-            eligible_count=len(eligible_ids),
+            eligible_count=len(params.eligible_ids),
             client_count=ctx.client_count,
-            coverage_ratio=coverage_ratio,
+            coverage_ratio=params.coverage_ratio,
         )
     )
 
@@ -719,7 +791,7 @@ def _compute_aggregate_stats(
         worst_tpr_value=worst.tpr_value,
         worst_f1_value=worst.f1_value,
         worst_ba_value=worst.ba_value,
-        coverage_ratio=coverage_ratio,
+        coverage_ratio=params.coverage_ratio,
     )
 
 
@@ -743,7 +815,15 @@ def _process_per_client_metrics(
 
     for row in ctx.normalized_clients:
         _compute_client_metric_row(acc, ctx, threshold_state, row, rpc)
-    _compute_aggregate_stats(acc, ctx, rpc.eligible_ids, rpc.incomplete, coverage_ratio)
+    _compute_aggregate_stats(
+        acc,
+        ctx,
+        _AggregateStatsParams(
+            eligible_ids=rpc.eligible_ids,
+            incomplete=rpc.incomplete,
+            coverage_ratio=coverage_ratio,
+        ),
+    )
 
 
 def _build_run_manifest(

@@ -278,7 +278,7 @@ def _dtype_entries(raw: object) -> tuple[ScoringColumnDtype, ...]:
             ScoringColumnDtype(column=str(column), dtype=str(dtype))
             for column, dtype in raw.items()
         )
-    rows = _sequence(raw, Mapping)
+    rows = _sequence(raw, Mapping)  # type: ignore[type-abstract]
     return tuple(
         ScoringColumnDtype(
             column=_required_text(row, "column"),
@@ -306,7 +306,7 @@ def _record_from_payload(payload: Mapping[str, object]) -> ScoringRecord:
 def _manifest_from_payload(payload: Mapping[str, object]) -> ScoringManifest:
     records = tuple(
         _record_from_payload(row)
-        for row in _required_sequence(payload, "records", Mapping)
+        for row in _required_sequence(payload, "records", Mapping)  # type: ignore[type-abstract]
     )
     return ScoringManifest(
         schema_version=_required_text(payload, "schema_version"),
@@ -379,40 +379,48 @@ def _score_clients_impl(
         for stage in SCORING_STAGES:
             records.append(
                 _score_one_split(
-                    model,
-                    model_device,
-                    getattr(splits, stage.client_data_attr),
-                    cid,
-                    stage,
-                    score_base,
-                    scoring_batch_size,
+                    _SplitScoringParams(
+                        model=model,
+                        model_device=model_device,
+                        data=getattr(splits, stage.client_data_attr),
+                        cid=cid,
+                        stage=stage,
+                        score_base=score_base,
+                        batch_size=scoring_batch_size,
+                    )
                 )
             )
     return records
 
 
-def _score_one_split(
-    model: Autoencoder,
-    model_device: torch.device,
-    data: torch.Tensor,
-    cid: str,
-    stage: ScoringStage,
-    score_base: Path,
-    batch_size: int,
-) -> ScoringRecord:
-    if data.device != model_device:
-        data = data.to(model_device, non_blocking=True)
-    errors = compute_reconstruction_errors(model, data, batch_size=batch_size)
-    out_path = _score_output_path(score_base, stage, cid)
+@dataclass(frozen=True, slots=True)
+class _SplitScoringParams:
+    model: Autoencoder
+    model_device: torch.device
+    data: torch.Tensor
+    cid: str
+    stage: ScoringStage
+    score_base: Path
+    batch_size: int
+
+
+def _score_one_split(p: _SplitScoringParams) -> ScoringRecord:
+    data = (
+        p.data.to(p.model_device, non_blocking=True)
+        if p.data.device != p.model_device
+        else p.data
+    )
+    errors = compute_reconstruction_errors(p.model, data, batch_size=p.batch_size)
+    out_path = _score_output_path(p.score_base, p.stage, p.cid)
     write_artifact(_errors_to_dataframe(errors), out_path)
     logger.debug(
         "wrote scores",
         n_scores=len(errors),
         path=str(out_path),
-        client=cid,
-        stage=stage,
+        client=p.cid,
+        stage=p.stage,
     )
-    return _score_record(out_path, cid, stage, errors)
+    return _score_record(out_path, p.cid, p.stage, errors)
 
 
 @dataclass(frozen=True, slots=True)

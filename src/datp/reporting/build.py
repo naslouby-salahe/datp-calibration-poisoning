@@ -3,7 +3,6 @@ from datp.attacks.enums import ThresholdPolicy
 
 import csv
 import json
-import math
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -105,6 +104,45 @@ class _CalibrationErrorsParams:
     rng_seed: int
 
 
+@dataclass(frozen=True, slots=True)
+class _DenominatorCheckParams:
+    client_id: str
+    row: Mapping[str, Any]
+    tp: int
+    fp: int
+    tn: int
+    fn: int
+
+
+@dataclass(frozen=True, slots=True)
+class _Figure1SidecarParams:
+    base_dir: Path
+    seed0_global: EvaluationResult
+    seed0_local: EvaluationResult
+    figure1_ids: list[str]
+    global_seed0_fpr: np.ndarray
+    local_seed0_fpr: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class _Figure2SidecarParams:
+    base_dir: Path
+    seed0_global: EvaluationResult
+    rep_seed: int
+    representative: list[str]
+    figure2_max_points: int
+    tau_global: float
+
+
+@dataclass(frozen=True, slots=True)
+class _AuditPayloadParams:
+    base_dir: Path
+    cfg: DatpConfig
+    paths: list[Path]
+    failures: list[str]
+    conv_warnings: list[str]
+
+
 def _result_path(key: _ResultPathKey) -> Path:
     run = PolicyRunId(
         cell=TrainingCellId(stage=key.stage, seed=key.seed),
@@ -139,17 +177,8 @@ def _load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _payload_alpha(value: Any) -> float | None:
-    if value is None:
-        return None
-
-    if isinstance(value, str) and value.lower() in {"inf", "iid"}:
-        return math.inf
-    return float(value)
-
-
 def _extract_confusion_counts(
-    client_id: Any, confusion: Mapping[str, Any]
+    client_id: str, confusion: Mapping[str, Any]
 ) -> tuple[int, int, int, int]:
     """Parse and validate tp/fp/tn/fn from a confusion dict. Raises ValueError on missing keys."""
     missing = [
@@ -169,17 +198,21 @@ def _extract_confusion_counts(
     )
 
 
-def _validate_denominator_row(
-    client_id: Any, row: Mapping[str, Any], tp: int, fp: int, tn: int, fn: int
-) -> None:
+def _validate_denominator_row(params: _DenominatorCheckParams) -> None:
     """Check n_benign / n_attack denominators against recomputed counts."""
-    if PayloadKey.N_BENIGN in row and int(row[PayloadKey.N_BENIGN]) != fp + tn:
+    if (
+        PayloadKey.N_BENIGN in params.row
+        and int(params.row[PayloadKey.N_BENIGN]) != params.fp + params.tn
+    ):
         raise ValueError(
-            f"[reporting] Benign denominator mismatch. Expected: fp+tn={fp + tn} for {client_id}. Got: {row[PayloadKey.N_BENIGN]}."
+            f"[reporting] Benign denominator mismatch. Expected: fp+tn={params.fp + params.tn} for {params.client_id}. Got: {params.row[PayloadKey.N_BENIGN]}."
         )
-    if PayloadKey.N_ATTACK in row and int(row[PayloadKey.N_ATTACK]) != tp + fn:
+    if (
+        PayloadKey.N_ATTACK in params.row
+        and int(params.row[PayloadKey.N_ATTACK]) != params.tp + params.fn
+    ):
         raise ValueError(
-            f"[reporting] Attack denominator mismatch. Expected: tp+fn={tp + fn} for {client_id}. Got: {row[PayloadKey.N_ATTACK]}."
+            f"[reporting] Attack denominator mismatch. Expected: tp+fn={params.tp + params.fn} for {params.client_id}. Got: {params.row[PayloadKey.N_ATTACK]}."
         )
 
 
@@ -192,7 +225,16 @@ def _client_records_from_payload(
         tp, fp, tn, fn = _extract_confusion_counts(
             client_id, row[PayloadKey.CONFUSION_MATRIX]
         )
-        _validate_denominator_row(client_id, row, tp, fp, tn, fn)
+        _validate_denominator_row(
+            _DenominatorCheckParams(
+                client_id=client_id,
+                row=row,
+                tp=tp,
+                fp=fp,
+                tn=tn,
+                fn=fn,
+            )
+        )
         cid_str = str(client_id)
         records.append(
             ClientEvaluationRecord(
@@ -390,22 +432,6 @@ def _paired_deltas(
     )
 
 
-def _pooled_intersection_fprs(
-    results: dict[ThresholdPolicy, list[EvaluationResult]],
-    left: ThresholdPolicy,
-    right: ThresholdPolicy,
-) -> tuple[np.ndarray, np.ndarray]:
-    left_arrays: list[np.ndarray] = []
-    right_arrays: list[np.ndarray] = []
-    for idx in range(len(results[left])):
-        left_arr, right_arr, _ = _eligible_intersection_fprs(
-            results[left][idx], results[right][idx]
-        )
-        left_arrays.append(left_arr)
-        right_arrays.append(right_arr)
-    return np.concatenate(left_arrays), np.concatenate(right_arrays)
-
-
 def _intersect_eligible_ids(
     maps: dict[ThresholdPolicy, dict[str, float]], policies: tuple[ThresholdPolicy, ...]
 ) -> list[str]:
@@ -553,29 +579,13 @@ def _convergence_summary_warnings(base_dir: Path, seeds: tuple[int, ...]) -> lis
     return warnings_list
 
 
-def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
-    seeds = tuple(cfg.experiment.seeds)
-    n_bootstrap = cfg.statistics.n_bootstrap
-    bootstrap_seed = cfg.statistics.bootstrap_seed
-    ci = cfg.statistics.ci_level
-    metric_tol = cfg.reporting.metric_tol
-
-    analysis_dir = base_dir / ArtifactDir.ANALYSIS
-    analysis_dir.mkdir(parents=True, exist_ok=True)
-
-    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
-
-    nbaiot_results = _load_results(
-        _LoadResultsParams(
-            base_dir=base_dir,
-            stage=ExperimentStage.NBAIOT_MAIN,
-            policies=nbaiot_policies,
-            seeds=seeds,
-            metric_tol=metric_tol,
-        )
-    )
-
-    payload: dict[str, Any] = {
+def _build_stats_payload(
+    nbaiot_results: dict[ThresholdPolicy, list[EvaluationResult]],
+    n_bootstrap: int,
+    ci: float,
+    bootstrap_seed: int,
+) -> dict[str, Any]:
+    return {
         StatsField.PRIMARY_ENDPOINT: {
             StatsField.CONDITION: "Primary endpoint: NBAIOT_MAIN, GLOBAL_THRESHOLD vs LOCAL_THRESHOLD, CV(FPR), per-seed bootstrap CI.",
             **_bootstrap_payload(
@@ -635,21 +645,8 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         },
     }
 
-    payload[StatsField.HETEROGENEITY_CONTEXT_CHECK] = _check_heterogeneity_context(
-        _HeterogeneityContextParams(
-            bootstrap_payload=payload,
-            nbaiot_results=nbaiot_results,
-            base_dir=base_dir,
-            practical_significance_threshold=cfg.statistics.dispersion_threshold,
-            seeds=seeds,
-            metric_tol=metric_tol,
-        )
-    )
 
-    json_path = write_json_atomic(
-        analysis_dir / ArtifactFile.BOOTSTRAP_CIS_JSON, payload
-    )
-    csv_path = analysis_dir / ArtifactFile.BOOTSTRAP_CIS_CSV
+def _write_stats_csv(csv_path: Path, payload: dict[str, Any]) -> None:
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(
@@ -685,6 +682,47 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
                     ]
                 )
 
+
+def build_stats(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
+    seeds = tuple(cfg.experiment.seeds)
+    n_bootstrap = cfg.statistics.n_bootstrap
+    bootstrap_seed = cfg.statistics.bootstrap_seed
+    ci = cfg.statistics.ci_level
+    metric_tol = cfg.reporting.metric_tol
+
+    analysis_dir = base_dir / ArtifactDir.ANALYSIS
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+
+    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
+
+    nbaiot_results = _load_results(
+        _LoadResultsParams(
+            base_dir=base_dir,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            policies=nbaiot_policies,
+            seeds=seeds,
+            metric_tol=metric_tol,
+        )
+    )
+
+    payload = _build_stats_payload(nbaiot_results, n_bootstrap, ci, bootstrap_seed)
+    payload[StatsField.HETEROGENEITY_CONTEXT_CHECK] = _check_heterogeneity_context(
+        _HeterogeneityContextParams(
+            bootstrap_payload=payload,
+            nbaiot_results=nbaiot_results,
+            base_dir=base_dir,
+            practical_significance_threshold=cfg.statistics.dispersion_threshold,
+            seeds=seeds,
+            metric_tol=metric_tol,
+        )
+    )
+
+    json_path = write_json_atomic(
+        analysis_dir / ArtifactFile.BOOTSTRAP_CIS_JSON, payload
+    )
+    csv_path = analysis_dir / ArtifactFile.BOOTSTRAP_CIS_CSV
+    _write_stats_csv(csv_path, payload)
+
     return BuildOutputs(paths=[json_path, csv_path])
 
 
@@ -704,59 +742,52 @@ def _calibration_errors_for_devices(
     return errors
 
 
-def _build_figure1_sidecar(
-    base_dir: Path,
-    seed0_global: EvaluationResult,
-    seed0_local: EvaluationResult,
-    figure1_ids: list[str],
-    global_seed0_fpr: Any,
-    local_seed0_fpr: Any,
-) -> dict[str, Any]:
+def _build_figure1_sidecar(params: _Figure1SidecarParams) -> dict[str, Any]:
     return {
         SidecarField.FIGURE: FigureName.FIGURE_1.value,
         SidecarField.TITLE: "Per-device FPR: GLOBAL_THRESHOLD vs LOCAL_THRESHOLD, NBAIOT_MAIN — representative seed, descriptive only",
         SidecarField.DATASET: DatasetID.NBAIOT.value,
         SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN.value,
-        SidecarField.SEED: seed0_global.seed,
-        SidecarField.SEEDS: [seed0_global.seed],
+        SidecarField.SEED: params.seed0_global.seed,
+        SidecarField.SEEDS: [params.seed0_global.seed],
         SidecarField.SOURCE_METRICS_FILES: [
             str(
                 _result_path(
                     _ResultPathKey(
-                        base_dir,
+                        params.base_dir,
                         ExperimentStage.NBAIOT_MAIN,
                         ThresholdPolicy.GLOBAL_THRESHOLD,
-                        seed0_global.seed,
+                        params.seed0_global.seed,
                     )
                 )
             ),
             str(
                 _result_path(
                     _ResultPathKey(
-                        base_dir,
+                        params.base_dir,
                         ExperimentStage.NBAIOT_MAIN,
                         ThresholdPolicy.LOCAL_THRESHOLD,
-                        seed0_local.seed,
+                        params.seed0_local.seed,
                     )
                 )
             ),
         ],
         SidecarField.RUN_IDS: [
-            f"{ExperimentStage.NBAIOT_MAIN.value}_global_threshold_seed{seed0_global.seed}",
-            f"{ExperimentStage.NBAIOT_MAIN.value}_local_threshold_seed{seed0_local.seed}",
+            f"{ExperimentStage.NBAIOT_MAIN.value}_global_threshold_seed{params.seed0_global.seed}",
+            f"{ExperimentStage.NBAIOT_MAIN.value}_local_threshold_seed{params.seed0_local.seed}",
         ],
         SidecarField.ALPHAS: [],
         SidecarField.ELIGIBLE_COUNTS: {
-            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.eligible_count,
-            ThresholdPolicy.LOCAL_THRESHOLD.value: seed0_local.eligible_count,
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: params.seed0_global.eligible_count,
+            ThresholdPolicy.LOCAL_THRESHOLD.value: params.seed0_local.eligible_count,
         },
         SidecarField.CLIENT_COUNTS: {
-            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.client_count,
-            ThresholdPolicy.LOCAL_THRESHOLD.value: seed0_local.client_count,
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: params.seed0_global.client_count,
+            ThresholdPolicy.LOCAL_THRESHOLD.value: params.seed0_local.client_count,
         },
         SidecarField.COVERAGE_RATIOS: {
-            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.coverage_ratio,
-            ThresholdPolicy.LOCAL_THRESHOLD.value: seed0_local.coverage_ratio,
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: params.seed0_global.coverage_ratio,
+            ThresholdPolicy.LOCAL_THRESHOLD.value: params.seed0_local.coverage_ratio,
         },
         SidecarField.METRIC_NAMES: [MetricName.FPR.value],
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
@@ -780,60 +811,60 @@ def _build_figure1_sidecar(
                 ThresholdPolicy.LOCAL_THRESHOLD.value: float(local_val),
             }
             for cid, global_val, local_val in zip(
-                figure1_ids, global_seed0_fpr, local_seed0_fpr, strict=True
+                params.figure1_ids,
+                params.global_seed0_fpr,
+                params.local_seed0_fpr,
+                strict=True,
             )
         ],
     }
 
 
-def _build_figure2_sidecar(
-    base_dir: Path,
-    seed0_global: EvaluationResult,
-    rep_seed: int,
-    representative: list[str],
-    figure2_max_points: int,
-    tau_global: float,
-) -> dict[str, Any]:
+def _build_figure2_sidecar(params: _Figure2SidecarParams) -> dict[str, Any]:
     return {
         SidecarField.FIGURE: FigureName.FIGURE_2.value,
         SidecarField.TITLE: "Calibration-error ECDF for three representative N-BaIoT clients with GLOBAL_THRESHOLD client-averaged threshold — representative seed, descriptive only",
         SidecarField.DATASET: DatasetID.NBAIOT.value,
         SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN.value,
-        SidecarField.SEED: rep_seed,
-        SidecarField.SEEDS: [rep_seed],
+        SidecarField.SEED: params.rep_seed,
+        SidecarField.SEEDS: [params.rep_seed],
         SidecarField.SOURCE_METRICS_FILES: [
             str(
                 _result_path(
                     _ResultPathKey(
-                        base_dir,
+                        params.base_dir,
                         ExperimentStage.NBAIOT_MAIN,
                         ThresholdPolicy.GLOBAL_THRESHOLD,
-                        rep_seed,
+                        params.rep_seed,
                     )
                 )
             )
         ],
         SidecarField.SOURCE_SCORE_MANIFESTS: [
             str(
-                ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
+                ArtifactLayout(
+                    base_dir=params.base_dir, stage=ExperimentStage.NBAIOT_MAIN
+                )
                 .score_cell(
-                    TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=rep_seed)
+                    TrainingCellId(
+                        stage=ExperimentStage.NBAIOT_MAIN, seed=params.rep_seed
+                    )
                 )
                 .manifest_path
             )
         ],
         SidecarField.RUN_IDS: [
-            f"{ExperimentStage.NBAIOT_MAIN.value}_global_threshold_seed{rep_seed}"
+            f"{ExperimentStage.NBAIOT_MAIN.value}_global_threshold_seed{params.rep_seed}"
         ],
         SidecarField.ALPHAS: [],
         SidecarField.ELIGIBLE_COUNTS: {
-            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.eligible_count
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: params.seed0_global.eligible_count
         },
         SidecarField.CLIENT_COUNTS: {
-            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.client_count
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: params.seed0_global.client_count
         },
         SidecarField.COVERAGE_RATIOS: {
-            ThresholdPolicy.GLOBAL_THRESHOLD.value: seed0_global.coverage_ratio
+            ThresholdPolicy.GLOBAL_THRESHOLD.value: params.seed0_global.coverage_ratio
         },
         SidecarField.METRIC_NAMES: [SCORE_COLUMN, PayloadKey.THRESHOLD_VALUE],
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
@@ -842,12 +873,54 @@ def _build_figure2_sidecar(
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
         SidecarField.POLICIES: [ThresholdPolicy.GLOBAL_THRESHOLD.value],
         SidecarField.POLICY_ORDER: [ThresholdPolicy.GLOBAL_THRESHOLD.value],
-        SidecarField.ELIGIBILITY_POLICY: f"selected eligible clients from GLOBAL_THRESHOLD seed {rep_seed}",
+        SidecarField.ELIGIBILITY_POLICY: f"selected eligible clients from GLOBAL_THRESHOLD seed {params.rep_seed}",
         SidecarField.AXIS_LABELS: {"x": "Reconstruction Error", "y": "Density"},
-        SidecarField.TAU_GLOBAL: tau_global,
-        SidecarField.CLIENT_IDS: representative,
-        SidecarField.MAX_POINTS_PER_CLIENT: figure2_max_points,
+        SidecarField.TAU_GLOBAL: params.tau_global,
+        SidecarField.CLIENT_IDS: params.representative,
+        SidecarField.MAX_POINTS_PER_CLIENT: params.figure2_max_points,
     }
+
+
+def _figure3_source_metrics_files(
+    base_dir: Path,
+    b_values: tuple[str, ...],
+    seeds: tuple[int, ...],
+) -> list[str]:
+    return [
+        str(
+            _result_path(
+                _ResultPathKey(
+                    base_dir, ExperimentStage.NBAIOT_MAIN, ThresholdPolicy(b), seed
+                )
+            )
+        )
+        for b in b_values
+        for seed in seeds
+    ]
+
+
+def _figure3_run_ids(b_values: tuple[str, ...], seeds: tuple[int, ...]) -> list[str]:
+    return [
+        f"{ExperimentStage.NBAIOT_MAIN.value}_{b}_seed{seed}"
+        for b in b_values
+        for seed in seeds
+    ]
+
+
+def _figure3_per_policy_counts(
+    nbaiot_results: dict[ThresholdPolicy, list[EvaluationResult]],
+    b_enums: tuple[ThresholdPolicy, ...],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    eligible_counts = {
+        b.value: [r.eligible_count for r in nbaiot_results[b]] for b in b_enums
+    }
+    client_counts = {
+        b.value: [r.client_count for r in nbaiot_results[b]] for b in b_enums
+    }
+    coverage_ratios = {
+        b.value: [r.coverage_ratio for r in nbaiot_results[b]] for b in b_enums
+    }
+    return eligible_counts, client_counts, coverage_ratios
 
 
 def _build_figure3_sidecar(
@@ -866,38 +939,23 @@ def _build_figure3_sidecar(
         ThresholdPolicy.LOCAL_THRESHOLD,
         ThresholdPolicy.CLUSTER_THRESHOLD,
     )
+    eligible_counts, client_counts, coverage_ratios = _figure3_per_policy_counts(
+        nbaiot_results, b_enums
+    )
     return {
         SidecarField.FIGURE: FigureName.FIGURE_3.value,
         SidecarField.TITLE: "Per-client FPR distribution, N-BaIoT main",
         SidecarField.DATASET: DatasetID.NBAIOT.value,
         SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN.value,
-        SidecarField.SOURCE_METRICS_FILES: [
-            str(
-                _result_path(
-                    _ResultPathKey(
-                        base_dir, ExperimentStage.NBAIOT_MAIN, ThresholdPolicy(b), seed
-                    )
-                )
-            )
-            for b in b_values
-            for seed in seeds
-        ],
-        SidecarField.RUN_IDS: [
-            f"{ExperimentStage.NBAIOT_MAIN.value}_{b}_seed{seed}"
-            for b in b_values
-            for seed in seeds
-        ],
+        SidecarField.SOURCE_METRICS_FILES: _figure3_source_metrics_files(
+            base_dir, b_values, seeds
+        ),
+        SidecarField.RUN_IDS: _figure3_run_ids(b_values, seeds),
         SidecarField.SEEDS: list(seeds),
         SidecarField.ALPHAS: [],
-        SidecarField.ELIGIBLE_COUNTS: {
-            b.value: [r.eligible_count for r in nbaiot_results[b]] for b in b_enums
-        },
-        SidecarField.CLIENT_COUNTS: {
-            b.value: [r.client_count for r in nbaiot_results[b]] for b in b_enums
-        },
-        SidecarField.COVERAGE_RATIOS: {
-            b.value: [r.coverage_ratio for r in nbaiot_results[b]] for b in b_enums
-        },
+        SidecarField.ELIGIBLE_COUNTS: eligible_counts,
+        SidecarField.CLIENT_COUNTS: client_counts,
+        SidecarField.COVERAGE_RATIOS: coverage_ratios,
         SidecarField.METRIC_NAMES: [
             MetricName.FPR.value,
             "cv_fpr_delta_global_minus_local",
@@ -925,46 +983,30 @@ def _build_figure3_sidecar(
     }
 
 
-def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
-    """Generate Figures 1–3 from completed result and score artifacts."""
-    seeds = tuple(cfg.experiment.seeds)
-    metric_tol = cfg.reporting.metric_tol
-    figure2_max_points = cfg.reporting.figure2_max_points
-    style = cfg.reporting.style
-
-    figures_dir = base_dir / ArtifactDir.FIGURES
-    figures_dir.mkdir(parents=True, exist_ok=True)
-    paths: list[Path] = []
-
-    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
-
-    nbaiot_results = _load_results(
-        _LoadResultsParams(
-            base_dir=base_dir,
-            stage=ExperimentStage.NBAIOT_MAIN,
-            policies=nbaiot_policies,
-            seeds=seeds,
-            metric_tol=metric_tol,
-        )
-    )
+def _build_figure1(
+    base_dir: Path,
+    nbaiot_results: dict[ThresholdPolicy, list[EvaluationResult]],
+    figures_dir: Path,
+    style: Any,
+) -> list[Path]:
     seed0_global = nbaiot_results[ThresholdPolicy.GLOBAL_THRESHOLD][0]
     seed0_local = nbaiot_results[ThresholdPolicy.LOCAL_THRESHOLD][0]
     global_seed0_fpr, local_seed0_fpr, figure1_ids = _eligible_intersection_fprs(
         seed0_global, seed0_local
     )
-    paths.append(
-        _write_figure_data(
-            figures_dir,
-            FigureName.FIGURE_1.value,
-            _build_figure1_sidecar(
-                base_dir,
-                seed0_global,
-                seed0_local,
-                figure1_ids,
-                global_seed0_fpr,
-                local_seed0_fpr,
-            ),
-        )
+    sidecar_path = _write_figure_data(
+        figures_dir,
+        FigureName.FIGURE_1.value,
+        _build_figure1_sidecar(
+            _Figure1SidecarParams(
+                base_dir=base_dir,
+                seed0_global=seed0_global,
+                seed0_local=seed0_local,
+                figure1_ids=figure1_ids,
+                global_seed0_fpr=global_seed0_fpr,
+                local_seed0_fpr=local_seed0_fpr,
+            )
+        ),
     )
     fig1_png = generate_figure1(
         dict(zip(figure1_ids, global_seed0_fpr, strict=True)),
@@ -973,8 +1015,21 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         seed=seed0_global.seed,
         style=style,
     )
-    paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_1.value, fig1_png))
+    return [
+        sidecar_path,
+        *_save_figure_copies(figures_dir, FigureName.FIGURE_1.value, fig1_png),
+    ]
 
+
+def _build_figure2(
+    base_dir: Path,
+    nbaiot_results: dict[ThresholdPolicy, list[EvaluationResult]],
+    figures_dir: Path,
+    style: Any,
+    figure2_max_points: int,
+    figure2_rng_seed: int,
+) -> list[Path]:
+    seed0_global = nbaiot_results[ThresholdPolicy.GLOBAL_THRESHOLD][0]
     seed0_global_fprs = _eligible_fprs(seed0_global)
     sorted_devices = sorted(
         seed0_global_fprs, key=lambda device_id: seed0_global_fprs[device_id]
@@ -991,7 +1046,7 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
             seed=rep_seed,
             device_ids=representative,
             max_points=figure2_max_points,
-            rng_seed=cfg.reporting.figure2_rng_seed,
+            rng_seed=figure2_rng_seed,
         )
     )
     tau_global = float(
@@ -1006,25 +1061,36 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
             )
         )[MetricName.TAU_GLOBAL.value]
     )
-    paths.append(
-        _write_figure_data(
-            figures_dir,
-            FigureName.FIGURE_2.value,
-            _build_figure2_sidecar(
-                base_dir,
-                seed0_global,
-                rep_seed,
-                representative,
-                figure2_max_points,
-                tau_global,
-            ),
-        )
+    sidecar_path = _write_figure_data(
+        figures_dir,
+        FigureName.FIGURE_2.value,
+        _build_figure2_sidecar(
+            _Figure2SidecarParams(
+                base_dir=base_dir,
+                seed0_global=seed0_global,
+                rep_seed=rep_seed,
+                representative=representative,
+                figure2_max_points=figure2_max_points,
+                tau_global=tau_global,
+            )
+        ),
     )
     fig2_png = generate_figure2(
         cal_errors, tau_global, representative, figures_dir, style=style
     )
-    paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_2.value, fig2_png))
+    return [
+        sidecar_path,
+        *_save_figure_copies(figures_dir, FigureName.FIGURE_2.value, fig2_png),
+    ]
 
+
+def _build_figure3(
+    base_dir: Path,
+    nbaiot_results: dict[ThresholdPolicy, list[EvaluationResult]],
+    figures_dir: Path,
+    style: Any,
+    seeds: tuple[int, ...],
+) -> list[Path]:
     fpr_by_policy = _common_eligible_fprs(
         nbaiot_results,
         (
@@ -1033,15 +1099,52 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
             ThresholdPolicy.CLUSTER_THRESHOLD,
         ),
     )
-    paths.append(
-        _write_figure_data(
-            figures_dir,
-            FigureName.FIGURE_3.value,
-            _build_figure3_sidecar(base_dir, nbaiot_results, fpr_by_policy, seeds),
-        )
+    sidecar_path = _write_figure_data(
+        figures_dir,
+        FigureName.FIGURE_3.value,
+        _build_figure3_sidecar(base_dir, nbaiot_results, fpr_by_policy, seeds),
     )
     fig3_png = generate_figure3(fpr_by_policy, figures_dir, style=style)
-    paths.extend(_save_figure_copies(figures_dir, FigureName.FIGURE_3.value, fig3_png))
+    return [
+        sidecar_path,
+        *_save_figure_copies(figures_dir, FigureName.FIGURE_3.value, fig3_png),
+    ]
+
+
+def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
+    """Generate Figures 1–3 from completed result and score artifacts."""
+    seeds = tuple(cfg.experiment.seeds)
+    metric_tol = cfg.reporting.metric_tol
+    figure2_max_points = cfg.reporting.figure2_max_points
+    style = cfg.reporting.style
+
+    figures_dir = base_dir / ArtifactDir.FIGURES
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    nbaiot_policies = tuple(sorted(CONTROLLED_POLICIES))
+    nbaiot_results = _load_results(
+        _LoadResultsParams(
+            base_dir=base_dir,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            policies=nbaiot_policies,
+            seeds=seeds,
+            metric_tol=metric_tol,
+        )
+    )
+
+    paths: list[Path] = []
+    paths.extend(_build_figure1(base_dir, nbaiot_results, figures_dir, style))
+    paths.extend(
+        _build_figure2(
+            base_dir,
+            nbaiot_results,
+            figures_dir,
+            style,
+            figure2_max_points,
+            cfg.reporting.figure2_rng_seed,
+        )
+    )
+    paths.extend(_build_figure3(base_dir, nbaiot_results, figures_dir, style, seeds))
 
     return BuildOutputs(paths=paths)
 
@@ -1136,39 +1239,35 @@ def _validate_figure_sidecars(figures_dir: Path) -> list[str]:
     return errors
 
 
-def _build_audit_payload(
-    base_dir: Path,
-    cfg: DatpConfig,
-    paths: list[Path],
-    failures: list[str],
-    conv_warnings: list[str],
-) -> dict[str, Any]:
+def _build_audit_payload(params: _AuditPayloadParams) -> dict[str, Any]:
     return {
         AuditField.SCHEMA_VERSION: REPORTING_AUDIT_SCHEMA_VERSION,
         AuditField.GENERATED_TABLES: [
             str(p)
-            for p in paths
+            for p in params.paths
             if p.suffix in {".tex", ".csv"} and ArtifactDir.TABLES in p.name
         ],
         AuditField.GENERATED_FIGURES: [
             str(p)
-            for p in paths
+            for p in params.paths
             if p.suffix in {".pdf", ".png", ".json"} and ArtifactDir.FIGURES in p.name
         ],
         AuditField.SOURCE_METRICS_FILES: sorted(_REPORTING_SOURCES),
         AuditField.SOURCE_SCORE_MANIFESTS: sorted(
             str(
-                ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
+                ArtifactLayout(
+                    base_dir=params.base_dir, stage=ExperimentStage.NBAIOT_MAIN
+                )
                 .score_cell(
                     TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed)
                 )
                 .manifest_path
             )
-            for seed in cfg.experiment.seeds
+            for seed in params.cfg.experiment.seeds
         ),
         AuditField.SOURCE_RUN_IDS: sorted(_REPORTING_SOURCES),
         AuditField.VALIDATION_RESULTS: AuditStatus.FAIL.value
-        if failures
+        if params.failures
         else AuditStatus.PASS.value,
         AuditField.RECOMPUTATION_CHECKS: "canonical confusion-matrix recomputation during load",
         AuditField.COVERAGE_CHECKS: "explicit eligible_ids/pending_ids/eval_incomplete_ids required",
@@ -1176,9 +1275,9 @@ def _build_audit_payload(
         AuditField.STALE_ARTIFACT_CHECKS: "schema/provenance/sidecar checks",
         AuditField.DESCRIPTIVE_FIGURE_CHECKS: f"representative-seed sidecar validation for {sorted(_REPRESENTATIVE_SEED_FIGURES)}",
         AuditField.CONVERGENCE_METADATA_CHECKS: f"warn if {ArtifactFile.CONVERGENCE_SUMMARY} absent alongside model.pt",
-        AuditField.FIGURE_TABLE_OUTPUT_PATHS: [str(p) for p in paths],
-        AuditField.WARNINGS: conv_warnings,
-        AuditField.FAILURES: failures,
+        AuditField.FIGURE_TABLE_OUTPUT_PATHS: [str(p) for p in params.paths],
+        AuditField.WARNINGS: params.conv_warnings,
+        AuditField.FAILURES: params.failures,
     }
 
 
@@ -1197,7 +1296,15 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     conv_warnings = _convergence_summary_warnings(base_dir, tuple(cfg.experiment.seeds))
     audit_path = write_json_atomic(
         base_dir / ArtifactDir.ANALYSIS / ArtifactFile.REPORTING_AUDIT,
-        _build_audit_payload(base_dir, cfg, paths, failures, conv_warnings),
+        _build_audit_payload(
+            _AuditPayloadParams(
+                base_dir=base_dir,
+                cfg=cfg,
+                paths=paths,
+                failures=failures,
+                conv_warnings=conv_warnings,
+            )
+        ),
     )
     paths.append(audit_path)
     if failures:

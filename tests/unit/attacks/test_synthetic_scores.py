@@ -8,6 +8,7 @@ import pytest
 from datp.artifacts.poison_names import N_MIN
 from datp.scoring.schema import SCORE_COLUMN
 from datp.testsupport.synthetic_scores import (
+    SyntheticClientSpec,
     make_degenerate_tail_client,
     make_eligible_client,
     make_pending_client,
@@ -18,45 +19,51 @@ from datp.testsupport.synthetic_scores import (
 
 class TestMakeSyntheticClient:
     def test_deterministic(self) -> None:
-        a = make_synthetic_client(client_id="c0", client_idx=0)
-        b = make_synthetic_client(client_id="c0", client_idx=0)
+        a = make_synthetic_client(SyntheticClientSpec(client_id="c0", client_idx=0))
+        b = make_synthetic_client(SyntheticClientSpec(client_id="c0", client_idx=0))
         np.testing.assert_array_equal(a.cal, b.cal)
         np.testing.assert_array_equal(a.test_benign, b.test_benign)
         np.testing.assert_array_equal(a.test_attack, b.test_attack)
 
     def test_different_seeds_differ(self) -> None:
-        a = make_synthetic_client(client_id="c0", client_idx=0, training_seed=0)
-        b = make_synthetic_client(client_id="c0", client_idx=0, training_seed=1)
+        a = make_synthetic_client(
+            SyntheticClientSpec(client_id="c0", client_idx=0, training_seed=0)
+        )
+        b = make_synthetic_client(
+            SyntheticClientSpec(client_id="c0", client_idx=0, training_seed=1)
+        )
         assert not np.array_equal(a.cal, b.cal)
 
     def test_different_clients_differ(self) -> None:
-        a = make_synthetic_client(client_id="c0", client_idx=0)
-        b = make_synthetic_client(client_id="c1", client_idx=1)
+        a = make_synthetic_client(SyntheticClientSpec(client_id="c0", client_idx=0))
+        b = make_synthetic_client(SyntheticClientSpec(client_id="c1", client_idx=1))
         assert not np.array_equal(a.cal, b.cal)
 
     def test_shapes(self) -> None:
         c = make_synthetic_client(
-            client_id="c0",
-            n_cal=150,
-            n_test_benign=30,
-            n_test_attack=40,
+            SyntheticClientSpec(
+                client_id="c0",
+                n_cal=150,
+                n_test_benign=30,
+                n_test_attack=40,
+            )
         )
         assert c.cal.shape == (150,)
         assert c.test_benign.shape == (30,)
         assert c.test_attack.shape == (40,)
 
     def test_non_negative(self) -> None:
-        c = make_synthetic_client(client_id="c0")
+        c = make_synthetic_client(SyntheticClientSpec(client_id="c0"))
         assert np.all(c.cal >= 0.0)
         assert np.all(c.test_benign >= 0.0)
         assert np.all(c.test_attack >= 0.0)
 
     def test_attack_scores_higher_than_benign(self) -> None:
-        c = make_synthetic_client(client_id="c0")
+        c = make_synthetic_client(SyntheticClientSpec(client_id="c0"))
         assert np.mean(c.test_attack) > np.mean(c.test_benign)
 
     def test_score_column_attribute(self) -> None:
-        c = make_synthetic_client(client_id="c0")
+        c = make_synthetic_client(SyntheticClientSpec(client_id="c0"))
         assert c.score_column == SCORE_COLUMN
 
 
@@ -72,11 +79,11 @@ class TestEligibility:
         assert c.n_cal < N_MIN
 
     def test_boundary_eligible(self) -> None:
-        c = make_synthetic_client(client_id="c0", n_cal=N_MIN)
+        c = make_synthetic_client(SyntheticClientSpec(client_id="c0", n_cal=N_MIN))
         assert c.is_eligible
 
     def test_boundary_pending(self) -> None:
-        c = make_synthetic_client(client_id="c0", n_cal=N_MIN - 1)
+        c = make_synthetic_client(SyntheticClientSpec(client_id="c0", n_cal=N_MIN - 1))
         assert not c.is_eligible
 
 

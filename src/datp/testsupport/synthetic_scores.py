@@ -100,21 +100,25 @@ class SyntheticCalibrationScoreSet:
         raise KeyError(f"No client with id {client_id!r}")
 
 
-def make_synthetic_client(
-    *,
-    client_id: str,
-    n_cal: int = 200,
-    n_test_benign: int = 50,
-    n_test_attack: int = 50,
-    cal_loc: float = 0.05,
-    cal_scale: float = 0.02,
-    attack_loc: float = 0.30,
-    attack_scale: float = 0.05,
-    training_seed: int = 0,
-    poisoning_seed: int = 100,
-    client_idx: int = 0,
-    scope_idx: int = 0,
-) -> SyntheticClientScores:
+@dataclass(frozen=True, slots=True)
+class SyntheticClientSpec:
+    """Full parameter set for generating one synthetic client's scores."""
+
+    client_id: str
+    n_cal: int = 200
+    n_test_benign: int = 50
+    n_test_attack: int = 50
+    cal_loc: float = 0.05
+    cal_scale: float = 0.02
+    attack_loc: float = 0.30
+    attack_scale: float = 0.05
+    training_seed: int = 0
+    poisoning_seed: int = 100
+    client_idx: int = 0
+    scope_idx: int = 0
+
+
+def make_synthetic_client(spec: SyntheticClientSpec) -> SyntheticClientScores:
     """Generate one synthetic client's scores.
 
     Calibration and benign test scores are drawn from the same distribution
@@ -122,41 +126,29 @@ def make_synthetic_client(
     higher distribution (loc=attack_loc). All values are clipped to [0, inf).
     """
     rng = make_seed_rng(
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
-        client_idx=client_idx,
-        scope_idx=scope_idx,
+        training_seed=spec.training_seed,
+        poisoning_seed=spec.poisoning_seed,
+        client_idx=spec.client_idx,
+        scope_idx=spec.scope_idx,
         child_index=0,
     )
-    cal = np.maximum(rng.normal(loc=cal_loc, scale=cal_scale, size=n_cal), 0.0)
+    cal = np.maximum(
+        rng.normal(loc=spec.cal_loc, scale=spec.cal_scale, size=spec.n_cal), 0.0
+    )
     test_benign = np.maximum(
-        rng.normal(loc=cal_loc, scale=cal_scale, size=n_test_benign), 0.0
+        rng.normal(loc=spec.cal_loc, scale=spec.cal_scale, size=spec.n_test_benign), 0.0
     )
     test_attack = np.maximum(
-        rng.normal(loc=attack_loc, scale=attack_scale, size=n_test_attack), 0.0
+        rng.normal(
+            loc=spec.attack_loc, scale=spec.attack_scale, size=spec.n_test_attack
+        ),
+        0.0,
     )
     return SyntheticClientScores(
-        client_id=client_id,
+        client_id=spec.client_id,
         cal=cal,
         test_benign=test_benign,
         test_attack=test_attack,
-    )
-
-
-def _make_fixed_cal_client(
-    *,
-    client_id: str,
-    n_cal: int,
-    client_idx: int,
-    training_seed: int,
-    poisoning_seed: int,
-) -> SyntheticClientScores:
-    return make_synthetic_client(
-        client_id=client_id,
-        n_cal=n_cal,
-        client_idx=client_idx,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
     )
 
 
@@ -168,12 +160,14 @@ def make_eligible_client(
     poisoning_seed: int = 100,
 ) -> SyntheticClientScores:
     """Shorthand: eligible client with n_cal >= N_MIN."""
-    return _make_fixed_cal_client(
-        client_id=client_id,
-        n_cal=N_MIN + 100,
-        client_idx=client_idx,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
+    return make_synthetic_client(
+        SyntheticClientSpec(
+            client_id=client_id,
+            n_cal=N_MIN + 100,
+            client_idx=client_idx,
+            training_seed=training_seed,
+            poisoning_seed=poisoning_seed,
+        )
     )
 
 
@@ -185,12 +179,14 @@ def make_pending_client(
     poisoning_seed: int = 100,
 ) -> SyntheticClientScores:
     """Shorthand: Calibration-Pending client with n_cal < N_MIN."""
-    return _make_fixed_cal_client(
-        client_id=client_id,
-        n_cal=N_MIN - 1,
-        client_idx=client_idx,
-        training_seed=training_seed,
-        poisoning_seed=poisoning_seed,
+    return make_synthetic_client(
+        SyntheticClientSpec(
+            client_id=client_id,
+            n_cal=N_MIN - 1,
+            client_idx=client_idx,
+            training_seed=training_seed,
+            poisoning_seed=poisoning_seed,
+        )
     )
 
 

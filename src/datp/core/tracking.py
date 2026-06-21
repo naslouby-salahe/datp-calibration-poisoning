@@ -151,6 +151,29 @@ def _import_mlflow() -> _MlflowModule | None:
     return _MLFLOW
 
 
+def _active_mlflow() -> _MlflowModule | None:
+    """Return the mlflow module when tracking is enabled; None otherwise."""
+    if not _TRACKING_ENABLED:
+        return None
+    return _import_mlflow()
+
+
+def _apply_tags(mlflow: _MlflowModule, tags: TrackingTags | None) -> None:
+    if tags is None:
+        return
+    payload = _tags_to_mapping(tags)
+    if payload:
+        mlflow.set_tags(payload)
+
+
+def _apply_params(mlflow: _MlflowModule, params: TrackingParams | None) -> None:
+    if params is None:
+        return
+    payload = _params_to_mapping(params)
+    if payload:
+        mlflow.log_params(payload)
+
+
 def init_tracking(
     *,
     experiment_name: str,
@@ -181,25 +204,15 @@ def tracking_run(
     params: TrackingParams | None,
     tags: TrackingTags | None,
 ) -> Generator[None, None, None]:
-    if not _TRACKING_ENABLED:
-        yield
-        return
-
-    mlflow = _import_mlflow()
+    mlflow = _active_mlflow()
     if mlflow is None:
         yield
         return
 
     nested = mlflow.active_run() is not None
     with mlflow.start_run(run_name=run_name, nested=nested):
-        if tags is not None:
-            tag_payload = _tags_to_mapping(tags)
-            if tag_payload:
-                mlflow.set_tags(tag_payload)
-        if params is not None:
-            param_payload = _params_to_mapping(params)
-            if param_payload:
-                mlflow.log_params(param_payload)
+        _apply_tags(mlflow, tags)
+        _apply_params(mlflow, params)
         yield
 
 
@@ -209,9 +222,7 @@ def log_metrics(
     step: int | None,
     prefix: str | enum.Enum | None,
 ) -> None:
-    if not _TRACKING_ENABLED:
-        return
-    mlflow = _import_mlflow()
+    mlflow = _active_mlflow()
     if mlflow is None:
         return
 
@@ -232,14 +243,10 @@ def log_metrics(
 
 
 def log_params(params: TrackingParams) -> None:
-    if not _TRACKING_ENABLED:
-        return
-    mlflow = _import_mlflow()
+    mlflow = _active_mlflow()
     if mlflow is None:
         return
-    payload = _params_to_mapping(params)
-    if payload:
-        mlflow.log_params(payload)
+    _apply_params(mlflow, params)
 
 
 def log_artifact(
@@ -247,9 +254,7 @@ def log_artifact(
     *,
     artifact_path: str | ArtifactDir | None,
 ) -> None:
-    if not _TRACKING_ENABLED:
-        return
-    mlflow = _import_mlflow()
+    mlflow = _active_mlflow()
     if mlflow is None:
         return
     mlflow.log_artifact(

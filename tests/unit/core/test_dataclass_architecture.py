@@ -160,6 +160,20 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("federated/strategies.py", "FedAvgConfig", "checkpoint_milestones"),
         ("federated/strategies.py", "FedAvgConfig", "convergence_mode"),
         ("federated/strategies.py", "FedAvgConfig", "checkpoint_disk_dirs"),
+        # SyntheticClientSpec: test-convenience defaults that mirror the keyword-argument
+        # defaults that existed on the old make_synthetic_client() function; callers
+        # only need to override the fields that differ from the canonical test baseline
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "n_cal"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "n_test_benign"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "n_test_attack"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "cal_loc"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "cal_scale"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "attack_loc"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "attack_scale"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "training_seed"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "poisoning_seed"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "client_idx"),
+        ("testsupport/synthetic_scores.py", "SyntheticClientSpec", "scope_idx"),
     }
 )
 

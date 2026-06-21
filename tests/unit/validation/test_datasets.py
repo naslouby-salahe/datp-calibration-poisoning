@@ -43,13 +43,13 @@ def _write_parquet(path: Path, n_rows: int) -> None:
 
 class TestConfoundSummaryFor:
     def test_nbaiot_main_returns_nbaiot_summary(self) -> None:
-        result = confound_summary_for(ExperimentStage.NBAIOT_MAIN)
+        result = confound_summary_for()
         assert result == NBAIOT_CONFOUND_SUMMARY
 
 
 class TestChronologicalFlagsFor:
     def test_nbaiot_main_is_chronological(self) -> None:
-        assert chronological_flags_for(ExperimentStage.NBAIOT_MAIN) == (True, True)
+        assert chronological_flags_for() == (True, True)
 
 
 class TestBuildCiciotProtocol:

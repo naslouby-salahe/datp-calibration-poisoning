@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from dataclasses import dataclass
+
 from datp.attacks.enums import ThresholdPolicy
 
 from datp.config.stages import ExperimentStage
@@ -19,6 +22,17 @@ from datp.thresholding.metrics_serialization import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class _FakeMetricSpec:
+    policy: ThresholdPolicy
+    seed: int
+    checkpoint_round: int
+    cv_fpr: float
+    worst_fpr: float
+    p10_macro_f1: float
+    worst_ba: float
+
+
 def build_fake_checkpoint_metrics(
     *, rounds: tuple[int, ...], seeds: tuple[int, ...]
 ) -> tuple[SweepMetrics, ...]:
@@ -27,79 +41,54 @@ def build_fake_checkpoint_metrics(
         for seed in seeds:
             metrics.append(
                 _fake_metric(
-                    policy=ThresholdPolicy.GLOBAL_THRESHOLD,
-                    seed=seed,
-                    checkpoint_round=checkpoint_round,
-                    cv_fpr=0.30 + 0.01 * seed,
-                    worst_fpr=0.22 + 0.01 * seed,
-                    p10_macro_f1=0.70 + checkpoint_round / 1000.0,
-                    worst_ba=0.91 + checkpoint_round / 2000.0,
+                    _FakeMetricSpec(
+                        policy=ThresholdPolicy.GLOBAL_THRESHOLD,
+                        seed=seed,
+                        checkpoint_round=checkpoint_round,
+                        cv_fpr=0.30 + 0.01 * seed,
+                        worst_fpr=0.22 + 0.01 * seed,
+                        p10_macro_f1=0.70 + checkpoint_round / 1000.0,
+                        worst_ba=0.91 + checkpoint_round / 2000.0,
+                    )
                 )
             )
             metrics.append(
                 _fake_metric(
-                    policy=ThresholdPolicy.LOCAL_THRESHOLD,
-                    seed=seed,
-                    checkpoint_round=checkpoint_round,
-                    cv_fpr=0.20 + 0.01 * seed,
-                    worst_fpr=0.12 + 0.01 * seed,
-                    p10_macro_f1=0.73 + checkpoint_round / 1000.0,
-                    worst_ba=0.92 + checkpoint_round / 2000.0,
+                    _FakeMetricSpec(
+                        policy=ThresholdPolicy.LOCAL_THRESHOLD,
+                        seed=seed,
+                        checkpoint_round=checkpoint_round,
+                        cv_fpr=0.20 + 0.01 * seed,
+                        worst_fpr=0.12 + 0.01 * seed,
+                        p10_macro_f1=0.73 + checkpoint_round / 1000.0,
+                        worst_ba=0.92 + checkpoint_round / 2000.0,
+                    )
                 )
             )
     return tuple(metrics)
 
 
-def _fake_metric(
-    *,
-    policy: ThresholdPolicy,
-    seed: int,
-    checkpoint_round: int,
-    cv_fpr: float,
-    worst_fpr: float,
-    p10_macro_f1: float,
-    worst_ba: float,
-) -> SweepMetrics:
-    per_client = (
-        _client_detail(
-            "c1", fpr=worst_fpr, tpr=0.95, macro_f1=p10_macro_f1, ba=worst_ba
-        ),
-        _client_detail(
-            "c2",
-            fpr=max(worst_fpr - 0.05, 0.0),
-            tpr=0.96,
-            macro_f1=p10_macro_f1 + 0.02,
-            ba=worst_ba + 0.01,
-        ),
+def _fake_metric(spec: _FakeMetricSpec) -> SweepMetrics:
+    per_client = _build_per_client(spec)
+    aggregate = _build_aggregate(spec)
+    threshold_scope = (
+        ThresholdAggregationMethod.PER_CLIENT_PERCENTILE
+        if spec.policy == ThresholdPolicy.LOCAL_THRESHOLD
+        else ThresholdAggregationMethod.ELIGIBLE_CLIENT_ARITHMETIC_MEAN
     )
-    aggregate = {
-        MetricName.CV_FPR: cv_fpr,
-        MetricName.MEAN_FPR: worst_fpr - 0.025,
-        MetricName.STD_FPR: 0.01,
-        MetricName.CV_TPR: 0.02,
-        MetricName.IQR_FPR: 0.01,
-        MetricName.IQR_TPR: 0.01,
-        MetricName.MAX_MIN_FPR_GAP: 0.05,
-        MetricName.WORST_CLIENT_FPR: worst_fpr,
-        MetricName.WORST_CLIENT_ID: "c1",
-        MetricName.WORST_BA: worst_ba,
-        MetricName.P10_MACRO_F1: p10_macro_f1,
-    }
     return SweepMetrics(
         schema_version=METRICS_SCHEMA_VERSION,
         metric_schema_version=METRIC_SCHEMA_VERSION,
         threshold_schema_version=THRESHOLD_SCHEMA_VERSION,
-        run_id=f"nbaiot_main_{policy.value}_seed{seed}_round{checkpoint_round}",
+        run_id=f"nbaiot_main_{spec.policy.value}_seed{spec.seed}_round{spec.checkpoint_round}",
         run_kind=RunKind.CORE_LADDER,
-        policy=policy,
+        policy=spec.policy,
         stage=ExperimentStage.NBAIOT_MAIN,
-        seed=seed,
-        checkpoint_round=checkpoint_round,
+        seed=spec.seed,
+        checkpoint_round=spec.checkpoint_round,
         dataset=DatasetID.NBAIOT,
-        threshold_scope=ThresholdAggregationMethod.PER_CLIENT_PERCENTILE
-        if policy == ThresholdPolicy.LOCAL_THRESHOLD
-        else ThresholdAggregationMethod.ELIGIBLE_CLIENT_ARITHMETIC_MEAN,
-        threshold_strategy_name=policy.value,
+        threshold_scope=threshold_scope,
+        threshold_strategy_name=spec.policy.value,
         tau_global=0.5,
         eligible_ids=("c1", "c2"),
         pending_ids=(),
@@ -109,16 +98,16 @@ def _fake_metric(
         eval_incomplete_count=0,
         client_count=2,
         coverage_ratio=1.0,
-        cv_fpr=cv_fpr,
-        mean_fpr=worst_fpr - 0.025,
+        cv_fpr=spec.cv_fpr,
+        mean_fpr=spec.worst_fpr - 0.025,
         std_fpr=0.01,
         cv_tpr=0.02,
         iqr_fpr=0.01,
         iqr_tpr=0.01,
-        worst_client_fpr=worst_fpr,
+        worst_client_fpr=spec.worst_fpr,
         worst_client_id="c1",
-        worst_ba=worst_ba,
-        p10_macro_f1=p10_macro_f1,
+        worst_ba=spec.worst_ba,
+        p10_macro_f1=spec.p10_macro_f1,
         aggregate_metrics=aggregate,
         provenance=MetricsProvenance(
             config_identity="config",
@@ -132,6 +121,41 @@ def _fake_metric(
         ),
         per_client=per_client,
     )
+
+
+def _build_per_client(spec: _FakeMetricSpec) -> tuple[MetricsClientDetail, ...]:
+    return (
+        _client_detail(
+            "c1",
+            fpr=spec.worst_fpr,
+            tpr=0.95,
+            macro_f1=spec.p10_macro_f1,
+            ba=spec.worst_ba,
+        ),
+        _client_detail(
+            "c2",
+            fpr=max(spec.worst_fpr - 0.05, 0.0),
+            tpr=0.96,
+            macro_f1=spec.p10_macro_f1 + 0.02,
+            ba=spec.worst_ba + 0.01,
+        ),
+    )
+
+
+def _build_aggregate(spec: _FakeMetricSpec) -> dict[MetricName, float | str | None]:
+    return {
+        MetricName.CV_FPR: spec.cv_fpr,
+        MetricName.MEAN_FPR: spec.worst_fpr - 0.025,
+        MetricName.STD_FPR: 0.01,
+        MetricName.CV_TPR: 0.02,
+        MetricName.IQR_FPR: 0.01,
+        MetricName.IQR_TPR: 0.01,
+        MetricName.MAX_MIN_FPR_GAP: 0.05,
+        MetricName.WORST_CLIENT_FPR: spec.worst_fpr,
+        MetricName.WORST_CLIENT_ID: "c1",
+        MetricName.WORST_BA: spec.worst_ba,
+        MetricName.P10_MACRO_F1: spec.p10_macro_f1,
+    }
 
 
 def _client_detail(

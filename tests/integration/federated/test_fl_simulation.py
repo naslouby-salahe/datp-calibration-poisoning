@@ -31,27 +31,24 @@ def test_synthetic_smoke(tmp_path) -> None:
 
 @pytest.mark.integration
 def test_nbaiot_full_loop(tmp_path) -> None:
-    alpha_levels = [0.1, 0.5, 1.0, 5.0, 10.0, float("inf")]
     n_virtual_clients = 4  # Reduced from 20 for test speed
+    cfg = make_fl_cfg(
+        stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, rounds=2, encoder_dims=[8, 4, 8]
+    )
+    client_data = make_client_data(n_clients=n_virtual_clients, seed=SEED)
 
-    for _ in alpha_levels:
-        cfg = make_fl_cfg(
-            stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, rounds=2, encoder_dims=[8, 4, 8]
-        )
-        client_data = make_client_data(n_clients=n_virtual_clients, seed=SEED)
+    result = run_fl_training(
+        cfg=cfg,
+        client_data=client_data,
+        seed=SEED,
+        base_dir=tmp_path,
+    )
 
-        result = run_fl_training(
-            cfg=cfg,
-            client_data=client_data,
-            seed=SEED,
-            base_dir=tmp_path,
-        )
-
-        assert result.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
-        assert result.total_rounds >= 1
-        assert result.checkpoint_dir.exists()
-        assert (result.checkpoint_dir / "model.pt").exists()
-        assert result.score_dir.exists()
+    assert result.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
+    assert result.total_rounds >= 1
+    assert result.checkpoint_dir.exists()
+    assert (result.checkpoint_dir / "model.pt").exists()
+    assert result.score_dir.exists()
 
 
 @pytest.mark.integration

@@ -209,7 +209,7 @@ def _write_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
     for metric in metrics:
         cell = TrainingCellId(stage=metric.stage, seed=metric.seed)
         run = PolicyRunId(cell=cell, policy=metric.policy)
-        checkpoint_round = metric.checkpoint_round
+        checkpoint_round: int | None = metric.checkpoint_round
         if checkpoint_round is None:
             raise RuntimeError("smoke metric lacks checkpoint_round")
         manifest_path = layout.score_cell_for_round(

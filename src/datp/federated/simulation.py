@@ -170,47 +170,49 @@ def _init_model_and_params(
     return model, param_module, ndarrays_to_parameters(get_parameters(param_module))
 
 
-def _execute_flower_simulation(
-    cfg: DatpConfig,
-    client_fn: Callable[[Context], Client],
-    num_clients: int,
-    strategy: DatpFedAvg | None,
-    label: str,
-    effective_rounds_max: int,
-) -> None:
-    """Configure Ray, run Flower simulation; Ray lifecycle managed by the backend."""
+@dataclass(frozen=True, slots=True)
+class _FlowerSimParams:
+    cfg: DatpConfig
+    client_fn: Callable[[Context], Client]
+    num_clients: int
+    strategy: DatpFedAvg | None
+    label: str
+    effective_rounds_max: int
+
+
+def _execute_flower_simulation(p: _FlowerSimParams) -> None:
     configure_runtime_env()
-    ensure_ray_memory_threshold(cfg.runtime.ray_memory_threshold)
+    ensure_ray_memory_threshold(p.cfg.runtime.ray_memory_threshold)
     client_resources = derive_client_resources(
         RayClientResourceRequest(
-            per_client_ram_gb=cfg.machine.per_client_ram_gb,
-            reserve_ram_gb=cfg.machine.reserve_ram_gb,
-            max_concurrent_override=cfg.machine.max_concurrent_override,
-            require_cuda=cfg.machine.require_cuda,
-            num_gpus_per_client=cfg.machine.ray_num_gpus_per_client,
+            per_client_ram_gb=p.cfg.machine.per_client_ram_gb,
+            reserve_ram_gb=p.cfg.machine.reserve_ram_gb,
+            max_concurrent_override=p.cfg.machine.max_concurrent_override,
+            require_cuda=p.cfg.machine.require_cuda,
+            num_gpus_per_client=p.cfg.machine.ray_num_gpus_per_client,
         )
     )
     object_store_preflight = check_object_store_capacity(
-        cfg.machine.ray_object_store_mb
+        p.cfg.machine.ray_object_store_mb
     )
     logger.info(
         "ray object-store preflight",
         object_store_mb=object_store_preflight["object_store_mb"],
         available_ram_mb=object_store_preflight["available_ram_mb"],
     )
-    object_store_bytes = cfg.machine.ray_object_store_mb * 1024 * 1024
-    num_rounds = effective_rounds_max
-    round_timeout = cfg.federation.convergence.round_timeout_s
+    object_store_bytes = p.cfg.machine.ray_object_store_mb * 1024 * 1024
+    num_rounds = p.effective_rounds_max
+    round_timeout = p.cfg.federation.convergence.round_timeout_s
 
     def server_fn(_: Context) -> ServerAppComponents:
         return ServerAppComponents(
-            strategy=strategy,
+            strategy=p.strategy,
             config=ServerConfig(num_rounds=num_rounds, round_timeout=round_timeout),
         )
 
     _run_simulation(
-        num_supernodes=num_clients,
-        client_app=ClientApp(client_fn=client_fn),
+        num_supernodes=p.num_clients,
+        client_app=ClientApp(client_fn=p.client_fn),
         server_app=ServerApp(server_fn=server_fn),
         backend_config=cast(
             BackendConfig,
@@ -221,7 +223,7 @@ def _execute_flower_simulation(
         ),
         exit_event=EventType.PYTHON_API_RUN_SIMULATION_LEAVE,
     )
-    logger.info("ray shutdown after FL simulation", label=label)
+    logger.info("ray shutdown after FL simulation", label=p.label)
 
 
 def _convergence_snapshot(monitor: ConvergenceMonitor) -> ConvergenceSnapshot:
@@ -315,13 +317,15 @@ def load_scoring_data(
 
 
 def _checkpoint_dirs_by_round(
-    checkpoint_cfg: CheckpointProtocolConfig | None,
+    cfg: DatpConfig,
     protocol_enabled: bool,
     ckpt_dir: Path,
+    *,
     stage: ExperimentStage,
     seed: int,
 ) -> dict[int, Path]:
-    if checkpoint_cfg is None or not protocol_enabled:
+    checkpoint_cfg = cfg.checkpoint_protocol
+    if not isinstance(checkpoint_cfg, CheckpointProtocolConfig) or not protocol_enabled:
         return {}
 
     from datp.artifacts.layout import ArtifactLayout
@@ -391,6 +395,183 @@ def _score_checkpoint_protocol_rounds(ctx: _CheckpointProtocolContext) -> None:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class _SimulationState:
+    model: Autoencoder
+    param_module: nn.Module
+    strategy: DatpFedAvg
+    monitor: ConvergenceMonitor
+    total_rounds: int
+    converged_round: int | None
+
+
+def _run_training_loop(
+    cfg: DatpConfig,
+    client_data: dict[str, ClientData] | None,
+    seed: int,
+    *,
+    model: Autoencoder,
+    param_module: nn.Module,
+    initial_parameters: Parameters,
+    client_ids: list[str],
+    num_clients: int,
+    device: torch.device,
+    label: str,
+    model_cls: type[Autoencoder],
+    prepared_dir: Path | None,
+    client_config: SimClientConfig,
+    ckpt_dir: Path,
+    ckpt_dir_by_round: dict[int, Path],
+    protocol_enabled: bool,
+    effective_rounds_max: int,
+) -> _SimulationState:
+    strategy = DatpFedAvg.from_config(
+        cfg,
+        initial_parameters=initial_parameters,
+        num_clients=num_clients,
+        effective_rounds_max=effective_rounds_max,
+        checkpoint_disk_dirs=ckpt_dir_by_round or None,
+    )
+    monitor = strategy.convergence_monitor
+
+    with RunLifecycle(ckpt_dir, seed=seed) as lifecycle:
+        client_fn = make_client_fn(
+            (client_data or {}) if prepared_dir is None else {},
+            client_ids,
+            cfg,
+            device,
+            prepared_dir=prepared_dir,
+            model_cls=model_cls,
+            client_cls=client_config.client_cls,
+            extra_kwargs=client_config.client_extra_kwargs,
+            seed=seed,
+        )
+        _execute_flower_simulation(
+            _FlowerSimParams(
+                cfg=cfg,
+                client_fn=client_fn,
+                num_clients=num_clients,
+                strategy=strategy,
+                label=label,
+                effective_rounds_max=effective_rounds_max,
+            )
+        )
+        total_rounds = monitor.num_recorded
+        converged_round = monitor.converged_round
+        logger.info(
+            "FL training complete",
+            label=label,
+            total_rounds=total_rounds,
+            converged_round=converged_round,
+        )
+        save_ctx = _CheckpointSaveContext(
+            model=model,
+            param_module=param_module,
+            strategy=strategy,
+            monitor=monitor,
+            cfg=cfg,
+            lifecycle=lifecycle,
+            total_rounds=total_rounds,
+        )
+        if protocol_enabled:
+            _save_checkpoint_protocol_artifacts(save_ctx, ckpt_dir_by_round)
+        else:
+            _save_training_artifacts(save_ctx, ckpt_dir)
+
+    return _SimulationState(
+        model=model,
+        param_module=param_module,
+        strategy=strategy,
+        monitor=monitor,
+        total_rounds=total_rounds,
+        converged_round=converged_round,
+    )
+
+
+def _run_scoring_phase(
+    state: _SimulationState,
+    cfg: DatpConfig,
+    client_data: dict[str, ClientData] | None,
+    *,
+    prepared_dir: Path | None,
+    protocol_enabled: bool,
+    checkpoint_cfg: CheckpointProtocolConfig | None,
+    ckpt_dir_by_round: dict[int, Path],
+    score_base: Path,
+    stage: ExperimentStage,
+    seed: int,
+    ckpt_dir: Path,
+) -> None:
+    scoring_data = load_scoring_data(client_data, prepared_dir)
+    if protocol_enabled:
+        assert checkpoint_cfg is not None
+        _score_checkpoint_protocol_rounds(
+            _CheckpointProtocolContext(
+                model=state.model,
+                param_module=state.param_module,
+                strategy=state.strategy,
+                checkpoint_cfg=checkpoint_cfg,
+                ckpt_dir_by_round=ckpt_dir_by_round,
+                scoring_data=scoring_data,
+                score_base=score_base,
+                stage=stage,
+                seed=seed,
+                cfg=cfg,
+            )
+        )
+    else:
+        score_clients(
+            model=state.model,
+            client_data=scoring_data,
+            score_base=score_base,
+            stage=stage,
+            seed=seed,
+            dataset=dataset_for_stage(stage),
+            checkpoint_path=ckpt_dir / ArtifactFile.MODEL_CHECKPOINT,
+            checkpoint_round=None,
+            scoring_batch_size=cfg.machine.scoring_batch_size,
+        )
+
+
+def _log_tracking(
+    stage: ExperimentStage,
+    seed: int,
+    label: str,
+    effective_rounds_max: int,
+    state: _SimulationState,
+    ckpt_dir: Path,
+) -> None:
+    log_params(
+        TrackingParams(
+            (
+                TrackingParam(TrackingParamKey.STAGE, stage),
+                TrackingParam(TrackingParamKey.SEED, seed),
+                TrackingParam(TrackingParamKey.ROUNDS_MAX, effective_rounds_max),
+                TrackingParam(TrackingParamKey.LABEL, label),
+            )
+        )
+    )
+    converged_round = state.converged_round
+    log_metrics(
+        TrackingMetrics(
+            (
+                TrackingMetric(
+                    TrackingMetricKey.CONVERGED_ROUND,
+                    float(converged_round)
+                    if converged_round is not None
+                    else float(state.total_rounds),
+                ),
+                TrackingMetric(TrackingMetricKey.TOTAL_ROUNDS, state.total_rounds),
+            )
+        ),
+        step=None,
+        prefix=None,
+    )
+    ckpt_file = ckpt_dir / ArtifactFile.MODEL_CHECKPOINT
+    if ckpt_file.exists():
+        log_artifact(ckpt_file, artifact_path=None)
+
+
 def run_fl_simulation(
     cfg: DatpConfig,
     client_data: dict[str, ClientData] | None,
@@ -412,11 +593,7 @@ def run_fl_simulation(
         else cfg.federation.convergence.rounds_max
     )
 
-    catalog = TrainingClientCatalog(
-        client_data=client_data,
-        prepared_dir=prepared_dir,
-    )
-
+    catalog = TrainingClientCatalog(client_data=client_data, prepared_dir=prepared_dir)
     if prepared_dir is not None:
         catalog.validate_prepared_splits()
 
@@ -426,138 +603,63 @@ def run_fl_simulation(
     model, param_module, initial_parameters = _init_model_and_params(
         cfg, model_cls, device, client_config.encoder_only
     )
-
-    client_ids = catalog.client_ids
-    num_clients = catalog.num_clients
     logger.info(
         "starting FL training",
         label=label,
         stage=stage,
         seed=seed,
-        n_clients=num_clients,
+        n_clients=catalog.num_clients,
     )
 
     ckpt_dir_by_round = _checkpoint_dirs_by_round(
-        checkpoint_cfg, protocol_enabled, ckpt_dir, stage, seed
+        cfg, protocol_enabled, ckpt_dir, stage=stage, seed=seed
     )
 
-    strategy = DatpFedAvg.from_config(
+    state = _run_training_loop(
         cfg,
+        client_data,
+        seed,
+        model=model,
+        param_module=param_module,
         initial_parameters=initial_parameters,
-        num_clients=num_clients,
+        client_ids=catalog.client_ids,
+        num_clients=catalog.num_clients,
+        device=device,
+        label=label,
+        model_cls=model_cls,
+        prepared_dir=prepared_dir,
+        client_config=client_config,
+        ckpt_dir=ckpt_dir,
+        ckpt_dir_by_round=ckpt_dir_by_round,
+        protocol_enabled=protocol_enabled,
         effective_rounds_max=effective_rounds_max,
-        checkpoint_disk_dirs=ckpt_dir_by_round or None,
     )
-    monitor = strategy.convergence_monitor
-    converged_round: int | None = None
-    total_rounds = 0
-
-    with RunLifecycle(ckpt_dir, seed=seed) as lifecycle:
-        client_fn = make_client_fn(
-            (client_data or {}) if prepared_dir is None else {},
-            client_ids,
-            cfg,
-            device,
-            prepared_dir=prepared_dir,
-            model_cls=model_cls,
-            client_cls=client_config.client_cls,
-            extra_kwargs=client_config.client_extra_kwargs,
-            seed=seed,
-        )
-
-        _execute_flower_simulation(
-            cfg, client_fn, num_clients, strategy, label, effective_rounds_max
-        )
-
-        total_rounds = monitor.num_recorded
-        converged_round = monitor.converged_round
-        logger.info(
-            "FL training complete",
-            label=label,
-            total_rounds=total_rounds,
-            converged_round=converged_round,
-        )
-
-        save_ctx = _CheckpointSaveContext(
-            model=model,
-            param_module=param_module,
-            strategy=strategy,
-            monitor=monitor,
-            cfg=cfg,
-            lifecycle=lifecycle,
-            total_rounds=total_rounds,
-        )
-        if protocol_enabled:
-            _save_checkpoint_protocol_artifacts(save_ctx, ckpt_dir_by_round)
-        else:
-            _save_training_artifacts(save_ctx, ckpt_dir)
 
     if client_config.score_after:
-        scoring_data = load_scoring_data(client_data, prepared_dir)
-        if protocol_enabled:
-            assert checkpoint_cfg is not None
-            _score_checkpoint_protocol_rounds(
-                _CheckpointProtocolContext(
-                    model=model,
-                    param_module=param_module,
-                    strategy=strategy,
-                    checkpoint_cfg=checkpoint_cfg,
-                    ckpt_dir_by_round=ckpt_dir_by_round,
-                    scoring_data=scoring_data,
-                    score_base=score_base,
-                    stage=stage,
-                    seed=seed,
-                    cfg=cfg,
-                )
-            )
-        else:
-            score_clients(
-                model=model,
-                client_data=scoring_data,
-                score_base=score_base,
-                stage=stage,
-                seed=seed,
-                dataset=dataset_for_stage(stage),
-                checkpoint_path=ckpt_dir / ArtifactFile.MODEL_CHECKPOINT,
-                checkpoint_round=None,
-                scoring_batch_size=cfg.machine.scoring_batch_size,
-            )
-
-    log_params(
-        TrackingParams(
-            (
-                TrackingParam(TrackingParamKey.STAGE, stage),
-                TrackingParam(TrackingParamKey.SEED, seed),
-                TrackingParam(TrackingParamKey.ROUNDS_MAX, effective_rounds_max),
-                TrackingParam(TrackingParamKey.LABEL, label),
-            )
+        _run_scoring_phase(
+            state,
+            cfg,
+            client_data,
+            prepared_dir=prepared_dir,
+            protocol_enabled=protocol_enabled,
+            checkpoint_cfg=checkpoint_cfg
+            if isinstance(checkpoint_cfg, CheckpointProtocolConfig)
+            else None,
+            ckpt_dir_by_round=ckpt_dir_by_round,
+            score_base=score_base,
+            stage=stage,
+            seed=seed,
+            ckpt_dir=ckpt_dir,
         )
-    )
-    log_metrics(
-        TrackingMetrics(
-            (
-                TrackingMetric(
-                    TrackingMetricKey.CONVERGED_ROUND,
-                    float(converged_round)
-                    if converged_round is not None
-                    else float(total_rounds),
-                ),
-                TrackingMetric(TrackingMetricKey.TOTAL_ROUNDS, total_rounds),
-            )
-        ),
-        step=None,
-        prefix=None,
-    )
-    ckpt_file = ckpt_dir / ArtifactFile.MODEL_CHECKPOINT
-    if ckpt_file.exists():
-        log_artifact(ckpt_file, artifact_path=None)
+
+    _log_tracking(stage, seed, label, effective_rounds_max, state, ckpt_dir)
 
     return TrainingResult(
         stage=stage,
         seed=seed,
-        converged_round=converged_round,
-        total_rounds=total_rounds,
+        converged_round=state.converged_round,
+        total_rounds=state.total_rounds,
         checkpoint_dir=ckpt_dir,
         score_dir=score_base,
-        loss_history=monitor.loss_history,
+        loss_history=state.monitor.loss_history,
     )
