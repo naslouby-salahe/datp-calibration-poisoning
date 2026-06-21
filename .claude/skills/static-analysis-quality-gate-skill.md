@@ -158,7 +158,7 @@ The affected surface must have:
 19. No hardcoded scientific parameters.
 20. No hardcoded artifact path fragments.
 21. No hardcoded metric keys.
-22. No repeated baseline, regime, stage, status, or artifact type strings.
+22. No repeated policy, stage, source, status, or artifact type strings.
 23. No scattered configs.
 24. No scattered constants.
 25. No scattered enums.
@@ -265,8 +265,8 @@ Repeated literals must be centralized according to meaning:
 3. Artifact filenames belong in artifact constants.
 4. Directory names belong in artifact directory/path modules.
 5. Metric keys belong in metric key modules.
-6. Baseline names belong in baseline enums.
-7. Regime names belong in regime enums.
+6. Policy names belong in policy enums.
+7. Source strategy names belong in source strategy enums.
 8. Stage names belong in stage enums.
 9. Status names belong in status enums.
 10. Scientific values belong in config.

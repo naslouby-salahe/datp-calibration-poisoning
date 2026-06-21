@@ -179,7 +179,7 @@ If the experiment requires unavailable data or a user action:
 1. Stop.
 2. Stop and tell the user exactly what action is required.
 3. Record the blocker.
-     human-intervention tracker; do not assume one exists in this CP2 tree
+     human-intervention tracker; do not assume one exists in this codebase
 4. State exactly what the user must provide.
 5. State where it must be placed.
 6. State which command or ticket becomes unblocked afterward.
@@ -194,7 +194,7 @@ Do not mark partial outputs as complete.
 
 Rerun only what is necessary.
 
-Do not rerun entire regimes if a smaller failed cell can be safely repaired and rerun.
+Do not rerun entire sweeps if a smaller failed cell can be safely repaired and rerun.
 
 Do not rerun completed valid cells unless:
 
@@ -213,7 +213,7 @@ Stop immediately if:
 1. The command violates `CLAUDE.md`.
 2. The experiment is not authorized.
 3. Scores are being recomputed incorrectly.
-4. Training occurs per threshold baseline.
+4. Training occurs per threshold policy.
 5. Results look scientifically invalid.
 6. Logs show uncontrolled failure loops.
 7. The fix would require changing scientific scope.

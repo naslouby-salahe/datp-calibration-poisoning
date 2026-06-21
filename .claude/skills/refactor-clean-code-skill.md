@@ -106,7 +106,7 @@ Use names such as:
 3. `calibration_errors`
 4. `benign_scores`
 5. `attack_scores`
-6. `regime_alpha`
+6. `attack_objective`
 7. `run_identity`
 8. `score_manifest`
 9. `threshold_summary`

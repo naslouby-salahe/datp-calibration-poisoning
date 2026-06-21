@@ -82,7 +82,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 1. Find methodological loopholes.
 2. Find scientific overclaims.
-3. Find missing baselines.
+3. Find missing policy comparisons.
 4. Find unfair comparisons.
 5. Find artifact inconsistencies.
 6. Find weak tests.

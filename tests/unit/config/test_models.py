@@ -287,20 +287,13 @@ class TestThresholdConfig:
 
 class TestExperimentConfig:
     def test_valid_construction(self) -> None:
-        e = ExperimentConfig(
-            seeds=[0, 1, 2],
-            absorption_strong_retention=0.75,
-            absorption_partial=0.25,
-        )
+        e = ExperimentConfig(seeds=[0, 1, 2])
         assert e.seeds == [0, 1, 2]
-        assert abs(e.absorption_strong_retention - 0.75) < 1e-9
 
     def test_extra_forbidden(self) -> None:
         with pytest.raises(ValidationError, match="extra"):
             ExperimentConfig(  # type: ignore[call-arg]
                 seeds=[0, 1, 2],
-                absorption_strong_retention=0.75,
-                absorption_partial=0.25,
                 bogus=1,  # type: ignore[call-arg]
             )
 

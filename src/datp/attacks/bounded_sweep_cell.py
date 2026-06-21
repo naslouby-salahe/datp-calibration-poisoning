@@ -1,6 +1,6 @@
-"""Real-data bounded sweep cell runner.
+"""Real-data bounded sweep cell runner for the N-BaIoT main matrix.
 
-Orchestrates the real-data bounded matrix on ``REGIME_A_NBAIOT`` using the same
+Orchestrates one (policy, source, fraction, victim, seed) cell using the same
 tested primitives as the synthetic smoke harness
 (``datp.attacks.cell_runner``). The key difference from the smoke harness:
 ``mu_flag_threshold`` is locked once per training seed from the *clean GLOBAL_THRESHOLD*

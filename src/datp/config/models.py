@@ -159,8 +159,6 @@ class ThresholdConfig(BaseModel):
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     seeds: list[int]
-    absorption_strong_retention: float = 0.0
-    absorption_partial: float = 0.0
 
 
 class StatisticsConfig(BaseModel):

@@ -361,7 +361,7 @@ def test_invariant_9_manifest_round_trip(collection, tmp_path):
     )
     manifest = build_manifest(
         ManifestBuildRequest(
-            dataset="REGIME_SMOKE_SYNTHETIC",
+            dataset="synthetic",
             stage=ExperimentStage.SYNTHETIC_SMOKE,
             policy=ThresholdPolicy.LOCAL_THRESHOLD,
             objective=AttackerObjective.THRESHOLD_RAISE,
@@ -395,7 +395,7 @@ def test_invariant_9_manifest_round_trip(collection, tmp_path):
 def test_invariant_9_manifest_requires_locked_mu_flag(tmp_path):
     manifest = build_manifest(
         ManifestBuildRequest(
-            dataset="REGIME_SMOKE_SYNTHETIC",
+            dataset="synthetic",
             stage=ExperimentStage.SYNTHETIC_SMOKE,
             policy=ThresholdPolicy.LOCAL_THRESHOLD,
             objective=AttackerObjective.THRESHOLD_RAISE,
@@ -575,7 +575,7 @@ def test_roadmap_outputs_in_temp_only(collection, tmp_path, monkeypatch):
     )
     manifest = build_manifest(
         ManifestBuildRequest(
-            dataset="REGIME_SMOKE_SYNTHETIC",
+            dataset="synthetic",
             stage=ExperimentStage.SYNTHETIC_SMOKE,
             policy=ThresholdPolicy.LOCAL_THRESHOLD,
             objective=AttackerObjective.THRESHOLD_RAISE,

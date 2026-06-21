@@ -34,7 +34,7 @@ Maintain:
 5. No path drift
 6. No missing artifact loop
 7. No invalid metric pattern
-8. No baseline retraining violation
+8. No calibration data retraining violation
 9. No unexpected overwrite
 10. No silent partial success
 

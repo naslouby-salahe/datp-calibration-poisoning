@@ -19,7 +19,7 @@ class TestCanonicalIdentityTypes:
         assert dataclasses.is_dataclass(TrainingCellId)
         assert TrainingCellId.__dataclass_params__.frozen  # type: ignore[attr-defined]
 
-    def test_baseline_run_id_is_frozen_dataclass(self) -> None:
+    def test_policy_run_id_is_frozen_dataclass(self) -> None:
         from datp.core.identity import PolicyRunId
 
         assert dataclasses.is_dataclass(PolicyRunId)
@@ -209,7 +209,7 @@ class TestArtifactPathContracts:
                 f"ArtifactLayout must expose {method!r}"
             )
 
-    def test_baseline_run_paths_has_run(self) -> None:
+    def test_policy_run_paths_has_run(self) -> None:
         from datp.artifacts.layout import PolicyRunPaths
         from datp.core.identity import PolicyRunId
 
@@ -221,7 +221,7 @@ class TestArtifactPathContracts:
             f"PolicyRunPaths.run must be PolicyRunId, got {hints['run']}"
         )
 
-    def test_baseline_run_paths_has_metrics_path(self) -> None:
+    def test_policy_run_paths_has_metrics_path(self) -> None:
         from datp.artifacts.layout import PolicyRunPaths
 
         field_names = {f.name for f in dataclasses.fields(PolicyRunPaths)}
@@ -229,7 +229,7 @@ class TestArtifactPathContracts:
             "PolicyRunPaths must have metrics_path field"
         )
 
-    def test_baseline_run_paths_has_result_dir_and_log_dir(self) -> None:
+    def test_policy_run_paths_has_result_dir_and_log_dir(self) -> None:
         from datp.artifacts.layout import PolicyRunPaths
 
         field_names = {f.name for f in dataclasses.fields(PolicyRunPaths)}

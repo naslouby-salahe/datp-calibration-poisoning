@@ -123,17 +123,17 @@ def emit_flat_cv_tpr_warnings(
 
 def _emit_local_utility_warning(
     cell_key: tuple[ExperimentStage, int],
-    b1: "_CellPanel",
-    b2: "_CellPanel",
+    global_panel: "_CellPanel",
+    local_panel: "_CellPanel",
     warnings: list[WarningRecord],
 ) -> None:
     stage, seed = cell_key
     worsened: list[str] = []
-    if _is_worsened(b1.macro_f1_mean, b2.macro_f1_mean):
+    if _is_worsened(global_panel.macro_f1_mean, local_panel.macro_f1_mean):
         worsened.append("macro_f1_mean")
-    if _is_worsened(b1.auroc_mean, b2.auroc_mean):
+    if _is_worsened(global_panel.auroc_mean, local_panel.auroc_mean):
         worsened.append("auroc_mean")
-    if _is_worsened(b1.pr_auc_mean, b2.pr_auc_mean):
+    if _is_worsened(global_panel.pr_auc_mean, local_panel.pr_auc_mean):
         worsened.append("pr_auc_mean")
     if worsened:
         warnings.append(
@@ -147,11 +147,11 @@ def _emit_local_utility_warning(
 
 def check_local_threshold_utility_tradeoff(
     cell_key: tuple[ExperimentStage, int],
-    b1: "_CellPanel",
-    b2: "_CellPanel",
+    global_panel: "_CellPanel",
+    local_panel: "_CellPanel",
     warnings: list[WarningRecord],
 ) -> None:
-    _emit_local_utility_warning(cell_key, b1, b2, warnings)
+    _emit_local_utility_warning(cell_key, global_panel, local_panel, warnings)
 
 
 def emit_ciciot_homogeneity_warnings(

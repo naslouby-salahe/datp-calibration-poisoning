@@ -194,7 +194,7 @@ Examples of concepts that deserve typed objects:
 Before moving or creating anything, determine the owner:
 
 1. Scientific parameter: config.
-2. Baseline/regime/stage/status: enum.
+2. Policy/stage/status: enum.
 3. Artifact filename/path/marker: artifact module.
 4. Metric key: evaluation metric key owner.
 5. Dataset schema: data schema owner.

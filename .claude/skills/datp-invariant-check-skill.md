@@ -24,7 +24,7 @@ Do not rely on memory. Do not rely on archived or stale roadmap context.
 
 ## 2. Core Scientific Invariants
 
-Check these whenever touching CP2 code:
+Check these whenever touching datp-cp code:
 
 1. Calibration-channel poisoning only — never poison training data, model weights, aggregation, or test data.
 2. Injection rule is `REPLACE_FIXED_BUDGET`: replace `m_i = max(1, round(f·n_i))` positions with values resampled **with replacement** from the victim-local reservoir.

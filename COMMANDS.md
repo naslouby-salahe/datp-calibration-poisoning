@@ -30,7 +30,7 @@ make check
 Run ruff, pyright, and the full test suite. Use this before any commit.
 
 ```bash
-datp config preview --regime=<R> --baseline=<B> --seed=<S> [--alpha=<A>]
+datp config preview --stage=<S> --policy=<P> --seed=<N>
 ```
 Preview resolved config for any experiment cell.
 
@@ -90,7 +90,7 @@ Build datp-cp report artifacts from completed outputs. Writes figures, tables, a
 ```bash
 make status
 ```
-Show complete/missing/aborted counts per regime. < 1 min.
+Show complete/missing/aborted counts per stage. < 1 min.
 
 ```bash
 make audit-results

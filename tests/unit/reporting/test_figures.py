@@ -24,10 +24,10 @@ def _synthetic_per_device_fpr() -> dict[str, float]:
 
 
 def test_figure1_creates_png(tmp_path: Path) -> None:
-    fpr_b1 = _synthetic_per_device_fpr()
-    fpr_b2 = _synthetic_per_device_fpr()
+    fpr_global = _synthetic_per_device_fpr()
+    fpr_local = _synthetic_per_device_fpr()
     path = generate_figure1(
-        fpr_b1, fpr_b2, tmp_path, seed=0, style=BASE_CONFIG.reporting.style
+        fpr_global, fpr_local, tmp_path, seed=0, style=BASE_CONFIG.reporting.style
     )
     assert path.exists()
     assert path.suffix == ".png"
@@ -76,10 +76,10 @@ def test_figure4_creates_png(tmp_path: Path) -> None:
 
 
 def test_figure_dpi_minimum(tmp_path: Path) -> None:
-    fpr_b1 = _synthetic_per_device_fpr()
-    fpr_b2 = _synthetic_per_device_fpr()
+    fpr_global = _synthetic_per_device_fpr()
+    fpr_local = _synthetic_per_device_fpr()
     path = generate_figure1(
-        fpr_b1, fpr_b2, tmp_path, seed=99, style=BASE_CONFIG.reporting.style
+        fpr_global, fpr_local, tmp_path, seed=99, style=BASE_CONFIG.reporting.style
     )
     img = Image.open(path)
     dpi = img.info.get("dpi", (72, 72))

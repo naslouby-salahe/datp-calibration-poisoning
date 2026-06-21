@@ -85,10 +85,10 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/score_containers.py", "ScoreCollection", "_eligible_result"),
         # TrackingPayload (if any)
         ("core/tracking.py", "_TrackingPayload", "payload"),
-        # ScoreCellPaths/BaselineRunPaths: None = "standard run, not a checkpoint-protocol run"
+        # ScoreCellPaths/PolicyRunPaths: None = "standard run, not a checkpoint-protocol run"
         # checkpoint_round is set only for checkpoint-protocol cells; None is the normal case
         ("artifacts/layout.py", "ScoreCellPaths", "checkpoint_round"),
-        ("artifacts/layout.py", "BaselineRunPaths", "checkpoint_round"),
+        ("artifacts/layout.py", "PolicyRunPaths", "checkpoint_round"),
         # DatasetSpec: optional per-dataset fields; not all datasets use all fields
         ("data/catalog.py", "DatasetSpec", "cap_policy"),
         ("data/catalog.py", "DatasetSpec", "family_map"),

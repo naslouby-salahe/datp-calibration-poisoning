@@ -63,7 +63,7 @@ def test_strategy_log_only_mode_does_not_enter_stopped_state() -> None:
     assert strategy.stopped is False
 
 
-def test_checkpoint_save_schedule_and_b4_k_are_fixed() -> None:
+def test_checkpoint_save_schedule_k_are_fixed() -> None:
     import pytest
 
     if BASE_CONFIG.checkpoint_protocol is None:

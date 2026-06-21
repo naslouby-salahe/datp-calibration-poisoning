@@ -41,9 +41,9 @@ Consider:
 2. Missing files.
 3. Missing columns.
 4. Invalid config.
-5. Invalid baseline.
-6. Invalid regime.
-7. Invalid stage.
+5. Invalid policy.
+6. Invalid stage.
+7. Invalid source.
 8. Invalid seed.
 9. Missing alpha.
 10. Calibration-pending clients.

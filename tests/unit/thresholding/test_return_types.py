@@ -193,7 +193,7 @@ def test_score_cell_paths_is_frozen_dataclass():
     assert ScoreCellPaths.__dataclass_params__.frozen  # type: ignore[attr-defined]
 
 
-def test_baseline_run_paths_is_frozen_dataclass():
+def test_policy_run_paths_is_frozen_dataclass():
     from datp.artifacts.layout import PolicyRunPaths
 
     assert dataclasses.is_dataclass(PolicyRunPaths)

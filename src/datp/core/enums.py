@@ -131,36 +131,6 @@ class ScoringStage(enum.StrEnum):
 SCORING_STAGES: tuple[ScoringStage, ...] = ScoringStage.all()
 
 
-class AbsorptionClass(enum.StrEnum):
-    """Absorption ratio classification per scientific protocol.
-
-    Ratio = Δ_local / Δ_global under the paired clean-threshold comparison.
-    """
-
-    STRONG_LOCAL_RETENTION = "strong_local_retention"
-    PARTIAL_ABSORPTION = "partial_absorption"
-    NEAR_FULL_ABSORPTION = "near_full_absorption"
-
-
-def classify_absorption(
-    ratio: float,
-    *,
-    strong_retention_threshold: float,
-    partial_threshold: float,
-) -> AbsorptionClass:
-    """Classify absorption ratio into the locked categories.
-
-    Thresholds are config-driven — read from
-    ``ExperimentConfig.absorption_strong_retention`` and
-    ``ExperimentConfig.absorption_partial``. Do not hardcode.
-    """
-    if ratio >= strong_retention_threshold:
-        return AbsorptionClass.STRONG_LOCAL_RETENTION
-    if ratio >= partial_threshold:
-        return AbsorptionClass.PARTIAL_ABSORPTION
-    return AbsorptionClass.NEAR_FULL_ABSORPTION
-
-
 # Derived maps — do not duplicate in other modules; import from here.
 
 MAIN_BODY_POLICIES: frozenset[ThresholdPolicy] = frozenset(
@@ -199,9 +169,6 @@ CLUSTER_FINGERPRINT_FEATURES: tuple[str, ...] = ("mean", "std", "skew", "p95")
 
 class RunKind(enum.StrEnum):
     CORE_LADDER = "core_ladder"
-    STRESS_TEST = "stress_test"
-    CENTRALIZED_REFERENCE = "centralized_reference"
-    COMPARATOR = "comparator"
 
 
 class SeedScope(enum.StrEnum):

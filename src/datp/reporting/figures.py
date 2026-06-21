@@ -46,17 +46,17 @@ def _policy_color(policy: ThresholdPolicy, style: StyleConfig) -> str:
 
 
 def generate_figure1(
-    per_device_fpr_b1: dict[str, float],
-    per_device_fpr_b2: dict[str, float],
+    per_device_fpr_global: dict[str, float],
+    per_device_fpr_local: dict[str, float],
     output_dir: Path,
     seed: int,
     style: StyleConfig,
 ) -> Path:
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size  # type: ignore[index]
 
-    devices = sorted(per_device_fpr_b1.keys())
-    fpr_b1 = [per_device_fpr_b1[d] for d in devices]
-    fpr_b2 = [per_device_fpr_b2[d] for d in devices]
+    devices = sorted(per_device_fpr_global.keys())
+    fpr_global = [per_device_fpr_global[d] for d in devices]
+    fpr_local = [per_device_fpr_local[d] for d in devices]
     labels = [NBAIOT_DEVICE_SHORT_LABELS.get(d, d.replace("_", " ")) for d in devices]
 
     x = np.arange(len(devices))
@@ -65,14 +65,14 @@ def generate_figure1(
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
     ax.bar(
         x - width / 2,
-        fpr_b1,
+        fpr_global,
         width,
         label=_policy_label(ThresholdPolicy.GLOBAL_THRESHOLD, style),
         color=_policy_color(ThresholdPolicy.GLOBAL_THRESHOLD, style),
     )
     ax.bar(
         x + width / 2,
-        fpr_b2,
+        fpr_local,
         width,
         label=_policy_label(ThresholdPolicy.LOCAL_THRESHOLD, style),
         color=_policy_color(ThresholdPolicy.LOCAL_THRESHOLD, style),

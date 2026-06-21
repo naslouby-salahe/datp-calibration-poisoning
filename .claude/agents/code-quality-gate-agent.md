@@ -124,7 +124,7 @@ Block completion if any of the following remain in the affected surface:
 25. Hardcoded artifact paths.
 26. Hardcoded filenames.
 27. Hardcoded metric keys.
-28. Hardcoded stage, baseline, regime, or status names.
+28. Hardcoded stage, policy, source, or status names.
 29. Long methods.
 30. Large methods.
 31. Cognitive complexity violations.
@@ -159,7 +159,7 @@ Preserve these invariants unless a ticket explicitly and scientifically changes 
 
 1. Fixed encoder and FedAvg remain fixed where the controlled comparison requires it.
 2. Threshold scope is the controlled scientific variable for GLOBAL_THRESHOLD-CLUSTER_THRESHOLD.
-3. Shared training is preserved for fixed dataset, regime, seed, and alpha.
+3. Shared training is preserved for fixed dataset, stage, seed, and policy.
 4. Scores are reused by thresholds and evaluations.
 5. Thresholding must not retrain upstream models.
 6. Scientific parameters come from config.

@@ -99,7 +99,7 @@ _METRICS_SOURCE_FILES = (
 
 
 class AuditOutputName(enum.StrEnum):
-    BASELINE_INVARIANTS = "baseline_invariants"
+    POLICY_INVARIANTS = "policy_invariants"
     RUN_MANIFEST = "run_manifest"
     SEED_DELTAS = "seed_deltas"
     PER_CLIENT_METRICS = "per_client_metrics"
@@ -150,76 +150,76 @@ class DatasetPartitionAuditPayload:
 def _build_seed_delta_record(
     stage: ExperimentStage,
     seed: int,
-    b1: _CellPanel,
-    b2: _CellPanel,
-    b4: _CellPanel,
+    global_panel: _CellPanel,
+    local_panel: _CellPanel,
+    cluster_panel: _CellPanel,
 ) -> SeedDeltaRecord:
     return SeedDeltaRecord(
         stage=stage,
         seed=seed,
-        global_cv_fpr=b1.cv_fpr,
-        local_cv_fpr=b2.cv_fpr,
-        cluster_cv_fpr=b4.cv_fpr,
-        global_cv_tpr=b1.cv_tpr,
-        local_cv_tpr=b2.cv_tpr,
-        cluster_cv_tpr=b4.cv_tpr,
-        global_macro_f1_mean=b1.macro_f1_mean,
-        local_macro_f1_mean=b2.macro_f1_mean,
-        cluster_macro_f1_mean=b4.macro_f1_mean,
-        global_macro_f1_p10=b1.macro_f1_p10,
-        local_macro_f1_p10=b2.macro_f1_p10,
-        cluster_macro_f1_p10=b4.macro_f1_p10,
-        global_auroc_mean=b1.auroc_mean,
-        local_auroc_mean=b2.auroc_mean,
-        cluster_auroc_mean=b4.auroc_mean,
-        global_pr_auc_mean=b1.pr_auc_mean,
-        local_pr_auc_mean=b2.pr_auc_mean,
-        cluster_pr_auc_mean=b4.pr_auc_mean,
-        global_mean_fpr=b1.mean_fpr,
-        local_mean_fpr=b2.mean_fpr,
-        cluster_mean_fpr=b4.mean_fpr,
-        global_std_fpr=b1.std_fpr,
-        local_std_fpr=b2.std_fpr,
-        cluster_std_fpr=b4.std_fpr,
-        global_iqr_fpr=b1.iqr_fpr,
-        local_iqr_fpr=b2.iqr_fpr,
-        cluster_iqr_fpr=b4.iqr_fpr,
-        global_worst_client_fpr=b1.worst_client_fpr,
-        local_worst_client_fpr=b2.worst_client_fpr,
-        cluster_worst_client_fpr=b4.worst_client_fpr,
-        global_worst_client_tpr=b1.worst_client_tpr,
-        local_worst_client_tpr=b2.worst_client_tpr,
-        cluster_worst_client_tpr=b4.worst_client_tpr,
-        global_worst_client_macro_f1=b1.worst_client_macro_f1,
-        local_worst_client_macro_f1=b2.worst_client_macro_f1,
-        cluster_worst_client_macro_f1=b4.worst_client_macro_f1,
-        global_worst_client_balanced_accuracy=b1.worst_client_balanced_accuracy,
-        local_worst_client_balanced_accuracy=b2.worst_client_balanced_accuracy,
-        cluster_worst_client_balanced_accuracy=b4.worst_client_balanced_accuracy,
-        delta_cv_fpr_global_minus_local=_safe_diff(b1.cv_fpr, b2.cv_fpr),
-        delta_cv_fpr_global_minus_cluster=_safe_diff(b1.cv_fpr, b4.cv_fpr),
-        delta_cv_tpr_global_minus_local=_safe_diff(b1.cv_tpr, b2.cv_tpr),
-        delta_cv_tpr_global_minus_cluster=_safe_diff(b1.cv_tpr, b4.cv_tpr),
-        delta_macro_f1_global_minus_local=_safe_diff(b1.macro_f1_mean, b2.macro_f1_mean),
-        delta_macro_f1_global_minus_cluster=_safe_diff(b1.macro_f1_mean, b4.macro_f1_mean),
-        delta_pr_auc_global_minus_local=_safe_diff(b1.pr_auc_mean, b2.pr_auc_mean),
-        delta_pr_auc_global_minus_cluster=_safe_diff(b1.pr_auc_mean, b4.pr_auc_mean),
-        delta_auroc_global_minus_local=_safe_diff(b1.auroc_mean, b2.auroc_mean),
-        delta_auroc_global_minus_cluster=_safe_diff(b1.auroc_mean, b4.auroc_mean),
-        global_convergence_round=b1.convergence_round,
-        local_convergence_round=b2.convergence_round,
-        cluster_convergence_round=b4.convergence_round,
-        global_tau_global=b1.tau_global,
-        local_tau_global=b2.tau_global,
-        cluster_tau_global=b4.tau_global,
+        global_cv_fpr=global_panel.cv_fpr,
+        local_cv_fpr=local_panel.cv_fpr,
+        cluster_cv_fpr=cluster_panel.cv_fpr,
+        global_cv_tpr=global_panel.cv_tpr,
+        local_cv_tpr=local_panel.cv_tpr,
+        cluster_cv_tpr=cluster_panel.cv_tpr,
+        global_macro_f1_mean=global_panel.macro_f1_mean,
+        local_macro_f1_mean=local_panel.macro_f1_mean,
+        cluster_macro_f1_mean=cluster_panel.macro_f1_mean,
+        global_macro_f1_p10=global_panel.macro_f1_p10,
+        local_macro_f1_p10=local_panel.macro_f1_p10,
+        cluster_macro_f1_p10=cluster_panel.macro_f1_p10,
+        global_auroc_mean=global_panel.auroc_mean,
+        local_auroc_mean=local_panel.auroc_mean,
+        cluster_auroc_mean=cluster_panel.auroc_mean,
+        global_pr_auc_mean=global_panel.pr_auc_mean,
+        local_pr_auc_mean=local_panel.pr_auc_mean,
+        cluster_pr_auc_mean=cluster_panel.pr_auc_mean,
+        global_mean_fpr=global_panel.mean_fpr,
+        local_mean_fpr=local_panel.mean_fpr,
+        cluster_mean_fpr=cluster_panel.mean_fpr,
+        global_std_fpr=global_panel.std_fpr,
+        local_std_fpr=local_panel.std_fpr,
+        cluster_std_fpr=cluster_panel.std_fpr,
+        global_iqr_fpr=global_panel.iqr_fpr,
+        local_iqr_fpr=local_panel.iqr_fpr,
+        cluster_iqr_fpr=cluster_panel.iqr_fpr,
+        global_worst_client_fpr=global_panel.worst_client_fpr,
+        local_worst_client_fpr=local_panel.worst_client_fpr,
+        cluster_worst_client_fpr=cluster_panel.worst_client_fpr,
+        global_worst_client_tpr=global_panel.worst_client_tpr,
+        local_worst_client_tpr=local_panel.worst_client_tpr,
+        cluster_worst_client_tpr=cluster_panel.worst_client_tpr,
+        global_worst_client_macro_f1=global_panel.worst_client_macro_f1,
+        local_worst_client_macro_f1=local_panel.worst_client_macro_f1,
+        cluster_worst_client_macro_f1=cluster_panel.worst_client_macro_f1,
+        global_worst_client_balanced_accuracy=global_panel.worst_client_balanced_accuracy,
+        local_worst_client_balanced_accuracy=local_panel.worst_client_balanced_accuracy,
+        cluster_worst_client_balanced_accuracy=cluster_panel.worst_client_balanced_accuracy,
+        delta_cv_fpr_global_minus_local=_safe_diff(global_panel.cv_fpr, local_panel.cv_fpr),
+        delta_cv_fpr_global_minus_cluster=_safe_diff(global_panel.cv_fpr, cluster_panel.cv_fpr),
+        delta_cv_tpr_global_minus_local=_safe_diff(global_panel.cv_tpr, local_panel.cv_tpr),
+        delta_cv_tpr_global_minus_cluster=_safe_diff(global_panel.cv_tpr, cluster_panel.cv_tpr),
+        delta_macro_f1_global_minus_local=_safe_diff(global_panel.macro_f1_mean, local_panel.macro_f1_mean),
+        delta_macro_f1_global_minus_cluster=_safe_diff(global_panel.macro_f1_mean, cluster_panel.macro_f1_mean),
+        delta_pr_auc_global_minus_local=_safe_diff(global_panel.pr_auc_mean, local_panel.pr_auc_mean),
+        delta_pr_auc_global_minus_cluster=_safe_diff(global_panel.pr_auc_mean, cluster_panel.pr_auc_mean),
+        delta_auroc_global_minus_local=_safe_diff(global_panel.auroc_mean, local_panel.auroc_mean),
+        delta_auroc_global_minus_cluster=_safe_diff(global_panel.auroc_mean, cluster_panel.auroc_mean),
+        global_convergence_round=global_panel.convergence_round,
+        local_convergence_round=local_panel.convergence_round,
+        cluster_convergence_round=cluster_panel.convergence_round,
+        global_tau_global=global_panel.tau_global,
+        local_tau_global=local_panel.tau_global,
+        cluster_tau_global=cluster_panel.tau_global,
         coverage_ratio=str(
-            b1.coverage_ratio
-            or b2.coverage_ratio
-            or b4.coverage_ratio
+            global_panel.coverage_ratio
+            or local_panel.coverage_ratio
+            or cluster_panel.coverage_ratio
             or DEFAULT_COVERAGE_RATIO
         ),
         status=AuditStatus.PASS
-        if (b1.cv_fpr is not None and b2.cv_fpr is not None)
+        if (global_panel.cv_fpr is not None and local_panel.cv_fpr is not None)
         else AuditStatus.BLOCKED_PENDING_RUN,
     )
 
@@ -231,11 +231,11 @@ def _build_seed_deltas(
     # Side effect: emits LOCAL_UTILITY_TRADEOFF warnings.
     out: list[SeedDeltaRecord] = []
     for stage, seed in sorted({(s, sd) for s, sd, _ in cell_panel}):
-        b1 = cell_panel.get((stage, seed, ThresholdPolicy.GLOBAL_THRESHOLD), _CellPanel.empty())
-        b2 = cell_panel.get((stage, seed, ThresholdPolicy.LOCAL_THRESHOLD), _CellPanel.empty())
-        b4 = cell_panel.get((stage, seed, ThresholdPolicy.CLUSTER_THRESHOLD), _CellPanel.empty())
-        out.append(_build_seed_delta_record(stage, seed, b1, b2, b4))
-        _check_local_threshold_utility_tradeoff((stage, seed), b1, b2, warnings)
+        global_panel = cell_panel.get((stage, seed, ThresholdPolicy.GLOBAL_THRESHOLD), _CellPanel.empty())
+        local_panel = cell_panel.get((stage, seed, ThresholdPolicy.LOCAL_THRESHOLD), _CellPanel.empty())
+        cluster_panel = cell_panel.get((stage, seed, ThresholdPolicy.CLUSTER_THRESHOLD), _CellPanel.empty())
+        out.append(_build_seed_delta_record(stage, seed, global_panel, local_panel, cluster_panel))
+        _check_local_threshold_utility_tradeoff((stage, seed), global_panel, local_panel, warnings)
     return out
 
 
@@ -410,7 +410,7 @@ def _audit_output_paths(audit_dir: Path) -> AuditOutputPaths:
     return AuditOutputPaths(
         paths=(
             AuditOutputPath(
-                AuditOutputName.BASELINE_INVARIANTS,
+                AuditOutputName.POLICY_INVARIANTS,
                 audit_dir / POLICY_INVARIANTS_JSON,
             ),
             AuditOutputPath(AuditOutputName.RUN_MANIFEST, audit_dir / RUN_MANIFEST_CSV),
