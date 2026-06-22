@@ -250,6 +250,7 @@ def _frozen_scaler_thresholds(
 
     km = KMeans(
         n_clusters=k,
+        init="k-means++",
         random_state=random_state,
         n_init=int(n_init),  # type: ignore[arg-type]
         max_iter=int(max_iter),

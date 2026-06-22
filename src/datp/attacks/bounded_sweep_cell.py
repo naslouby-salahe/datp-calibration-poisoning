@@ -2,11 +2,10 @@
 
 Orchestrates one (policy, source, fraction, victim, seed) cell using the same
 tested primitives as the synthetic smoke harness
-(``datp.attacks.cell_runner``). The key difference from the smoke harness:
-``mu_flag_threshold`` is locked once per training seed from the *clean GLOBAL_THRESHOLD*
-eligible-client mean FPR and passed in explicitly, then reused unmodified
-across every policy/source/fraction/victim/poisoning-seed cell for that
-training seed — it is never recomputed from a non-GLOBAL_THRESHOLD policy's clean pair.
+(``datp.attacks.cell_runner``). ``mu_flag_threshold`` is locked once per
+training seed from the minimum positive clean mean FPR across all three
+threshold policies (roadmap §9.6) and reused unmodified across every
+policy/source/fraction/victim/poisoning-seed cell for that training seed.
 """
 
 from __future__ import annotations
@@ -39,27 +38,33 @@ from datp.core.seeds import SeedPair
 
 
 def lock_mu_flag_threshold(collection: ScoreCollection) -> float:
-    """Lock ``mu_flag_threshold`` from the clean GLOBAL_THRESHOLD eligible-client mean FPR.
+    """Lock ``mu_flag_threshold`` per roadmap §9.6.
+
+    Computes the clean mean FPR for each of the three threshold policies
+    (GLOBAL_THRESHOLD, LOCAL_THRESHOLD, CLUSTER_THRESHOLD), takes the
+    smallest positive value across all three, and divides by 8.
 
     Must be called once per training seed, before any poisoned run for that
-    seed, and the returned value reused unmodified across every policy/cell
-    for that seed. The lock is always GLOBAL_THRESHOLD-derived, regardless of which policy a
-    given cell evaluates.
+    seed, and the returned value reused unmodified across every policy/cell.
     """
-    clean_cal = {
-        cid: collection.clients[cid].cal.copy() for cid in collection.eligible_ids
-    }
-    clean_global_pair = recompute_pair(
-        collection,
-        PoisonedCalibrationSet.from_mapping(clean_cal),
+    clean_cal_set = PoisonedCalibrationSet.from_mapping(
+        {cid: collection.clients[cid].cal.copy() for cid in collection.eligible_ids}
+    )
+    mean_fprs: list[float] = []
+    for policy in (
         ThresholdPolicy.GLOBAL_THRESHOLD,
-    )
-    clean_metrics = compute_metrics(
-        MetricEngineInput(
-            collection=collection, pair=clean_global_pair, mu_flag_threshold=None
+        ThresholdPolicy.LOCAL_THRESHOLD,
+        ThresholdPolicy.CLUSTER_THRESHOLD,
+    ):
+        pair = recompute_pair(collection, clean_cal_set, policy)
+        metrics = compute_metrics(
+            MetricEngineInput(collection=collection, pair=pair, mu_flag_threshold=None)
         )
-    )
-    return compute_mu_flag_threshold(clean_metrics.fleet_fpr.mean_fpr)
+        mean_fprs.append(metrics.fleet_fpr.mean_fpr)
+    positive_fprs = [v for v in mean_fprs if v > 0.0]
+    if not positive_fprs:
+        return 0.0
+    return compute_mu_flag_threshold(min(positive_fprs))
 
 
 @dataclass(frozen=True, slots=True)

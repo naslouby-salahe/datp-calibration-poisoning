@@ -107,6 +107,7 @@ def _silhouette_scores_by_k(
             continue
         km = KMeans(
             n_clusters=k,
+            init="k-means++",
             random_state=random_state,
             n_init=int(n_init),  # type: ignore[arg-type]  # sklearn stubs restrict n_init to str; int is valid
             max_iter=int(max_iter),
@@ -236,6 +237,7 @@ def _fit_cluster_labels(
 ) -> np.ndarray:
     km = KMeans(
         n_clusters=k,
+        init="k-means++",
         random_state=random_state,
         n_init=int(n_init),  # type: ignore[arg-type]  # sklearn stubs restrict n_init to str; int is valid
         max_iter=int(max_iter),

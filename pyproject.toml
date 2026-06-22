@@ -5,11 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "datp"
 version = "0.1.0"
-description = "Device-Aware Threshold Personalization (DATP): controlled federated-learning study on IoT malware detection."
+description = "datp-cp: calibration-channel poisoning of federated threshold personalization in IoT malware detection."
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [
     { name = "DATP Project" },
+]
+keywords = [
+    "federated-learning",
+    "anomaly-detection",
+    "threshold-personalization",
+    "calibration-poisoning",
+    "IoT",
+    "N-BaIoT",
 ]
 dependencies = [
     "cachetools",
@@ -46,7 +54,9 @@ test = [
     "Pillow",
     "pyright",
     "pytest",
+    "pytest-typeguard",
     "ruff",
+    "typeguard",
 ]
 
 [tool.setuptools]

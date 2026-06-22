@@ -76,7 +76,10 @@ class ThresholdAggregationMethod(enum.StrEnum):
 class ThresholdSource(enum.StrEnum):
     """Identifies the calibration scope for a threshold.
 
-    Values mirror the active threshold policies.
+    These are internal routing tags for threshold result objects. The values
+    use compact shorthand (``"global"``, ``"local"``, ``"cluster"``) distinct
+    from the canonical policy enum string values. TAU_GLOBAL_FALLBACK is an
+    internal fallback tag, not a threshold policy.
     """
 
     GLOBAL = "global"

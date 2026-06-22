@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from datp.artifacts.poison_names import DDOF_CV, EPS_NUM, THRESHOLD_QUANTILE
 from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
@@ -89,6 +90,11 @@ class RunManifest(BaseModel):
 
     # Every derived child seed recorded for reproducibility.
     seed_record: SeedRecord
+
+    # Locked protocol scalars — recorded for exact reproducibility.
+    threshold_quantile_q: float = THRESHOLD_QUANTILE
+    eps_num: float = EPS_NUM
+    ddof: int = DDOF_CV
 
     # ISO-8601 UTC timestamp.
     generated_at_utc: str

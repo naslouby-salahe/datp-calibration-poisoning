@@ -55,3 +55,10 @@ TRIM_FRACTION_APPENDIX: float = 0.10
 CLUSTER_K_NBAIOT: int = 3
 CLUSTER_N_INIT: int = 10
 CLUSTER_MAX_ITER: int = 300
+
+# Locked numerical epsilon for Δτ_rel and any explicitly stabilised diagnostic ratio.
+# NOT used in CV(FPR) denominator — protocol mandates no ε there.
+EPS_NUM: float = 1e-12
+
+# Locked ddof convention for CV(FPR): population std over the complete eligible-client set.
+DDOF_CV: int = 0

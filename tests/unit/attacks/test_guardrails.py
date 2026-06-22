@@ -52,12 +52,13 @@ class TestReservoirNotTestOrTraining:
     def test_calibration_label_passes(self) -> None:
         assert_reservoir_not_test_or_training(ScoringStage.CAL)
 
-    def test_benign_cal_label_passes(self) -> None:
-        assert_reservoir_not_test_or_training(ScoringStage.CAL)
-
-    def test_test_label_raises(self) -> None:
+    def test_test_benign_label_raises(self) -> None:
         with pytest.raises(GuardrailError, match="test"):
             assert_reservoir_not_test_or_training(ScoringStage.TEST_BENIGN)
+
+    def test_test_attack_label_raises(self) -> None:
+        with pytest.raises(GuardrailError, match="test"):
+            assert_reservoir_not_test_or_training(ScoringStage.TEST_ATTACK)
 
 
 class TestAssertValidPolicy:

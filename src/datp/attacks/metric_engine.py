@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.artifacts.poison_names import MATERIALITY_FACTOR
+from datp.artifacts.poison_names import MATERIALITY_FACTOR, EPS_NUM
 from datp.attacks.score_containers import ClientScores, ScoreCollection
 from datp.attacks.types import (
     AurocRecord,
@@ -30,9 +30,9 @@ from datp.evaluation.metrics import recompute_binary_metrics
 from datp.evaluation.ranking import compute_binary_ranking_metrics
 from datp.statistics.cv import cv
 
-# ε_num: locked at 1e-12. Used only in Δτ_rel to avoid division by zero.
+# ε_num: imported from poison_names (1e-12). Used only in Δτ_rel.
 # NOT used in CV(FPR) — protocol lock mandates no ε in CV denominator.
-_DELTA_TAU_REL_EPS: float = 1e-12
+_DELTA_TAU_REL_EPS: float = EPS_NUM
 
 # IQR percentiles for per-client significance scale.
 _IQR_P25: float = 25.0

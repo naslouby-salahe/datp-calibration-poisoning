@@ -62,8 +62,8 @@ def _is_directionally_significant(
     delta_tau: float, delta_tau_scale: float, objective: AttackerObjective
 ) -> bool:
     if objective == AttackerObjective.THRESHOLD_RAISE:
-        return delta_tau > delta_tau_scale
-    return delta_tau < -delta_tau_scale
+        return delta_tau >= delta_tau_scale
+    return delta_tau <= -delta_tau_scale
 
 
 def compute_asr(

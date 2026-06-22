@@ -1,5 +1,7 @@
 {
-  "include": ["src/datp/experiments/baselines", "src/datp/evaluation"],
+  "include": ["src"],
+  "venvPath": ".",
+  "venv": ".venv",
   "typeCheckingMode": "standard",
   "reportPrivateImportUsage": "none",
   "reportUnsupportedDunderAll": "none"

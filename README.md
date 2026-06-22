@@ -2,16 +2,14 @@
 
 Calibration-channel poisoning of federated threshold personalization in IoT anomaly detection.
 
-This repository studies whether poisoning only benign threshold-calibration scores can shift threshold policies enough to degrade detection or alarm burden. Training data, aggregation, model parameters, test scores, and test labels remain clean and unchanged.
+This repository studies whether poisoning only benign threshold-calibration scores can shift threshold policies enough to degrade detection or increase alarm burden. Training data, aggregation, model weights, test scores, and test labels remain clean and unchanged throughout.
 
 ## Threshold Policies
-
-The active policies are:
 
 | Policy | Meaning |
 | --- | --- |
 | `GLOBAL_THRESHOLD` | Eligible client thresholds are averaged into one shared threshold. |
-| `LOCAL_THRESHOLD` | Each eligible client keeps its own calibration percentile threshold. |
+| `LOCAL_THRESHOLD` | Each eligible client keeps its own calibration-percentile threshold. |
 | `CLUSTER_THRESHOLD` | Eligible clients are clustered by calibration-score fingerprints and receive cluster-mean thresholds. |
 
 The primary dataset is N-BaIoT with physical devices as clients. CICIoT2023 is optional diagnostic stretch scope only.
@@ -23,7 +21,7 @@ uv sync --locked --extra test
 source .venv/bin/activate
 ```
 
-If `uv` is unavailable, the fallback is:
+If `uv` is unavailable:
 
 ```bash
 pip install -e ".[test]"
@@ -31,22 +29,23 @@ pip install -e ".[test]"
 
 ## Workflow
 
-Use the canonical Make targets:
+Run targets in order:
 
 ```bash
-make help
-make check
-make datp-cp-clean
-make datp-cp-smoke
-make datp-cp-dry-run
-make datp-cp-run
-make datp-cp-report
-make status
-make audit-results
-make clean
-```
+make check                  # ruff + pyright + full test suite
+make datp-cp-unit-tests     # unit tests only (faster dev iteration)
 
-`make check` runs ruff, pyright, and pytest through the repository virtualenv.
+make datp-cp-clean          # [1] generate clean N-BaIoT artifacts
+make datp-cp-smoke          # [2] synthetic smoke invariants (must pass)
+make datp-cp-dry-run        # [3] enumerate run plan without execution
+make datp-cp-run            # [4] run the main calibration-poisoning matrix
+make audit-results          # [5] audit completed result artifacts
+make datp-cp-report         # [6] build figures, tables, statistics
+
+make status                 # show artifact status at any point
+make clean                  # remove caches and temp markers
+make help                   # list all targets
+```
 
 ## Data
 

@@ -1,7 +1,14 @@
 cff-version: 1.2.0
-message: "If you use this repository, please cite the associated DATP paper."
-title: "Device-Aware Threshold Personalization for Non-IID Federated IoT Malware Detection"
+message: "If you use this work, please cite it using the metadata below."
+type: software
+title: "datp-cp: Calibration-Channel Poisoning of Federated Threshold Personalization"
+abstract: >
+  Empirical study of calibration-channel poisoning in federated IoT malware detection.
+  Evaluates three threshold policies (GLOBAL_THRESHOLD, LOCAL_THRESHOLD, CLUSTER_THRESHOLD)
+  under the REPLACE_FIXED_BUDGET injection rule on the N-BaIoT dataset.
+  Training data, model weights, aggregation, test scores, and test labels remain clean.
 authors:
   - name: "DATP Project"
 version: "0.1.0"
-date-released: "2026-05-18"
+date-released: "2026-06-22"
+license: "LicenseRef-datp-cp"

@@ -20,7 +20,9 @@ from datp.attacks.enums import (
     PoisoningSourceStrategy,
     is_diagnostic_source,
 )
+from datp.attacks.guardrails import assert_reservoir_not_test_or_training
 from datp.attacks.reservoir import ReservoirResult, build_reservoir
+from datp.core.enums import ScoringStage
 
 # bounded source strategies — fixed by scientific protocol.
 _BOUNDED_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
@@ -39,6 +41,7 @@ def _select_reservoir(
     clean_cal: np.ndarray,
     tail_mass: float,
     allow_diagnostic: bool = False,
+    reservoir_stage: ScoringStage = ScoringStage.CAL,
 ) -> ReservoirResult:
     """Select the victim-local reservoir for the given source strategy.
 
@@ -46,8 +49,10 @@ def _select_reservoir(
     allow_diagnostic is False. This ensures diagnostic sources never silently
     enter the main experiment matrix.
 
-    For bounded sources, delegates directly to build_reservoir.
+    ``reservoir_stage`` must be ScoringStage.CAL; the guardrail asserts this
+    so that test and training stages are rejected if accidentally passed.
     """
+    assert_reservoir_not_test_or_training(reservoir_stage)
     if is_diagnostic_source(source) and not allow_diagnostic:
         raise DiagnosticSourceError(
             f"Source {source!r} is diagnostic-only. Pass allow_diagnostic=True "

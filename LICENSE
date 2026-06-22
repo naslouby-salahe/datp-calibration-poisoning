@@ -1,12 +1,12 @@
-DATP Repository License
+datp-cp Repository License
 
 Copyright (c) 2026 DATP Project.
 
 All rights reserved.
 
 This repository is provided for academic review, artifact evaluation, and
-reproducibility of the study "Device-Aware Threshold Personalization for
-Non-IID Federated IoT Malware Detection."
+reproducibility of the calibration-channel poisoning study associated with
+"Device-Aware Threshold Personalization for Non-IID Federated IoT Malware Detection."
 
 You may inspect, run, and reproduce the code and documented experiments for
 non-commercial academic review and research verification. No permission is

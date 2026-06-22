@@ -597,3 +597,60 @@ def test_roadmap_outputs_in_temp_only(collection, tmp_path, monkeypatch):
     # The real output root must never be created by a synthetic smoke run.
     assert not (tmp_path / CALIBRATION_POISONING_OUTPUT_ROOT).exists()
     assert not Path(CALIBRATION_POISONING_OUTPUT_ROOT).exists()
+
+
+# ---------------------------------------------------------------------------
+# Roadmap invariant 8 — THRESHOLD_LOWER connects to positive FPR-dispersion movement
+# ---------------------------------------------------------------------------
+
+
+def test_roadmap_invariant_8_lowering_increases_fpr_dispersion(collection):
+    """Roadmap §13.8: LOW_SCORE_BENIGN under LOCAL_THRESHOLD must increase FPR dispersion.
+
+    Under LOCAL_THRESHOLD, only the victim's threshold changes. A lower victim
+    threshold means more benign test samples exceed it, increasing the victim's FPR
+    while non-victims are unaffected — so max-min FPR gap and worst-client FPR
+    must increase relative to the clean baseline.
+    """
+    cell = run_smoke_cell(
+        collection,
+        victim_id=_VICTIM,
+        policy=ThresholdPolicy.LOCAL_THRESHOLD,
+        source=PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+        fraction=_HIGH_FRACTION,
+    )
+    # Prerequisite: victim threshold must have dropped (invariant 4 establishes this).
+    victim_delta = cell.poisoned_metrics.delta_tau[_VICTIM].delta_tau
+    assert victim_delta < 0.0, (
+        f"LOW_SCORE_BENIGN must lower the victim threshold; got Δτ={victim_delta:.4f}"
+    )
+
+    clean_fpr = cell.clean_metrics.fleet_fpr
+    pois_fpr = cell.poisoned_metrics.fleet_fpr
+
+    # At least one FPR-dispersion metric must increase (roadmap §10.2, §13.8).
+    dispersion_increased = (
+        (
+            not math.isnan(pois_fpr.max_min_fpr_gap)
+            and not math.isnan(clean_fpr.max_min_fpr_gap)
+            and pois_fpr.max_min_fpr_gap > clean_fpr.max_min_fpr_gap
+        )
+        or (
+            not math.isnan(pois_fpr.iqr_fpr)
+            and not math.isnan(clean_fpr.iqr_fpr)
+            and pois_fpr.iqr_fpr > clean_fpr.iqr_fpr
+        )
+        or (
+            not math.isnan(pois_fpr.worst_client_fpr)
+            and not math.isnan(clean_fpr.worst_client_fpr)
+            and pois_fpr.worst_client_fpr > clean_fpr.worst_client_fpr
+        )
+    )
+    assert dispersion_increased, (
+        f"THRESHOLD_LOWER must increase FPR dispersion under LOCAL_THRESHOLD. "
+        f"victim Δτ={victim_delta:.4f}, "
+        f"clean(max_min={clean_fpr.max_min_fpr_gap:.4f}, iqr={clean_fpr.iqr_fpr:.4f}, "
+        f"worst={clean_fpr.worst_client_fpr:.4f}), "
+        f"poisoned(max_min={pois_fpr.max_min_fpr_gap:.4f}, iqr={pois_fpr.iqr_fpr:.4f}, "
+        f"worst={pois_fpr.worst_client_fpr:.4f})"
+    )

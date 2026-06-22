@@ -21,10 +21,12 @@ import numpy as np
 
 from datp.artifacts.poison_names import TAIL_MASS, THRESHOLD_QUANTILE
 from datp.attacks.cluster_threshold_recompute import compute_cluster_pair
+from datp.attacks.guardrails import assert_no_inplace_mutation
 from datp.attacks.injector import InjectionResult, inject_fixed_budget
 from datp.attacks.reservoir import ReservoirResult
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.source_strategies import _select_reservoir
+from datp.core.enums import ScoringStage
 from datp.attacks.threshold_recompute import (
     compute_global_pair,
     compute_local_pair,
@@ -108,8 +110,12 @@ def inject_single_victim(
     internally).
     """
     victim_clean = collection.for_client(victim_id).cal
+    _clean_snapshot = victim_clean.copy()
     reservoir = _select_reservoir(
-        source=spec.source, clean_cal=victim_clean, tail_mass=spec.tail_mass
+        source=spec.source,
+        clean_cal=victim_clean,
+        tail_mass=spec.tail_mass,
+        reservoir_stage=ScoringStage.CAL,
     )
     rng = make_seed_rng(
         SeedRecord(
@@ -125,6 +131,7 @@ def inject_single_victim(
         fraction=spec.fraction,
         rng=rng,
     )
+    assert_no_inplace_mutation(_clean_snapshot, victim_clean, "victim_cal")
     poisoned_clients = _build_poisoned_clients(
         collection, victim_cal_map={victim_id: injection.poisoned_cal}
     )
