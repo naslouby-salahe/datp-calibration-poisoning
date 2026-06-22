@@ -250,7 +250,7 @@ def log_params(params: TrackingParams) -> None:
 
 
 def log_artifact(
-    path: str | Path,
+    path: Path,
     *,
     artifact_path: str | ArtifactDir | None,
 ) -> None:

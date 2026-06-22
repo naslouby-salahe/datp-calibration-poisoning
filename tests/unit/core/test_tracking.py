@@ -261,14 +261,14 @@ class TestLogArtifact:
         import datp.core.tracking as t
 
         t._TRACKING_ENABLED = False  # noqa: SLF001
-        log_artifact(str(tmp_path / "fake.txt"), artifact_path=None)  # should not raise
+        log_artifact(tmp_path / "fake.txt", artifact_path=None)  # should not raise
 
     def test_noop_when_mlflow_missing(self, tmp_path: Path) -> None:
         import datp.core.tracking as t
 
         t._TRACKING_ENABLED = True  # noqa: SLF001
         with patch("datp.core.tracking._import_mlflow", return_value=None):
-            log_artifact(str(tmp_path / "fake.txt"), artifact_path=None)
+            log_artifact(tmp_path / "fake.txt", artifact_path=None)
 
     def test_delegates_to_mlflow_with_path_conversion(self, tmp_path: Path) -> None:
         mock_mlflow = MagicMock(spec=_MlflowModule)

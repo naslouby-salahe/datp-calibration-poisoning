@@ -209,14 +209,12 @@ def _write_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
     for metric in metrics:
         cell = TrainingCellId(stage=metric.stage, seed=metric.seed)
         run = PolicyRunId(cell=cell, policy=metric.policy)
-        checkpoint_round: int | None = metric.checkpoint_round
-        if checkpoint_round is None:
+        metric_round = metric.checkpoint_round
+        if metric_round is None:
             raise RuntimeError("smoke metric lacks checkpoint_round")
-        manifest_path = layout.score_cell_for_round(
-            cell, checkpoint_round
-        ).manifest_path
+        manifest_path = layout.score_cell_for_round(cell, metric_round).manifest_path
         checkpoint_path = (
-            layout.checkpoint_dir_for_round(cell, checkpoint_round)
+            layout.checkpoint_dir_for_round(cell, metric_round)
             / ArtifactFile.MODEL_CHECKPOINT
         )
         metric = metric.model_copy(
@@ -229,7 +227,7 @@ def _write_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
                 )
             }
         )
-        metrics_path = layout.policy_run_for_round(run, checkpoint_round).metrics_path
+        metrics_path = layout.policy_run_for_round(run, metric_round).metrics_path
         write_json_atomic(metrics_path, metric.model_dump(mode="json"))
     return metrics
 

@@ -94,7 +94,7 @@ def client_rows(
     if isinstance(raw, Mapping):
         return [(str(cid), row) for cid, row in raw.items()]  # type: ignore[misc]
     # list-of-dicts format: each row has "client_id"
-    rows: list[Any] = list(raw)  # type: ignore[arg-type]
+    rows: list[Any] = list(raw)  # type: ignore[call-overload]
     return [(str(row[PayloadKey.CLIENT_ID]), row) for row in rows]
 
 
@@ -121,9 +121,9 @@ def _payload_validation_ids(
     row_ids: set[str],
 ) -> ValidationIds:
     return ValidationIds(
-        eligible={str(cid) for cid in payload[PayloadKey.ELIGIBLE_IDS]},  # type: ignore[arg-type]
-        pending={str(cid) for cid in payload[PayloadKey.PENDING_IDS]},  # type: ignore[arg-type]
-        incomplete={str(cid) for cid in payload[PayloadKey.EVAL_INCOMPLETE_IDS]},  # type: ignore[arg-type]
+        eligible={str(cid) for cid in payload[PayloadKey.ELIGIBLE_IDS]},  # type: ignore[attr-defined]
+        pending={str(cid) for cid in payload[PayloadKey.PENDING_IDS]},  # type: ignore[attr-defined]
+        incomplete={str(cid) for cid in payload[PayloadKey.EVAL_INCOMPLETE_IDS]},  # type: ignore[attr-defined]
         row=row_ids,
     )
 
