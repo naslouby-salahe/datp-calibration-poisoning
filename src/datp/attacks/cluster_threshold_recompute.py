@@ -10,6 +10,11 @@ Protocol (scientific protocol §5):
    Δτ_i^total = τ_i^{eff,pois} − τ_i^{eff,clean}.
 4. Churn = residual: Δτ_i^churn = Δτ_i^total − Δτ_i^agg.
    Identity Δτ_agg + Δτ_churn = Δτ_total holds exactly.
+5. Frozen-scaler diagnostic: fit clean StandardScaler on clean fingerprints, apply to
+   poisoned fingerprints, re-run k-means → τ_i^{eff,frozen_scaler} (diagnostic only).
+   Δτ_i^frozen_scaler = τ_i^{eff,frozen_scaler} − τ_i^{eff,clean}.
+6. Normalization-gap = total − frozen_scaler (diagnostic, not deployed).
+   Δτ_i^normalization_gap = Δτ_i^total − Δτ_i^frozen_scaler.
 
 Raw k-means label IDs are never compared across runs.
 All deltas are client-indexed (by client_id, not label).
@@ -23,6 +28,8 @@ from dataclasses import dataclass
 from typing import Any, SupportsIndex, overload
 
 import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 from datp.artifacts.poison_names import (
     CLUSTER_K_NBAIOT,
@@ -44,20 +51,33 @@ from datp.thresholding.eligibility import (
     compute_client_thresholds,
     compute_tau_global,
 )
-from datp.thresholding.strategies.cluster_threshold import compute as cluster_compute
+from datp.thresholding.strategies.cluster_threshold import (
+    compute as cluster_compute,
+    compute_fingerprints,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ClusterDecompEntry:
-    """Per-client cluster-threshold decomposition for one poisoned condition."""
+    """Per-client cluster-threshold decomposition for one poisoned condition.
+
+    delta_tau_total = deployed full-refit effect (τ_pois - τ_clean).
+    delta_tau_agg = frozen-clean-assignments aggregation component.
+    delta_tau_churn = total - agg (re-assignment effect).
+    delta_tau_frozen_scaler = diagnostic: clean scaler on poisoned fingerprints.
+    delta_tau_normalization_gap = total - frozen_scaler (scaler-refit effect).
+    """
 
     client_id: str
     tau_clean: float
     tau_agg: float
     tau_pois: float
+    tau_frozen_scaler: float
     delta_tau_agg: float
     delta_tau_churn: float
     delta_tau_total: float
+    delta_tau_frozen_scaler: float
+    delta_tau_normalization_gap: float
 
 
 class ClusterDecomposition(tuple[ClusterDecompEntry, ...]):
@@ -200,27 +220,78 @@ def _build_cal_dicts(
     return clean, pois
 
 
+def _frozen_scaler_thresholds(
+    *,
+    eligible_ids: list[str],
+    clean_cal_dict: dict[str, np.ndarray],
+    pois_cal_dict: dict[str, np.ndarray],
+    pois_per_client_taus: dict[str, float],
+    q: float,
+    k: int,
+    n_init: int,
+    max_iter: int,
+    random_state: int,
+) -> dict[str, float]:
+    """τ_i^{eff,frozen_scaler}: clean StandardScaler applied to poisoned fingerprints.
+
+    Diagnostic only. The clean scaler is fitted on clean fingerprints and then applied
+    to poisoned fingerprints. K-means is run on the scaled poisoned fingerprints using
+    fixed K. Cluster-mean thresholds use poisoned per-client taus.
+    Never modifies clean or poisoned arrays.
+    """
+    clean_fp = compute_fingerprints(clean_cal_dict, eligible_ids, q=q)
+    clean_fp_matrix = np.array([clean_fp[cid] for cid in eligible_ids], dtype=np.float64)
+    scaler = StandardScaler()
+    scaler.fit(clean_fp_matrix)
+
+    pois_fp = compute_fingerprints(pois_cal_dict, eligible_ids, q=q)
+    pois_fp_matrix = np.array([pois_fp[cid] for cid in eligible_ids], dtype=np.float64)
+    pois_fp_scaled = scaler.transform(pois_fp_matrix)
+
+    km = KMeans(
+        n_clusters=k,
+        random_state=random_state,
+        n_init=int(n_init),  # type: ignore[arg-type]
+        max_iter=int(max_iter),
+    )
+    labels = km.fit_predict(pois_fp_scaled)
+
+    client_cluster = dict(zip(eligible_ids, labels.astype(int), strict=True))
+    cluster_taus: dict[int, list[float]] = defaultdict(list)
+    for cid in eligible_ids:
+        cluster_taus[client_cluster[cid]].append(pois_per_client_taus[cid])
+    tau_per_cluster = {c: float(np.mean(t)) for c, t in cluster_taus.items()}
+    return {cid: tau_per_cluster[client_cluster[cid]] for cid in eligible_ids}
+
+
 def _build_cluster_decomposition(
     eligible_ids: list[str],
     eff_clean: dict[str, float],
     tau_agg: dict[str, float],
     eff_pois: dict[str, float],
+    tau_frozen_scaler: dict[str, float],
 ) -> ClusterDecomposition:
-    """Build the per-client cluster-threshold decomposition from the three threshold maps."""
+    """Build the per-client cluster-threshold decomposition from all threshold maps."""
     entries = []
     for cid in eligible_ids:
         tc = eff_clean[cid]
         ta = tau_agg[cid]
         tp = eff_pois[cid]
+        tfs = tau_frozen_scaler[cid]
+        dt_total = tp - tc
+        dt_fs = tfs - tc
         entries.append(
             ClusterDecompEntry(
                 client_id=cid,
                 tau_clean=tc,
                 tau_agg=ta,
                 tau_pois=tp,
+                tau_frozen_scaler=tfs,
                 delta_tau_agg=ta - tc,
-                delta_tau_churn=(tp - tc) - (ta - tc),
-                delta_tau_total=tp - tc,
+                delta_tau_churn=dt_total - (ta - tc),
+                delta_tau_total=dt_total,
+                delta_tau_frozen_scaler=dt_fs,
+                delta_tau_normalization_gap=dt_total - dt_fs,
             )
         )
     return ClusterDecomposition(entries)
@@ -309,8 +380,20 @@ def compute_cluster_pair(
         pois_full_cal, q, tau_global_pois, **hyperparams
     )
 
+    tau_frozen_scaler = _frozen_scaler_thresholds(
+        eligible_ids=eligible_ids,
+        clean_cal_dict={cid: clean_full_cal[cid] for cid in eligible_ids},
+        pois_cal_dict={cid: pois_full_cal[cid] for cid in eligible_ids},
+        pois_per_client_taus=dict(pois_per_client_taus.items()),
+        q=q,
+        k=k,
+        n_init=n_init,
+        max_iter=max_iter,
+        random_state=random_state,
+    )
+
     decomposition = _build_cluster_decomposition(
-        eligible_ids, eff_clean, tau_agg, eff_pois
+        eligible_ids, eff_clean, tau_agg, eff_pois, tau_frozen_scaler
     )
 
     return ClusterThresholdPair(

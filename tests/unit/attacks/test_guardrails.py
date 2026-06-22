@@ -12,9 +12,12 @@ from datp.attacks.guardrails import (
     assert_no_inplace_mutation,
     assert_valid_policy,
     assert_reservoir_not_test_or_training,
+    assert_valid_source_objective_pair,
 )
 from datp.attacks.constants import NBAIOT_MAIN_SWEEP_FRACTIONS
 from datp.attacks.enums import (
+    AttackerObjective,
+    PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
 )
@@ -132,3 +135,50 @@ class TestBoundedScaleRequiresSingleClient:
         assert_bounded_scale_requires_single_client(
             ExperimentStage.SYNTHETIC_SMOKE, PoisoningTargetScope.MULTI_CLIENT
         )
+
+
+class TestValidSourceObjectivePair:
+    def test_high_score_with_raise_passes(self) -> None:
+        assert_valid_source_objective_pair(
+            PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            AttackerObjective.THRESHOLD_RAISE,
+        )
+
+    def test_low_score_with_lower_passes(self) -> None:
+        assert_valid_source_objective_pair(
+            PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+            AttackerObjective.THRESHOLD_LOWER,
+        )
+
+    def test_random_benign_with_raise_passes(self) -> None:
+        assert_valid_source_objective_pair(
+            PoisoningSourceStrategy.RANDOM_BENIGN,
+            AttackerObjective.THRESHOLD_RAISE,
+        )
+
+    def test_random_benign_with_lower_passes(self) -> None:
+        assert_valid_source_objective_pair(
+            PoisoningSourceStrategy.RANDOM_BENIGN,
+            AttackerObjective.THRESHOLD_LOWER,
+        )
+
+    def test_high_score_with_lower_raises(self) -> None:
+        with pytest.raises(GuardrailError, match="THRESHOLD_RAISE"):
+            assert_valid_source_objective_pair(
+                PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+                AttackerObjective.THRESHOLD_LOWER,
+            )
+
+    def test_low_score_with_raise_raises(self) -> None:
+        with pytest.raises(GuardrailError, match="THRESHOLD_LOWER"):
+            assert_valid_source_objective_pair(
+                PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+                AttackerObjective.THRESHOLD_RAISE,
+            )
+
+    def test_error_message_includes_source_and_objective(self) -> None:
+        with pytest.raises(GuardrailError, match="HIGH_SCORE_BENIGN"):
+            assert_valid_source_objective_pair(
+                PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+                AttackerObjective.THRESHOLD_LOWER,
+            )

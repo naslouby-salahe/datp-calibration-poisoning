@@ -18,8 +18,11 @@ from datp.attacks.constants import (
     NBAIOT_FULL_OPTIONAL_SWEEP_FRACTION_SET,
 )
 from datp.attacks.enums import (
+    AttackerObjective,
+    PoisoningSourceStrategy,
     PoisoningTargetScope,
     ThresholdPolicy,
+    objective_for_source,
 )
 from datp.core.enums import ScoringStage
 from datp.config.stages import ExperimentStage
@@ -161,4 +164,32 @@ def assert_bounded_scale_requires_single_client(
             f"Calibration-poisoning guardrail: NBAIOT_MAIN stage requires SINGLE_CLIENT target scope; "
             f"got {target_scope!r}. Multi-client and all-client scopes "
             "are diagnostic-only and must not be used in bounded runs."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Source-objective cross-validation guardrail
+# ---------------------------------------------------------------------------
+
+
+def assert_valid_source_objective_pair(
+    source: PoisoningSourceStrategy,
+    objective: AttackerObjective,
+) -> None:
+    """Raise if source and objective are an invalid combination.
+
+    HIGH_SCORE_BENIGN is locked to THRESHOLD_RAISE.
+    LOW_SCORE_BENIGN is locked to THRESHOLD_LOWER.
+    RANDOM_BENIGN is valid under both objectives (negative control).
+    Diagnostic sources are excluded from this check (they are gated elsewhere).
+
+    Raises:
+        GuardrailError: On any invalid (source, objective) pair.
+    """
+    expected = objective_for_source(source)
+    if expected is not None and objective != expected:
+        raise GuardrailError(
+            f"Calibration-poisoning guardrail: source {source!r} requires "
+            f"objective {expected!r}; got {objective!r}. "
+            f"Invalid source-objective combination."
         )

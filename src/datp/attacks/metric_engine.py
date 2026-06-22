@@ -30,13 +30,16 @@ from datp.evaluation.metrics import recompute_binary_metrics
 from datp.evaluation.ranking import compute_binary_ranking_metrics
 from datp.statistics.cv import cv
 
-# ε used only in Δτ_rel to avoid division by zero.
+# ε_num: locked at 1e-12. Used only in Δτ_rel to avoid division by zero.
 # NOT used in CV(FPR) — protocol lock mandates no ε in CV denominator.
-_DELTA_TAU_REL_EPS: float = 1e-9
+_DELTA_TAU_REL_EPS: float = 1e-12
 
 # IQR percentiles for per-client significance scale.
 _IQR_P25: float = 25.0
 _IQR_P75: float = 75.0
+
+# Floor factor: δτ_floor = 0.01 × median client IQR over clean eligible clients.
+_DELTA_TAU_FLOOR_FACTOR: float = 0.01
 
 
 # ---------------------------------------------------------------------------
@@ -124,26 +127,80 @@ def _client_fpr(test_benign: np.ndarray, threshold: float) -> float:
 # ---------------------------------------------------------------------------
 
 
+def _per_client_raw_scale(clean_cal: np.ndarray) -> tuple[float, bool]:
+    """Compute δτ_i_raw and degenerate flag for one client.
+
+    Returns (raw_scale, is_degenerate):
+      - If IQR > 0: raw_scale = MATERIALITY_FACTOR * IQR.
+      - If IQR == 0 and MAD > 0: raw_scale = MATERIALITY_FACTOR * MAD.
+      - If both == 0 and a smallest positive gap exists: raw_scale = MATERIALITY_FACTOR * gap.
+      - If none exist: degenerate, raw_scale = nan.
+    """
+    iqr = float(
+        np.percentile(clean_cal, _IQR_P75) - np.percentile(clean_cal, _IQR_P25)
+    )
+    if iqr > 0.0:
+        return MATERIALITY_FACTOR * iqr, False
+
+    mad = float(np.median(np.abs(clean_cal - np.median(clean_cal))))
+    if mad > 0.0:
+        return MATERIALITY_FACTOR * mad, False
+
+    sorted_unique = np.unique(clean_cal)
+    diffs = np.diff(sorted_unique)
+    pos_diffs = diffs[diffs > 0.0]
+    if pos_diffs.size > 0:
+        return MATERIALITY_FACTOR * float(pos_diffs.min()), False
+
+    return math.nan, True
+
+
 def compute_delta_tau(
     collection: ScoreCollection,
     pair: ThresholdPairBase,
 ) -> dict[str, DeltaTauEntry]:
     """Compute per-victim Δτ family for all eligible clients.
 
-    delta_tau_scale = 0.1 × IQR(clean calibration scores_i) per client.
-    delta_tau_rel = Δτ / max(|τ_clean|, ε) where ε is for division-by-zero only.
+    δτ_i_raw = 0.1 × IQR(clean cal scores); IQR=0 → MAD; both=0 → smallest positive gap.
+    δτ_floor = 0.01 × median(client IQR) over clean eligible clients.
+    δτ_i = max(δτ_i_raw, δτ_floor).
+    Degenerate clients (no spread at all) have scale=nan and is_significant=False.
+    delta_tau_rel = Δτ / max(|τ_clean|, ε_num) where ε_num = 1e-12 is division-by-zero only.
     """
+    # First pass: raw scales and IQRs (for floor computation).
+    raw_scales: dict[str, float] = {}
+    degenerate: set[str] = set()
+    iqrs: list[float] = []
+
+    for cid in collection.eligible_ids:
+        clean_cal = collection.for_client(cid).cal
+        raw_scale, is_deg = _per_client_raw_scale(clean_cal)
+        raw_scales[cid] = raw_scale
+        if is_deg:
+            degenerate.add(cid)
+        iqr_i = float(
+            np.percentile(clean_cal, _IQR_P75) - np.percentile(clean_cal, _IQR_P25)
+        )
+        iqrs.append(iqr_i)
+
+    # Floor: 0.01 × median client IQR.
+    iqr_floor = _DELTA_TAU_FLOOR_FACTOR * float(np.median(iqrs)) if iqrs else 0.0
+
+    # Second pass: build DeltaTauEntry with floor applied.
     result: dict[str, DeltaTauEntry] = {}
     for cid in collection.eligible_ids:
         tc = pair.thresholds_clean[cid]
         tp = pair.thresholds_pois[cid]
         dt = tp - tc
         dt_rel = dt / max(abs(tc), _DELTA_TAU_REL_EPS)
-        clean_cal = collection.for_client(cid).cal
-        iqr = float(
-            np.percentile(clean_cal, _IQR_P75) - np.percentile(clean_cal, _IQR_P25)
-        )
-        scale = MATERIALITY_FACTOR * iqr
+
+        if cid in degenerate:
+            scale = math.nan
+            is_sig = False
+        else:
+            scale = max(raw_scales[cid], iqr_floor)
+            is_sig = abs(dt) >= scale
+
         result[cid] = DeltaTauEntry(
             client_id=cid,
             policy=pair.policy,
@@ -152,7 +209,7 @@ def compute_delta_tau(
             delta_tau=dt,
             delta_tau_rel=dt_rel,
             delta_tau_scale=scale,
-            is_significant=abs(dt) > scale,
+            is_significant=is_sig,
         )
     return result
 
@@ -189,7 +246,7 @@ def compute_fleet_fpr(
     fpr_arr = np.array([f for f in fprs if not math.isnan(f)], dtype=np.float64)
     n_valid = fpr_arr.size
 
-    cv_fpr = cv(fpr_arr) if n_valid >= 2 else math.nan
+    cv_fpr = cv(fpr_arr, ddof=0) if n_valid >= 2 else math.nan
     mean_fpr = float(fpr_arr.mean()) if n_valid > 0 else math.nan
     std_fpr = float(fpr_arr.std(ddof=1)) if n_valid >= 2 else math.nan
     iqr_fpr = (
@@ -203,7 +260,7 @@ def compute_fleet_fpr(
     n_total = len(collection.clients)
 
     mu_flag = (
-        (not math.isnan(mean_fpr) and mean_fpr <= mu_flag_threshold)
+        (not math.isnan(mean_fpr) and mean_fpr < mu_flag_threshold)
         if mu_flag_threshold is not None and not math.isnan(mean_fpr)
         else False
     )

@@ -250,7 +250,7 @@ def _aggregate_dispersion(
     ba_arr = fm.ba_eligible
     f1_arr = fm.f1_eligible
 
-    cv_fpr = cv(fpr_arr)
+    cv_fpr = cv(fpr_arr, ddof=0)
     mean_fpr = float(fpr_arr.mean()) if fpr_arr.size > 0 else math.nan
     std_fpr = float(fpr_arr.std(ddof=1)) if fpr_arr.size >= 2 else math.nan
     iqr_fpr = (
@@ -272,13 +272,13 @@ def _aggregate_dispersion(
         worst_client_fpr = math.nan
         worst_client_id = None
         max_min_fpr_gap = math.nan
-    cv_tpr = cv(tpr_arr)
+    cv_tpr = cv(tpr_arr, ddof=0)
     iqr_tpr = (
         float(np.percentile(tpr_arr, 75) - np.percentile(tpr_arr, 25))
         if tpr_arr.size >= 2
         else math.nan
     )
-    worst_ba = float(ba_arr.min()) if ba_arr.size > 0 else math.nan
+    worst_ba = float(ba_arr.min()) if ba_arr .size > 0 else math.nan
     p10_macro_f1 = float(np.percentile(f1_arr, 10)) if f1_arr.size > 0 else math.nan
 
     return DispersionMetrics(

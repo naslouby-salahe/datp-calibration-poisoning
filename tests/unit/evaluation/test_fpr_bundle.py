@@ -21,9 +21,9 @@ def test_cv_fpr_eligible_only() -> None:
         pending_ids=["c4"],
     )
 
-    expected_cv = cv(np.array([0.10, 0.15, 0.20]), ddof=1)
+    expected_cv = cv(np.array([0.10, 0.15, 0.20]), ddof=0)
     assert abs(ev.cv_fpr - expected_cv) < 1e-12
-    assert abs(ev.cv_fpr - cv(np.array([0.10, 0.15, 0.20, 0.50]), ddof=1)) > 0.01
+    assert abs(ev.cv_fpr - cv(np.array([0.10, 0.15, 0.20, 0.50]), ddof=0)) > 0.01
 
 
 def test_coverage_ratio() -> None:

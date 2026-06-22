@@ -22,6 +22,10 @@ from datp.attacks.cell_runner import (
     recompute_pair,
 )
 from datp.attacks.bounded_sweep_matrix import SweepCellSpec
+from datp.attacks.guardrails import (
+    assert_bounded_scale_requires_single_client,
+    assert_fractions_in_locked_grid,
+)
 from datp.attacks.metric_engine import (
     MetricResult,
     compute_metrics,
@@ -30,6 +34,7 @@ from datp.attacks.metric_engine import (
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.types import AurocSet, MetricEngineInput, PoisonedCalibrationSet
 from datp.attacks.enums import PoisoningSourceStrategy
+from datp.config.stages import ExperimentStage
 from datp.core.seeds import SeedPair
 
 
@@ -137,6 +142,8 @@ def run_sweep_cell(
     config: SweepCellConfig,
 ) -> SweepCellResult:
     """Run one bounded cell using a pre-locked ``mu_flag_threshold``."""
+    assert_fractions_in_locked_grid([spec.fraction], ExperimentStage.NBAIOT_MAIN)
+    assert_bounded_scale_requires_single_client(ExperimentStage.NBAIOT_MAIN, spec.target_scope)
     clean_pair, clean_metrics = _cell_injection_and_metrics(
         spec, config, fraction=0.0, mu_flag_threshold=None
     )

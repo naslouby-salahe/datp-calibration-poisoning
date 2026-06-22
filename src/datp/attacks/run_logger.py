@@ -29,6 +29,7 @@ from datp.attacks.enums import (
     PoisoningTargetScope,
     ThresholdPolicy,
 )
+from datp.attacks.guardrails import assert_valid_source_objective_pair
 from datp.core.seed_sequence import SeedRecord
 from datp.core.seeds import SeedPair
 from datp.config.stages import ExperimentStage
@@ -69,6 +70,7 @@ def build_manifest(request: ManifestBuildRequest) -> RunManifest:
     mu_flag_threshold may be None only if you intend to update it before any
     poisoned run. Call emit_manifest only after locking mu_flag_threshold.
     """
+    assert_valid_source_objective_pair(request.source, request.objective)
 
     record = SeedRecord(
         pair=SeedPair(
@@ -136,9 +138,9 @@ class RunLogEntry:
     """
 
     dataset: str
-    policy: str
-    objective: str
-    source: str
+    policy: ThresholdPolicy
+    objective: AttackerObjective
+    source: PoisoningSourceStrategy
     fraction: float
     training_seed: int
     poisoning_seed: int

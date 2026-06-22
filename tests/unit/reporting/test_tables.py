@@ -73,9 +73,9 @@ def _make_eval_result(policy: ThresholdPolicy, seed: int) -> EvaluationResult:
     eligible_tprs = [c.metrics.tpr for c in clients if c.client_id in _ELIGIBLE_IDS]
     from datp.statistics.cv import cv
 
-    _cv_fpr = cv(np.array(eligible_fprs))
+    _cv_fpr = cv(np.array(eligible_fprs), ddof=0)
     cv_fpr = float(_cv_fpr) if not math.isnan(_cv_fpr) else 0.0
-    _cv_tpr = cv(np.array(eligible_tprs))
+    _cv_tpr = cv(np.array(eligible_tprs), ddof=0)
     cv_tpr = float(_cv_tpr) if not math.isnan(_cv_tpr) else 0.0
     mean_fpr = float(np.mean(eligible_fprs))
     std_fpr = float(np.std(eligible_fprs, ddof=1))

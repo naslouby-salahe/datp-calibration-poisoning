@@ -101,16 +101,18 @@ def compute_blast_radius(
     *,
     victim_id: str | None = None,
 ) -> BlastRadiusRecord:
-    """Compute blast radius: number of eligible clients with significant |Δτ|.
+    """Compute blast radius: number of non-victim eligible clients with material |Δτ|.
 
-    victim_id is optional metadata only; it does not filter the count.
-    GLOBAL_THRESHOLD: global → blast radius counts all eligible clients whose threshold shifted.
-    LOCAL_THRESHOLD: local → blast radius is typically 1 (only the victim).
-    CLUSTER_THRESHOLD: cluster-local → counts cluster-mates with significant agg spillover.
+    Excludes the victim client when victim_id is provided (roadmap §10.6).
+    GLOBAL_THRESHOLD: blast radius counts all non-victim eligible clients whose threshold shifted.
+    LOCAL_THRESHOLD: blast radius is 0 (victim excluded; no other clients affected).
+    CLUSTER_THRESHOLD: blast radius counts non-victim cluster-mates with significant |Δτ|.
     """
     entries = result.delta_tau
-    n_significant = sum(1 for e in entries.values() if e.is_significant)
-    n_eligible = len(entries)
+    n_significant = sum(
+        1 for cid, e in entries.items() if cid != victim_id and e.is_significant
+    )
+    n_eligible = len(entries) - (1 if victim_id is not None and victim_id in entries else 0)
     blast_fraction = n_significant / n_eligible if n_eligible > 0 else 0.0
     return BlastRadiusRecord(
         policy=result.policy,

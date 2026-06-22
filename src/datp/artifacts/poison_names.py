@@ -13,7 +13,12 @@ class ManifestFile(StrEnum):
 
     PROJECT_AUDIT_REPORT = "project_audit_report.json"
     CLEAN_SCORE_ARTIFACTS = "clean_score_artifacts.json"
+    SYNTHETIC_SMOKE_MANIFEST = "synthetic_smoke_manifest.json"
     NBAIOT_MAIN_MANIFEST = "nbaiot_main_manifest.json"
+    CLUSTER_THRESHOLD_MANIFEST = "cluster_threshold_manifest.json"
+    RESERVOIR_MANIFEST = "reservoir_manifest.json"
+    INFEASIBLE_CELLS = "infeasible_cells.json"
+    MULTI_CLIENT_PLAN = "multi_client_plan.json"
     PAPER_FIGURE_MANIFEST = "paper_figure_manifest.json"
     RUN_MANIFEST = "run_manifest.json"
 

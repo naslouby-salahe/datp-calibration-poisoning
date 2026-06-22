@@ -110,6 +110,36 @@ class TestDecompositionIdentity:
             assert entry.tau_pois == pytest.approx(pair.thresholds_pois[cid])
 
 
+class TestDecompositionFrozenScaler:
+    def test_normalization_gap_identity(self) -> None:
+        """Δτ_normalization_gap == Δτ_total - Δτ_frozen_scaler (exact identity)."""
+        col = _make_collection()
+        pois_cal, _ = _make_poisoned_cal(col)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        for cid, entry in pair.decomposition.items():
+            assert entry.delta_tau_normalization_gap == pytest.approx(
+                entry.delta_tau_total - entry.delta_tau_frozen_scaler, abs=1e-10
+            ), f"Normalization-gap identity failed for {cid}"
+
+    def test_frozen_scaler_is_finite(self) -> None:
+        col = _make_collection()
+        pois_cal, _ = _make_poisoned_cal(col)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        import math
+        for entry in pair.decomposition.values():
+            assert math.isfinite(entry.delta_tau_frozen_scaler)
+            assert math.isfinite(entry.delta_tau_normalization_gap)
+
+    def test_f0_frozen_scaler_zero(self) -> None:
+        """f=0 → frozen-scaler delta and normalization-gap must be zero."""
+        col = _make_collection()
+        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        for entry in pair.decomposition.values():
+            assert entry.delta_tau_frozen_scaler == pytest.approx(0.0, abs=1e-10)
+            assert entry.delta_tau_normalization_gap == pytest.approx(0.0, abs=1e-10)
+
+
 class TestFractionZero:
     def test_f0_all_deltas_zero(self) -> None:
         """f=0 → poisoned_cal == clean_cal → all Δτ == 0."""
@@ -121,6 +151,8 @@ class TestFractionZero:
             assert entry.delta_tau_total == pytest.approx(0.0, abs=1e-10)
             assert entry.delta_tau_agg == pytest.approx(0.0, abs=1e-10)
             assert entry.delta_tau_churn == pytest.approx(0.0, abs=1e-10)
+            assert entry.delta_tau_frozen_scaler == pytest.approx(0.0, abs=1e-10)
+            assert entry.delta_tau_normalization_gap == pytest.approx(0.0, abs=1e-10)
 
 
 class TestDeterminism:
