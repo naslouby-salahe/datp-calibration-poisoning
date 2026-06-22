@@ -16,7 +16,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from datp.attacks.manifests.run_manifest import (
+from datp.attacks.run_manifest import (
     SPLIT_SEMANTICS,
     RunManifest,
 )

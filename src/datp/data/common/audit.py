@@ -5,7 +5,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from datp.artifacts.markers import write_json_atomic
+from datp.artifacts.io import write_json_atomic
 from datp.config.stages import ExperimentStage
 from datp.core.errors import fmt, fmt_missing
 from datp.core.logging import get_logger

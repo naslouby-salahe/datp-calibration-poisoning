@@ -48,7 +48,7 @@ class TestDryRun:
         # CliRunner mixes stdout+stderr into result.output by default.
         assert "blocked" in result.output.lower()
 
-    def test_dry_run_nbaiot_main_sweep_no_longer_blocked(self) -> None:
+    def test_dry_execute_bounded_sweep_sweep_no_longer_blocked(self) -> None:
         # NBAIOT_MAIN has allow_run=True, so the blocked notice must not appear.
         result = _runner.invoke(app, ["poison", "dry-run", "--stage", "nbaiot_main"])
         assert "blocked" not in result.output.lower()

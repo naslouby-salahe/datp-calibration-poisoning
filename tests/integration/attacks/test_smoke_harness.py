@@ -36,32 +36,32 @@ from datp.artifacts.poison_names import (
     CALIBRATION_POISONING_OUTPUT_ROOT,
 )
 from datp.attacks.constants import POISONING_SEEDS
-from datp.attacks.threshold_recomputation.cluster_threshold_recompute import ClusterThresholdPair
-from datp.attacks.execution.cell_runner import (
+from datp.attacks.cluster_recompute import ClusterThresholdPair
+from datp.attacks.cell_runner import (
     InjectionSpec,
     inject_single_victim,
     pending_threshold,
 )
-from datp.attacks.planning.guardrails import assert_no_inplace_mutation
-from datp.attacks.metrics.inference import (
+from datp.attacks.guardrails import assert_no_inplace_mutation
+from datp.attacks.inference import (
     InferenceInput,
     PairedDeltas,
     SeedDelta,
     collect_paired_deltas,
     compute_inference,
 )
-from datp.attacks.metrics.metric_engine import compute_fleet_fpr
-from datp.attacks.manifests.run_logger import (
+from datp.attacks.metrics import compute_fleet_fpr
+from datp.attacks.run_logger import (
     ManifestBuildRequest,
     ManifestEmissionError,
     build_manifest,
     emit_manifest,
     load_manifest,
 )
-from datp.attacks.manifests.run_manifest import RESERVOIR_MODE
+from datp.attacks.run_manifest import RESERVOIR_MODE
 from datp.attacks.score_containers import build_score_collection
-from datp.attacks.reservoirs.source_strategies import near_null_criterion
-from datp.attacks.threshold_recomputation.threshold_recompute import ThresholdPair
+from datp.attacks.source_strategies import near_null_criterion
+from datp.attacks.threshold_recompute import ThresholdPair
 from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,

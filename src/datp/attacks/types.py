@@ -12,7 +12,7 @@ from datp.core.enums import ThresholdPolicy
 from datp.thresholding.eligibility import ClientThresholdsCollection
 
 if TYPE_CHECKING:
-    from datp.attacks.injection.injector import InjectionResult
+    from datp.attacks.injector import InjectionResult
     from datp.attacks.score_containers import ScoreCollection
 
 
@@ -110,7 +110,7 @@ class AurocSet:
 
 
 @dataclass(frozen=True, slots=True)
-class MetricEngineInput:
+class MetricInput:
     collection: "ScoreCollection"
     pair: ThresholdPairBase
     mu_flag_threshold: float | None = None

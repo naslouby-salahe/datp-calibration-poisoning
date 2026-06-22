@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from datp.artifacts.constants import MANIFEST_FILE
+from datp.artifacts.names import ArtifactFile
 from datp.core.errors import fmt, fmt_missing
 from datp.core.logging import get_logger
 from datp.data.artifacts import create_empty_feature_frame, write_client_splits
@@ -373,7 +373,7 @@ def prepare_ciciot(
             "n_features": FEATURE_COUNT,
             "cap": cap,
         },
-        manifest_path=client_root / MANIFEST_FILE,
+        manifest_path=client_root / ArtifactFile.MANIFEST,
     )
 
     return results

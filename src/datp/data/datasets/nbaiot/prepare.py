@@ -5,7 +5,7 @@ from pathlib import Path
 
 import polars as pl
 
-from datp.artifacts.constants import MANIFEST_FILE
+from datp.artifacts.names import ArtifactFile
 from datp.core.errors import fmt, fmt_missing
 from datp.core.logging import get_logger
 from datp.data.artifacts import create_empty_feature_frame, write_client_splits
@@ -288,7 +288,7 @@ def prepare_nbaiot(
                 if result.split_indices is not None
             },
         },
-        manifest_path=output_dir / MANIFEST_FILE,
+        manifest_path=output_dir / ArtifactFile.MANIFEST,
     )
 
     return results

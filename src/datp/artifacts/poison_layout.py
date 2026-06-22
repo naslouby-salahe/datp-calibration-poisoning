@@ -32,7 +32,7 @@ from datp.attacks.enums import (
     PoisoningTargetScope,
 )
 from datp.core.enums import ThresholdPolicy
-from datp.core.enums import PathToken
+from datp.artifacts.names import PathToken
 from datp.core.seeds import SeedPair
 from datp.data.catalog import DatasetID
 from datp.config.stages import ExperimentStage

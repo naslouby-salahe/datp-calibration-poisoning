@@ -45,63 +45,63 @@ class _StatusReport:
 
     stage_reports: dict[str, _StageReport] = field(default_factory=dict)
 
-    def summary_rows(self) -> list[tuple[str, int, int, int, int]]:
-        rows: list[tuple[str, int, int, int, int]] = []
-        total_complete = 0
-        total_missing = 0
-        total_aborted = 0
-        total_all = 0
+def _summary_rows(report: _StatusReport) -> list[tuple[str, int, int, int, int]]:
+    rows: list[tuple[str, int, int, int, int]] = []
+    total_complete = 0
+    total_missing = 0
+    total_aborted = 0
+    total_all = 0
 
-        for name in sorted(self.stage_reports):
-            report = self.stage_reports[name]
-            rows.append(
-                (
-                    f"Stage {name.upper()}",
-                    report.complete_count,
-                    report.missing_count,
-                    report.aborted_count,
-                    report.total,
-                )
-            )
-            total_complete += report.complete_count
-            total_missing += report.missing_count
-            total_aborted += report.aborted_count
-            total_all += report.total
-
+    for name in sorted(report.stage_reports):
+        stage_report = report.stage_reports[name]
         rows.append(
-            ("Overall", total_complete, total_missing, total_aborted, total_all)
+            (
+                f"Stage {name.upper()}",
+                stage_report.complete_count,
+                stage_report.missing_count,
+                stage_report.aborted_count,
+                stage_report.total,
+            )
         )
-        return rows
+        total_complete += stage_report.complete_count
+        total_missing += stage_report.missing_count
+        total_aborted += stage_report.aborted_count
+        total_all += stage_report.total
 
-    def summary_lines(self) -> list[str]:
-        lines: list[str] = []
-        for label, complete, missing, aborted, total in self.summary_rows():
-            lines.append(
-                f"{label}: complete={complete} "
-                f"missing={missing} "
-                f"aborted={aborted} "
-                f"(total={total})"
-            )
-        return lines
+    rows.append(("Overall", total_complete, total_missing, total_aborted, total_all))
+    return rows
 
-    def render_table(self) -> Table:
-        table = Table(title="datp-cp Status", border_style="cyan")
-        table.add_column("Scope", style="bold")
-        table.add_column("Complete", justify="right", style="green")
-        table.add_column("Missing", justify="right", style="yellow")
-        table.add_column("Aborted", justify="right", style="red")
-        table.add_column("Total", justify="right")
 
-        for label, complete, missing, aborted, total in self.summary_rows():
-            style = "bold" if label == "Overall" else ""
-            table.add_row(
-                f"[{style}]{label}[/{style}]" if style else label,
-                str(complete),
-                str(missing),
-                str(aborted),
-                str(total),
-            )
-        return table
+def format_status_lines(report: _StatusReport) -> list[str]:
+    return [
+        (
+            f"{label}: complete={complete} "
+            f"missing={missing} "
+            f"aborted={aborted} "
+            f"(total={total})"
+        )
+        for label, complete, missing, aborted, total in _summary_rows(report)
+    ]
+
+
+def render_status_table(report: _StatusReport) -> Table:
+    table = Table(title="datp-cp Status", border_style="cyan")
+    table.add_column("Scope", style="bold")
+    table.add_column("Complete", justify="right", style="green")
+    table.add_column("Missing", justify="right", style="yellow")
+    table.add_column("Aborted", justify="right", style="red")
+    table.add_column("Total", justify="right")
+
+    for label, complete, missing, aborted, total in _summary_rows(report):
+        style = "bold" if label == "Overall" else ""
+        table.add_row(
+            f"[{style}]{label}[/{style}]" if style else label,
+            str(complete),
+            str(missing),
+            str(aborted),
+            str(total),
+        )
+    return table
 
 
 def get_status(base_dir: Path) -> _StatusReport:
@@ -137,4 +137,4 @@ def status(
 ) -> None:
     """Report experiment cell completion status."""
     report = get_status(base_dir=base_dir)
-    console.print(report.render_table())
+    console.print(render_status_table(report))

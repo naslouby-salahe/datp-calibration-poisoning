@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datp.core.enums import ThresholdPolicy
 
-from datp.app.cli.status import get_status
+from datp.app.cli.status import format_status_lines, get_status
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactFile
 from datp.config.stages import ExperimentStage
@@ -67,7 +67,7 @@ class TestAbortedDetected:
 class TestSummaryLinesFormat:
     def test_summary_lines_format(self, tmp_path):
         report = get_status(base_dir=tmp_path)
-        lines = report.summary_lines()
+        lines = format_status_lines(report)
 
         assert len(lines) == 2  # 1 stage + Overall
 

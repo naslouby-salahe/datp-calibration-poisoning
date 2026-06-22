@@ -13,7 +13,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from datp.attacks.execution.bounded_sweep_run import write_nbaiot_main_manifest
+from datp.attacks.sweep_run import write_bounded_sweep_manifest
 from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.stages import (
     ExperimentStage,
@@ -126,7 +126,7 @@ def run_bounded_sweep(
             f"False (gate {cfg.gate!r} not satisfied)."
         )
         raise typer.Exit(code=1)
-    out_path = write_nbaiot_main_manifest(base_dir)
+    out_path = write_bounded_sweep_manifest(base_dir)
     _stdout.print(f"[bold green]Wrote bounded-sweep manifest:[/bold green] {out_path}")
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from datp.attacks.manifests.run_manifest import (
+from datp.attacks.run_manifest import (
     SPLIT_SEMANTICS,
     ProvenanceRecord,
     RunManifest,

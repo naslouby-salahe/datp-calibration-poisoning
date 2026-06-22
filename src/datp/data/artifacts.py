@@ -6,7 +6,7 @@ from typing import Mapping
 import polars as pl
 from sklearn.preprocessing import StandardScaler
 
-from datp.artifacts.constants import SCALER_FILE
+from datp.artifacts.names import ArtifactFile
 from datp.data.catalog import DatasetSpec
 from datp.data.common.schemas import validate_feature_artifact
 from datp.data.common.storage import write_artifact
@@ -44,4 +44,4 @@ def write_client_splits(
             )
 
     if scaler is not None:
-        save_scaler(scaler, client_dir / SCALER_FILE)
+        save_scaler(scaler, client_dir / ArtifactFile.SCALER)

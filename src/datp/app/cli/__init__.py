@@ -19,7 +19,7 @@ def _main_callback(ctx: typer.Context) -> None:
 
 
 from datp.app.cli.audit import app as audit_app  # noqa: E402
-from datp.app.cli.checkpoint_protocol import app as checkpoint_protocol_app  # noqa: E402
+from datp.app.cli.checkpoint import app as checkpoint_protocol_app  # noqa: E402
 from datp.app.cli.config import app as config_app  # noqa: E402
 from datp.app.cli.poison import app as poison_app  # noqa: E402
 from datp.app.cli.report import app as report_app  # noqa: E402

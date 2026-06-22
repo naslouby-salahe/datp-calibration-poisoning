@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from rich.console import Console
 from rich.logging import RichHandler
 
-from datp.core.enums import ArtifactFile
+from datp.artifacts.names import ArtifactFile
 
 if TYPE_CHECKING:
     from datp.config.models import LoggingConfig

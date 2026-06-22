@@ -32,16 +32,15 @@ from datp.artifacts.poison_names import (
     THRESHOLD_QUANTILE,
 )
 from datp.attacks.constants import CLUSTER_RANDOM_STATE
-from datp.attacks.execution.cell_runner import (
+from datp.attacks.cell_runner import (
     InjectionOutcome,
     InjectionSpec,
-    PolicyPair,
     inject_single_victim,
     pending_threshold,
     recompute_pair,
 )
-from datp.attacks.metrics.metric_engine import (
-    MetricEngineInput,
+from datp.attacks.metrics import (
+    MetricInput,
     MetricResult,
     compute_metrics,
     compute_mu_flag_threshold,
@@ -58,6 +57,7 @@ from datp.core.seeds import SeedPair
 from datp.attacks.enums import (
     PoisoningSourceStrategy,
 )
+from datp.attacks.types import ThresholdPairBase
 from datp.core.enums import ThresholdPolicy
 from datp.testsupport.synthetic_scores import SyntheticScoreSet
 from datp.thresholding.eligibility import compute_client_thresholds, compute_tau_global
@@ -65,7 +65,7 @@ from datp.thresholding.policies.cluster_threshold import compute as cluster_comp
 
 __all__ = [
     "InjectionOutcome",
-    "PolicyPair",
+    "ThresholdPairBase",
     "inject_single_victim",
     "pending_threshold",
     "recompute_pair",
@@ -99,8 +99,8 @@ class SmokeCellResult:
     fraction: float
     source: PoisoningSourceStrategy
     outcome: InjectionOutcome
-    clean_pair: PolicyPair
-    poisoned_pair: PolicyPair
+    clean_pair: ThresholdPairBase
+    poisoned_pair: ThresholdPairBase
     clean_metrics: MetricResult
     poisoned_metrics: MetricResult
     mu_flag_threshold: float
@@ -137,7 +137,7 @@ def run_smoke_cell(
     )
     clean_pair = recompute_pair(collection, clean_outcome.poisoned_cal_set, policy)
     clean_metrics = compute_metrics(
-        MetricEngineInput(
+        MetricInput(
             collection=collection, pair=clean_pair, mu_flag_threshold=None
         )
     )
@@ -160,7 +160,7 @@ def run_smoke_cell(
     )
     poisoned_pair = recompute_pair(collection, outcome.poisoned_cal_set, policy)
     poisoned_metrics = compute_metrics(
-        MetricEngineInput(
+        MetricInput(
             collection=collection, pair=poisoned_pair, mu_flag_threshold=mu_flag
         )
     )
@@ -214,7 +214,7 @@ def victim_seed_deltas(
         )
         pair = recompute_pair(collection, outcome.poisoned_cal_set, policy)
         entry = compute_metrics(
-            MetricEngineInput(collection=collection, pair=pair, mu_flag_threshold=None)
+            MetricInput(collection=collection, pair=pair, mu_flag_threshold=None)
         ).delta_tau[victim_id]
         deltas[ps] = entry.delta_tau
     return deltas

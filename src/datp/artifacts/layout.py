@@ -50,12 +50,8 @@ class PolicyRunPaths:
 
 
 @dataclass(frozen=True, slots=True)
-class ArtifactLayout:
-    """Canonical artifact paths for one experiment stage.
-
-    Checkpoint and score paths intentionally omit policy: GLOBAL_THRESHOLD-CLUSTER_THRESHOLD share the
-    trained encoder and scores.
-    """
+class ScoreLayout:
+    """Score/checkpoint cell paths for one experiment stage."""
 
     base_dir: Path
     stage: ExperimentStage
@@ -69,12 +65,8 @@ class ArtifactLayout:
         return self.base_dir / ArtifactDir.SCORES / self.stage.value
 
     @property
-    def _result_root(self) -> Path:
-        return self.base_dir / ArtifactDir.RESULTS / self.stage.value
-
-    @property
-    def _log_root(self) -> Path:
-        return self.base_dir / ArtifactDir.LOGS / self.stage.value
+    def checkpoint_root(self) -> Path:
+        return self._checkpoint_root
 
     def checkpoint_dir(self, cell: TrainingCellId) -> Path:
         return self._checkpoint_root / _seed_segment(cell.seed)
@@ -96,18 +88,6 @@ class ArtifactLayout:
             checkpoint_round=checkpoint_round,
         )
 
-    def _policy_run_paths(
-        self, run: PolicyRunId, seg: Path, checkpoint_round: int | None = None
-    ) -> PolicyRunPaths:
-        result_dir = self._result_root / run.policy.value / seg
-        return PolicyRunPaths(
-            run=run,
-            result_dir=result_dir,
-            metrics_path=result_dir / ArtifactFile.METRICS,
-            log_dir=self._log_root / run.policy.value / seg,
-            checkpoint_round=checkpoint_round,
-        )
-
     def score_cell(self, cell: TrainingCellId) -> ScoreCellPaths:
         return self._score_cell_paths(cell, _seed_segment(cell.seed))
 
@@ -117,18 +97,6 @@ class ArtifactLayout:
         return self._score_cell_paths(
             cell,
             _round_aware_segment(cell.seed, checkpoint_round),
-            checkpoint_round,
-        )
-
-    def policy_run(self, run: PolicyRunId) -> PolicyRunPaths:
-        return self._policy_run_paths(run, _seed_segment(run.seed))
-
-    def policy_run_for_round(
-        self, run: PolicyRunId, checkpoint_round: int
-    ) -> PolicyRunPaths:
-        return self._policy_run_paths(
-            run,
-            _round_aware_segment(run.seed, checkpoint_round),
             checkpoint_round,
         )
 
@@ -157,4 +125,103 @@ class ArtifactLayout:
             self.score_cell_for_round(cell, checkpoint_round).score_dir
             / stage
             / f"{client_id}{PathToken.PARQUET_EXT}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RunLayout:
+    """Policy-run result/log paths for one experiment stage."""
+
+    base_dir: Path
+    stage: ExperimentStage
+
+    @property
+    def _result_root(self) -> Path:
+        return self.base_dir / ArtifactDir.RESULTS / self.stage.value
+
+    @property
+    def _log_root(self) -> Path:
+        return self.base_dir / ArtifactDir.LOGS / self.stage.value
+
+    def _policy_run_paths(
+        self, run: PolicyRunId, seg: Path, checkpoint_round: int | None = None
+    ) -> PolicyRunPaths:
+        result_dir = self._result_root / run.policy.value / seg
+        return PolicyRunPaths(
+            run=run,
+            result_dir=result_dir,
+            metrics_path=result_dir / ArtifactFile.METRICS,
+            log_dir=self._log_root / run.policy.value / seg,
+            checkpoint_round=checkpoint_round,
+        )
+
+    def policy_run(self, run: PolicyRunId) -> PolicyRunPaths:
+        return self._policy_run_paths(run, _seed_segment(run.seed))
+
+    def policy_run_for_round(
+        self, run: PolicyRunId, checkpoint_round: int
+    ) -> PolicyRunPaths:
+        return self._policy_run_paths(
+            run,
+            _round_aware_segment(run.seed, checkpoint_round),
+            checkpoint_round,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactLayout:
+    """Facade composing score and run artifact layouts."""
+
+    base_dir: Path
+    stage: ExperimentStage
+
+    @property
+    def _scores(self) -> ScoreLayout:
+        return ScoreLayout(base_dir=self.base_dir, stage=self.stage)
+
+    @property
+    def _runs(self) -> RunLayout:
+        return RunLayout(base_dir=self.base_dir, stage=self.stage)
+
+    def checkpoint_dir(self, cell: TrainingCellId) -> Path:
+        return self._scores.checkpoint_dir(cell)
+
+    def checkpoint_dir_for_round(
+        self, cell: TrainingCellId, checkpoint_round: int
+    ) -> Path:
+        return self._scores.checkpoint_dir_for_round(cell, checkpoint_round)
+
+    def score_cell(self, cell: TrainingCellId) -> ScoreCellPaths:
+        return self._scores.score_cell(cell)
+
+    def score_cell_for_round(
+        self, cell: TrainingCellId, checkpoint_round: int
+    ) -> ScoreCellPaths:
+        return self._scores.score_cell_for_round(cell, checkpoint_round)
+
+    def policy_run(self, run: PolicyRunId) -> PolicyRunPaths:
+        return self._runs.policy_run(run)
+
+    def policy_run_for_round(
+        self, run: PolicyRunId, checkpoint_round: int
+    ) -> PolicyRunPaths:
+        return self._runs.policy_run_for_round(run, checkpoint_round)
+
+    def score_file(
+        self, cell: TrainingCellId, stage: ScoringStage, client_id: str
+    ) -> Path:
+        return self._scores.score_file(cell, stage, client_id)
+
+    def score_file_for_round(
+        self,
+        cell: TrainingCellId,
+        stage: ScoringStage,
+        client_id: str,
+        checkpoint_round: int,
+    ) -> Path:
+        return self._scores.score_file_for_round(
+            cell,
+            stage,
+            client_id,
+            checkpoint_round,
         )

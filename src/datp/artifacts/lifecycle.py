@@ -37,6 +37,29 @@ def check_run_state(run_dir: Path) -> RunState:
     return RunState.IN_PROGRESS
 
 
+def _format_abort_text(
+    *,
+    last_completed_round: int | None,
+    policy: ThresholdPolicy | None,
+    seed: int | None,
+    exc_type: type[BaseException] | None,
+    exc_val: BaseException | None,
+    exc_tb: TracebackType | None,
+) -> str:
+    lines = [
+        f"last_completed_round: {last_completed_round}",
+        f"policy: {str(policy) if policy is not None else 'None'}",
+        f"seed: {seed}",
+        f"exception_type: {exc_type.__name__ if exc_type else 'None'}",
+        f"exception_message: {exc_val}",
+    ]
+    if exc_tb is not None:
+        tb_lines = traceback.format_tb(exc_tb)
+        lines.append("traceback:")
+        lines.extend(f" {line.rstrip()}" for line in tb_lines)
+    return "\n".join(lines) + "\n"
+
+
 class RunLifecycle:
     def __init__(
         self,
@@ -99,16 +122,12 @@ class RunLifecycle:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        lines = [
-            f"last_completed_round: {self.last_completed_round}",
-            f"policy: {str(self.policy) if self.policy is not None else 'None'}",
-            f"seed: {self.seed}",
-            f"exception_type: {exc_type.__name__ if exc_type else 'None'}",
-            f"exception_message: {exc_val}",
-        ]
-        if exc_tb is not None:
-            tb_lines = traceback.format_tb(exc_tb)
-            lines.append("traceback:")
-            lines.extend(f" {line.rstrip()}" for line in tb_lines)
-
-        (self.run_dir / ArtifactFile.RUN_ABORTED).write_text("\n".join(lines) + "\n")
+        text = _format_abort_text(
+            last_completed_round=self.last_completed_round,
+            policy=self.policy,
+            seed=self.seed,
+            exc_type=exc_type,
+            exc_val=exc_val,
+            exc_tb=exc_tb,
+        )
+        (self.run_dir / ArtifactFile.RUN_ABORTED).write_text(text)

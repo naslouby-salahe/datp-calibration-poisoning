@@ -108,9 +108,9 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # SweepCellSpec.target_scope: protocol lock — the bounded sweep
         # matrix is always SINGLE_CLIENT; any other scope is out of scope here
         ("attacks/planning/bounded_sweep_matrix.py", "SweepCellSpec", "target_scope"),
-        # MetricEngineInput: None defaults represent "not yet locked/computed"
-        ("attacks/types.py", "MetricEngineInput", "mu_flag_threshold"),
-        ("attacks/types.py", "MetricEngineInput", "auroc_set"),
+        # MetricInput: None defaults represent "not yet locked/computed"
+        ("attacks/types.py", "MetricInput", "mu_flag_threshold"),
+        ("attacks/types.py", "MetricInput", "auroc_set"),
         # SweepCellConfig: per-training-seed runtime config; scope_idx/q/cluster_seed
         # are protocol-constant hyperparams; auroc_set is lazy-computed
         ("attacks/execution/bounded_sweep_cell.py", "SweepCellConfig", "auroc_set"),

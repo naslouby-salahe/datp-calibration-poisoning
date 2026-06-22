@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from datp.core.enums import ThresholdPolicy
 from datp.config.stages import ExperimentStage
-from datp.core.enums import PathToken
+from datp.artifacts.names import PathToken
 
 if TYPE_CHECKING:
     from typing import TypeAlias
