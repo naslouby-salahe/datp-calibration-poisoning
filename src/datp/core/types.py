@@ -1,7 +1,7 @@
-"""Core data models and shared types for DATP."""
+"""Core data models and shared types for datp-cp."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 from typing import Any, SupportsIndex, overload

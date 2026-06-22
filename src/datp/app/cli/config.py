@@ -1,4 +1,4 @@
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 from pathlib import Path
 
 import typer

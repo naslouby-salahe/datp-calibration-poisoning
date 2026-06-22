@@ -42,7 +42,7 @@ def _should_log_epoch_progress(
 
 
 def _quiet_lightning_console_logging() -> None:
-    # Suppresses Lightning console chatter while preserving DATP structured logs.
+    # Suppresses Lightning console chatter while preserving datp-cp structured logs.
     for name in (
         "lightning",
         "lightning.fabric",

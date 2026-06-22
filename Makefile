@@ -4,7 +4,7 @@ SHELL := /bin/bash
 
 PYTHON := .venv/bin/python
 PYTEST := $(PYTHON) -m pytest
-DATP := $(PYTHON) -m datp.app.cli
+DATP_CLI := $(PYTHON) -m datp.app.cli
 OUTPUTS_DIR := outputs
 
 .DEFAULT_GOAL := help
@@ -38,7 +38,7 @@ datp-cp-unit-tests: ## Run unit tests only (faster iteration during development)
 
 .PHONY: datp-cp-clean
 datp-cp-clean: ## [1] Generate clean N-BaIoT artifacts (scores, thresholds, manifests).
-	$(DATP) sweep --base-dir=$(OUTPUTS_DIR) --data-root=.
+	$(DATP_CLI) sweep --base-dir=$(OUTPUTS_DIR) --data-root=.
 
 .PHONY: datp-cp-smoke
 datp-cp-smoke: ## [2] Run synthetic smoke invariant tests (must pass before main run).
@@ -46,27 +46,27 @@ datp-cp-smoke: ## [2] Run synthetic smoke invariant tests (must pass before main
 
 .PHONY: datp-cp-smoke-preview
 datp-cp-smoke-preview: ## Print the smoke stage config preview (does not run invariant tests).
-	$(DATP) poison smoke
+	$(DATP_CLI) poison smoke
 
 .PHONY: datp-cp-dry-run
 datp-cp-dry-run: ## [3] Enumerate the N-BaIoT main run plan without execution.
-	$(DATP) poison dry-run --stage nbaiot_main
+	$(DATP_CLI) poison dry-run --stage nbaiot_main
 
 .PHONY: datp-cp-run
 datp-cp-run: ## [4] Run the authorized N-BaIoT main calibration-poisoning matrix.
-	$(DATP) poison run-bounded-sweep --base-dir=$(OUTPUTS_DIR)
+	$(DATP_CLI) poison run-bounded-sweep --base-dir=$(OUTPUTS_DIR)
 
 .PHONY: audit-results
 audit-results: ## [5] Audit completed result artifacts and manifest provenance.
-	$(DATP) audit results --base-dir=$(OUTPUTS_DIR) --data-root=.
+	$(DATP_CLI) audit results --base-dir=$(OUTPUTS_DIR) --data-root=.
 
 .PHONY: status
 status: ## Show current experiment artifact status (complete/missing/aborted counts).
-	$(DATP) status --base-dir=$(OUTPUTS_DIR)
+	$(DATP_CLI) status --base-dir=$(OUTPUTS_DIR)
 
 .PHONY: datp-cp-report
 datp-cp-report: ## [6] Build report artifacts (figures, tables, statistics) from completed outputs.
-	$(DATP) report all --base-dir=$(OUTPUTS_DIR)
+	$(DATP_CLI) report all --base-dir=$(OUTPUTS_DIR)
 
 # ---------------------------------------------------------------------------
 # Cleanup

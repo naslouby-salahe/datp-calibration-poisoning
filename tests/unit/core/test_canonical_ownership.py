@@ -5,7 +5,7 @@ preventing drift back to the pre-canonicalization state.
 """
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import datp.checkpointing.enums as checkpointing_enums
 import datp.core.enums as core_enums

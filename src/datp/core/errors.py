@@ -1,4 +1,4 @@
-"""Canonical error-message formatters for DATP.
+"""Canonical error-message formatters for datp-cp.
 
 Every formatter produces a ``[module] ...`` prefix so that error messages
 are self-documenting about their origin.

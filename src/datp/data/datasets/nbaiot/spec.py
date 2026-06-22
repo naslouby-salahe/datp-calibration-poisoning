@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datp.data.catalog import (
+from datp.data.specs import (
     ClientIdentity,
     DatasetID,
     DatasetSpec,

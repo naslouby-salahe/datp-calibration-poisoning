@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 from datp.thresholding.eligibility import ClientThresholdsCollection
 
 if TYPE_CHECKING:
-    from datp.attacks.injector import InjectionResult
+    from datp.attacks.injection.injector import InjectionResult
     from datp.attacks.score_containers import ScoreCollection
 
 

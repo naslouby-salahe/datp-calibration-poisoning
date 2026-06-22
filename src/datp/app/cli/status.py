@@ -85,7 +85,7 @@ class _StatusReport:
         return lines
 
     def render_table(self) -> Table:
-        table = Table(title="DATP Status", border_style="cyan")
+        table = Table(title="datp-cp Status", border_style="cyan")
         table.add_column("Scope", style="bold")
         table.add_column("Complete", justify="right", style="green")
         table.add_column("Missing", justify="right", style="yellow")

@@ -1,4 +1,4 @@
-"""DATP: Device-Aware Threshold Personalization package."""
+"""datp-cp: calibration-channel poisoning of threshold policies."""
 
 from __future__ import annotations
 

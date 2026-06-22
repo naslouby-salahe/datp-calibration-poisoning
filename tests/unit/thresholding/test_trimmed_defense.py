@@ -12,8 +12,8 @@ import math
 import numpy as np
 import pytest
 
-from datp.attacks.cell_runner import InjectionSpec, inject_single_victim, recompute_pair
-from datp.attacks.defenses import (
+from datp.attacks.execution.cell_runner import InjectionSpec, inject_single_victim, recompute_pair
+from datp.attacks.injection.defenses import (
     apply_defense,
     build_defended_collection,
     trimmed_calibration,

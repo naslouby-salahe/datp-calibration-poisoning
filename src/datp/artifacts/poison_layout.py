@@ -30,8 +30,8 @@ from datp.attacks.enums import (
     AttackerObjective,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
-    ThresholdPolicy,
 )
+from datp.core.enums import ThresholdPolicy
 from datp.core.enums import PathToken
 from datp.core.seeds import SeedPair
 from datp.data.catalog import DatasetID

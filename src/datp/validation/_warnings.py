@@ -1,7 +1,7 @@
 """Warning emission functions for the results audit."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 from collections import defaultdict
 from typing import TYPE_CHECKING

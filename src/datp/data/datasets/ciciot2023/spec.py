@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from datp.data.catalog import (
+from datp.data.specs import (
     CapPolicy,
     CapStrategy,
     ClientIdentity,

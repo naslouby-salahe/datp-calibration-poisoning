@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 from pathlib import Path

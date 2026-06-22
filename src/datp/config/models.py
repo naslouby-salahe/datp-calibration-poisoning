@@ -5,7 +5,7 @@ scientific parameters downstream.
 """
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 

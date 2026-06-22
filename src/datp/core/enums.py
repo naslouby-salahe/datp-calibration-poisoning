@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import enum
 
-from datp.attacks.enums import ThresholdPolicy
-
 
 class DatasetID(enum.StrEnum):
     NBAIOT = "nbaiot"
     CICIOT2023 = "ciciot2023"
+
+
+class ThresholdPolicy(enum.StrEnum):
+    """Canonical threshold policies for datp-cp."""
+
+    GLOBAL_THRESHOLD = "global_threshold"
+    LOCAL_THRESHOLD = "local_threshold"
+    CLUSTER_THRESHOLD = "cluster_threshold"
 
 
 class ClientIdentity(enum.StrEnum):

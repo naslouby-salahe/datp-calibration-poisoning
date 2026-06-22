@@ -33,7 +33,7 @@ def results(
         cfg=BASE_CONFIG,
         data_root=data_root,
     )
-    table = Table(title="DATP Results Audit", border_style="cyan")
+    table = Table(title="datp-cp Results Audit", border_style="cyan")
     table.add_column("Artifact", style="bold")
     table.add_column("Path")
     for name, path in paths.items():

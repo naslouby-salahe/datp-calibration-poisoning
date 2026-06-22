@@ -1,7 +1,7 @@
 """Sweep orchestration: enumerate, validate, and run controlled policy cells."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import time
 from collections import defaultdict

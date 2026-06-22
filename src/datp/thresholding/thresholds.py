@@ -1,7 +1,6 @@
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
-import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -52,42 +51,14 @@ def arithmetic_mean_threshold(tau_list: list[float] | np.ndarray) -> float:
     return float(arr.mean())
 
 
-def conformal_threshold(errors: np.ndarray, alpha: float) -> float:
-    """Per‑client split‑conformal threshold.
-
-    k = ceil((n + 1) * (1 − alpha))
-    τ = sorted_errors[k − 1] (0‑indexed)
-
-    If k > n (insufficient samples for the requested alpha), returns max(errors)
-    as a conservative fallback. Raises ValueError if errors is empty.
-
-    Primary anchor: Lu et al. ICML 2023; co‑anchor: Humbert et al. ICML 2023.
-    """
-    if errors.size == 0:
-        raise ValueError(
-            fmt(
-                _MODULE,
-                "Cannot compute conformal threshold",
-                "non-empty array",
-                "empty array",
-            )
-        )
-    n = errors.size
-    k = int(math.ceil((n + 1) * (1.0 - alpha)))
-    if k > n:
-        return float(np.max(errors))
-    sorted_errors = np.sort(errors)
-    return float(sorted_errors[k - 1])
-
-
 def _derive_global(args: _DeriveArgs) -> ThresholdResult:
-    from datp.thresholding.strategies import global_threshold as global_mod
+    from datp.thresholding.policies import global_threshold as global_mod
 
     return global_mod.compute(args.client_errors, args.n_min, q=args.q, run=args.run)
 
 
 def _derive_local(args: _DeriveArgs, tau_global: float) -> ThresholdResult:
-    from datp.thresholding.strategies import local_threshold as local_mod
+    from datp.thresholding.policies import local_threshold as local_mod
 
     return local_mod.compute(
         args.client_errors, args.n_min, tau_global, q=args.q, run=args.run
@@ -99,7 +70,7 @@ def _derive_cluster(
     tau_global: float,
     threshold_cfg: "ThresholdConfig",
 ) -> ThresholdResult:
-    from datp.thresholding.strategies import cluster_threshold as cluster_mod
+    from datp.thresholding.policies import cluster_threshold as cluster_mod
 
     k_for_a = threshold_cfg.cluster_k_nbaiot
     return cluster_mod.compute(

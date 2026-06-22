@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 from datp.config.stages import ExperimentStage
 from datp.core.enums import PathToken
 

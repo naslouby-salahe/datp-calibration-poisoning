@@ -1,7 +1,7 @@
 """Regression tests: audit _threshold_result must equal canonical derive_threshold."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import numpy as np
 import pytest

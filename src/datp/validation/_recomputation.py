@@ -1,7 +1,7 @@
 """Metric recomputation verification for the results audit."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import dataclasses
 import math

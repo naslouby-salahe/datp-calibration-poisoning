@@ -32,7 +32,7 @@ from datp.artifacts.poison_names import (
     THRESHOLD_QUANTILE,
 )
 from datp.attacks.constants import CLUSTER_RANDOM_STATE
-from datp.attacks.cell_runner import (
+from datp.attacks.execution.cell_runner import (
     InjectionOutcome,
     InjectionSpec,
     PolicyPair,
@@ -40,7 +40,7 @@ from datp.attacks.cell_runner import (
     pending_threshold,
     recompute_pair,
 )
-from datp.attacks.metric_engine import (
+from datp.attacks.metrics.metric_engine import (
     MetricEngineInput,
     MetricResult,
     compute_metrics,
@@ -57,11 +57,11 @@ from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.seeds import SeedPair
 from datp.attacks.enums import (
     PoisoningSourceStrategy,
-    ThresholdPolicy,
 )
+from datp.core.enums import ThresholdPolicy
 from datp.testsupport.synthetic_scores import SyntheticScoreSet
 from datp.thresholding.eligibility import compute_client_thresholds, compute_tau_global
-from datp.thresholding.strategies.cluster_threshold import compute as cluster_compute
+from datp.thresholding.policies.cluster_threshold import compute as cluster_compute
 
 __all__ = [
     "InjectionOutcome",

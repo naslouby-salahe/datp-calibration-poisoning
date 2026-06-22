@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import enum
 from collections.abc import Mapping
@@ -86,9 +86,9 @@ _SCORING_SOURCE_FILES = (
     Path("src/datp/scoring/cal_loading.py"),
 )
 _THRESHOLD_SOURCE_FILES = (
-    Path("src/datp/thresholding/strategies/global_threshold.py"),
-    Path("src/datp/thresholding/strategies/local_threshold.py"),
-    Path("src/datp/thresholding/strategies/cluster_threshold.py"),
+    Path("src/datp/thresholding/policies/global_threshold.py"),
+    Path("src/datp/thresholding/policies/local_threshold.py"),
+    Path("src/datp/thresholding/policies/cluster_threshold.py"),
     Path("src/datp/thresholding/thresholds.py"),
 )
 _METRICS_SOURCE_FILES = (
@@ -567,7 +567,7 @@ def run_results_audit(
 
 
 def _write_warnings(path: Path, warnings: list[WarningRecord]) -> None:
-    lines = ["# DATP Results Audit Warnings", ""]
+    lines = ["# datp-cp Results Audit Warnings", ""]
     if not warnings:
         lines.append("No warnings.")
     for warning in warnings:
@@ -589,7 +589,7 @@ def _write_summary(
     )
     fail_count = sum(row.status == AuditStatus.FAIL for row in invariant_results)
     lines = [
-        "# DATP Results Audit Summary",
+        "# datp-cp Results Audit Summary",
         "",
         f"- Completed runs audited: {len(manifest_records)}",
         f"- Controlled-policy invariant PASS cells: {pass_count}",

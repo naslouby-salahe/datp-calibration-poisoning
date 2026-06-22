@@ -35,14 +35,14 @@ def test_command_reference_make_targets_exist() -> None:
     assert documented - targets == set()
 
 
-def test_makefile_datp_commands_are_registered() -> None:
+def test_makefile_cli_commands_are_registered() -> None:
     makefile_commands = set(
-        re.findall(r"\$\(DATP\)\s+([A-Za-z0-9_.-]+)", _makefile_text())
+        re.findall(r"\$\(DATP_CLI\)\s+([A-Za-z0-9_.-]+)", _makefile_text())
     )
     assert makefile_commands - _registered_root_commands() == set()
 
 
 def test_removed_diagnostic_cli_targets_do_not_return() -> None:
     makefile = _makefile_text()
-    assert "$(DATP) diagnostic" not in makefile
+    assert "$(DATP_CLI) diagnostic" not in makefile
     assert "diagnostic-regime-" not in makefile

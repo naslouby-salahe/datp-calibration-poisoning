@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 from datp.config.stages import ExperimentStage
 from datp.core.metric_enums import MetricName
 from datp.validation._audit_types import _CellPanel

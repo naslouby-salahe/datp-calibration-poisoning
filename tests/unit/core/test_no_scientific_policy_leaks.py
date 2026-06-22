@@ -83,7 +83,7 @@ class TestNoLocalStatsBaselines:
 
 
 class TestNoAttrsDefineInSrc:
-    """No new attrs.define usage for internal DATP domain specs."""
+    """No new attrs.define usage for internal datp-cp domain specs."""
 
     _PATTERN = re.compile(r"@attrs\.define|attrs\.define\(")
 

@@ -8,7 +8,7 @@ All payloads are 32-bit (4-byte) floats.
 """
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 from dataclasses import dataclass
 

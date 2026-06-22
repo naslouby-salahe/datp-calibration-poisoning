@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 from datp.app.cli.status import get_status
 from datp.artifacts.layout import ArtifactLayout

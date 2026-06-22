@@ -5,10 +5,21 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 
-from datp.evaluation.metrics import ClientEvaluationRecord
+
+class _MetricValues(Protocol):
+    fpr: float
+    tpr: float
+    balanced_accuracy: float
+    macro_f1: float
+
+
+class _ClientMetricRecord(Protocol):
+    client_id: str
+    metrics: _MetricValues
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +33,7 @@ class _FilteredMetrics:
 
 
 def _collect_complete_metrics(
-    cr: ClientEvaluationRecord,
+    cr: _ClientMetricRecord,
     incomplete_set: set[str],
     tpr_list: list[float],
     ba_list: list[float],
@@ -39,7 +50,7 @@ def _collect_complete_metrics(
 
 
 def _filter_eligible_metrics(
-    clients: Sequence[ClientEvaluationRecord],
+    clients: Sequence[_ClientMetricRecord],
     eligible_ids: Sequence[str],
     incomplete_ids: Sequence[str] | None,
 ) -> _FilteredMetrics:

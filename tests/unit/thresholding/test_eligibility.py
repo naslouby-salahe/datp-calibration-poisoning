@@ -1,7 +1,7 @@
 """Unit tests for datp.thresholding.eligibility — eligibility partition, client thresholds, tau_global, and ThresholdResult assembly."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import numpy as np
 import pytest

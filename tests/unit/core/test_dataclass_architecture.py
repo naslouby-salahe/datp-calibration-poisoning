@@ -90,14 +90,14 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("artifacts/layout.py", "ScoreCellPaths", "checkpoint_round"),
         ("artifacts/layout.py", "PolicyRunPaths", "checkpoint_round"),
         # DatasetSpec: optional per-dataset fields; not all datasets use all fields
-        ("data/catalog.py", "DatasetSpec", "cap_policy"),
-        ("data/catalog.py", "DatasetSpec", "family_map"),
-        ("data/catalog.py", "DatasetSpec", "device_ids"),
-        ("data/catalog.py", "DatasetSpec", "attack_family_dirs"),
-        ("data/catalog.py", "DatasetSpec", "expected_client_count"),
+        ("data/specs.py", "DatasetSpec", "cap_policy"),
+        ("data/specs.py", "DatasetSpec", "family_map"),
+        ("data/specs.py", "DatasetSpec", "device_ids"),
+        ("data/specs.py", "DatasetSpec", "attack_family_dirs"),
+        ("data/specs.py", "DatasetSpec", "expected_client_count"),
         # HolmResult.descriptive_only: protocol lock — Holm is ALWAYS descriptive
         # only here; True is the only valid value; False would be a protocol violation
-        ("attacks/inference.py", "HolmResult", "descriptive_only"),
+        ("attacks/metrics/inference.py", "HolmResult", "descriptive_only"),
         # ScoreCollection.n_min: canonical N_MIN=100 lock (Calibration-Pending
         # boundary); any deviation from 100 is a protocol violation
         ("attacks/score_containers.py", "ScoreCollection", "n_min"),
@@ -107,28 +107,28 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/score_containers.py", "ScoreCollection", "_pending_ids"),
         # SweepCellSpec.target_scope: protocol lock — the bounded sweep
         # matrix is always SINGLE_CLIENT; any other scope is out of scope here
-        ("attacks/bounded_sweep_matrix.py", "SweepCellSpec", "target_scope"),
+        ("attacks/planning/bounded_sweep_matrix.py", "SweepCellSpec", "target_scope"),
         # MetricEngineInput: None defaults represent "not yet locked/computed"
         ("attacks/types.py", "MetricEngineInput", "mu_flag_threshold"),
         ("attacks/types.py", "MetricEngineInput", "auroc_set"),
         # SweepCellConfig: per-training-seed runtime config; scope_idx/q/cluster_seed
         # are protocol-constant hyperparams; auroc_set is lazy-computed
-        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "auroc_set"),
-        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "scope_idx"),
-        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "q"),
-        ("attacks/bounded_sweep_cell.py", "SweepCellConfig", "cluster_seed"),
+        ("attacks/execution/bounded_sweep_cell.py", "SweepCellConfig", "auroc_set"),
+        ("attacks/execution/bounded_sweep_cell.py", "SweepCellConfig", "scope_idx"),
+        ("attacks/execution/bounded_sweep_cell.py", "SweepCellConfig", "q"),
+        ("attacks/execution/bounded_sweep_cell.py", "SweepCellConfig", "cluster_seed"),
         # InjectionSpec: scope_idx/tail_mass are protocol-constant defaults
-        ("attacks/cell_runner.py", "InjectionSpec", "scope_idx"),
-        ("attacks/cell_runner.py", "InjectionSpec", "tail_mass"),
+        ("attacks/execution/cell_runner.py", "InjectionSpec", "scope_idx"),
+        ("attacks/execution/cell_runner.py", "InjectionSpec", "tail_mass"),
         # BootstrapConfig: CI hyperparameters with protocol-locked defaults
-        ("attacks/inference.py", "BootstrapConfig", "ci"),
-        ("attacks/inference.py", "BootstrapConfig", "n_bootstrap"),
-        ("attacks/inference.py", "BootstrapConfig", "analysis_seed"),
+        ("attacks/metrics/inference.py", "BootstrapConfig", "ci"),
+        ("attacks/metrics/inference.py", "BootstrapConfig", "n_bootstrap"),
+        ("attacks/metrics/inference.py", "BootstrapConfig", "analysis_seed"),
         # HolmConfig: alpha is the standard Holm threshold
-        ("attacks/inference.py", "HolmConfig", "alpha"),
+        ("attacks/metrics/inference.py", "HolmConfig", "alpha"),
         # InferenceInput: bootstrap_config and holm_config have sensible defaults
-        ("attacks/inference.py", "InferenceInput", "bootstrap_config"),
-        ("attacks/inference.py", "InferenceInput", "holm_config"),
+        ("attacks/metrics/inference.py", "InferenceInput", "bootstrap_config"),
+        ("attacks/metrics/inference.py", "InferenceInput", "holm_config"),
         # _DeriveInput: seed=0 is the canonical deterministic default; alpha=None
         # means "no alpha sweep" — both are genuine domain sentinels
         ("thresholding/thresholds.py", "_DeriveInput", "seed"),
@@ -137,10 +137,10 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         # reservoir mode (always REPLACE_FIXED_BUDGET and CALIBRATION_ONLY);
         # local_epochs=1 enforces E=1 lock; checkpoint_round=None is the normal
         # (non-checkpoint-protocol) case. Callers may override when needed.
-        ("attacks/run_logger.py", "ManifestBuildRequest", "local_epochs"),
-        ("attacks/run_logger.py", "ManifestBuildRequest", "checkpoint_round"),
-        ("attacks/run_logger.py", "ManifestBuildRequest", "injection_rule"),
-        ("attacks/run_logger.py", "ManifestBuildRequest", "reservoir_mode"),
+        ("attacks/manifests/run_logger.py", "ManifestBuildRequest", "local_epochs"),
+        ("attacks/manifests/run_logger.py", "ManifestBuildRequest", "checkpoint_round"),
+        ("attacks/manifests/run_logger.py", "ManifestBuildRequest", "injection_rule"),
+        ("attacks/manifests/run_logger.py", "ManifestBuildRequest", "reservoir_mode"),
         # _ResultPathKey/_LoadResultsParams: alpha=None is the domain sentinel for
         # runs without an alpha sweep; alpha-sweep callers always supply a label.
         ("reporting/build.py", "_ResultPathKey", "alpha"),

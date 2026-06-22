@@ -1,7 +1,7 @@
 """Typed test builders for evaluation unit tests."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import math
 from dataclasses import dataclass

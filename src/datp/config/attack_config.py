@@ -35,8 +35,8 @@ from datp.attacks.enums import (
     PoisoningKnowledge,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
-    ThresholdPolicy,
 )
+from datp.core.enums import ThresholdPolicy
 from datp.config.stages import ExperimentStage
 
 _DEFAULT_POLICY_SET: frozenset[ThresholdPolicy] = frozenset(DEFAULT_POLICIES)

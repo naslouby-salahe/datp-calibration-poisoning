@@ -162,7 +162,7 @@ class TestLoadModelFromCheckpoint:
         self._write_checkpoint(tmp_path)
         cpu_device = torch.device(DeviceType.CPU)
 
-        with patch("datp.scoring.generation.resolve_device", return_value=cpu_device):
+        with patch("datp.scoring.model_loading.resolve_device", return_value=cpu_device):
             model = load_model_from_checkpoint(
                 BASE_CONFIG, ckpt_dir=tmp_path, require_cuda=False
             )
@@ -179,7 +179,7 @@ class TestLoadModelFromCheckpoint:
             raise RuntimeError("CUDA is required but not available")
 
         with patch(
-            "datp.scoring.generation.resolve_device",
+            "datp.scoring.model_loading.resolve_device",
             side_effect=_raise_cuda_unavailable,
         ):
             with pytest.raises(RuntimeError, match="CUDA"):
@@ -238,14 +238,14 @@ class TestBatchedScoring:
 
 class TestErrorsToDataFrame:
     def test_empty_errors(self) -> None:
-        from datp.scoring.generation import _errors_to_dataframe
+        from datp.scoring.artifact_writing import _errors_to_dataframe
 
         df = _errors_to_dataframe(np.array([], dtype=np.float32))
         assert df.shape == (0, 1)
         assert df.columns == [SCORE_COLUMN]
 
     def test_non_empty_errors(self) -> None:
-        from datp.scoring.generation import _errors_to_dataframe
+        from datp.scoring.artifact_writing import _errors_to_dataframe
 
         errors = np.array([0.1, 0.2, 0.3], dtype=np.float32)
         df = _errors_to_dataframe(errors)

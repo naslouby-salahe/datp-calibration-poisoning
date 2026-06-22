@@ -13,7 +13,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from datp.attacks.bounded_sweep_run import write_nbaiot_main_manifest
+from datp.attacks.execution.bounded_sweep_run import write_nbaiot_main_manifest
 from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.stages import (
     ExperimentStage,

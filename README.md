@@ -69,3 +69,4 @@ N-BaIoT is the confirmatory dataset. CICIoT2023 is diagnostic-only stretch scope
 - Do not claim model poisoning, training poisoning, evasion, privacy, deployment readiness, or broad federated-learning robustness.
 
 The protocol of record is [docs/DATP_CP_Roadmap.md](docs/DATP_CP_Roadmap.md).
+The package ownership map is [docs/architecture.md](docs/architecture.md).

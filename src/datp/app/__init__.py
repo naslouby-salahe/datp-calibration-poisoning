@@ -1,2 +1,2 @@
 # SPDX-License-Identifier: Proprietary
-"""DATP application entrypoints."""
+"""datp-cp application entry points."""

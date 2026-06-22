@@ -1,7 +1,7 @@
 """Tests for datp.validation.discovery — path enumeration and parsing."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 from pathlib import Path
 

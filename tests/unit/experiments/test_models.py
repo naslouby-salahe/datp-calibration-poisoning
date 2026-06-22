@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 from datp.config.stages import ExperimentStage
 from datp.core.identity import TrainingCellId
 from datp.experiments.enums import ContingencyDecision

@@ -6,7 +6,7 @@ from datp.core.logging import configure_logging
 
 app = typer.Typer(
     name="datp",
-    help="DATP: Device-Aware Threshold Personalization CLI",
+    help="datp-cp: calibration-channel poisoning CLI",
     invoke_without_command=True,
 )
 

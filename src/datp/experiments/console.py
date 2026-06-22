@@ -2,7 +2,7 @@
 """Rich console utilities for sweep experiment output."""
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import enum
 from pathlib import Path
@@ -50,7 +50,7 @@ class _Label(enum.StrEnum):
 
 
 class _Title(enum.StrEnum):
-    SWEEP = "[bold]DATP Sweep[/bold]"
+    SWEEP = "[bold]datp-cp Sweep[/bold]"
     SWEEP_MATRIX = "Sweep Matrix"
     SWEEP_SUMMARY = "Sweep Summary"
 

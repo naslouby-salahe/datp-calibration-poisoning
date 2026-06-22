@@ -6,7 +6,7 @@ canonical metric computation (``evaluation.metrics``), and canonical score loadi
 """
 
 from __future__ import annotations
-from datp.attacks.enums import ThresholdPolicy
+from datp.core.enums import ThresholdPolicy
 
 import enum
 import json

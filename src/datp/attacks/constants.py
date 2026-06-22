@@ -2,21 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from datp.artifacts.poison_names import (
-    CLUSTER_K_NBAIOT,
-    CLUSTER_MAX_ITER,
-    CLUSTER_N_INIT,
-)
 from datp.attacks.enums import (
     AttackerObjective,
     PoisoningSourceStrategy,
-    ThresholdPolicy,
 )
-
-if TYPE_CHECKING:
-    from datp.config.attack_config import ClusterConfig
+from datp.core.enums import ThresholdPolicy
 
 NBAIOT_MAIN_SWEEP_FRACTIONS: tuple[float, ...] = (0.0, 0.10, 0.20, 0.40)
 NBAIOT_MAIN_SWEEP_FRACTION_SET: frozenset[float] = frozenset(
@@ -58,14 +48,3 @@ COMPROMISE_PATTERN_SEED: int = 400
 CLUSTER_RANDOM_STATE: int = (
     42  # for k-means only; coincidentally same as BOOTSTRAP_RANDOM_STATE
 )
-
-
-def default_cluster_config() -> "ClusterConfig":
-    from datp.config.attack_config import ClusterConfig
-
-    return ClusterConfig(
-        k=CLUSTER_K_NBAIOT,
-        n_init=CLUSTER_N_INIT,
-        max_iter=CLUSTER_MAX_ITER,
-        random_state=CLUSTER_RANDOM_STATE,
-    )
