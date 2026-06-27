@@ -1,0 +1,15 @@
+\begin{table}[htbp]
+\caption{Table 3: N-BaIoT Main Results}
+\centering
+\begin{tabular}{l c c c c c}
+\toprule
+ThresholdPolicy & CV(FPR)$\dagger$ & CV(TPR)$\dagger$ & Worst BA & P10 client Macro-F1 & Coverage \\
+\midrule
+CLUSTER_THRESHOLD & 0.615 ± 0.143 (9/9) & 0.313 ± 0.009 & 0.656 ± 0.004 & 0.299 ± 0.000 & 1.00 (9/9) \\
+GLOBAL_THRESHOLD & 0.905 ± 0.039 (9/9) & \textbf{0.255 ± 0.030} & 0.657 ± 0.008 & 0.398 ± 0.053 & 1.00 (9/9) \\
+LOCAL_THRESHOLD & \textbf{0.333 ± 0.034} (9/9) & 0.296 ± 0.036 & 0.655 ± 0.005 & 0.335 ± 0.058 & 1.00 (9/9) \\
+\bottomrule
+\end{tabular}
+
+\footnotesize{† Eligible clients only.}
+\end{table}

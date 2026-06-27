@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software or artifact, please cite it using the metadata below."
+type: software
+title: "DATP-CP: Calibration-Channel Poisoning of Federated Threshold Personalization in IoT Anomaly Detection"
+abstract: >
+  Code and curated reproducibility artifacts for the DATP-CP study on
+  calibration-channel poisoning in federated IoT anomaly detection. The artifact
+  supports the N-BaIoT experiments with physical devices as clients and the
+  GLOBAL_THRESHOLD, LOCAL_THRESHOLD, and CLUSTER_THRESHOLD policies. Training
+  data, model weights, aggregation, test scores, and test labels remain clean.
+authors:
+  - family-names: "Naslouby"
+    given-names: "Salaheddine"
+  - family-names: "Lachgar"
+    given-names: "Mohamed"
+  - family-names: "Hrimech"
+    given-names: "Hamid"
+version: "1.0.0"
+date-released: "2026-07-04"
+repository-code: "https://github.com/naslouby/datp-calibration-poisoning"
+keywords:
+  - "calibration-channel poisoning"
+  - "federated learning"
+  - "IoT anomaly detection"
+  - "threshold calibration"
+  - "N-BaIoT"

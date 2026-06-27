@@ -1,0 +1,40 @@
+{
+  "current_repository_head": "5f36c3ef39e56838ffad84cec9cef48628c0f877",
+  "note_on_head": "This is the HEAD at time of results/ curation. The artifacts were generated at the version indicated by artifact_code_version below.",
+  "artifact_code_versions_consistent_across_seeds": {
+    "package_version": "f9faf94830cbbf3c347bc90cbe3d419a80a8dca3",
+    "metric_code_version": "769c35da87f1f8403356de81043b346db79eddee821be7aae3cfc9862731db14",
+    "threshold_code_version": "f9faf94830cbbf3c347bc90cbe3d419a80a8dca3",
+    "note": "These are content-hash identities of the source modules at artifact generation time, not git commit hashes."
+  },
+  "artifact_generation_timestamps": {
+    "metrics_generated_at_utc": "2026-06-27T20:15:20.717366+00:00",
+    "scoring_generated_at_utc": "2026-06-27T20:15:20.084030+00:00",
+    "note": "Timestamps from seed_0 representative artifacts; all seeds generated in same run."
+  },
+  "config_identity": "e7f416ebf2d78790c59a70a2e73cb41a9d40a550a401b269aff3d2953d8ce4d8",
+  "split_manifest_identity": "1090687cf64d55573a5eab66e04789b7c4153e3fa2030974b912e0edc12a9b47",
+  "model_checkpoint_identity": "d5354f5c738f5823cb347e01db70f02349a1a92795d3a5c1a432dfd2a33fde09",
+  "scoring_code_version": "f9faf94830cbbf3c347bc90cbe3d419a80a8dca3",
+  "source_outputs_path": "outputs/conference_calibration_poisoning/",
+  "curated_results_created_at_utc": "2026-07-04T16:51:47.133056+00:00",
+  "seeds_used": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "stage": "nbaiot_main",
+  "dataset": "nbaiot",
+  "policies": [
+    "global_threshold",
+    "local_threshold",
+    "cluster_threshold"
+  ]
+}

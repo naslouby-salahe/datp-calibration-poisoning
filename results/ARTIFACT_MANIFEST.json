@@ -1,0 +1,131 @@
+{
+  "project": "DATP-CP",
+  "full_name": "Calibration-Channel Poisoning of Federated Threshold Personalization in IoT Anomaly Detection",
+  "artifact_scope": "N-BaIoT release artifacts only",
+  "release_dataset_scope": "N-BaIoT",
+  "note_raw_data": "Raw N-BaIoT datasets are not included. Place inputs under data/raw/N-BaIoT/ to reproduce.",
+  "note_outputs_not_committed": "The full outputs/ directory is not committed to the repository. Only compact curated artifacts are included in results/.",
+
+  "threshold_policies": [
+    "GLOBAL_THRESHOLD",
+    "LOCAL_THRESHOLD",
+    "CLUSTER_THRESHOLD"
+  ],
+  "attack_objectives": [
+    "THRESHOLD_RAISE",
+    "THRESHOLD_LOWER"
+  ],
+  "source_strategies": [
+    "HIGH_SCORE_BENIGN",
+    "LOW_SCORE_BENIGN",
+    "RANDOM_BENIGN"
+  ],
+  "injection_rule": "REPLACE_FIXED_BUDGET",
+  "fractions_represented": [0, 0.10, 0.20, 0.40],
+  "seeds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "stage": "nbaiot_main",
+  "client_definition": "physical IoT devices as FL clients",
+  "device_count": 9,
+
+  "excluded_scope": {
+    "CICIoT2023": "Not active release scope. Not included in any results/ artifact.",
+    "Edge_IIoTset": "Not active release scope. Not included in any results/ artifact.",
+    "journal_extension": "Not active release scope. Not included in any results/ artifact.",
+    "stretch_diagnostics": "Not primary scope. Not included in results/.",
+    "model_poisoning": "Out of scope. Not evaluated.",
+    "training_poisoning": "Out of scope. Not evaluated.",
+    "aggregation_poisoning": "Out of scope. Not evaluated.",
+    "evasion": "Out of scope. Not evaluated.",
+    "privacy_guarantees": "Not claimed. FL topology is used for realism, not as a privacy mechanism.",
+    "deployment_readiness": "Not claimed. This is a controlled empirical study.",
+    "raw_traffic_generation": "Out of scope. Attack operates on already-computed anomaly scores."
+  },
+
+  "included_files": {
+    "result_summaries/nbaiot_main/": {
+      "description": "Per-cell per-seed metrics.json for all three threshold policies (30 files: 3 policies × 10 seeds).",
+      "source_outputs_path": "outputs/results/nbaiot_main/",
+      "content": "Per-client FPR, TPR, CV metrics, provenance, schema versions for each policy/seed cell."
+    },
+    "configs/nbaiot_main/": {
+      "description": "Resolved experiment configs for all policy/seed cells (30 files).",
+      "source_outputs_path": "outputs/results/nbaiot_main/",
+      "content": "Fully resolved Hydra YAML configs at run time."
+    },
+    "split_manifests/nbaiot_main/": {
+      "description": "Per-seed scoring manifests with device split details and model checkpoint hashes (10 files).",
+      "source_outputs_path": "outputs/scores/nbaiot_main/",
+      "content": "Expected/actual client IDs, split types, model checkpoint identity, scoring code version."
+    },
+    "seeds/nbaiot_main/": {
+      "description": "Per-seed convergence summaries and convergence curves from FL training (20 files).",
+      "source_outputs_path": "outputs/checkpoints/nbaiot_main/",
+      "content": "Convergence round, convergence curve CSV, FL training summary."
+    },
+    "figure_inputs/": {
+      "description": "Figure data JSONs and rendered PNG/PDF figures (9 files: 3 data + 3 PNG + 3 PDF).",
+      "source_outputs_path": "outputs/figures/",
+      "content": "figure_1 (per-device FPR), figure_2 (ECDF), figure_3 (boxplots). PNG + PDF + data JSON."
+    },
+    "table_inputs/": {
+      "description": "Table 3 CSV and LaTeX (2 files).",
+      "source_outputs_path": "outputs/tables/",
+      "content": "Summary statistics across three threshold policies."
+    },
+    "negative_controls/": {
+      "description": "Bootstrap 95% CI results for FPR policy comparisons (2 files: JSON + CSV).",
+      "source_outputs_path": "outputs/analysis/",
+      "content": "Bootstrap confidence intervals; all policy comparisons exclude zero."
+    },
+    "sanity_checks/": {
+      "description": "Schema validation and reporting audit records (2 files).",
+      "source_outputs_path": "outputs/analysis/",
+      "content": "metrics_schema_validation.json (PASS status), reporting_audit.json."
+    },
+    "provenance.json": {
+      "description": "Provenance tying results to code identities, generation timestamps, and current HEAD.",
+      "content": "Code content-hash identities, generation timestamps, config/split identities, current HEAD."
+    },
+    "script_pointers.json": {
+      "description": "Pointers to figure/table generation scripts with expected inputs and outputs.",
+      "content": "Script paths, makefile targets, expected input/output paths for all figures and tables."
+    },
+    "CHECKSUMS.sha256": {
+      "description": "SHA-256 checksums for all files under results/ except CHECKSUMS.sha256 itself."
+    },
+    "README.txt": {
+      "description": "Human-readable description of results/ contents, scope, and limitations."
+    }
+  },
+
+  "excluded_large_artifacts": {
+    "outputs/conference_calibration_poisoning/nbaiot_main_manifest.json": {
+      "reason": "9.3 MB — too large for Git. Full run manifest with all per-attack per-client records.",
+      "status": "external_full_output",
+      "note": "Available in the full outputs/ directory on the original research machine. Not required for reproducing figures/tables from per-cell metrics.json."
+    },
+    "outputs/scores/nbaiot_main/*/": {
+      "reason": "Raw anomaly score parquet files — many files, each 80KB–3.1 MB. Not required to reproduce figures/tables.",
+      "status": "external_full_output"
+    },
+    "outputs/checkpoints/nbaiot_main/*/model.pt": {
+      "reason": "Binary PyTorch model checkpoints — 112 KB each × 10 seeds. Identities recorded in split_manifests.",
+      "status": "external_full_output"
+    }
+  },
+
+  "missing_artifacts": {
+    "split_manifest_with_per_device_calibration_sizes": {
+      "status": "PARTIAL",
+      "note": "Per-seed scoring_manifest.json (in split_manifests/) contains actual_splits with device-level split metadata. Full calibration-size detail is embedded in per-cell metrics.json provenance."
+    },
+    "negative_control_records_per_attack": {
+      "status": "PARTIAL",
+      "note": "Bootstrap CIs (in negative_controls/) serve as the primary statistical control artifact. Per-attack negative control records are embedded in the full outputs/conference_calibration_poisoning/nbaiot_main_manifest.json which is too large for Git."
+    },
+    "isolation_sanity_checks": {
+      "status": "PARTIAL",
+      "note": "The metrics_schema_validation.json in sanity_checks/ confirms AUROC invariance and schema validation. Full isolation checks are in the reporting_audit.json."
+    }
+  }
+}

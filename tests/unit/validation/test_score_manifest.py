@@ -1,0 +1,430 @@
+"""Tests verifying verification checks on local score files, schemas, and checkpoint matches."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+
+from datp.artifacts.names import ArtifactFile
+from datp.core.enums import (
+    SCORING_STAGES,
+)
+from datp.config.models import ExperimentStage
+from datp.data.catalog import DatasetID
+from datp.data.common.storage import write_artifact
+from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
+from datp.scoring.manifest import SCORE_COLUMN
+from datp.validation.discovery import iter_score_cells
+from datp.validation.enums import AuditArtifact, AuditStatus
+from datp.validation.score_manifest import (
+    ScoreCheckCode,
+    verify_all_score_cells,
+    verify_score_cell,
+)
+
+CLIENTS: tuple[str, ...] = NBAIOT_SPEC.device_ids
+PARTIAL_CLIENTS: tuple[str, ...] = NBAIOT_SPEC.device_ids[:3]
+
+
+def _sha256(path: Path) -> str:
+    """Helper to compute sha256 hash of a file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_score_parquet(path: Path, values: np.ndarray) -> None:
+    """Helper to write a mock scores parquet file."""
+    write_artifact(pl.DataFrame({SCORE_COLUMN: values.astype(np.float32)}), path)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _CellSpec:
+    """Test dataclass to represent cell builder specifications."""
+
+    base_dir: Path
+    data_root: Path
+    stage: ExperimentStage = ExperimentStage.NBAIOT_MAIN
+    seed: int = 0
+    clients: tuple[str, ...] = CLIENTS
+    dataset: DatasetID = DatasetID.NBAIOT
+    include_sentinel: bool = True
+    include_manifest: bool = True
+    drop_manifest_field: str | None = None
+    completion_status: str = "complete"
+    checkpoint_hash_override: str | None = None
+    checkpoint_present: bool = True
+    write_partition: bool = True
+
+
+def _write_score_files(spec: _CellSpec, cell_dir: Path) -> None:
+    """Helper to write synthetic client score Parquet files."""
+    for score_stage in SCORING_STAGES:
+        for client_id in spec.clients:
+            arr = np.linspace(0.01, 0.05, 25, dtype=np.float32)
+            _write_score_parquet(
+                cell_dir / score_stage.value / f"{client_id}.parquet", arr
+            )
+
+
+def _write_partition_files(spec: _CellSpec) -> None:
+    """Helper to write mock workspace processed data partitions and manifests."""
+    partition_root = spec.data_root / "data" / "processed" / spec.dataset
+    partition_root.mkdir(parents=True, exist_ok=True)
+    (partition_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "dataset": spec.dataset,
+                "file_hashes": {"fixture": "abc"},
+                "metadata": {
+                    "n_features": 115,
+                    "n_devices": len(spec.clients),
+                    "n_clients": None,
+                },
+                "created": "2026-04-26T00:00:00+00:00",
+            }
+        ),
+    )
+    for client_id in spec.clients:
+        (partition_root / client_id).mkdir(parents=True, exist_ok=True)
+
+
+def _resolve_checkpoint(spec: _CellSpec) -> tuple[Path, str]:
+    """Helper to set up mock checkpoint files and return their expected hashes."""
+    ckpt = (
+        spec.base_dir
+        / "checkpoints"
+        / spec.stage.value
+        / f"seed_{spec.seed}"
+        / ArtifactFile.MODEL_CHECKPOINT
+    )
+    if spec.checkpoint_present:
+        ckpt.parent.mkdir(parents=True, exist_ok=True)
+        ckpt.write_bytes(b"fixture-checkpoint-bytes")
+        ckpt_hash = _sha256(ckpt)
+    else:
+        ckpt_hash = "0" * 64
+    return ckpt, ckpt_hash
+
+
+def _write_manifest_file(
+    spec: _CellSpec, cell_dir: Path, ckpt: Path, ckpt_hash: str
+) -> None:
+    """Helper to generate and write mock scoring_manifest.json files."""
+    manifest: dict = {
+        "schema_version": "1",
+        "dataset": spec.dataset,
+        "stage": spec.stage.value,
+        "seed": spec.seed,
+        "model_checkpoint_path": str(ckpt.relative_to(spec.data_root))
+        if spec.data_root in ckpt.parents
+        else str(ckpt),
+        "model_checkpoint_hash": spec.checkpoint_hash_override or ckpt_hash,
+        "scoring_code_version": "fixture",
+        "score_column_name": SCORE_COLUMN,
+        "expected_client_ids": sorted(spec.clients),
+        "expected_splits": [s.value for s in SCORING_STAGES],
+        "actual_client_ids": sorted(spec.clients),
+        "actual_splits": sorted(s.value for s in SCORING_STAGES),
+        "records": [
+            {"client_id": cid, "split": s.value}
+            for cid in spec.clients
+            for s in SCORING_STAGES
+        ],
+        "completion_status": spec.completion_status,
+        "generated_at_utc": "2026-04-26T00:00:00+00:00",
+    }
+    if spec.drop_manifest_field is not None:
+        manifest.pop(spec.drop_manifest_field, None)
+    (cell_dir / ArtifactFile.SCORING_MANIFEST).write_text(
+        json.dumps(manifest),
+    )
+
+
+def _build_cell(spec: _CellSpec) -> Path:
+    """Helper to assemble a complete mock scores folder structure."""
+    cell_dir = spec.base_dir / "scores" / spec.stage.value / f"seed_{spec.seed}"
+    cell_dir.mkdir(parents=True, exist_ok=True)
+
+    _write_score_files(spec, cell_dir)
+
+    if spec.write_partition:
+        _write_partition_files(spec)
+
+    ckpt, ckpt_hash = _resolve_checkpoint(spec)
+
+    if spec.include_manifest:
+        _write_manifest_file(spec, cell_dir, ckpt, ckpt_hash)
+
+    if spec.include_sentinel:
+        (cell_dir / ArtifactFile.SCORING_SENTINEL).write_text("done\n")
+
+    return cell_dir
+
+
+def _check_status(report: object, code: ScoreCheckCode) -> AuditStatus:
+    """Helper to lookup validation check status in a report."""
+    for check in report.checks:
+        if check.code == code:
+            return check.status
+    raise AssertionError(f"check {code} not present in report")
+
+
+def test_valid_cell_passes_all_checks(tmp_path: Path) -> None:
+    """Verify that a standard valid cell directory passes all validation checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.PASS, report.checks
+    assert report.cell.stage == ExperimentStage.NBAIOT_MAIN
+    assert report.cell.seed == 0
+    assert set(report.expected_client_ids) == set(CLIENTS)
+
+
+def test_missing_manifest_fails(tmp_path: Path) -> None:
+    """Verify that missing scoring_manifest.json fails checks with MISSING status."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(
+        _CellSpec(base_dir=base_dir, data_root=tmp_path, include_manifest=False)
+    )
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.PARTIAL
+    assert _check_status(report, ScoreCheckCode.MANIFEST_PRESENT) == AuditStatus.MISSING
+    assert (
+        _check_status(report, ScoreCheckCode.MANIFEST_PARSEABLE) == AuditStatus.MISSING
+    )
+
+
+def test_missing_client_directory_fails(tmp_path: Path) -> None:
+    """Verify that missing client split Parquet files fails the presence check."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
+
+    (cell / "cal" / f"{CLIENTS[0]}.parquet").unlink()
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.FAIL
+    assert (
+        _check_status(report, ScoreCheckCode.PER_CLIENT_SPLIT_FILES_PRESENT)
+        == AuditStatus.FAIL
+    )
+
+
+def test_wrong_parquet_schema_fails(tmp_path: Path) -> None:
+    """Verify that incorrect column names in Parquet files fails schema checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
+
+    bad = cell / "cal" / f"{CLIENTS[0]}.parquet"
+    table = pa.table({"wrong_col": pa.array([0.1, 0.2], type=pa.float32())})
+    pq.write_table(table, bad)
+
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.FAIL
+    assert (
+        _check_status(report, ScoreCheckCode.PARQUET_SCHEMA_VALID) == AuditStatus.FAIL
+    )
+
+
+def test_missing_checkpoint_hash_field_fails(tmp_path: Path) -> None:
+    """Verify that an invalid checkpoint hash value in manifest fails the presence check."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
+    manifest_path = cell / ArtifactFile.SCORING_MANIFEST
+    manifest = json.loads(manifest_path.read_text())
+    manifest["model_checkpoint_hash"] = "NOT_PROVIDED"
+    manifest_path.write_text(json.dumps(manifest))
+
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status != AuditStatus.PASS
+    assert (
+        _check_status(report, ScoreCheckCode.CHECKPOINT_HASH_FIELD_PRESENT)
+        == AuditStatus.FAIL
+    )
+
+
+def test_missing_checkpoint_file_fails(tmp_path: Path) -> None:
+    """Verify that missing checkpoint files result in MISSING status for hash match checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
+
+    (
+        base_dir
+        / "checkpoints"
+        / ExperimentStage.NBAIOT_MAIN.value
+        / "seed_0"
+        / ArtifactFile.MODEL_CHECKPOINT
+    ).unlink()
+
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert (
+        _check_status(report, ScoreCheckCode.CHECKPOINT_FILE_PRESENT)
+        == AuditStatus.MISSING
+    )
+    assert (
+        _check_status(report, ScoreCheckCode.CHECKPOINT_HASH_MATCHES)
+        == AuditStatus.MISSING
+    )
+
+
+def test_wrong_checkpoint_hash_fails(tmp_path: Path) -> None:
+    """Verify that mismatches between manifest hashes and actual checkpoint files fail matching checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(
+        _CellSpec(
+            base_dir=base_dir,
+            data_root=tmp_path,
+            checkpoint_hash_override="0" * 64,
+        )
+    )
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.FAIL
+    assert (
+        _check_status(report, ScoreCheckCode.CHECKPOINT_HASH_MATCHES)
+        == AuditStatus.FAIL
+    )
+
+
+@pytest.mark.parametrize("split_to_drop", ["cal", "test_benign", "test_attack"])
+def test_incomplete_split_directory_fails(tmp_path: Path, split_to_drop: str) -> None:
+    """Verify that missing expected split directories fail split existence checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
+    split_dir = cell / split_to_drop
+    for f in split_dir.glob("*.parquet"):
+        f.unlink()
+    split_dir.rmdir()
+
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.FAIL
+    assert (
+        _check_status(report, ScoreCheckCode.SPLIT_DIRECTORIES_PRESENT)
+        == AuditStatus.FAIL
+    )
+
+
+def test_empty_parquet_fails(tmp_path: Path) -> None:
+    """Verify that Parquet files with zero rows fail the non-empty check."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
+
+    bad = cell / "cal" / f"{CLIENTS[0]}.parquet"
+    table = pa.table({SCORE_COLUMN: pa.array([], type=pa.float32())})
+    pq.write_table(table, bad)
+
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.FAIL
+    assert _check_status(report, ScoreCheckCode.PARQUET_NON_EMPTY) == AuditStatus.FAIL
+
+
+def test_required_manifest_field_missing_fails(tmp_path: Path) -> None:
+    """Verify that missing required keys in scoring_manifest.json fail parsing checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(
+        _CellSpec(
+            base_dir=base_dir,
+            data_root=tmp_path,
+            drop_manifest_field="model_checkpoint_hash",
+        )
+    )
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert report.overall_status == AuditStatus.FAIL
+    assert (
+        _check_status(report, ScoreCheckCode.MANIFEST_FIELDS_PRESENT)
+        == AuditStatus.FAIL
+    )
+
+
+def test_completion_status_not_complete_fails(tmp_path: Path) -> None:
+    """Verify that non-'complete' status values in manifest fail completion checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(
+        _CellSpec(
+            base_dir=base_dir,
+            data_root=tmp_path,
+            completion_status="partial",
+        )
+    )
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert (
+        _check_status(report, ScoreCheckCode.MANIFEST_COMPLETION_STATUS)
+        == AuditStatus.FAIL
+    )
+
+
+def test_missing_sentinel_marker_partial(tmp_path: Path) -> None:
+    """Verify that missing scoring_sentinel files fail sentinel presence checks."""
+    base_dir = tmp_path / "outputs"
+    cell = _build_cell(
+        _CellSpec(base_dir=base_dir, data_root=tmp_path, include_sentinel=False)
+    )
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert (
+        _check_status(report, ScoreCheckCode.SCORING_SENTINEL_PRESENT)
+        == AuditStatus.MISSING
+    )
+
+
+def test_client_mismatch_vs_partition_fails(tmp_path: Path) -> None:
+    """Verify that client ID lists mismatching partition manifest IDs fail partition checks."""
+    base_dir = tmp_path / "outputs"
+
+    cell = _build_cell(
+        _CellSpec(base_dir=base_dir, data_root=tmp_path, clients=PARTIAL_CLIENTS)
+    )
+    report = verify_score_cell(cell, base_dir, data_root=tmp_path)
+
+    assert (
+        _check_status(report, ScoreCheckCode.CLIENT_IDS_MATCH_PARTITION)
+        == AuditStatus.FAIL
+    )
+
+
+def test_iter_score_cells_and_verify_all(tmp_path: Path) -> None:
+    """Verify that verify_all_score_cells successfully iterates and writes CSV reports."""
+    base_dir = tmp_path / "outputs"
+    _build_cell(
+        _CellSpec(
+            base_dir=base_dir,
+            data_root=tmp_path,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            seed=0,
+        )
+    )
+    _build_cell(
+        _CellSpec(
+            base_dir=base_dir,
+            data_root=tmp_path,
+            stage=ExperimentStage.NBAIOT_MAIN,
+            seed=1,
+        )
+    )
+
+    cells = iter_score_cells(base_dir)
+    assert {(c.stage, c.seed) for c in cells} == {
+        (ExperimentStage.NBAIOT_MAIN, 0),
+        (ExperimentStage.NBAIOT_MAIN, 1),
+    }
+
+    reports = verify_all_score_cells(base_dir, data_root=tmp_path, write_reports=True)
+    assert len(reports) == 2
+    for cell in cells:
+        assert (cell.cell_dir / AuditArtifact.SCORE_CELL_VERIFICATION).is_file()
+    assert (base_dir / "scores" / AuditArtifact.SCORE_CELL_VERIFICATION_INDEX).is_file()

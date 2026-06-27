@@ -1,0 +1,55 @@
+{
+  "alphas": [],
+  "axis_labels": {
+    "x": "Reconstruction Error",
+    "y": "Density"
+  },
+  "client_counts": {
+    "global_threshold": 9
+  },
+  "client_ids": [
+    "Provision_PT_838_Security_Camera",
+    "SimpleHome_XCS7_1003_WHT_Security_Camera",
+    "SimpleHome_XCS7_1002_WHT_Security_Camera"
+  ],
+  "coverage_ratios": {
+    "global_threshold": 1.0
+  },
+  "dataset": "nbaiot",
+  "eligibility_policy": "selected eligible clients from GLOBAL_THRESHOLD seed 0",
+  "eligible_counts": {
+    "global_threshold": 9
+  },
+  "evidence_role": "descriptive",
+  "figure": "figure_2",
+  "max_points_per_client": 5000,
+  "metric_names": [
+    "reconstruction_error",
+    "threshold_value"
+  ],
+  "not_confirmatory_warning": "Representative seed only; descriptive evidence, not confirmatory.",
+  "policies": [
+    "global_threshold"
+  ],
+  "policy_order": [
+    "global_threshold"
+  ],
+  "run_ids": [
+    "nbaiot_main_global_threshold_seed0"
+  ],
+  "seed": 0,
+  "seed_scope": "representative_seed",
+  "seeds": [
+    0
+  ],
+  "source_metrics_files": [
+    "outputs/results/nbaiot_main/global_threshold/seed_0/metrics.json"
+  ],
+  "source_score_manifests": [
+    "outputs/scores/nbaiot_main/seed_0/scoring_manifest.json"
+  ],
+  "stage": "nbaiot_main",
+  "tau_global": 0.36681657797760364,
+  "title": "Calibration-error ECDF for three representative N-BaIoT clients with GLOBAL_THRESHOLD client-averaged threshold — representative seed, descriptive only",
+  "validation_status": "PASS"
+}

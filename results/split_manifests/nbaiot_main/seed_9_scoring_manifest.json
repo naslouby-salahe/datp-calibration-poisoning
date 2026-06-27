@@ -1,0 +1,559 @@
+{
+  "actual_client_ids": [
+    "Danmini_Doorbell",
+    "Ecobee_Thermostat",
+    "Ennio_Doorbell",
+    "Philips_B120N10_Baby_Monitor",
+    "Provision_PT_737E_Security_Camera",
+    "Provision_PT_838_Security_Camera",
+    "Samsung_SNH_1011_N_Webcam",
+    "SimpleHome_XCS7_1002_WHT_Security_Camera",
+    "SimpleHome_XCS7_1003_WHT_Security_Camera"
+  ],
+  "actual_splits": [
+    "cal",
+    "test_attack",
+    "test_benign"
+  ],
+  "checkpoint_round": null,
+  "completion_status": "complete",
+  "dataset": "nbaiot",
+  "expected_client_ids": [
+    "Danmini_Doorbell",
+    "Ecobee_Thermostat",
+    "Ennio_Doorbell",
+    "Philips_B120N10_Baby_Monitor",
+    "Provision_PT_737E_Security_Camera",
+    "Provision_PT_838_Security_Camera",
+    "Samsung_SNH_1011_N_Webcam",
+    "SimpleHome_XCS7_1002_WHT_Security_Camera",
+    "SimpleHome_XCS7_1003_WHT_Security_Camera"
+  ],
+  "expected_splits": [
+    "cal",
+    "test_benign",
+    "test_attack"
+  ],
+  "generated_at_utc": "2026-06-27T21:12:02.339806+00:00",
+  "model_checkpoint_hash": "611a64cfbea64d02abaa5a2d1db35555e6892857f7554bb2b3d48f5a5448d305",
+  "model_checkpoint_path": "outputs/checkpoints/nbaiot_main/seed_9/model.pt",
+  "records": [
+    {
+      "client_id": "Danmini_Doorbell",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "584c63106436fad6594c85bef09ad4efe4414283bcb2acc984921a1b1354fdf7",
+      "path": "cal/Danmini_Doorbell.parquet",
+      "row_count": 9909,
+      "score_max": 104.68115997314453,
+      "score_min": 0.01991126872599125,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "Danmini_Doorbell",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "386997632e2b4799e1f5a6a227eed8e2e6225606e5e1b8af2dc4ae805f4a9300",
+      "path": "test_benign/Danmini_Doorbell.parquet",
+      "row_count": 8921,
+      "score_max": 104.68115997314453,
+      "score_min": 0.02000592276453972,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "Danmini_Doorbell",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "71a61750063745ef2390302f7b63558d7e318f4e262ee5b6b58065820f930c1f",
+      "path": "test_attack/Danmini_Doorbell.parquet",
+      "row_count": 968750,
+      "score_max": 4260711.5,
+      "score_min": 0.6696117520332336,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "Ecobee_Thermostat",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "7218008e87bb5298e0045ec871fd95a5d1eb363793a8986fb5ec29882717a64b",
+      "path": "cal/Ecobee_Thermostat.parquet",
+      "row_count": 2622,
+      "score_max": 0.9900290966033936,
+      "score_min": 0.052209772169589996,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "Ecobee_Thermostat",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "66daf2e5c04fe9c30ceb14b68c3a86b88a30c87d1459edce9ba09b8c772a1c7f",
+      "path": "test_benign/Ecobee_Thermostat.parquet",
+      "row_count": 2362,
+      "score_max": 2.7553834915161133,
+      "score_min": 0.050537269562482834,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "Ecobee_Thermostat",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "27bd990a886da159f94b3309d3d32bd69dffae26776f8536c0a1324cf1d863ef",
+      "path": "test_attack/Ecobee_Thermostat.parquet",
+      "row_count": 822763,
+      "score_max": 1506012.0,
+      "score_min": 0.21758867800235748,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "Ennio_Doorbell",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "0686668db0b6cafe024c1fe81fc566aab02f6340b3f725e950ac0c7eacfe7d32",
+      "path": "cal/Ennio_Doorbell.parquet",
+      "row_count": 7820,
+      "score_max": 57.5160026550293,
+      "score_min": 0.007374510634690523,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "Ennio_Doorbell",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "fadaf24a1ff7b4d6cf71cbec756457ca07143c2b8c46c2ef409ff9fb025996cc",
+      "path": "test_benign/Ennio_Doorbell.parquet",
+      "row_count": 7038,
+      "score_max": 57.5160026550293,
+      "score_min": 0.007159545551985502,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "Ennio_Doorbell",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "c42071b675b907eaf2e7f34d20b7786fe25d06c49a4174d709e59e267aee3679",
+      "path": "test_attack/Ennio_Doorbell.parquet",
+      "row_count": 316400,
+      "score_max": 1183585.125,
+      "score_min": 0.1100231260061264,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "Philips_B120N10_Baby_Monitor",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "447c191434896d1b52e56d41289512e25a23151ca17c303615ee78e43e5af92b",
+      "path": "cal/Philips_B120N10_Baby_Monitor.parquet",
+      "row_count": 35048,
+      "score_max": 3.3427178859710693,
+      "score_min": 0.0014935991493985057,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "Philips_B120N10_Baby_Monitor",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "488732545c3c3977bb4b5c724bf1d8282f3e4ce4a91908a36bfd51ba8a4a75e0",
+      "path": "test_benign/Philips_B120N10_Baby_Monitor.parquet",
+      "row_count": 31544,
+      "score_max": 3.3427178859710693,
+      "score_min": 0.0014932217309251428,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "Philips_B120N10_Baby_Monitor",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "d437357e75e907a148ca51e75576992742beb187a22adb8736acdd5780e3c01d",
+      "path": "test_attack/Philips_B120N10_Baby_Monitor.parquet",
+      "row_count": 923437,
+      "score_max": 5514.18310546875,
+      "score_min": 0.02396748773753643,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "Provision_PT_737E_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "5adc08ad1d9786b41758a15cfb29903c60b2534927325a528fbfa8c209bcd1da",
+      "path": "cal/Provision_PT_737E_Security_Camera.parquet",
+      "row_count": 12430,
+      "score_max": 10.96175765991211,
+      "score_min": 0.010961871594190598,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "Provision_PT_737E_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "660d6f67cc8d2ac71011f7358b8ee24b8d1d88a3bf4730c34dc68d482e921a18",
+      "path": "test_benign/Provision_PT_737E_Security_Camera.parquet",
+      "row_count": 11190,
+      "score_max": 10.96175765991211,
+      "score_min": 0.01090199314057827,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "Provision_PT_737E_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "ab3cdc44b6ddb9563d103a594fff2a279a8dc1daa11688dbd376e308358d6a10",
+      "path": "test_attack/Provision_PT_737E_Security_Camera.parquet",
+      "row_count": 766106,
+      "score_max": 185880.625,
+      "score_min": 0.07057028263807297,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "Provision_PT_838_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "c664e1add79d71dad85cea983eb710db2b31e99d70376d8cb1899c4ea942eafc",
+      "path": "cal/Provision_PT_838_Security_Camera.parquet",
+      "row_count": 19702,
+      "score_max": 7.610872268676758,
+      "score_min": 0.018062498420476913,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "Provision_PT_838_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "804a29e122fd98addcf0ea0a637815b6d25fe3feec3167e0e992880f411d8701",
+      "path": "test_benign/Provision_PT_838_Security_Camera.parquet",
+      "row_count": 17734,
+      "score_max": 7.610872268676758,
+      "score_min": 0.018083199858665466,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "Provision_PT_838_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "85082e1e9d8649ad6614707921165381bfb4ea5448bd2102139d89c2ee00bffe",
+      "path": "test_attack/Provision_PT_838_Security_Camera.parquet",
+      "row_count": 738377,
+      "score_max": 4570.205078125,
+      "score_min": 0.08239593356847763,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "Samsung_SNH_1011_N_Webcam",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "c912c417f1b1c4374f79df53821fd43f54bf64e8e335ba7ef27dd0f000d45fb7",
+      "path": "cal/Samsung_SNH_1011_N_Webcam.parquet",
+      "row_count": 10430,
+      "score_max": 27.692941665649414,
+      "score_min": 0.013003241270780563,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "Samsung_SNH_1011_N_Webcam",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "a7b4188c3222e845b41251b789d19f7e10d598e807d84b1081f5be11bcc2bcd4",
+      "path": "test_benign/Samsung_SNH_1011_N_Webcam.parquet",
+      "row_count": 9388,
+      "score_max": 27.692941665649414,
+      "score_min": 0.013015220873057842,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "Samsung_SNH_1011_N_Webcam",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "92858a11761f3cde8b12035b000c6055d68ff59d7055a489f54798915c4ef750",
+      "path": "test_attack/Samsung_SNH_1011_N_Webcam.parquet",
+      "row_count": 323072,
+      "score_max": 12407.1376953125,
+      "score_min": 0.1721612960100174,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1002_WHT_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "241e532039d15024609a103459bb5c9103cb0959834f3360413284a3cffdc5e4",
+      "path": "cal/SimpleHome_XCS7_1002_WHT_Security_Camera.parquet",
+      "row_count": 9317,
+      "score_max": 30.12711524963379,
+      "score_min": 0.006998033262789249,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1002_WHT_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "ef64d8396d1db8c79ec18d0e72f27f0d558a885f26a6ff6dc033314ad3a5cc50",
+      "path": "test_benign/SimpleHome_XCS7_1002_WHT_Security_Camera.parquet",
+      "row_count": 8387,
+      "score_max": 3.7454686164855957,
+      "score_min": 0.006965871434658766,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1002_WHT_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "84439a573906de8d7acf06fbb3d5d328821a519cb71a87ce483cc706d6f10f2c",
+      "path": "test_attack/SimpleHome_XCS7_1002_WHT_Security_Camera.parquet",
+      "row_count": 816471,
+      "score_max": 2715.05615234375,
+      "score_min": 0.04885042458772659,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1003_WHT_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "78739bb30f29aedee98123122bb6ca0924f1f8efbb02d03988c119d9ffe6a1d8",
+      "path": "cal/SimpleHome_XCS7_1003_WHT_Security_Camera.parquet",
+      "row_count": 3905,
+      "score_max": 9.071061134338379,
+      "score_min": 0.008013296872377396,
+      "score_nan_count": 0,
+      "split": "cal"
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1003_WHT_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "d2aa5f115b68059be15acc0393b6e3f50e932177a74431239cd66c5a1f294b46",
+      "path": "test_benign/SimpleHome_XCS7_1003_WHT_Security_Camera.parquet",
+      "row_count": 3517,
+      "score_max": 6.656737804412842,
+      "score_min": 0.008009926415979862,
+      "score_nan_count": 0,
+      "split": "test_benign"
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1003_WHT_Security_Camera",
+      "columns": [
+        "reconstruction_error"
+      ],
+      "dtypes": [
+        {
+          "column": "reconstruction_error",
+          "dtype": "Float32"
+        }
+      ],
+      "file_hash": "f369bf7985c1fee6ca396927fddec0b00e6396bfa3c9c583b83bdd0fda7cce65",
+      "path": "test_attack/SimpleHome_XCS7_1003_WHT_Security_Camera.parquet",
+      "row_count": 831298,
+      "score_max": 49627.51171875,
+      "score_min": 0.18650749325752258,
+      "score_nan_count": 0,
+      "split": "test_attack"
+    }
+  ],
+  "score_column_name": "reconstruction_error",
+  "scoring_code_version": "f9faf94830cbbf3c347bc90cbe3d419a80a8dca3",
+  "seed": 9,
+  "stage": "nbaiot_main"
+}

@@ -1,0 +1,113 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datp-cp"
+version = "0.1.0"
+description = "datp-cp: calibration-channel poisoning of federated threshold personalization in IoT malware detection."
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Salaheddine Naslouby" },
+    { name = "Mohamed Lachgar" },
+    { name = "Hamid Hrimech" },
+]
+keywords = [
+    "federated-learning",
+    "anomaly-detection",
+    "threshold-personalization",
+    "calibration-poisoning",
+    "IoT",
+    "N-BaIoT",
+]
+dependencies = [
+    "cachetools",
+    "filelock",
+    "flwr",
+    "hydra-core",
+    "jinja2",
+    "joblib",
+    "lightning",
+    "matplotlib",
+    "mlflow",
+    "numpy",
+    "omegaconf",
+    "orjson",
+    "pandas",
+    "pandera",
+    "psutil",
+    "pyarrow",
+    "pydantic>=2.0",
+    "pyyaml",
+    "ray",
+    "rich",
+    "scikit-learn",
+    "scipy",
+    "statsmodels",
+    "structlog",
+    "torch",
+    "typer>=0.9",
+]
+
+[project.scripts]
+datp = "datp.cli:cli_entry"
+
+[project.optional-dependencies]
+test = [
+    "Pillow",
+    "pyright",
+    "pytest",
+    "ruff",
+    "typeguard",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.package-data]
+"datp.conf" = ["*.yaml", "regime/*.yaml"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["--import-mode=importlib"]
+markers = [
+    "integration: integration tests (e.g., Flower simulation smoke tests)",
+]
+
+[tool.ruff]
+respect-gitignore = true
+exclude = [
+    "docs",
+    ".git",
+    ".venv",
+    "venv",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    "__pycache__",
+    ".vscode-server",
+    "site-packages",
+    "dist-packages",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# Typer and Pydantic Field require call-in-default-argument by design.
+extend-immutable-calls = [
+    "typer.Option",
+    "typer.Argument",
+    "pydantic.Field",
+    "pydantic.v1.Field",
+]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "mypy>=1.19.1",
+    "pylint>=4.0.6",
+    "semgrep>=1.167.0",
+]

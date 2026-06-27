@@ -1,0 +1,98 @@
+{
+  "alphas": [],
+  "axis_labels": {
+    "x": "Device",
+    "y": "FPR"
+  },
+  "client_counts": {
+    "global_threshold": 9,
+    "local_threshold": 9
+  },
+  "clients": [
+    {
+      "client_id": "Danmini_Doorbell",
+      "global_threshold": 0.043268691850689385,
+      "local_threshold": 0.038560699473153236
+    },
+    {
+      "client_id": "Ecobee_Thermostat",
+      "global_threshold": 0.04657070279424217,
+      "local_threshold": 0.05927180355630821
+    },
+    {
+      "client_id": "Ennio_Doorbell",
+      "global_threshold": 0.02912759306621199,
+      "local_threshold": 0.049872122762148335
+    },
+    {
+      "client_id": "Philips_B120N10_Baby_Monitor",
+      "global_threshold": 0.012173471975653057,
+      "local_threshold": 0.038295713923408574
+    },
+    {
+      "client_id": "Provision_PT_737E_Security_Camera",
+      "global_threshold": 0.003932082216264522,
+      "local_threshold": 0.04075067024128686
+    },
+    {
+      "client_id": "Provision_PT_838_Security_Camera",
+      "global_threshold": 0.0028758317356490357,
+      "local_threshold": 0.013984436675312958
+    },
+    {
+      "client_id": "Samsung_SNH_1011_N_Webcam",
+      "global_threshold": 0.06114188325521943,
+      "local_threshold": 0.04463144439710268
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1002_WHT_Security_Camera",
+      "global_threshold": 0.12495528794563014,
+      "local_threshold": 0.055323715273637775
+    },
+    {
+      "client_id": "SimpleHome_XCS7_1003_WHT_Security_Camera",
+      "global_threshold": 0.04321865226044925,
+      "local_threshold": 0.030139323286892238
+    }
+  ],
+  "coverage_ratios": {
+    "global_threshold": 1.0,
+    "local_threshold": 1.0
+  },
+  "dataset": "nbaiot",
+  "eligibility_policy": "eligible-client intersection",
+  "eligible_counts": {
+    "global_threshold": 9,
+    "local_threshold": 9
+  },
+  "evidence_role": "descriptive",
+  "figure": "figure_1",
+  "metric_names": [
+    "fpr"
+  ],
+  "not_confirmatory_warning": "Representative seed only; descriptive evidence, not confirmatory.",
+  "policies": [
+    "global_threshold",
+    "local_threshold"
+  ],
+  "policy_order": [
+    "global_threshold",
+    "local_threshold"
+  ],
+  "run_ids": [
+    "nbaiot_main_global_threshold_seed0",
+    "nbaiot_main_local_threshold_seed0"
+  ],
+  "seed": 0,
+  "seed_scope": "representative_seed",
+  "seeds": [
+    0
+  ],
+  "source_metrics_files": [
+    "outputs/results/nbaiot_main/global_threshold/seed_0/metrics.json",
+    "outputs/results/nbaiot_main/local_threshold/seed_0/metrics.json"
+  ],
+  "stage": "nbaiot_main",
+  "title": "Per-device FPR: GLOBAL_THRESHOLD vs LOCAL_THRESHOLD, NBAIOT_MAIN — representative seed, descriptive only",
+  "validation_status": "PASS"
+}

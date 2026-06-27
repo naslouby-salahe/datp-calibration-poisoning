@@ -1,0 +1,22 @@
+datp-cp Repository License
+
+Copyright (c) 2026 Salaheddine Naslouby.
+
+All rights reserved.
+
+This repository is provided for academic review, artifact evaluation, and
+reproducibility of the calibration-channel poisoning study associated with
+"Device-Aware Threshold Personalization for Non-IID Federated IoT Malware Detection."
+
+You may inspect, run, and reproduce the code and documented experiments for
+non-commercial academic review and research verification. No permission is
+granted to redistribute, sublicense, sell, or incorporate this repository or
+substantial portions of it into another project without prior written
+permission from the copyright holder.
+
+Raw datasets referenced by this repository are not included and remain subject
+to their original dataset licenses and access terms.
+
+Unless a file explicitly states otherwise, all source code, configuration,
+documentation, and tracked artifacts in this repository are covered by this
+license.

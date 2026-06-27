@@ -1,0 +1,91 @@
+{
+  "project": "DATP-CP",
+  "description": "Pointers to figure and table generation scripts in the repository, with their expected inputs and outputs.",
+  "figure_scripts": {
+    "figure_1": {
+      "script": "src/datp/reporting/figures.py",
+      "entry_point": "datp report all",
+      "makefile_target": "datp-cp-report",
+      "expected_inputs": [
+        "outputs/results/nbaiot_main/global_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/local_threshold/seed_*/metrics.json"
+      ],
+      "expected_outputs": [
+        "outputs/figures/figure_1.png",
+        "outputs/figures/figure_1.pdf",
+        "outputs/figures/figure_1_data.json"
+      ],
+      "description": "Per-device FPR comparison: GLOBAL_THRESHOLD vs LOCAL_THRESHOLD on N-BaIoT, representative seed (descriptive)."
+    },
+    "figure_2": {
+      "script": "src/datp/reporting/figures.py",
+      "entry_point": "datp report all",
+      "makefile_target": "datp-cp-report",
+      "expected_inputs": [
+        "outputs/results/nbaiot_main/global_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/local_threshold/seed_*/metrics.json"
+      ],
+      "expected_outputs": [
+        "outputs/figures/figure_2.png",
+        "outputs/figures/figure_2.pdf",
+        "outputs/figures/figure_2_data.json"
+      ],
+      "description": "ECDF of per-client FPR across seeds: GLOBAL_THRESHOLD vs LOCAL_THRESHOLD."
+    },
+    "figure_3": {
+      "script": "src/datp/reporting/figures.py",
+      "entry_point": "datp report all",
+      "makefile_target": "datp-cp-report",
+      "expected_inputs": [
+        "outputs/results/nbaiot_main/global_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/local_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/cluster_threshold/seed_*/metrics.json"
+      ],
+      "expected_outputs": [
+        "outputs/figures/figure_3.png",
+        "outputs/figures/figure_3.pdf",
+        "outputs/figures/figure_3_data.json"
+      ],
+      "description": "Boxplots of CV(FPR) across all three threshold policies and all seeds."
+    }
+  },
+  "table_scripts": {
+    "table_3": {
+      "script": "src/datp/reporting/tables.py",
+      "entry_point": "datp report all",
+      "makefile_target": "datp-cp-report",
+      "expected_inputs": [
+        "outputs/results/nbaiot_main/global_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/local_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/cluster_threshold/seed_*/metrics.json"
+      ],
+      "expected_outputs": [
+        "outputs/tables/table3_nbaiot.csv",
+        "outputs/tables/table3_nbaiot.tex"
+      ],
+      "description": "Summary statistics (CV(FPR), CV(TPR), Worst BA, P10 Macro-F1) across three threshold policies, N-BaIoT."
+    }
+  },
+  "statistics_scripts": {
+    "bootstrap_cis": {
+      "script": "src/datp/statistics/bootstrap.py",
+      "entry_point": "datp report all",
+      "makefile_target": "datp-cp-report",
+      "expected_inputs": [
+        "outputs/results/nbaiot_main/global_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/local_threshold/seed_*/metrics.json",
+        "outputs/results/nbaiot_main/cluster_threshold/seed_*/metrics.json"
+      ],
+      "expected_outputs": [
+        "outputs/analysis/bootstrap_cis.json",
+        "outputs/analysis/bootstrap_cis.csv"
+      ],
+      "description": "Bootstrap 95% confidence intervals for FPR differences between threshold policies."
+    }
+  },
+  "reporting_build_entry": {
+    "command": "make datp-cp-report",
+    "or": "datp report all --base-dir=outputs/",
+    "note": "Regenerates all figures, tables, and statistics from the per-cell metrics.json files."
+  }
+}
