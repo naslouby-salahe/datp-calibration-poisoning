@@ -1,0 +1,24 @@
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\textbf{Score-level proxy and detectability.}
+The experiment operates at the score level: reconstruction scores in the calibration buffer are replaced programmatically rather than through generated traffic.
+A complete end-to-end attack would additionally require generating network packets whose autoencoder reconstruction error lands in the target tail of the victim's score distribution---a non-trivial requirement spanning feature engineering, the encoder-decoder nonlinearity, and physical network behavior.
+We present this work as a \emph{vulnerability-surface characterization}, not a deployed attack; traffic-level realizability is future work.
+A related implementation limitation: with-replacement sampling from the tail reservoir at $f{=}0.4$ produces duplicate scores in the calibration buffer.
+With reservoir size $R{\approx}10\,\%{\cdot}N$ and the smallest calibration set ($N{\approx}2{,}622$), the expected collision count $(N{\cdot}f)^2/(2R){\approx}2{,}100$ expected collision pairs at $f{=}0.4$---easily flagged by a uniqueness check; evading requires score perturbation at the cost of leaving the exact tail boundary.
+We flag detectability as an open problem.
+
+\textbf{GLOBAL spillover, lowering bounds, and policy implications.}
+The $1/N$-diluted shift is a definitional property of the \textsc{Global} policy; what is empirical is that the residual magnitude ($\approx$10\,\% of the local shift, $\Delta\mathrm{TPR}{=}{-}6.1$\,pp at $f{=}0.4$) remains measurable above the seed-to-seed variance.
+The lowering attack's conditionality stems from the percentile mechanism: random position replacement displaces upper-tail support only with probability $\approx f$, leaving 60\,\% of the upper tail intact at $f{=}0.4$.
+The Local/Cluster lowering results ($\Delta\mathrm{CV(FPR)} {=} {+}0.05$--$0.06$ disparity increase, $\Delta\mathrm{TPR} {=} {+}10$--$12$\,pp detection-rate shift) are therefore a \emph{lower bound} under the \textsc{Replace-Fixed-Budget} mechanism; adversaries with access to the buffer's rank structure could achieve larger threshold displacements and correspondingly larger alarm-burden effects.
+These results together reveal a structural trade-off in policy design: \textsc{Local} maximizes per-client isolation but maximizes per-victim exposure; \textsc{Global} limits per-victim shift via averaging but propagates residual harm federation-wide.
+Defense designers must choose which risk to bound.
+
+\textbf{Scope limitations.}
+Claims are bounded to N-BaIoT (9 clients, autoencoder, FedAvg, $q{=}0.95$, calibration sets of $\geq$100 to $\approx$9900 benign samples per device).
+Generalizability to other anomaly detectors (isolation forest, LOF, VAE), FL algorithms (FedProx, SCAFFOLD), federation sizes, and IoT datasets is not established and is future work.
+The $n{=}10$ seed bootstrap CI coverage may differ from nominal at the tails.
+This paper does not propose or evaluate defenses.
+Any effective defense must address the calibration buffer as an unmonitored input channel, validate submitted thresholds against server-side priors, or impose calibration-set integrity constraints --- requirements that differ from training-phase defense requirements and merit independent study.

@@ -1,0 +1,183 @@
+\ifdefined\pdfobjcompresslevel
+  \pdfobjcompresslevel=0
+\fi
+\documentclass[runningheads]{llncs}
+
+\usepackage{cmap}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xspace}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,shadows,calc}
+
+% ---------- macros ----------
+\newcommand{\dtau}{\ensuremath{\Delta\tau}\xspace}
+\newcommand{\GLOBAL}{\textsc{Global}\xspace}
+\newcommand{\LOCAL}{\textsc{Local}\xspace}
+\newcommand{\CLUSTER}{\textsc{Cluster}\xspace}
+\newcommand{\datp}{\textsc{datp-cp}\xspace}
+
+\begin{document}
+
+\title{Poisoning the Threshold-Calibration Stage in\texorpdfstring{\\}{ }Federated IoT Anomaly Detection:\texorpdfstring{\\}{ }A Policy-Differentiated Vulnerability Analysis}
+\titlerunning{Calibration-Stage Poisoning in Federated IoT Anomaly Detection}
+
+\author{
+Salaheddine Naslouby\inst{1}
+\and
+Mohamed Lachgar\inst{2}
+\and
+Hamid Hrimech\inst{1}
+}
+
+\authorrunning{S. Naslouby et al.}
+
+\institute{
+LAMSAD Laboratory, National School of Applied Sciences (ENSA), Hassan First University, Berrechid, Morocco
+\and
+L2IS Laboratory, Higher Normal School (ENS), University Cadi Ayyad, Marrakech, Morocco
+}
+
+\maketitle
+
+\begin{abstract}
+Federated learning (FL) defenses for IoT anomaly detection focus on the training phase---Byzantine-robust aggregation, gradient filtering, differential privacy.
+The post-training \emph{threshold-calibration stage}, where each client autonomously collects a benign calibration set and derives its detection threshold, is structurally outside the scope of these defenses.
+We characterize the vulnerability of this stage under a score-level contamination model: a single compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the detection threshold without altering model weights, training data, or test labels.
+Across three threshold-policy families (\textsc{Global}, \textsc{Local}, \textsc{Cluster}) evaluated on the N-BaIoT nine-device federation, the score-level raising attack achieves 100\% Gate-1 pass rate at all non-zero fractions, degrading victim true-positive rates by 2.4 to 7.9 percentage points across injection fractions (4.9--7.9\,pp at $f{=}0.4$).
+The score-level lowering attack succeeds for \textsc{Local} and \textsc{Cluster} (victim detection-rate increase of 10--12\,pp as a lower bound, with coefficient-of-variation disparity $\Delta\mathrm{CV}(\mathrm{FPR})$ increasing 0.05--0.06) but is structurally bounded for \textsc{Global} due to $1/N$ dilution.
+Policy choice determines not just per-victim magnitude but blast radius: \textsc{Local} confines harm to the compromised client; \textsc{Global} dilutes per-victim shift but propagates it to all federation members.
+
+\keywords{Federated Learning \and Anomaly Detection \and IoT Security \and Poisoning Attack \and Threshold Calibration \and Vulnerability Analysis}
+\end{abstract}
+
+% -------------------------------------------------------
+\input{sections/introduction}
+
+% -------------------------------------------------------
+\input{sections/background}
+
+% -------------------------------------------------------
+\input{sections/threat_model}
+
+% -------------------------------------------------------
+\input{sections/method}
+
+% Figure: TikZ attack-surface diagram
+\begin{figure}[tb]
+\centering
+\resizebox{0.94\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\footnotesize,
+  box/.style={draw, rounded corners=3pt, minimum width=2.15cm, minimum height=0.68cm,
+              align=center, fill=white, inner xsep=6pt, inner ysep=4pt},
+  secure/.style={box, fill=green!12, draw=green!50!black},
+  vuln/.style={box, fill=red!12, draw=red!60!black},
+  attack/.style={box, fill=red!4, draw=red!60!black, text=red!70!black,
+                 minimum width=1.80cm},
+  phase/.style={draw=gray!60, rounded corners=4pt, fill=gray!7, inner xsep=10pt, inner ysep=12pt},
+  phaseLabel/.style={font=\footnotesize\bfseries, align=center, inner sep=1pt},
+  arr/.style={-Stealth, thick},
+  darr/.style={-Stealth, thick, red!70!black, dashed}
+]
+  % Training phase
+  \node[secure] (local) {Local Training};
+  \node[secure, right=0.95cm of local] (agg)  {FedAvg\\Aggregation};
+  \node[secure, right=0.95cm of agg]   (model){Shared Model};
+  \node[phaseLabel, above=0.28cm of agg] (trainLabel) {Training phase (defended)};
+
+  % Calibration stage
+  \node[vuln, below=1.78cm of model] (thresh) {Threshold\\$\tau$};
+  \node[vuln, left=1.18cm of thresh] (cal) {Calibration\\Buffer};
+  \node[phaseLabel, text=red!70!black, above=0.32cm of cal, xshift=0.20cm]
+        (calLabel) {Calibration stage (\underline{undefended})};
+
+  % Policies below thresh
+  \node[box, minimum width=1.45cm, below=0.72cm of thresh, xshift=-1.85cm] (pg) {\GLOBAL};
+  \node[box, minimum width=1.45cm, below=0.72cm of thresh]                 (pl) {\LOCAL};
+  \node[box, minimum width=1.45cm, below=0.72cm of thresh, xshift=1.85cm]  (pc) {\CLUSTER};
+
+  % Adversary injection source
+  \node[attack, left=1.50cm of cal]
+        (adv) {Adversary\\(score-level)};
+
+  % Phase labels
+  \begin{scope}[on background layer]
+    \node[phase, fit=(local)(agg)(model)(trainLabel)] (tp) {};
+    \node[phase, fill=red!6, draw=red!40, fit=(calLabel)(adv)(cal)(thresh)(pg)(pl)(pc)] (cs) {};
+  \end{scope}
+
+  % Normal arrows
+  \draw[arr] (local) -- (agg);
+  \draw[arr] (agg)   -- (model);
+  \draw[arr] (model.south) -- (thresh.north);
+  \draw[arr] (cal)   -- (thresh);
+  \draw[arr] (thresh) -- (pg);
+  \draw[arr] (thresh) -- (pl);
+  \draw[arr] (thresh) -- (pc);
+
+  % Adversary injection arrow
+  \draw[darr] (adv) -- node[midway,above=5pt,font=\scriptsize,red!70!black,
+                          fill=red!6, inner xsep=2pt, inner ysep=0.5pt]{tail scores} (cal);
+\end{tikzpicture}%
+}
+\caption{Attack surface: the threshold-calibration stage occurs after FL training completes.
+Training-phase and aggregation-phase defenses (green) are structurally blind to the calibration stage (red).
+An adversary with score-level access to one client's calibration buffer can shift $\tau$ without modifying model weights, gradients, or labels.}
+\label{fig:attack-surface}
+\end{figure}
+
+% -------------------------------------------------------
+\input{sections/results}
+
+% Figure: Clean-baseline per-client FPR
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.82\textwidth]{figures/fig_clean_fpr.pdf}
+\caption{Per-client FPR under clean baseline, \GLOBAL vs.\ \LOCAL threshold (seed 0).
+\GLOBAL forces a single threshold on nine devices with heterogeneous score distributions, producing high CV(FPR)\,=\,0.91 (seed 0).
+\LOCAL fits each client's own calibration distribution, achieving CV(FPR)\,=\,0.33 on average.}
+\label{fig:clean-fpr}
+\end{figure}
+
+% Figure: Threshold shift vs fraction
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/fig_threshold_shift.pdf}
+\caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for the raising (a) and lowering (b) attacks across three policies.
+Error bars: 95\,\% bootstrap CI over 10 seeds.
+\GLOBAL exhibits the smallest magnitude in both directions due to $1/N$ federation averaging.
+\textsc{Random-Benign} negative control (not plotted) produces CI spanning zero at all fractions.}
+\label{fig:threshold-shift}
+\end{figure}
+
+% -------------------------------------------------------
+\input{sections/discussion}
+
+% Table: Baseline
+\input{tables/table_baseline}
+
+% Table: Main results
+\input{tables/table_main_results}
+
+% -------------------------------------------------------
+\clearpage
+\input{sections/conclusion}
+
+% -------------------------------------------------------
+\begin{credits}
+\subsubsection{\discintname}
+The authors have no competing interests to declare that are relevant to the content of this article.
+\end{credits}
+
+% -------------------------------------------------------
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}

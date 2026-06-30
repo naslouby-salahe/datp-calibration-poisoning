@@ -1,0 +1,26 @@
+\section{Background and Related Work}
+\label{sec:background}
+
+\textbf{Federated anomaly detection for IoT.}
+Network-level anomaly detection using federated learning allows devices to collaborate on a shared model while keeping raw traffic local~\cite{nguyen2022federated,rey2022federated}.
+Autoencoder-based reconstruction-error detectors are a standard approach: each client trains a local encoder-decoder on benign traffic; anomalies are flagged when reconstruction error exceeds a per-client detection threshold~\cite{zhou2017anomaly}.
+The N-BaIoT benchmark~\cite{meidan2018nbaiot} provides labeled benign and Mirai/BASHLITE traffic for nine physical IoT device types, establishing a widely used evaluation platform for FL-IDS research.
+
+\textbf{Defenses.}
+Existing defenses target the \emph{training phase}.
+Byzantine-robust rules, including Krum~\cite{blanchard2017machine}, Trimmed-Mean, and Median~\cite{yin2018byzantine}, filter or downweight outlier gradients before aggregation.
+FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
+Differential privacy approaches add noise to local updates~\cite{geyer2017differentially}.
+These defenses all operate on gradients or model updates; they complete before the threshold-calibration stage begins.
+
+\textbf{Threshold calibration and poisoning.}
+Threshold-based anomaly detection is sensitive to the calibration distribution: small shifts in the quantile-defining score set translate directly to missed detections or false alarms~\cite{lheureux2017machine}.
+Poisoning attacks on anomaly detectors have been studied in centralized settings~\cite{kloft2012online,cretu2008casting,barreno2010security}, but these assume either a single data owner or a trusted aggregator who can sanitize training data across the full dataset.
+In FL, calibration data never leaves the client, so server-side sanitization is not available.
+Prior work on FL model poisoning~\cite{bagdasaryan2020backdoor} and FL inference attacks~\cite{geiping2020inverting} focuses on the gradient/weight surface.
+To our knowledge, no prior work characterizes the vulnerability of the post-training threshold-calibration stage in federated threshold-based anomaly detection.
+
+\textbf{Threshold policies.}
+Federated threshold personalization spans a spectrum.
+\textsc{Global} policies share a single federation-mean threshold; \textsc{Local} policies preserve per-client thresholds; \textsc{Cluster} policies group clients by calibration-score similarity and apply cluster-level thresholds~\cite{ghosh2020efficient,sattler2020clustered}.
+The security implications of this design choice have not been studied under calibration-stage adversaries.
