@@ -2,10 +2,15 @@
 \label{sec:conclusion}
 
 We characterized the post-training threshold-calibration stage in federated IoT anomaly detection as an attack surface that training-phase and aggregation-phase defenses do not address.
-Under a score-level contamination model with a single compromised client, the raising attack degrades victim detection rates by 2.4--7.9\,pp across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 100\,\% Gate-1 pass rates and 95\,\% bootstrap CIs excluding zero.
+Under a score-level contamination model on the N-BaIoT nine-device federation (FedAvg autoencoder, $q{=}0.95$, single compromised client), the raising attack degrades victim detection rates by 2.4--7.9\,pp across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 100\,\% Gate-1 pass rates and 95\,\% bootstrap CIs excluding zero; these intervals are descriptive uncertainty estimates over ten paired seeds.
 The lowering attack shifts thresholds downward, increasing victim TPR by 10--12\,pp and $\Delta\mathrm{CV(FPR)}$ by 0.05--0.06 (lower bound under \textsc{Replace-Fixed-Budget}) for \textsc{Local} and \textsc{Cluster}.
 The policy ordering---per-victim exposure maximized under \textsc{Local}, diluted but federation-wide under \textsc{Global}, intra-cluster under \textsc{Cluster}---implies calibration-stage hardening must match the aggregation design, not only the training-phase defense.
+These findings isolate a necessary calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
 Future work should address traffic-level realizability, calibration-stage integrity defenses, and generalization across detector architectures and datasets.
 
-\textbf{Code availability.}
-Code and experimental artifacts will be made available upon acceptance.
+\begin{sloppypar}
+\textbf{Reproducibility.}
+All experiments are pipeline-generated and locally archived (code commit \texttt{f9faf94}).
+The artifact bundle comprises the experiment configuration; the seed scheme (training $0$--$9$, paired poisoning $100$--$109$, analysis/bootstrap $300$--$309$); the split manifest with per-device calibration sizes and the chronological benign-only $60/1/20/1/18$ split semantics; the raw per-cell results; negative-control records; isolation sanity checks; and figure/table scripts.
+Code and artifacts will be released publicly on acceptance and are available to reviewers on request.
+\end{sloppypar}

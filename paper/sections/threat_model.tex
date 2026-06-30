@@ -17,12 +17,12 @@ The adversary has \emph{gray-box score-level access}: since the adversary contro
 The adversary does not access model weights, modify gradients, alter other clients' data, or touch test data, test labels, or training labels.
 This is a strictly weaker capability than model-poisoning adversaries, which require gradient injection.
 The adversary operates at the score level; generating traffic that achieves a target reconstruction score is out of scope (end-to-end realizability is discussed in \S\ref{sec:discussion}).
-The \textsc{Replace-Fixed-Budget} mechanism samples replacement scores with replacement from the tail reservoir; at high fractions ($f{=}0.4$), this may produce duplicate scores in the calibration buffer, which is detectable by a uniqueness check---this limitation is disclosed in \S\ref{sec:discussion}.
+The \textsc{Replace-Fixed-Budget} mechanism samples with replacement from the tail reservoir, which at high fractions produces duplicate scores detectable by a uniqueness check (disclosed in \S\ref{sec:discussion}).
 
 \textbf{Attack mechanics.}
 We evaluate two attack objectives:
 \begin{description}
-  \item[Raise.] \textsc{Threshold-Raise} (primary): for $f{>}0$, replace $m=\max(1,\mathrm{round}(fn_v))$ random positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\textsc{High-Score-Benign} source).
+  \item[Raise.] \textsc{Threshold-Raise} (primary): for $f{>}0$, replace $m=\max\!\bigl(1,\mathrm{round}(fn_v)\bigr)$ positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\textsc{High-Score-Benign} source).
   All replacement scores are semantically benign; AUROC is invariant by construction (test scores and labels are unchanged under poisoning).
   A raised threshold $\tau_v$ increases the detection threshold, suppressing alarms at the victim site.
   \item[Lower.] \textsc{Threshold-Lower} (secondary, conditional): replace $m$ positions with scores from the bottom-10\% tail (\textsc{Low-Score-Benign}).
@@ -36,5 +36,5 @@ Any effect attributable to score contamination rather than position perturbation
 \textbf{Scope boundary.}
 This paper characterizes the vulnerability at the score level.
 A complete end-to-end attack would additionally require generating network traffic whose autoencoder reconstruction score lands in the target tail---this is future work (\S\ref{sec:discussion}).
-The score-level characterization is a controlled experiment, not a deployed attack.
+The score-level characterization is a controlled experiment, not a deployed attack: it isolates a necessary calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
 Claims are bounded to the single-client, single-compromise scenario; multi-client collusion is not evaluated.

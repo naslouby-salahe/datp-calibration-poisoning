@@ -3,12 +3,12 @@
 
 \subsection{Dataset and Federation}
 
-We use N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical device types (doorbells, baby monitor, security camera, smart TV, thermostat, webcam).
+We use N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical devices spanning five device types (doorbell, baby monitor, security camera, thermostat, webcam).
 Each device constitutes one federation client; all nine are eligible for calibration.
-Calibration set sizes range from 2,622 (Ecobee Thermostat) to 9,909 (Danmini Doorbell) benign samples per device (all $\ge$100, satisfying the eligibility threshold).
-The federation trains a per-client autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg} for feature extraction, then enters the threshold-calibration stage.
-The full configuration is: threshold quantile $q{=}0.95$; injection fractions $f \in \{0.0, 0.1, 0.2, 0.4\}$; injection rule \textsc{Replace-Fixed-Budget}; single-client attack scope; 10 paired (training + poisoning) seeds; reservoir = bottom/top 10\,\% tail of the poisoned client's benign calibration scores, sampled with replacement.
-Table~\ref{tab:repro} summarizes the full experimental configuration.
+Calibration set sizes range from 2,622 (Ecobee Thermostat) to 35,048 (Philips Baby Monitor) benign samples per device (all $\ge$100, satisfying the eligibility threshold).
+Each device's benign stream is partitioned chronologically into train/calibration/test segments in a $60/1/20/1/18$ ratio (the two $1\%$ gaps separate segments to avoid temporal leakage); training and calibration use benign traffic only, and test data, test labels, and training labels are never touched by the attack.
+The federation trains a per-client autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg} for feature extraction, then enters the threshold-calibration stage at a fixed quantile $q{=}0.95$.
+Table~\ref{tab:repro} lists the autoencoder architecture, training hyperparameters, and the calibration size range; injection fractions, seeds, and the reservoir are detailed under Attack Parameterization below.
 
 \begin{table}[tb]
 \caption{Experimental configuration for reproducibility.}
@@ -29,15 +29,12 @@ Optimizer & Adam, lr\,=\,0.001, weight\_decay\,=\,0 \\
 \multicolumn{2}{@{}l}{\emph{Federated training (FedAvg)}} \\
 Local epochs & 1 \\
 Aggregation & Sample-count-weighted mean \\
-Rounds & Initial 40; max 150 (convergence: $\Delta$loss~$\le$~0.005 over 10 rounds) \\
+Rounds & 40 initial, 150 max (conv.: $\Delta$loss\,$\le$\,0.005 over 10) \\
 Batch size & 256 \\
 \midrule
-\multicolumn{2}{@{}l}{\emph{N-BaIoT calibration sizes (benign samples)}} \\
-Danmini Doorbell & 9,909 \quad Philips Baby Monitor: 35,048 \\
-Ennio Doorbell & 7,820 \quad Samsung Webcam: 10,430 \\
-Provision PT-737E & 12,430 \quad SimpleHome XCS7-1002: 9,317 \\
-Provision PT-838 & 19,702 \quad SimpleHome XCS7-1003: 3,905 \\
-Ecobee Thermostat & 2,622 \\
+\multicolumn{2}{@{}l}{\emph{Calibration (per-device sizes in released split manifest)}} \\
+Benign samples / device & 2,622 (Ecobee) -- 35,048 (Philips) \\
+Threshold quantile $q$ & 0.95 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -65,7 +62,7 @@ The four source-objective pairs are:
 (1)~\textsc{High-Score-Benign\,+\,Threshold-Raise} (primary raising attack),
 (2)~\textsc{Low-Score-Benign\,+\,Threshold-Lower} (primary lowering attack),
 (3)~\textsc{Random-Benign\,+\,Threshold-Raise} (objective-matched negative control for the raising attack), and
-(4)~\textsc{Random-Benign\,+\,Threshold-Lower} (objective-matched negative control for the lowering attack).
+(4)~\textsc{Random-Benign} paired with \textsc{Threshold-Lower} (negative control for the lowering attack).
 The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ experimental cells total.
 Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, giving statistically independent stochasticity across training, calibration sampling, and bootstrap resampling.
 
@@ -85,12 +82,11 @@ Mean victim TPR change, $\Delta\mathrm{TPR}$, is directionally consistent (negat
 
 \textbf{Confidence intervals.}
 All CIs are 95\% percentile bootstrap over 10 seed-level aggregates, with $B{=}10{,}000$ resamples.
-Percentile bootstrap coverage at $n{=}10$ may deviate from nominal at the tails; reported CIs should be interpreted as approximate.
-AUROC invariance is verified as a protocol check: since test scores and labels are unchanged, AUROC must be identical under poisoning; any deviation would indicate a protocol violation.
+Primary claim gates are evaluated over these paired seed-level aggregates; the per-victim-seed cells are descriptive support, not independent units.
+With ten paired seeds, percentile-bootstrap intervals are approximate uncertainty estimates rather than exact coverage guarantees, and may deviate from nominal at the tails.
 
 \textbf{Gate constant justification.}
-The 10\,\% IQR coefficient for Gate-1 materiality ($0.1{\times}\mathrm{IQR}$) was set to exceed calibration natural instability observed in the clean baseline while remaining smaller than the expected tail-injection shift at $f{=}0.1$.
-The 1\,\% cross-client floor ($0.01{\times}\mathrm{median}_j(\mathrm{IQR})$) prevents degenerate clients with near-zero score spread from counting as material on arbitrarily small shifts.
+The 10\,\% IQR coefficient for Gate-1 materiality ($0.1{\times}\mathrm{IQR}$) exceeds the calibration instability observed in the clean baseline while remaining below the expected tail-injection shift at $f{=}0.1$; the 1\,\% cross-client floor ($0.01{\times}\mathrm{median}_j(\mathrm{IQR})$) prevents degenerate clients with near-zero score spread from counting as material on arbitrarily small shifts.
 Both constants were locked from clean-artifact statistics before any poisoned run was executed.
 
 \subsection{Isolation Sanity Check}

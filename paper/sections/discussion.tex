@@ -10,11 +10,9 @@ With reservoir size $R{\approx}10\,\%{\cdot}n_v$ and the smallest per-client cal
 We flag detectability as an open problem.
 
 \textbf{GLOBAL spillover, lowering bounds, and policy implications.}
-The $1/N$-diluted shift is a definitional property of the \textsc{Global} policy; what is empirical is that the residual magnitude ($\approx$10\,\% of the local shift, $\Delta\mathrm{TPR}{=}{-}6.1$\,pp at $f{=}0.4$) remains measurable above the seed-to-seed variance.
-The lowering attack's conditionality stems from the percentile mechanism: random position replacement displaces upper-tail support only with probability $\approx f$, leaving 60\,\% of the upper tail intact at $f{=}0.4$.
-The Local/Cluster lowering results ($\Delta\mathrm{CV(FPR)} {=} {+}0.05$--$0.06$ disparity increase, $\Delta\mathrm{TPR} {=} {+}10$--$12$\,pp detection-rate shift) are therefore a \emph{lower bound} under the \textsc{Replace-Fixed-Budget} mechanism; adversaries with access to the buffer's rank structure could achieve larger threshold displacements and correspondingly larger alarm-burden effects.
-These results together reveal a structural trade-off in policy design: \textsc{Local} maximizes per-client isolation but maximizes per-victim exposure; \textsc{Global} limits per-victim shift via averaging but propagates residual harm federation-wide.
-Defense designers must choose which risk to bound.
+The $1/N$-diluted \textsc{Global} shift is definitional; what is empirical is that the residual magnitude ($\approx$10\,\% of the local shift, $\Delta\mathrm{TPR}{=}{-}6.1$\,pp at $f{=}0.4$) remains measurable above the seed-to-seed variance.
+The Local/Cluster lowering results are a \emph{lower bound} under \textsc{Replace-Fixed-Budget} (\S\ref{sec:results}): adversaries with access to the buffer's rank structure could achieve larger threshold displacements and alarm-burden effects.
+These results reveal a structural trade-off in policy design: \textsc{Local} maximizes per-client isolation but maximizes per-victim exposure, whereas \textsc{Global} limits per-victim shift via averaging but propagates residual harm federation-wide; defense designers must choose which risk to bound.
 
 \textbf{Scope limitations.}
 Claims are bounded to N-BaIoT (9 clients; generalizability to other federated IoT datasets and larger federation sizes is open), autoencoder architecture, FedAvg, and $q{=}0.95$ (quantile sensitivity is future work).
