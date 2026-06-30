@@ -52,7 +52,7 @@ Three threshold-policy families are evaluated, covering the main design points i
   All clients receive the same threshold; any per-client shift is diluted by $1/N$.
   \item[Local.] \textsc{Local}: each client retains $\tau_i^{\mathrm{local}}$.
   Shifts are confined to the compromised client; no spillover.
-  \item[Cluster.] \textsc{Cluster}: clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$ clusters of 3 clients each, \texttt{random\_state}$=42$; reassigned each seed).
+  \item[Cluster.] \textsc{Cluster}: clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, \texttt{random\_state}$=42$; reassigned each seed).
   Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) reflects cluster-assignment variability.
   A compromised client may alter the threshold for all co-cluster members (\emph{intra-cluster spillover}); clients in other clusters are unaffected.
 \end{description}

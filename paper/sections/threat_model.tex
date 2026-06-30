@@ -22,7 +22,7 @@ The \textsc{Replace-Fixed-Budget} mechanism samples replacement scores with repl
 \textbf{Attack mechanics.}
 We evaluate two attack objectives:
 \begin{description}
-  \item[Raise.] \textsc{Threshold-Raise} (primary): replace $m{=}\lfloor f \cdot n_v \rfloor$ randomly selected positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\textsc{High-Score-Benign} source).
+  \item[Raise.] \textsc{Threshold-Raise} (primary): for $f{>}0$, replace $m=\max(1,\mathrm{round}(fn_v))$ random positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\textsc{High-Score-Benign} source).
   All replacement scores are semantically benign; AUROC is invariant by construction (test scores and labels are unchanged under poisoning).
   A raised threshold $\tau_v$ increases the detection threshold, suppressing alarms at the victim site.
   \item[Lower.] \textsc{Threshold-Lower} (secondary, conditional): replace $m$ positions with scores from the bottom-10\% tail (\textsc{Low-Score-Benign}).
