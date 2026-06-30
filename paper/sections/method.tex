@@ -8,6 +8,39 @@ Each device constitutes one federation client; all nine are eligible for calibra
 Calibration set sizes range from 2,622 (Ecobee Thermostat) to 9,909 (Danmini Doorbell) benign samples per device (all $\ge$100, satisfying the eligibility threshold).
 The federation trains a per-client autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg} for feature extraction, then enters the threshold-calibration stage.
 The full configuration is: threshold quantile $q{=}0.95$; injection fractions $f \in \{0.0, 0.1, 0.2, 0.4\}$; injection rule \textsc{Replace-Fixed-Budget}; single-client attack scope; 10 paired (training + poisoning) seeds; reservoir = bottom/top 10\,\% tail of the poisoned client's benign calibration scores, sampled with replacement.
+Table~\ref{tab:repro} summarizes the full experimental configuration.
+
+\begin{table}[tb]
+\caption{Experimental configuration for reproducibility.}
+\label{tab:repro}
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Component & Configuration \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Autoencoder architecture}} \\
+Input features & 115 (N-BaIoT statistical traffic features) \\
+Encoder layers & $115 \to 80 \to 40 \to 20$; decoder mirrors \\
+Activation & ReLU (no batch normalization) \\
+Loss & Mean squared reconstruction error \\
+Optimizer & Adam, lr\,=\,0.001, weight\_decay\,=\,0 \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Federated training (FedAvg)}} \\
+Local epochs & 1 \\
+Aggregation & Sample-count-weighted mean \\
+Rounds & Initial 40; max 150 (convergence: $\Delta$loss~$\le$~0.005 over 10 rounds) \\
+Batch size & 256 \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{N-BaIoT calibration sizes (benign samples)}} \\
+Danmini Doorbell & 9,909 \quad Philips Baby Monitor: 35,048 \\
+Ennio Doorbell & 7,820 \quad Samsung Webcam: 10,430 \\
+Provision PT-737E & 12,430 \quad SimpleHome XCS7-1002: 9,317 \\
+Provision PT-838 & 19,702 \quad SimpleHome XCS7-1003: 3,905 \\
+Ecobee Thermostat & 2,622 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Threshold Policies}
 
@@ -19,7 +52,7 @@ Three threshold-policy families are evaluated, covering the main design points i
   All clients receive the same threshold; any per-client shift is diluted by $1/N$.
   \item[Local.] \textsc{Local}: each client retains $\tau_i^{\mathrm{local}}$.
   Shifts are confined to the compromised client; no spillover.
-  \item[Cluster.] \textsc{Cluster}: clients are grouped by calibration-score similarity ($K{=}3$, $k$-means++, \texttt{random\_state}$=42$; assignments recomputed each seed as calibration fingerprints vary with training).
+  \item[Cluster.] \textsc{Cluster}: clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$ clusters of 3 clients each, \texttt{random\_state}$=42$; reassigned each seed).
   Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) reflects cluster-assignment variability.
   A compromised client may alter the threshold for all co-cluster members (\emph{intra-cluster spillover}); clients in other clusters are unaffected.
 \end{description}
@@ -28,6 +61,11 @@ Three threshold-policy families are evaluated, covering the main design points i
 
 For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, we run 10 paired seeds: each seed selects a training configuration and an independent poisoning draw.
 A clean copy of the calibration array is preserved; only the poisoned copy is used for threshold computation.
+The four source-objective pairs are:
+(1)~\textsc{High-Score-Benign\,+\,Threshold-Raise} (primary raising attack),
+(2)~\textsc{Low-Score-Benign\,+\,Threshold-Lower} (primary lowering attack),
+(3)~\textsc{Random-Benign\,+\,Threshold-Raise} (objective-matched negative control for the raising attack), and
+(4)~\textsc{Random-Benign\,+\,Threshold-Lower} (objective-matched negative control for the lowering attack).
 The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ experimental cells total.
 Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, giving statistically independent stochasticity across training, calibration sampling, and bootstrap resampling.
 
@@ -37,7 +75,7 @@ Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and
 Threshold shift $\Delta\tau_v = \tau_v^{\mathrm{poisoned}} - \tau_v^{\mathrm{clean}}$ is computed per seed.
 A seed is \emph{Gate-1 significant} when $|\Delta\tau_v| > \delta\tau_v$ and the sign is consistent with the attack objective, where the materiality threshold is
 $\delta\tau_v = \max\!\bigl(0.1 \times \mathrm{IQR}(\mathcal{C}_v^{\mathrm{clean}}),\;0.01 \times \mathrm{median}_j(\mathrm{IQR}(\mathcal{C}_j^{\mathrm{clean}}))\bigr)$.
-Gate-1 passes when $\ge 8/10$ seeds are significant and the victim-majority condition ($\ge 5/9$ victims significant) holds.
+Gate-1 passes when $\ge 8/10$ seeds are significant and the victim-majority condition ($\ge 5/9$ victims significant, i.e.\ a simple majority of the nine federation clients) holds.
 
 \textbf{Gate 2 (directional excess over control).}
 Bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the negative control (\textsc{Random-Benign}).
@@ -47,7 +85,13 @@ Mean victim TPR change, $\Delta\mathrm{TPR}$, is directionally consistent (negat
 
 \textbf{Confidence intervals.}
 All CIs are 95\% percentile bootstrap over 10 seed-level aggregates, with $B{=}10{,}000$ resamples.
+Percentile bootstrap coverage at $n{=}10$ may deviate from nominal at the tails; reported CIs should be interpreted as approximate.
 AUROC invariance is verified as a protocol check: since test scores and labels are unchanged, AUROC must be identical under poisoning; any deviation would indicate a protocol violation.
+
+\textbf{Gate constant justification.}
+The 10\,\% IQR coefficient for Gate-1 materiality ($0.1{\times}\mathrm{IQR}$) was set to exceed calibration natural instability observed in the clean baseline while remaining smaller than the expected tail-injection shift at $f{=}0.1$.
+The 1\,\% cross-client floor ($0.01{\times}\mathrm{median}_j(\mathrm{IQR})$) prevents degenerate clients with near-zero score spread from counting as material on arbitrarily small shifts.
+Both constants were locked from clean-artifact statistics before any poisoned run was executed.
 
 \subsection{Isolation Sanity Check}
 

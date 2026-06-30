@@ -14,11 +14,12 @@ Differential privacy approaches add noise to local updates~\cite{geyer2017differ
 These defenses all operate on gradients or model updates; they complete before the threshold-calibration stage begins.
 
 \textbf{Threshold calibration and poisoning.}
-Threshold-based anomaly detection is sensitive to the calibration distribution: small shifts in the quantile-defining score set translate directly to missed detections or false alarms~\cite{lheureux2017machine}.
+By construction, a detection threshold defined as a fixed quantile $q$ of the calibration score distribution is sensitive to the scores admitted to that distribution: inserting high-score tail values raises the quantile boundary (yielding missed detections), while inserting low-score tail values lowers it (yielding false alarms).
 Poisoning attacks on anomaly detectors have been studied in centralized settings~\cite{kloft2012online,cretu2008casting,barreno2010security}, but these assume either a single data owner or a trusted aggregator who can sanitize training data across the full dataset.
+Kloft \& Laskov~\cite{kloft2012online} study online poisoning of centralized anomaly detectors via insertion into a continuous training stream; their adversarial model requires persistent model-update access, which is absent in the post-training calibration stage of FL.
 In FL, calibration data never leaves the client, so server-side sanitization is not available.
 Prior work on FL model poisoning~\cite{bagdasaryan2020backdoor} and FL inference attacks~\cite{geiping2020inverting} focuses on the gradient/weight surface.
-To our knowledge, no prior work characterizes the vulnerability of the post-training threshold-calibration stage in federated threshold-based anomaly detection.
+To the best of our knowledge, no prior work characterizes the vulnerability of the post-training threshold-calibration stage in federated threshold-based anomaly detection.
 
 \textbf{Threshold policies.}
 Federated threshold personalization spans a spectrum.

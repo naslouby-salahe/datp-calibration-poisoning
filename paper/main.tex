@@ -50,9 +50,11 @@ L2IS Laboratory, Higher Normal School (ENS), University Cadi Ayyad, Marrakech, M
 Federated learning (FL) defenses for IoT anomaly detection focus on the training phase---Byzantine-robust aggregation, gradient filtering, differential privacy.
 The post-training \emph{threshold-calibration stage}, where each client autonomously collects a benign calibration set and derives its detection threshold, is structurally outside the scope of these defenses.
 We characterize the vulnerability of this stage under a score-level contamination model: a single compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the detection threshold without altering model weights, training data, or test labels.
-Across three threshold-policy families (\textsc{Global}, \textsc{Local}, \textsc{Cluster}) evaluated on the N-BaIoT nine-device federation, the score-level raising attack achieves 100\% Gate-1 pass rate at all non-zero fractions, degrading victim true-positive rates by 2.4 to 7.9 percentage points across injection fractions (4.9--7.9\,pp at $f{=}0.4$).
-The score-level lowering attack succeeds for \textsc{Local} and \textsc{Cluster} (victim detection-rate increase of 10--12\,pp as a lower bound, with coefficient-of-variation disparity $\Delta\mathrm{CV}(\mathrm{FPR})$ increasing 0.05--0.06) but is structurally bounded for \textsc{Global} due to $1/N$ dilution.
-Policy choice determines not just per-victim magnitude but blast radius: \textsc{Local} confines harm to the compromised client; \textsc{Global} dilutes per-victim shift but propagates it to all federation members.
+Across three threshold-policy families (\textsc{Global}, \textsc{Local}, \textsc{Cluster}) evaluated on the N-BaIoT nine-device federation, the score-level raising attack achieves a 100\% pass rate on our primary materiality significance test (Gate-1; \S\ref{sec:method}) at all non-zero fractions, degrading victim true-positive rates by 2.4 to 7.9 percentage points across injection fractions (4.9--7.9\,pp at $f{=}0.4$).
+The score-level lowering attack achieves elevated false-alarm rates for \textsc{Local} and \textsc{Cluster}, increasing the cross-client false-positive coefficient of variation $\Delta\mathrm{CV}(\mathrm{FPR})$ by 0.05--0.06 (a lower bound under \textsc{Replace-Fixed-Budget}); the $\Delta\mathrm{TPR}{>}0$ reflects threshold displacement, not a security benefit, as it increases the alarm burden that may lead operators to disable the detector.
+The lowering attack is structurally bounded for \textsc{Global} due to $1/N$ dilution.
+Policy choice determines not just per-victim magnitude but blast radius: \textsc{Local} confines harm to the compromised client; \textsc{Cluster} extends it to co-cluster members; \textsc{Global} dilutes per-victim shift but propagates it to all federation members.
+All results are at the score-substitution level; end-to-end traffic-level realization is future work.
 
 \keywords{Federated Learning \and Anomaly Detection \and IoT Security \and Poisoning Attack \and Threshold Calibration \and Vulnerability Analysis}
 \end{abstract}
@@ -90,7 +92,7 @@ Policy choice determines not just per-victim magnitude but blast radius: \textsc
   \node[secure] (local) {Local Training};
   \node[secure, right=0.95cm of local] (agg)  {FedAvg\\Aggregation};
   \node[secure, right=0.95cm of agg]   (model){Shared Model};
-  \node[phaseLabel, above=0.28cm of agg] (trainLabel) {Training phase (defended)};
+  \node[phaseLabel, above=0.28cm of agg] (trainLabel) {Training \& aggregation (defended)};
 
   % Calibration stage
   \node[vuln, below=1.78cm of model] (thresh) {Threshold\\$\tau$};
@@ -140,9 +142,10 @@ An adversary with score-level access to one client's calibration buffer can shif
 \begin{figure}[tb]
 \centering
 \includegraphics[width=0.82\textwidth]{figures/fig_clean_fpr.pdf}
-\caption{Per-client FPR under clean baseline, \GLOBAL vs.\ \LOCAL threshold (seed 0).
-\GLOBAL forces a single threshold on nine devices with heterogeneous score distributions, producing high CV(FPR)\,=\,0.91 (seed 0).
-\LOCAL fits each client's own calibration distribution, achieving CV(FPR)\,=\,0.33 on average.}
+\caption{Per-client FPR under clean baseline, \GLOBAL vs.\ \LOCAL threshold (seed 0; CV(FPR) values across all 10 seeds reported in Table~\ref{tab:baseline}).
+\GLOBAL forces a single threshold on nine devices with heterogeneous score distributions, producing CV(FPR)\,=\,0.87 for seed~0 (mean\,$= 0.905 \pm 0.039$ across seeds).
+\LOCAL fits each client's own calibration distribution, achieving CV(FPR)\,=\,0.33 on average.
+\CLUSTER is omitted here; its baseline is in Table~\ref{tab:baseline} (CV(FPR)\,$= 0.615 \pm 0.143$).}
 \label{fig:clean-fpr}
 \end{figure}
 
@@ -153,7 +156,7 @@ An adversary with score-level access to one client's calibration buffer can shif
 \caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for the raising (a) and lowering (b) attacks across three policies.
 Error bars: 95\,\% bootstrap CI over 10 seeds.
 \GLOBAL exhibits the smallest magnitude in both directions due to $1/N$ federation averaging.
-\textsc{Random-Benign} negative control (not plotted) produces CI spanning zero at all fractions.}
+\textsc{Random-Benign} negative control (not shown) produces CIs spanning zero and G1\,=\,0\,\% at all fractions and policies; representative values at $f{=}0.4$ are in Table~\ref{tab:main-results} (Neg.\,Ctrl rows).}
 \label{fig:threshold-shift}
 \end{figure}
 
@@ -165,6 +168,9 @@ Error bars: 95\,\% bootstrap CI over 10 seeds.
 
 % Table: Main results
 \input{tables/table_main_results}
+
+% Table: Spillover profile
+\input{tables/table_spillover}
 
 % -------------------------------------------------------
 \clearpage
