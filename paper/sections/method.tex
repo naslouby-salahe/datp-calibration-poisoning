@@ -1,0 +1,55 @@
+\section{Experimental Protocol}
+\label{sec:method}
+
+\subsection{Dataset and Federation}
+
+We use N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical device types (doorbells, baby monitor, security camera, smart TV, thermostat, webcam).
+Each device constitutes one federation client; all nine are eligible for calibration.
+Calibration set sizes range from 2,622 (Ecobee Thermostat) to 9,909 (Danmini Doorbell) benign samples per device (all $\ge$100, satisfying the eligibility threshold).
+The federation trains a per-client autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg} for feature extraction, then enters the threshold-calibration stage.
+The full configuration is: threshold quantile $q{=}0.95$; injection fractions $f \in \{0.0, 0.1, 0.2, 0.4\}$; injection rule \textsc{Replace-Fixed-Budget}; single-client attack scope; 10 paired (training + poisoning) seeds; reservoir = bottom/top 10\,\% tail of the poisoned client's benign calibration scores, sampled with replacement.
+
+\subsection{Threshold Policies}
+
+Three threshold-policy families are evaluated, covering the main design points in the personalization literature:
+
+\begin{description}
+  \item[Global.] \textsc{Global}: $\tau_{\mathrm{global}} = \frac{1}{N}\sum_{i=1}^{N} \tau_i^{\mathrm{local}}$,
+  where $\tau_i^{\mathrm{local}} = \mathrm{quantile}(\mathcal{C}_i, q)$.
+  All clients receive the same threshold; any per-client shift is diluted by $1/N$.
+  \item[Local.] \textsc{Local}: each client retains $\tau_i^{\mathrm{local}}$.
+  Shifts are confined to the compromised client; no spillover.
+  \item[Cluster.] \textsc{Cluster}: clients are grouped by calibration-score similarity ($K{=}3$, $k$-means++, \texttt{random\_state}$=42$; assignments recomputed each seed as calibration fingerprints vary with training).
+  Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) reflects cluster-assignment variability.
+  A compromised client may alter the threshold for all co-cluster members (\emph{intra-cluster spillover}); clients in other clusters are unaffected.
+\end{description}
+
+\subsection{Attack Parameterization}
+
+For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, we run 10 paired seeds: each seed selects a training configuration and an independent poisoning draw.
+A clean copy of the calibration array is preserved; only the poisoned copy is used for threshold computation.
+The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ experimental cells total.
+Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, giving statistically independent stochasticity across training, calibration sampling, and bootstrap resampling.
+
+\subsection{Statistical Analysis}
+
+\textbf{Gate 1 (material shift, primary gate).}
+Threshold shift $\Delta\tau_v = \tau_v^{\mathrm{poisoned}} - \tau_v^{\mathrm{clean}}$ is computed per seed.
+A seed is \emph{Gate-1 significant} when $|\Delta\tau_v| > \delta\tau_v$ and the sign is consistent with the attack objective, where the materiality threshold is
+$\delta\tau_v = \max\!\bigl(0.1 \times \mathrm{IQR}(\mathcal{C}_v^{\mathrm{clean}}),\;0.01 \times \mathrm{median}_j(\mathrm{IQR}(\mathcal{C}_j^{\mathrm{clean}}))\bigr)$.
+Gate-1 passes when $\ge 8/10$ seeds are significant and the victim-majority condition ($\ge 5/9$ victims significant) holds.
+
+\textbf{Gate 2 (directional excess over control).}
+Bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the negative control (\textsc{Random-Benign}).
+
+\textbf{Gate 3 (downstream harm).}
+Mean victim TPR change, $\Delta\mathrm{TPR}$, is directionally consistent (negative for raising, positive for lowering) across $\ge 8/10$ seeds.
+
+\textbf{Confidence intervals.}
+All CIs are 95\% percentile bootstrap over 10 seed-level aggregates, with $B{=}10{,}000$ resamples.
+AUROC invariance is verified as a protocol check: since test scores and labels are unchanged, AUROC must be identical under poisoning; any deviation would indicate a protocol violation.
+
+\subsection{Isolation Sanity Check}
+
+To confirm that the attack is confined to the calibration stage, we verify: (i)~AUROC is invariant under poisoning for all cells, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical.
+All three hold in all 4320 cells.

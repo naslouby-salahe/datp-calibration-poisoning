@@ -1,0 +1,62 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{Clean-Baseline Policy Profile}
+
+Table~\ref{tab:baseline} reports clean-baseline dispersion statistics across all ten seeds.
+\textsc{Local} achieves the lowest CV(FPR) ($0.333 \pm 0.034$), confirming that per-client thresholds suppress false-positive heterogeneity most effectively.
+\textsc{Global} exhibits the highest CV(FPR) ($0.905 \pm 0.039$) because a single federation-wide threshold cannot simultaneously fit nine devices with different traffic distributions.
+\textsc{Cluster} lies in between ($0.615 \pm 0.143$) with higher variance across seeds, reflecting sensitivity to cluster assignment.
+Bootstrap 95\% CIs on the pairwise CV(FPR) difference exclude zero: Global$-$Local $= 0.572$ $[0.537, 0.607]$; Global$-$Cluster $= 0.291$ $[0.214, 0.358]$; Cluster$-$Local $= 0.281$ $[0.201, 0.374]$, confirming that all three policies are statistically distinguishable on baseline fairness.
+Figure~\ref{fig:clean-fpr} shows the per-client FPR distributions for \textsc{Global} and \textsc{Local} under the clean baseline.
+
+\subsection{Raising Attack: Primary Results}
+
+Table~\ref{tab:main-results} and Figure~\ref{fig:threshold-shift}(a) report threshold-shift and downstream detection harm for the \textsc{High-Score-Benign\,+\,Threshold-Raise} strategy.
+
+\textbf{All three policies pass all three gates.}
+The seed-level Gate-1 pass rate is 100\% (10/10 seeds) at every non-zero fraction for all three policies.
+For \textsc{Local} and \textsc{Cluster}, all nine clients are individually significant in every seed.
+For \textsc{Global} at $f{=}0.1$, two devices (Provision PT-737E and PT-838) are intermittently non-significant (2/10 and 4/10 seeds respectively), but the victim-majority condition ($\ge$5/9 per seed) still holds because the remaining seven clients are consistently significant.
+Bootstrap CIs on $\Delta\tau$ exclude zero and remain non-overlapping with the \textsc{Random-Benign} control (which produces CIs spanning zero at all fractions).
+
+\textbf{Policy-dependent magnitude.}
+The raising attack reveals a clear policy-dependent magnitude profile.
+\textsc{Local} and \textsc{Cluster} exhibit the largest threshold shifts: at $f{=}0.4$, $\Delta\tau = +0.902$ $[+0.864, +0.944]$ and $+0.899$ $[+0.859, +0.941]$ respectively.
+\textsc{Global} shows a structurally diluted but still significant shift: $+0.100$ $[+0.096, +0.105]$ at $f{=}0.4$.
+The dilution is expected by construction---\textsc{Global}'s threshold is the federation mean, so a single-client shift is divided by $N{=}9$---but the empirical question is whether the residual magnitude ($\approx$10\,\% of the local shift) suffices to produce measurable downstream harm.
+It does.
+
+\textbf{Downstream harm (Gate 3).}
+Mean victim $\Delta\mathrm{TPR}$ is negative and directionally consistent across all seeds for all three policies.
+At $f{=}0.4$: \textsc{Local} $-7.9$\,pp, \textsc{Cluster} $-4.9$\,pp (plateauing from $f{=}0.2$), \textsc{Global} $-6.1$\,pp.
+The \textsc{Global} harm ($-6.1$\,pp) is notable: despite the $1/9$-fold dilution of the per-client threshold shift, the federation-wide propagation of the poisoned threshold to \emph{all} clients means that harm originating at the poisoned client propagates to all federation members.
+To contextualize: a victim with clean TPR\,$= 1.0$ (Danmini\_Doorbell) drops to $\approx$0.92--0.95 at $f{=}0.4$; a victim with clean TPR\,$= 0.78$ (Ennio\_Doorbell) drops to $\approx$0.70--0.73, translating to an additional $\approx$30--80 undetected Mirai flows per 1000 attack packets at representative traffic rates.
+
+\subsection{Lowering Attack: Secondary Results (Conditional)}
+
+Figure~\ref{fig:threshold-shift}(b) shows threshold shift for the \textsc{Low-Score-Benign\,+\,Threshold-Lower} strategy.
+
+\textbf{Local and Cluster succeed; Global is marginal.}
+\textsc{Local} achieves $\Delta\tau = -0.164$ $[-0.176, -0.154]$ at $f{=}0.4$ with Gate-3 $\Delta\mathrm{TPR} = +11.8$\,pp (detection-rate increase under the lowered threshold).
+\textsc{Cluster} similarly achieves $-0.154$ $[-0.167, -0.142]$ at $f{=}0.4$ with $\Delta\mathrm{TPR} = +10.3$\,pp.
+\textsc{Global} is structurally bounded: at $f{=}0.4$, $\Delta\tau = -0.018$ $[-0.020, -0.017]$, Gate-1 passes only at $f{\ge}0.2$, and $\Delta\mathrm{TPR} = +2.1$\,pp.
+
+\textbf{FPR disparity (operational harm).}
+The operational harm metric is $\Delta\mathrm{CV(FPR)}$ (change in coefficient of variation of per-client FPR, dimensionless): $+0.053$ (\textsc{Local}, 10/10 seeds) and $+0.060$ (\textsc{Cluster}, 8/10 seeds) at $f{=}0.4$, while \textsc{Global} shows $-0.019$ (shared-threshold proportional FPR rise reduces relative disparity).
+
+\textbf{Mechanism and conditionality.}
+Lowering a $q{=}0.95$ quantile requires displacing scores in the upper-tail support; random position replacement achieves this with probability $\approx f$ (40\,\% at $f{=}0.4$), leaving 60\,\% of upper-tail support intact.
+The \textsc{Global} policy compounds this via $1/N$ dilution.
+We present these results as a lower bound under \textsc{Replace-Fixed-Budget}; targeted upper-tail removal would achieve larger shifts.
+
+\subsection{Policy-Differentiation Summary}
+
+The empirical profile reveals three structurally distinct vulnerability signatures:
+\begin{itemize}
+  \item \textbf{Local}: highest per-victim threshold shift magnitude; harm confined to the compromised client; no cross-client spillover; lowering attack effective.
+  \item \textbf{Cluster}: near-\textsc{Local} threshold shift magnitude; intra-cluster spillover observed (co-cluster clients share the contaminated threshold); lowering attack effective.
+  \item \textbf{Global}: structurally diluted threshold shift ($\approx$1/N of local shift); but \emph{full federation-wide spillover} (all 9 clients receive the poisoned threshold); raising attack produces significant victim harm despite dilution; lowering attack is marginal and condition-dependent.
+\end{itemize}
+
+A policy designer facing this trade-off must choose between isolated per-victim exposure (\textsc{Local}) and diluted federation-wide propagation (\textsc{Global}), with \textsc{Cluster} offering intra-cluster but not inter-cluster spillover.

@@ -1,0 +1,18 @@
+\begin{table}[tb]
+\caption{Clean-baseline dispersion statistics per threshold policy (N-BaIoT, $n{=}10$ seeds, 9 clients).
+CV: coefficient of variation (ddof\,=\,0); IQR: interquartile range.
+Lower CV(FPR) indicates more uniform false-positive rates across clients.
+Bold marks the best value per metric.}
+\label{tab:baseline}
+\centering
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Policy & CV(FPR) & CV(TPR) & Worst~BA & P10 Macro-F1 \\
+\midrule
+\textsc{Global} & 0.905\,$\pm$\,0.039 & \textbf{0.255\,$\pm$\,0.030} & 0.657\,$\pm$\,0.008 & 0.398\,$\pm$\,0.053 \\
+\textsc{Local}  & \textbf{0.333\,$\pm$\,0.034} & 0.296\,$\pm$\,0.036 & 0.655\,$\pm$\,0.005 & 0.335\,$\pm$\,0.058 \\
+\textsc{Cluster}& 0.615\,$\pm$\,0.143 & 0.313\,$\pm$\,0.009 & 0.656\,$\pm$\,0.004 & 0.299\,$\pm$\,0.000 \\
+\bottomrule
+\end{tabular}
+\end{table}

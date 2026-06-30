@@ -1,0 +1,40 @@
+\section{Threat Model}
+\label{sec:threat}
+
+\textbf{Attack surface.}
+The threshold-calibration stage occurs after global model convergence and before threshold-dependent detection begins.
+Each client $i$ collects a benign calibration set $\mathcal{C}_i = \{s_1, \ldots, s_{n_i}\}$ of reconstruction scores from its own traffic, then sets its local threshold $\tau_i = \mathrm{quantile}(\mathcal{C}_i,\, q)$ at a fixed quantile $q$ (here $q{=}0.95$).
+Depending on the federation's threshold policy, $\tau_i$ may be used directly (\textsc{Local}), averaged across clients (\textsc{Global}), or averaged within a calibration-score cluster (\textsc{Cluster}).
+
+No existing FL training-phase or aggregation-phase defense monitors or validates the calibration buffer: it is collected autonomously by the client after the aggregation round completes.
+
+\textbf{Adversary model.}
+The adversary controls a single compromised client $v$, which we call the \emph{poisoned client}.
+Under \textsc{Local} policy, only client $v$'s own detection degrades; under \textsc{Global} policy, all federation members receive the contaminated threshold.
+We use ``victim'' to refer to client $v$ itself when measuring per-client detection harm, and ``non-victim clients'' when referring to uninvolved federation members.
+
+The adversary has \emph{gray-box score-level access}: since the adversary controls the client, it can read and modify the local calibration buffer before threshold computation.
+The adversary does not access model weights, modify gradients, alter other clients' data, or touch test data, test labels, or training labels.
+This is a strictly weaker capability than model-poisoning adversaries, which require gradient injection.
+The adversary operates at the score level; generating traffic that achieves a target reconstruction score is out of scope (end-to-end realizability is discussed in \S\ref{sec:discussion}).
+The \textsc{Replace-Fixed-Budget} mechanism samples replacement scores with replacement from the tail reservoir; at high fractions ($f{=}0.4$), this may produce duplicate scores in the calibration buffer, which is detectable by a uniqueness check---this limitation is disclosed in \S\ref{sec:discussion}.
+
+\textbf{Attack mechanics.}
+We evaluate two attack objectives:
+\begin{description}
+  \item[Raise.] \textsc{Threshold-Raise} (primary): replace $m{=}\lfloor f \cdot n_v \rfloor$ randomly selected positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\textsc{High-Score-Benign} source).
+  All replacement scores are semantically benign; AUROC is invariant by construction (test scores and labels are unchanged under poisoning).
+  A raised threshold $\tau_v$ increases the detection threshold, suppressing alarms at the victim site.
+  \item[Lower.] \textsc{Threshold-Lower} (secondary, conditional): replace $m$ positions with scores from the bottom-10\% tail (\textsc{Low-Score-Benign}).
+  A lowered threshold increases the false-positive rate (alarm burden) and FPR disparity; the resulting $\Delta\mathrm{TPR}{>}0$ reflects threshold displacement and is a secondary indicator of operating-point shift.
+  This attack is structurally conditional: random position replacement displaces upper-tail support with probability $\approx f$.
+\end{description}
+
+\textbf{Negative control.} \textsc{Random-Benign}: replacement scores are sampled uniformly from the full calibration distribution rather than a tail.
+Any effect attributable to score contamination rather than position perturbation should vanish in this condition.
+
+\textbf{Scope boundary.}
+This paper characterizes the vulnerability at the score level.
+A complete end-to-end attack would additionally require generating network traffic whose autoencoder reconstruction score lands in the target tail---this is future work (\S\ref{sec:discussion}).
+The score-level characterization is a controlled experiment, not a deployed attack.
+Claims are bounded to the single-client, single-compromise scenario; multi-client collusion is not evaluated.

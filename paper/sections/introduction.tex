@@ -1,0 +1,35 @@
+\section{Introduction}
+\label{sec:intro}
+
+Federated learning (FL) has emerged as a natural fit for IoT anomaly detection: devices contribute to a shared model without exposing raw traffic, and personalized detection thresholds let each node adapt to its own traffic distribution~\cite{li2020federated,nguyen2022federated}.
+The dominant security concern in federated anomaly detection focuses on the \emph{training phase}---Byzantine clients injecting adversarial gradients, label-flipping poisoning, or model-inversion attacks~\cite{biggio2012poisoning,bhagoji2019analyzing,tolpegin2020data}.
+Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{cao2020fltrust,blanchard2017machine,yin2018byzantine}.
+
+\textbf{An undefended phase.}
+What existing defenses collectively ignore is the \emph{threshold-calibration stage}: the post-training, pre-deployment step in which each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
+Training-phase and aggregation-phase defenses are structurally blind to this stage---they complete before calibration begins.
+If a single client's benign calibration buffer can be contaminated with semantically benign but anomalously high (or low) reconstruction scores, the resulting threshold shifts without any change to model weights, training data, labels, or gradients.
+Such calibration-stage manipulation is structurally outside the scope of every defense that monitors the training or aggregation loop.
+
+\textbf{This paper.}
+We identify threshold calibration as an under-analyzed attack surface and characterize its vulnerability under a score-level contamination model.
+Concretely, an adversary with access to a single client's calibration buffer replaces a fraction~$f$ of entries with tail-sampled scores drawn from the same client's benign distribution (\emph{calibration-stage poisoning}).
+We evaluate three threshold-policy families---\textsc{Global} (federation-wide mean), \textsc{Local} (per-client), and \textsc{Cluster} (cluster-averaged)---across all nine physical-device clients in the N-BaIoT dataset~\cite{meidan2018nbaiot} at four injection fractions.
+
+To preempt the natural objection---``this is just data poisoning applied to calibration data''---we argue that calibration-stage poisoning is structurally distinct along three axes.
+First, it is \emph{temporally isolated}: it occurs strictly after model convergence, bypassing all training-phase defenses.
+Second, it exploits a \emph{phase-specific trust model}: calibration data is collected autonomously by each client with no central validation gate, a weaker trust assumption than that applied to gradients or labels.
+Third, its effects are \emph{policy-dependent} in ways that are not predictable from training-phase theory: the same injection fraction produces qualitatively different threshold shifts and spillover patterns depending on whether the policy aggregates thresholds globally, locally, or by cluster.
+
+\textbf{Contributions.}
+\begin{enumerate}
+  \item We isolate the post-training threshold-calibration stage as an undefended attack surface in federated IoT anomaly detection, distinct from training-phase and aggregation-phase poisoning (\S\ref{sec:threat}).
+  \item We present a controlled vulnerability characterization under score-level calibration contamination across three threshold policies, showing that the score-level raising attack reliably degrades victim detection rates by 2.4 to 7.9 percentage points across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 95\% bootstrap confidence intervals excluding zero (\S\ref{sec:results}).
+  \item We document a policy-differentiated vulnerability profile: \textsc{Local} and \textsc{Cluster} policies exhibit larger per-victim threshold shifts but no cross-client spillover; \textsc{Global} exhibits magnitude-diluted but federation-wide propagation; the score-level lowering attack succeeds for \textsc{Local} and \textsc{Cluster} but is conditionally bounded for \textsc{Global} (\S\ref{sec:results}).
+\end{enumerate}
+
+\textbf{Scope.}
+All claims are bounded to the nine-device N-BaIoT setting with autoencoder detectors and FedAvg aggregation.
+The poisoning mechanism operates at the score level; end-to-end traffic-generation realizability is future work (\S\ref{sec:discussion}).
+We do not claim deployability, evasion guarantees, or generalization beyond this setting.
+Defense design against calibration-stage poisoning is out of scope; we discuss properties a defense would need to satisfy in \S\ref{sec:discussion}.

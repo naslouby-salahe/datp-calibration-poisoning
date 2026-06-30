@@ -1,0 +1,41 @@
+\begin{table}[tb]
+\caption{Threshold shift and detection harm under calibration-stage poisoning (N-BaIoT, $n{=}10$ seeds).
+$\Delta\tau$: mean threshold shift [95\,\% bootstrap CI].
+G1: Gate-1 pass rate per seed (primary analysis: all 10/10 seeds).
+$\Delta$TPR\,(pp): victim detection-rate change; negative for Raise, positive for Lower (threshold displacement).
+Lowering rows ($\dagger$) are a lower bound; see \S\ref{sec:results} for $\Delta\mathrm{CV(FPR)}$ harm metric.
+\textsc{Random-Benign} control: CI spans zero, G1\,$\leq$\,30\,\% for all conditions.}
+\label{tab:main-results}
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrp{5.0cm}lr@{}}
+\toprule
+Policy & Attack & $f$ & \multicolumn{1}{l}{$\Delta\tau$ [95\,\% CI]} & G1 & $\Delta$TPR (pp) \\
+\midrule
+\textsc{Global} & Raise & 0.1 & $+0.033\;[+0.031,\,+0.035]$ & 100\,\% & -2.4 \\
+ &  & 0.2 & $+0.062\;[+0.059,\,+0.065]$ & 100\,\% & -4.6 \\
+ &  & 0.4 & $+0.100\;[+0.096,\,+0.105]$ & 100\,\% & -6.1 \\
+\addlinespace[2pt]
+\textsc{Local} & Raise & 0.1 & $+0.298\;[+0.281,\,+0.314]$ & 100\,\% & -6.0 \\
+ &  & 0.2 & $+0.558\;[+0.535,\,+0.581]$ & 100\,\% & -7.3 \\
+ &  & 0.4 & $+0.902\;[+0.864,\,+0.944]$ & 100\,\% & -7.9 \\
+\addlinespace[2pt]
+\textsc{Cluster} & Raise & 0.1 & $+0.253\;[+0.231,\,+0.277]$ & 100\,\% & -3.9 \\
+ &  & 0.2 & $+0.504\;[+0.475,\,+0.532]$ & 100\,\% & -4.9 \\
+ &  & 0.4 & $+0.899\;[+0.859,\,+0.941]$ & 100\,\% & -4.9 \\
+\midrule
+\textsc{Global} & Lower$\dagger$ & 0.1 & $-0.006\;[-0.006,\,-0.006]$ & 60\,\% & +0.8 \\
+ &  & 0.2 & $-0.010\;[-0.011,\,-0.010]$ & 100\,\% & +1.1 \\
+ &  & 0.4 & $-0.018\;[-0.020,\,-0.017]$ & 100\,\% & +2.1 \\
+\addlinespace[2pt]
+\textsc{Local} & Lower$\dagger$ & 0.1 & $-0.053\;[-0.057,\,-0.049]$ & 100\,\% & +2.8 \\
+ &  & 0.2 & $-0.094\;[-0.100,\,-0.088]$ & 100\,\% & +5.9 \\
+ &  & 0.4 & $-0.164\;[-0.176,\,-0.154]$ & 100\,\% & +11.8 \\
+\addlinespace[2pt]
+\textsc{Cluster} & Lower$\dagger$ & 0.1 & $-0.047\;[-0.065,\,-0.031]$ & 100\,\% & +2.2 \\
+ &  & 0.2 & $-0.100\;[-0.115,\,-0.084]$ & 100\,\% & +5.4 \\
+ &  & 0.4 & $-0.154\;[-0.167,\,-0.142]$ & 100\,\% & +10.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
