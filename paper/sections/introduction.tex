@@ -9,7 +9,7 @@ Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactl
 What existing defenses collectively ignore is the \emph{threshold-calibration stage}: the post-training, pre-deployment step in which each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
 Training-phase and aggregation-phase defenses are structurally blind to this stage---they complete before calibration begins.
 If a single client's benign calibration buffer can be contaminated with semantically benign but anomalously high (or low) reconstruction scores, the resulting threshold shifts without any change to model weights, training data, labels, or gradients.
-Such calibration-stage manipulation is structurally outside the scope of every defense that monitors the training or aggregation loop.
+We identify no existing defense that directly monitors or validates the calibration channel; training-phase and aggregation-phase defenses complete before calibration begins and cannot observe it.
 
 \textbf{This paper.}
 We identify threshold calibration as an under-analyzed attack surface and characterize its vulnerability under a score-level contamination model.
@@ -25,7 +25,7 @@ Third, its effects are \emph{policy-dependent} in ways that are not predictable 
 \begin{enumerate}
   \item We isolate the post-training threshold-calibration stage as an undefended attack surface in federated IoT anomaly detection, distinct from training-phase and aggregation-phase poisoning (\S\ref{sec:threat}).
   \item We present a controlled vulnerability characterization under score-level calibration contamination across three threshold policies, showing that the score-level raising attack reliably degrades victim detection rates by 2.4 to 7.9 percentage points across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 95\% bootstrap confidence intervals excluding zero (\S\ref{sec:results}).
-  \item We document a policy-differentiated vulnerability profile: \textsc{Local} and \textsc{Cluster} policies exhibit larger per-victim threshold shifts but no cross-client spillover; \textsc{Global} exhibits magnitude-diluted but federation-wide propagation; the score-level lowering attack succeeds for \textsc{Local} and \textsc{Cluster} but is conditionally bounded for \textsc{Global} (\S\ref{sec:results}).
+  \item We document a policy-differentiated vulnerability profile: \textsc{Local} exhibits the largest per-victim threshold shifts with harm confined to the compromised client (no cross-client spillover); \textsc{Cluster} exhibits near-\textsc{Local} shifts with potential intra-cluster spillover to co-cluster members; \textsc{Global} exhibits magnitude-diluted but fleet-wide propagation to all federation members; the score-level lowering attack succeeds for \textsc{Local} and \textsc{Cluster} but is conditionally bounded for \textsc{Global} (\S\ref{sec:results}).
 \end{enumerate}
 
 \textbf{Scope.}
