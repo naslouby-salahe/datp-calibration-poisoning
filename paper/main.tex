@@ -50,11 +50,11 @@ L2IS Laboratory, Higher Normal School (ENS), University Cadi Ayyad, Marrakech, M
 Federated learning (FL) defenses for IoT anomaly detection focus on the training phase---Byzantine-robust aggregation, gradient filtering, differential privacy.
 The post-training \emph{threshold-calibration stage}, where each client autonomously collects a benign calibration set and derives its detection threshold, is structurally outside the scope of these defenses.
 We characterize the vulnerability of this stage under a score-level contamination model: a single compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the detection threshold without altering model weights, training data, or test labels.
-Across three threshold-policy families (\textsc{Global}, \textsc{Local}, \textsc{Cluster}) evaluated on the N-BaIoT nine-device federation, the score-level raising attack achieves a 100\% pass rate on our primary materiality significance test (Gate-1; \S\ref{sec:method}) at all non-zero fractions, degrading victim true-positive rates by 2.4 to 7.9 percentage points across injection fractions (4.9--7.9\,pp at $f{=}0.4$).
+Across three threshold-policy families (\textsc{Global}, \textsc{Local}, \textsc{Cluster}) evaluated on the N-BaIoT nine-device federation, the score-level raising attack achieves a 100\% pass rate on our pre-specified materiality gate (Gate-1; \S\ref{sec:method}) at all non-zero fractions, degrading victim true-positive rates by 2.4 to 7.9 percentage points across injection fractions (4.9--7.9\,pp at $f{=}0.4$).
 The score-level lowering attack achieves elevated false-alarm rates for \textsc{Local} and \textsc{Cluster}, increasing the cross-client false-positive coefficient of variation $\Delta\mathrm{CV}(\mathrm{FPR})$ by 0.05--0.06 (a lower bound under \textsc{Replace-Fixed-Budget}); the $\Delta\mathrm{TPR}{>}0$ reflects threshold displacement, not a security benefit, as it increases the alarm burden that may lead operators to disable the detector.
 The lowering attack is structurally bounded for \textsc{Global} due to $1/N$ dilution.
 Policy choice determines not just per-victim magnitude but blast radius: \textsc{Local} confines harm to the compromised client; \textsc{Cluster} extends it to co-cluster members; \textsc{Global} dilutes per-victim shift but propagates it to all federation members.
-All results are at the score-substitution level; end-to-end traffic-level realization is future work.
+All results are at the score-substitution level: we characterize a necessary calibration-channel vulnerability mechanism, not a complete traffic-generation attack, and end-to-end traffic-level realization is future work.
 
 \keywords{Federated Learning \and Anomaly Detection \and IoT Security \and Poisoning Attack \and Threshold Calibration \and Vulnerability Analysis}
 \end{abstract}
@@ -92,13 +92,13 @@ All results are at the score-substitution level; end-to-end traffic-level realiz
   \node[secure] (local) {Local Training};
   \node[secure, right=0.95cm of local] (agg)  {FedAvg\\Aggregation};
   \node[secure, right=0.95cm of agg]   (model){Shared Model};
-  \node[phaseLabel, above=0.28cm of agg] (trainLabel) {Training \& aggregation (defended)};
+  \node[phaseLabel, above=0.28cm of agg] (trainLabel) {Training \& aggregation (within defense scope)};
 
   % Calibration stage
   \node[vuln, below=1.78cm of model] (thresh) {Threshold\\$\tau$};
   \node[vuln, left=1.18cm of thresh] (cal) {Calibration\\Buffer};
   \node[phaseLabel, text=red!70!black, above=0.32cm of cal, xshift=0.20cm]
-        (calLabel) {Calibration stage (\underline{undefended})};
+        (calLabel) {Calibration stage (\underline{outside defense scope})};
 
   % Policies below thresh
   \node[box, minimum width=1.45cm, below=0.72cm of thresh, xshift=-1.85cm] (pg) {\GLOBAL};
@@ -130,7 +130,7 @@ All results are at the score-substitution level; end-to-end traffic-level realiz
 \end{tikzpicture}%
 }
 \caption{Attack surface: the threshold-calibration stage occurs after FL training completes.
-Training-phase and aggregation-phase defenses (green) are structurally blind to the calibration stage (red).
+Green boxes mark the training and aggregation phases that existing FL-IDS defenses cover; the red region marks the calibration stage, which those defenses do not observe (no defense is implemented in this study).
 An adversary with score-level access to one client's calibration buffer can shift $\tau$ without modifying model weights, gradients, or labels.}
 \label{fig:attack-surface}
 \end{figure}

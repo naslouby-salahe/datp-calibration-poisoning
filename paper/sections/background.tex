@@ -13,13 +13,36 @@ FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
 Differential privacy approaches add noise to local updates~\cite{geyer2017differentially}.
 These defenses all operate on gradients or model updates; they complete before the threshold-calibration stage begins.
 
+\begin{sloppypar}
 \textbf{Threshold calibration and poisoning.}
-By construction, a detection threshold defined as a fixed quantile $q$ of the calibration score distribution is sensitive to the scores admitted to that distribution: inserting high-score tail values raises the quantile boundary (yielding missed detections), while inserting low-score tail values lowers it (yielding false alarms).
+By construction, a detection threshold at fixed quantile $q$ is sensitive to the scores admitted to the calibration distribution: tail-high contamination raises the boundary (missed detections); tail-low contamination lowers it (false alarms).
 Poisoning attacks on anomaly detectors have been studied in centralized settings~\cite{kloft2012online,cretu2008casting,barreno2010security}, but these assume either a single data owner or a trusted aggregator who can sanitize training data across the full dataset.
 Kloft \& Laskov~\cite{kloft2012online} study online poisoning of centralized anomaly detectors via insertion into a continuous training stream; their adversarial model requires persistent model-update access, which is absent in the post-training calibration stage of FL.
 In FL, calibration data never leaves the client, so server-side sanitization is not available.
 Prior work on FL model poisoning~\cite{bagdasaryan2020backdoor} and FL inference attacks~\cite{geiping2020inverting} focuses on the gradient/weight surface.
-To the best of our knowledge, no prior work characterizes the vulnerability of the post-training threshold-calibration stage in federated threshold-based anomaly detection.
+To the best of our knowledge, no prior work characterizes the vulnerability of the post-training threshold-calibration stage in federated threshold-based anomaly detection (Table~\ref{tab:related}).
+We do not claim a new class of poisoning in the abstract sense; we empirically show that, in federated threshold-based IoT anomaly detection, post-training calibration contamination creates policy-specific harm profiles that the surveyed training- and aggregation-phase defenses do not monitor.
+\end{sloppypar}
+
+\begin{table}[tb]
+\caption{Positioning relative to adjacent poisoning literature. DATP-CP differs by acting strictly after training, on the autonomously collected benign calibration buffer, leaving model weights, gradients, training data, and test data unchanged.}
+\label{tab:related}
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.45cm}>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{3.0cm}@{}}
+\toprule
+Prior work type & Attack surface & What changes & Distinction from DATP-CP \\
+\midrule
+Training-data poisoning~\cite{biggio2012poisoning,tolpegin2020data} & Training set / labels & Model parameters & DATP-CP leaves training data and model unchanged \\
+FL model poisoning~\cite{bhagoji2019analyzing,bagdasaryan2020backdoor} & Client gradients & Model weights & Needs no gradient access; acts after convergence \\
+Byzantine aggregation~\cite{blanchard2017machine,yin2018byzantine} & Aggregation inputs & Server aggregate & Does not touch aggregation; harm is post-aggregation \\
+Centralized AD poisoning~\cite{kloft2012online,cretu2008casting} & Central train stream & Decision boundary & No trusted sanitizer exists in FL calibration \\
+Threshold personalization~\cite{ghosh2020efficient,sattler2020clustered} & Threshold policy & Per-client/cluster $\tau$ & Studies utility, not adversarial contamination \\
+\textbf{DATP-CP (ours)} & Calibration scores & Threshold $\tau$ only & Score-level, post-training, single-client \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \textbf{Threshold policies.}
 Federated threshold personalization spans a spectrum.
