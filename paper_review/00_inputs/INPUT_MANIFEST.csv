@@ -1,0 +1,11 @@
+audit_id,filename,sha256,bytes,lines,grade,recommendation,duplicate_of,url_embedded_content,content_degraded
+AUDIT-01,"Paper Audit 1.md",72116f2ac091cd3509b793519fd224f2ddb7abe67bfc516c4238347c7701072b,31559,508,8.0,borderline/weak-accept,,FALSE,FALSE
+AUDIT-02,"Paper Audit 10.md",a313b19b2324c086693b9b205d6e2e8d7e09b47a9d88653de1c68e60947b67ae,767246,502,7.0,borderline/weak-reject,,TRUE,TRUE
+AUDIT-03,"Paper Audit 2.md",72116f2ac091cd3509b793519fd224f2ddb7abe67bfc516c4238347c7701072b,31559,508,8.0,borderline/weak-accept,AUDIT-01,FALSE,FALSE
+AUDIT-04,"Paper Audit 3.md",9ef6181358fe79c68f33a7fa92a201a3ee9bdd19588abc1a132109b2643d359a,55244,508,6.8,borderline/weak-accept,,FALSE,FALSE
+AUDIT-05,"Paper Audit 4.md",0f00ffe492e8a2a4e1a74d6fc1198081f74d215264575cf3c22ffe81c1822156,9536,120,7.8,weak-accept,,FALSE,FALSE
+AUDIT-06,"Paper Audit 5.md",755ec5685e879ae36e2b601b4a719855981a71cde8312cbf967d3a6f633ed0cc,58712,1090,7.8,weak-accept,,FALSE,FALSE
+AUDIT-07,"Paper Audit 6.md",755ec5685e879ae36e2b601b4a719855981a71cde8312cbf967d3a6f633ed0cc,58712,1090,7.8,weak-accept,AUDIT-06,FALSE,FALSE
+AUDIT-08,"Paper Audit 7.md",1716837f2fb7623d0cfa12a1093e77e822627b218148435aef2d070f6d375aa2,564556,427,6.7,weak-reject,,TRUE,TRUE
+AUDIT-09,"Paper Audit 8.md",4d3b7dc1a71da56540fd90092ff9385b49ae72957f30d875a09990a764311f5c,55454,1163,8.2,weak-accept/borderline,,FALSE,FALSE
+AUDIT-10,"Paper Audit 9.md",c3abc4abbb3463b12365c986bc8d7d089a4312f6e2a679db05ff1c78ea345fb5,69406,662,6.1,borderline/weak-reject,,FALSE,FALSE

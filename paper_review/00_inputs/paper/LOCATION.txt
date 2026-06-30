@@ -1,0 +1,5 @@
+Paper source: /home/naslouby/Projects/datp-calibration-poisoning/paper/main.tex
+Compiled PDF: /home/naslouby/Projects/datp-calibration-poisoning/paper/main.pdf
+Sections: /home/naslouby/Projects/datp-calibration-poisoning/paper/sections/
+Tables: /home/naslouby/Projects/datp-calibration-poisoning/paper/tables/
+References: /home/naslouby/Projects/datp-calibration-poisoning/paper/references.bib
