@@ -1,45 +1,45 @@
-\begin{table}[tb]
+\begin{table}[!ht]
 \caption{Threshold shift and detection harm under calibration-stage poisoning (N-BaIoT, $n{=}10$ seeds).
-$\Delta\tau$: mean threshold shift [95\,\% bootstrap CI].
-G1: fraction of 10 seeds passing Gate-1.
+$\Delta\tau$: mean threshold shift [95\,\% CI]. G1: fraction of 10 seeds passing Gate-1.
 $\Delta$TPR\,(pp): victim detection-rate change; negative for Raise (harm), positive for Lower (alarm-burden increase, not a security benefit).
-Lowering rows ($\dagger$): $\Delta\mathrm{CV(FPR)}$ is the primary harm metric; $\Delta$TPR confirms threshold displacement.
-\textsc{Neg.\,Control}: \textsc{Random-Benign} at $f{=}0.4$; all fractions are similarly near-null; bold=zero G1.}
+Lowering rows ($\dagger$): $\Delta\mathrm{CV(FPR)}$ is the primary harm metric (``---''\,=\,not the primary axis for Raise/Neg.\,Ctrl).
+\textsc{Neg.\,Control}: \textsc{Random-Benign} at $f{=}0.4$, similarly near-null at all fractions; bold=zero G1. Absolute FPR/TPR at $f{=}0.4$ are given in \S\ref{sec:results}.}
 \label{tab:main-results}
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}llrp{5.0cm}lr@{}}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{0.92}
+\begin{tabular}{@{}llrp{3.6cm}lrr@{}}
 \toprule
-Policy & Attack & $f$ & \multicolumn{1}{l}{$\Delta\tau$ [95\,\% CI]} & G1 & $\Delta$TPR (pp) \\
+Policy & Attack & $f$ & \multicolumn{1}{l}{$\Delta\tau$ [95\,\% CI]} & G1 & $\Delta$TPR (pp) & $\Delta$CV(FPR) \\
 \midrule
-\textsc{Global} & Raise & 0.1 & $+0.033\;[+0.031,\,+0.035]$ & 100\,\% & $-2.4$ \\
- &  & 0.2 & $+0.062\;[+0.059,\,+0.065]$ & 100\,\% & $-4.6$ \\
- &  & 0.4 & $+0.100\;[+0.096,\,+0.105]$ & 100\,\% & $-6.1$ \\
-\addlinespace[2pt]
-\textsc{Local} & Raise & 0.1 & $+0.298\;[+0.281,\,+0.314]$ & 100\,\% & $-6.0$ \\
- &  & 0.2 & $+0.558\;[+0.535,\,+0.581]$ & 100\,\% & $-7.3$ \\
- &  & 0.4 & $+0.902\;[+0.864,\,+0.944]$ & 100\,\% & $-7.9$ \\
-\addlinespace[2pt]
-\textsc{Cluster} & Raise & 0.1 & $+0.253\;[+0.231,\,+0.277]$ & 100\,\% & $-3.9$ \\
- &  & 0.2 & $+0.504\;[+0.475,\,+0.532]$ & 100\,\% & $-4.9$ \\
- &  & 0.4 & $+0.899\;[+0.859,\,+0.941]$ & 100\,\% & $-4.9$ \\
+\textsc{Global} & Raise & 0.1 & $+0.033\;[+0.031,\,+0.035]$ & 100\,\% & $-2.4$ & --- \\
+ &  & 0.2 & $+0.062\;[+0.059,\,+0.065]$ & 100\,\% & $-4.6$ & --- \\
+ &  & 0.4 & $+0.100\;[+0.096,\,+0.105]$ & 100\,\% & $-6.1$ & --- \\
+\addlinespace[1pt]
+\textsc{Local} & Raise & 0.1 & $+0.298\;[+0.281,\,+0.314]$ & 100\,\% & $-6.0$ & --- \\
+ &  & 0.2 & $+0.558\;[+0.535,\,+0.581]$ & 100\,\% & $-7.3$ & --- \\
+ &  & 0.4 & $+0.902\;[+0.864,\,+0.944]$ & 100\,\% & $-7.9$ & --- \\
+\addlinespace[1pt]
+\textsc{Cluster} & Raise & 0.1 & $+0.253\;[+0.231,\,+0.277]$ & 100\,\% & $-3.9$ & --- \\
+ &  & 0.2 & $+0.504\;[+0.475,\,+0.532]$ & 100\,\% & $-4.9$ & --- \\
+ &  & 0.4 & $+0.899\;[+0.859,\,+0.941]$ & 100\,\% & $-4.9$ & --- \\
 \midrule
-\textsc{Global} & Lower$\dagger$ & 0.1 & $-0.006\;[-0.006,\,-0.006]$ & 60\,\% & $+0.8$ \\
- &  & 0.2 & $-0.010\;[-0.011,\,-0.010]$ & 100\,\% & $+1.1$ \\
- &  & 0.4 & $-0.018\;[-0.020,\,-0.017]$ & 100\,\% & $+2.1$ \\
-\addlinespace[2pt]
-\textsc{Local} & Lower$\dagger$ & 0.1 & $-0.053\;[-0.057,\,-0.049]$ & 100\,\% & $+2.8$ \\
- &  & 0.2 & $-0.094\;[-0.100,\,-0.088]$ & 100\,\% & $+5.9$ \\
- &  & 0.4 & $-0.164\;[-0.176,\,-0.154]$ & 100\,\% & $+11.8$ \\
-\addlinespace[2pt]
-\textsc{Cluster} & Lower$\dagger$ & 0.1 & $-0.047\;[-0.065,\,-0.031]$ & 100\,\% & $+2.2$ \\
- &  & 0.2 & $-0.100\;[-0.115,\,-0.084]$ & 100\,\% & $+5.4$ \\
- &  & 0.4 & $-0.154\;[-0.167,\,-0.142]$ & 100\,\% & $+10.3$ \\
+\textsc{Global} & Lower$\dagger$ & 0.1 & $-0.006\;[-0.006,\,-0.006]$ & 60\,\% & $+0.8$ & $-0.007$ \\
+ &  & 0.2 & $-0.010\;[-0.011,\,-0.010]$ & 100\,\% & $+1.1$ & $-0.011$ \\
+ &  & 0.4 & $-0.018\;[-0.020,\,-0.017]$ & 100\,\% & $+2.1$ & $-0.019$ \\
+\addlinespace[1pt]
+\textsc{Local} & Lower$\dagger$ & 0.1 & $-0.053\;[-0.057,\,-0.049]$ & 100\,\% & $+2.8$ & $-0.002$ \\
+ &  & 0.2 & $-0.094\;[-0.100,\,-0.088]$ & 100\,\% & $+5.9$ & $+0.005$ \\
+ &  & 0.4 & $-0.164\;[-0.176,\,-0.154]$ & 100\,\% & $+11.8$ & $+0.053$ \\
+\addlinespace[1pt]
+\textsc{Cluster} & Lower$\dagger$ & 0.1 & $-0.047\;[-0.065,\,-0.031]$ & 100\,\% & $+2.2$ & $+0.007$ \\
+ &  & 0.2 & $-0.100\;[-0.115,\,-0.084]$ & 100\,\% & $+5.4$ & $+0.011$ \\
+ &  & 0.4 & $-0.154\;[-0.167,\,-0.142]$ & 100\,\% & $+10.3$ & $+0.060$ \\
 \midrule
-\textsc{Global} & Neg.~Ctrl & 0.4 & $-0.000\;[-0.001,\,+0.001]$ & \textbf{0\,\%} & $+0.3$ \\
-\textsc{Local} & Neg.~Ctrl & 0.4 & $-0.002\;[-0.009,\,+0.006]$ & \textbf{0\,\%} & $+0.9$ \\
-\textsc{Cluster} & Neg.~Ctrl & 0.4 & $-0.009\;[-0.022,\,+0.003]$ & \textbf{0\,\%} & $+0.4$ \\
+\textsc{Global} & Neg.~Ctrl & 0.4 & $-0.000\;[-0.001,\,+0.001]$ & \textbf{0\,\%} & $+0.3$ & --- \\
+\textsc{Local} & Neg.~Ctrl & 0.4 & $-0.002\;[-0.009,\,+0.006]$ & \textbf{0\,\%} & $+0.9$ & --- \\
+\textsc{Cluster} & Neg.~Ctrl & 0.4 & $-0.009\;[-0.022,\,+0.003]$ & \textbf{0\,\%} & $+0.4$ & --- \\
 \bottomrule
 \end{tabular}
 \end{table}

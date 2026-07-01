@@ -13,8 +13,9 @@ The adversary controls a single compromised client $v$, which we call the \emph{
 Under \textsc{Local} policy, only client $v$'s own detection degrades; under \textsc{Global} policy, all federation members receive the contaminated threshold.
 We use ``victim'' to refer to client $v$ itself when measuring per-client detection harm, and ``non-victim clients'' when referring to uninvolved federation members.
 
-The adversary has \emph{gray-box score-level access}: since the adversary controls the client, it can read and modify the local calibration buffer before threshold computation.
-The adversary does not access model weights, modify gradients, alter other clients' data, or touch test data, test labels, or training labels.
+The adversary has \emph{gray-box score-level access}: since the adversary controls the client, it can read and modify only its own local calibration buffer before threshold computation.
+It cannot modify training data, training labels, test scores, test labels, model weights, gradients, the aggregation procedure, other clients' data, client eligibility, or the threshold-policy definition (\textsc{Global}/\textsc{Local}/\textsc{Cluster} are fixed by the federation).
+The reservoir is drawn exclusively from the same client's own benign calibration split (\S\ref{sec:method}): attack-labeled samples, test scores, and training scores never enter it, by construction.
 This is a strictly weaker capability than model-poisoning adversaries, which require gradient injection.
 The adversary operates at the score level; generating traffic that achieves a target reconstruction score is out of scope (end-to-end realizability is discussed in \S\ref{sec:discussion}).
 The \textsc{Replace-Fixed-Budget} mechanism samples with replacement from the tail reservoir, which at high fractions produces duplicate scores detectable by a uniqueness check (disclosed in \S\ref{sec:discussion}).
@@ -22,8 +23,8 @@ The \textsc{Replace-Fixed-Budget} mechanism samples with replacement from the ta
 \textbf{Attack mechanics.}
 We evaluate two attack objectives:
 \begin{description}
-  \item[Raise.] \textsc{Threshold-Raise} (primary): for $f{>}0$, replace $m=\max\!\bigl(1,\mathrm{round}(fn_v)\bigr)$ positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\textsc{High-Score-Benign} source).
-  All replacement scores are semantically benign; AUROC is invariant by construction (test scores and labels are unchanged under poisoning).
+  \item[Raise.] \textsc{Threshold-Raise} (primary): $f{=}0$ is the unpoisoned clean baseline ($m{=}0$, no replacement); for $f{>}0$, replace $m=\max\!\bigl(1,\mathrm{round}(fn_v)\bigr)$ positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\textsc{High-Score-Benign} source).
+  All replacement scores are benign-origin reconstruction scores drawn from the victim's own clean calibration distribution; AUROC is invariant by construction (test scores and labels are unchanged under poisoning).
   A raised threshold $\tau_v$ increases the detection threshold, suppressing alarms at the victim site.
   \item[Lower.] \textsc{Threshold-Lower} (secondary, conditional): replace $m$ positions with scores from the bottom-10\% tail (\textsc{Low-Score-Benign}).
   A lowered threshold increases the false-positive rate (alarm burden) and FPR disparity; the resulting $\Delta\mathrm{TPR}{>}0$ reflects threshold displacement and is a secondary indicator of operating-point shift.

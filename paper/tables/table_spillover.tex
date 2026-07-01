@@ -1,11 +1,11 @@
-\begin{table}[tb]
-\caption{Spillover profile under the raising attack ($f{=}0.4$, $n{=}10$ seeds).
-Blast: mean fraction of non-victim clients with a statistically significant threshold shift.
-$^{\dagger}$~Non-victim threshold equals victim threshold by construction (shared global threshold); expected non-victim $\Delta$TPR $\approx$ victim $\Delta$TPR.
-$^{\ddagger}$~Effect driven by K-means cluster reassignment (churn); mean non-victim $\Delta\tau{=}0.0003$, std$\,{=}\,0.017$.}
+\begin{table}[!ht]
+\caption{Threshold-propagation profile under the raising attack ($f{=}0.4$, $n{=}10$ seeds).
+Blast: mean fraction of non-victims with a statistically significant threshold shift (significance only, not measured downstream harm; non-victim $\Delta$TPR was not separately recomputed for any policy---see \S\ref{sec:results}).
+$^{\dagger}$~Non-victim threshold equals victim's by construction (shared threshold).
+$^{\ddagger}$~K-means reassignment (churn); mean non-victim $\Delta\tau{=}0.0003$, std$\,{=}\,0.017$.}
 \label{tab:spillover}
 \centering
-\small
+\footnotesize
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
