@@ -10,16 +10,16 @@ The N-BaIoT benchmark~\cite{meidan2018nbaiot} provides labeled benign and Mirai/
 Existing defenses target the \emph{training phase}.
 Byzantine-robust rules, including Krum~\cite{blanchard2017machine}, Trimmed-Mean, and Median~\cite{yin2018byzantine}, filter or downweight outlier gradients before aggregation.
 FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
-Differential privacy approaches add noise to local updates to bound update privacy leakage~\cite{geyer2017differentially}; DP is a privacy mechanism for the training/update channel, not a poisoning defense, and we do not treat it as one.
-All of the above operate on gradients or model updates; they complete before the threshold-calibration stage begins.
+Differential privacy approaches add noise to local updates to bound update privacy leakage~\cite{geyer2017differentially}; DP is a privacy mechanism for the training/update channel, not a poisoning defense, and this study does not treat it as one.
+These defenses operate on gradients or model updates; they complete before the threshold-calibration stage begins.
 
 \begin{sloppypar}
 \textbf{Threshold calibration and poisoning.}
 By construction, a detection threshold at fixed quantile $q$ is sensitive to the scores admitted to the calibration distribution: tail-high contamination raises the boundary (missed detections); tail-low contamination lowers it (false alarms).
 Poisoning attacks on anomaly detectors have been studied in centralized settings~\cite{kloft2010online,cretu2008casting,barreno2010security}, e.g.\ Kloft \& Laskov's~\cite{kloft2010online} online poisoning via a continuous training stream; these assume a trusted aggregator or persistent model-update access, both absent from FL's post-training calibration stage, where calibration data never leaves the client and no server-side sanitization is possible.
 Prior work on FL model poisoning~\cite{bagdasaryan2020backdoor} and FL inference attacks~\cite{geiping2020inverting} focuses on the gradient/weight surface.
-To the best of our knowledge, no prior work isolates post-training threshold calibration as the attacked channel in federated threshold-based IoT anomaly detection under otherwise-unchanged training, model, aggregation, and test artifacts (Table~\ref{tab:related}).
-We do not claim a new class of poisoning in the abstract sense; the contribution is isolating the post-training calibration channel in federated threshold-based anomaly detection and showing policy-dependent victim effects and threshold propagation under a controlled score-level intervention.
+The literature reviewed for this study does not identify prior work that isolates post-training threshold calibration as the attacked channel in federated threshold-based IoT anomaly detection under otherwise-unchanged training, model, aggregation, and test artifacts (Table~\ref{tab:related}).
+No claim is made to a new class of poisoning in the abstract sense; the contribution is isolating the post-training calibration channel in federated threshold-based anomaly detection and showing policy-dependent victim effects and threshold propagation under a controlled score-level intervention.
 The closest neighbors treat the calibration/thresholding pipeline as trusted: Laridi et al.~\cite{laridi2024} propose summary-statistics-based federated thresholding without adversarial contamination, and S\'aez-de-C\'amara et al.~\cite{saezdecamara2023} propose a clustered federated IoT anomaly-detection architecture assuming a benign calibration pipeline; DATP-CP instead treats client-local benign calibration as the attacked channel.
 \end{sloppypar}
 
@@ -44,7 +44,7 @@ Centralized AD poisoning~\cite{kloft2010online,cretu2008casting} & Central train
 \addlinespace[3pt]
 Threshold personalization~\cite{ghosh2020efficient,sattler2020clustered} & Threshold policy & Per-client/cluster $\tau$ & Studies utility, not adversarial contamination \\
 \addlinespace[3pt]
-\textbf{DATP-CP (ours)} & Calibration scores & Threshold $\tau$ only & Score-level, post-training, single-client \\
+\textbf{DATP-CP} & Calibration scores & Threshold $\tau$ only & Score-level, post-training, single-client \\
 \bottomrule
 \end{tabular}
 \end{table}

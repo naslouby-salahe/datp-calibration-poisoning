@@ -4,9 +4,9 @@
 \textbf{Score-level proxy and detectability.}
 The experiment operates at the score level: reconstruction scores in the calibration buffer are replaced programmatically rather than through generated traffic.
 A complete end-to-end attack would additionally require generating network packets whose autoencoder reconstruction error lands in the target tail of the victim's score distribution---a non-trivial requirement spanning feature engineering, the encoder-decoder nonlinearity, and physical network behavior.
-We present this work as a \emph{vulnerability-surface characterization}, not a deployed attack; traffic-level realizability is future work.
+This work is presented as a \emph{vulnerability-surface characterization}, not a deployed attack; traffic-level realizability is future work.
 A related implementation limitation: with-replacement sampling from the tail reservoir at $f{=}0.4$ produces duplicate scores in the calibration buffer---for the smallest per-client calibration set ($n_v{\approx}2{,}622$), on the order of $10^3$ expected collision pairs, easily flagged by a uniqueness check; evading this requires score perturbation at the cost of leaving the exact tail boundary.
-We flag detectability as an open problem.
+Detectability remains an open problem.
 
 \textbf{GLOBAL threshold propagation, lowering bounds, and policy implications.}
 The $1/N$-diluted \textsc{Global} shift is definitional; what is empirical is that the residual magnitude ($\approx$10\,\% of the local shift, $\Delta\mathrm{TPR}{=}{-}6.1$\,pp at $f{=}0.4$) remains measurable above the seed-to-seed variance.
@@ -15,7 +15,7 @@ These results reveal a structural trade-off in policy design: \textsc{Local} max
 
 \textbf{Scope limitations.}
 Claims are bounded to N-BaIoT (9 clients; generalizability to other federated IoT datasets and larger federation sizes is open), autoencoder architecture, FedAvg, and $q{=}0.95$ (quantile sensitivity is future work).
-The experiment assumes a single compromised client; multi-client collusion is a natural extension.
+The experiment assumes a single compromised client; multi-client collusion is a direct extension.
 Generalizability to other anomaly detectors, FL algorithms, and heterogeneous federation profiles is not established.
 The $n{=}10$ seed bootstrap CI coverage may differ from nominal at the tails.
 Defense design for the calibration channel (threshold validation, calibration-set integrity constraints) is out of scope and merits independent study.

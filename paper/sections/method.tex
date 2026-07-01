@@ -3,7 +3,7 @@
 
 \subsection{Dataset and Federation}
 
-We use N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical devices spanning five device types (doorbell, baby monitor, security camera, thermostat, webcam).
+The evaluation uses N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical devices spanning five device types (doorbell, baby monitor, security camera, thermostat, webcam).
 Each device constitutes one federation client; all nine are eligible for calibration.
 Calibration set sizes range from 2,622 (Ecobee Thermostat) to 35,048 (Philips Baby Monitor) benign samples per device (all $\ge$100, satisfying the eligibility threshold).
 Each device's benign stream is partitioned chronologically into train/calibration/test segments in a $60/1/20/1/18$ ratio (the two $1\%$ gaps separate segments to avoid temporal leakage); training and calibration use benign traffic only, and test data, test labels, and training labels are never touched by the attack.
@@ -70,7 +70,7 @@ Three threshold-policy families are evaluated, covering the main design points i
 
 \subsection{Attack Parameterization}
 
-For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, we run 10 paired seeds: each seed selects a training configuration and an independent poisoning draw.
+For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, the protocol runs 10 paired seeds: each seed selects a training configuration and an independent poisoning draw.
 A clean copy of the calibration array is preserved; only the poisoned copy is used for threshold computation.
 The four source-objective pairs are:
 (1)~\textsc{High-Score-Benign\,+\,Threshold-Raise} (primary raising attack),
@@ -105,5 +105,5 @@ Both constants were locked from clean-artifact statistics before any poisoned ru
 
 \subsection{Isolation Sanity Check}
 
-To confirm that the attack is confined to the calibration stage, we verify: (i)~AUROC is invariant under poisoning for all cells, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical.
+To confirm that the attack is confined to the calibration stage, the protocol verifies: (i)~AUROC is invariant under poisoning for all cells, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical.
 All three hold in all 4320 cells.
