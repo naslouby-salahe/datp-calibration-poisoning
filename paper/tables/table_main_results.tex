@@ -1,9 +1,8 @@
 \begin{table}[!ht]
 \caption{Threshold shift and detection harm under calibration-stage poisoning (N-BaIoT, $n{=}10$ seeds).
-$\Delta\tau$: mean threshold shift [95\,\% CI]. G1: fraction of 10 seeds passing Gate-1.
-$\Delta$TPR\,(pp): victim detection-rate change; negative for Raise (harm), positive for Lower (alarm-burden increase, not a security benefit).
-Lowering rows ($\dagger$): $\Delta\mathrm{CV(FPR)}$ is the primary harm metric (``---''\,=\,not the primary axis for Raise/Neg.\,Ctrl).
-\textsc{Neg.\,Control}: \textsc{Random-Benign} at $f{=}0.4$, similarly near-null at all fractions; bold=zero G1. Absolute FPR/TPR at $f{=}0.4$ are given in \S\ref{sec:results}.}
+$\Delta\tau$: mean shift [95\,\% CI]; G1: Gate-1 seed pass rate.
+$\Delta$TPR is victim detection-rate change; lowering rows ($\dagger$) use $\Delta\mathrm{CV(FPR)}$ as the primary harm metric.
+\textsc{Neg.\,Control}: \textsc{Random-Benign} at $f{=}0.4$; bold=zero G1.}
 \label{tab:main-results}
 \centering
 \footnotesize

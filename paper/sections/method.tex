@@ -12,7 +12,7 @@ The federation trains a per-client autoencoder on benign traffic using FedAvg~\c
 Table~\ref{tab:repro} lists the autoencoder architecture, training hyperparameters, and the calibration size range; injection fractions, seeds, and the reservoir are detailed under Attack Parameterization below.
 
 \begin{table}[tb]
-\caption{Experimental configuration for reproducibility.}
+\caption{Experimental configuration.}
 \label{tab:repro}
 \centering
 \footnotesize
@@ -44,11 +44,6 @@ Threshold quantile $q$ & 0.95 \\
 
 Three threshold-policy families are evaluated, covering the main design points in the personalization literature:
 
-{%
-\setlength{\abovedisplayskip}{2pt}%
-\setlength{\belowdisplayskip}{2pt}%
-\setlength{\abovedisplayshortskip}{0pt}%
-\setlength{\belowdisplayshortskip}{2pt}%
 \begin{description}
   \item[\textsc{Global}.]
   \[
@@ -65,8 +60,7 @@ Three threshold-policy families are evaluated, covering the main design points i
   Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, \texttt{random\_state}$=42$; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
   Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) reflects this cluster-assignment sensitivity.
   A compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}); clients in other clusters are unaffected.
-\end{description}%
-}
+\end{description}
 
 \subsection{Attack Parameterization}
 

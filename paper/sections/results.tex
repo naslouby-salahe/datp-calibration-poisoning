@@ -17,10 +17,9 @@ This fairness gain is not a uniform improvement: \textsc{Local} improves cross-c
 \begin{figure}[tb]
 \centering
 \includegraphics[width=0.74\textwidth]{figures/fig_clean_fpr.pdf}
-\caption{Per-client FPR under clean baseline, \GLOBAL vs.\ \LOCAL threshold (seed 0; CV(FPR) values across all 10 seeds reported in Table~\ref{tab:baseline}).
-\GLOBAL forces a single threshold on nine devices with heterogeneous score distributions, producing CV(FPR)\,=\,0.87 for seed~0 (mean\,$= 0.905 \pm 0.039$ across seeds).
-\LOCAL fits each client's own calibration distribution, achieving CV(FPR)\,=\,0.33 on average.
-\CLUSTER is omitted here; its baseline is in Table~\ref{tab:baseline} (CV(FPR)\,$= 0.615 \pm 0.143$).}
+\caption{Per-client FPR under the clean baseline for \GLOBAL and \LOCAL thresholds (seed 0).
+\GLOBAL uses one threshold for heterogeneous devices; \LOCAL fits each client's calibration distribution.
+All-seed CV(FPR) values, including \CLUSTER, are reported in Table~\ref{tab:baseline}.}
 \label{fig:clean-fpr}
 \end{figure}
 
@@ -31,10 +30,9 @@ This fairness gain is not a uniform improvement: \textsc{Local} improves cross-c
 \begin{figure}[tb]
 \centering
 \includegraphics[width=0.86\textwidth]{figures/fig_threshold_shift.pdf}
-\caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for the raising (a) and lowering (b) attacks across three policies.
-Error bars: 95\,\% bootstrap CI over 10 seeds.
-\GLOBAL exhibits the smallest magnitude in both directions due to $1/N$ federation averaging.
-\textsc{Random-Benign} negative control (not shown) produces CIs spanning zero and G1\,=\,0\,\% at all fractions and policies; representative values at $f{=}0.4$ are in Table~\ref{tab:main-results} (Neg.\,Ctrl rows).}
+\caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for raising (a) and lowering (b) attacks.
+Error bars are 95\,\% bootstrap CIs over 10 seeds.
+\GLOBAL has the smallest magnitude due to $1/N$ averaging; \textsc{Random-Benign} controls are near-null (Table~\ref{tab:main-results}).}
 \label{fig:threshold-shift}
 \end{figure}
 
