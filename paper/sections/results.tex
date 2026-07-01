@@ -10,7 +10,7 @@ CV(FPR), the coefficient of variation of per-client false-positive rates (ddof\,
 \textsc{Cluster} lies in between ($0.615 \pm 0.143$) with higher variance across seeds, reflecting sensitivity to cluster assignment.
 Bootstrap 95\% CIs on the pairwise CV(FPR) difference exclude zero: Global$-$Local $= 0.572$ $[0.537, 0.607]$; Global$-$Cluster $= 0.291$ $[0.214, 0.358]$; Cluster$-$Local $= 0.281$ $[0.201, 0.374]$, confirming that all three policies are statistically distinguishable on baseline fairness.
 Figure~\ref{fig:clean-fpr} shows the per-client FPR distributions for \textsc{Global} and \textsc{Local} under the clean baseline.
-This fairness gain is not a uniform improvement: \textsc{Local} improves cross-client FPR equity but does not dominate all accuracy-oriented metrics. In particular, \textsc{Global} retains the best P10 Macro-F1 ($0.398$ vs.\ \textsc{Local} $0.335$, Table~\ref{tab:baseline}), so the worst-tail client is detected better under the federation-mean threshold. We therefore report both fairness-style dispersion (CV(FPR)) and detection-quality (P10 Macro-F1) metrics, plus the underlying absolute mean FPR/TPR, rather than a single summary.
+This fairness gain is not a uniform improvement: \textsc{Local} improves cross-client FPR equity but does not dominate all accuracy-oriented metrics. In particular, \textsc{Global} retains the best P10 Macro-F1 ($0.398$ vs.\ \textsc{Local} $0.335$, Table~\ref{tab:baseline}), so the worst-tail client is detected better under the federation-mean threshold. The evaluation therefore reports both fairness-style dispersion (CV(FPR)) and detection-quality (P10 Macro-F1) metrics, plus the underlying absolute mean FPR/TPR, rather than a single summary.
 
 \input{tables/table_baseline}
 
@@ -46,8 +46,8 @@ For \textsc{Local} and \textsc{Cluster}, all nine clients are individually signi
 For \textsc{Global} at $f{=}0.1$, two devices (Provision PT-737E and PT-838) are intermittently non-significant (2/10 and 4/10 seeds respectively), but the victim-majority condition ($\ge$5/9 per seed) still holds because the remaining seven clients are consistently significant.
 Bootstrap CIs on $\Delta\tau$ exclude zero and remain non-overlapping with the \textsc{Random-Benign} control, which produces CIs spanning zero, a $0\%$ Gate-1 pass rate, and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results}, Neg.\,Ctrl rows, reports representative $f{=}0.4$ values; all fractions are similarly near-null and the complete matrix is archived in the artifact bundle). The targeted effects are therefore attributable to tail contamination, not to position perturbation alone.
 
-\textbf{Policy-dependent magnitude.}
-The raising attack reveals a clear policy-dependent magnitude profile.
+\textbf{Policy magnitude.}
+Raising-attack magnitude differs by policy.
 \textsc{Local} and \textsc{Cluster} exhibit the largest threshold shifts: at $f{=}0.4$, $\Delta\tau = +0.902$ $[+0.864, +0.944]$ and $+0.899$ $[+0.859, +0.941]$ respectively.
 \textsc{Global} shows a structurally diluted but still significant shift: $+0.100$ $[+0.096, +0.105]$ at $f{=}0.4$.
 The dilution is expected by construction---\textsc{Global}'s threshold is the federation mean, so a single-client shift is divided by $N{=}9$---but the empirical question is whether the residual magnitude ($\approx$10\,\% of the local shift) suffices to produce measurable downstream harm.
@@ -77,7 +77,7 @@ Absolute clean$\to$poisoned FPR at $f{=}0.4$ (Table~\ref{tab:baseline} clean col
 \textbf{Mechanism and conditionality.}
 Lowering a $q{=}0.95$ quantile requires displacing scores in the upper-tail support; random position replacement achieves this with probability $\approx f$ (40\,\% at $f{=}0.4$), leaving 60\,\% of upper-tail support intact.
 The \textsc{Global} policy compounds this via $1/N$ dilution.
-We present these results as a lower bound under \textsc{Replace-Fixed-Budget}; targeted upper-tail removal would achieve larger shifts.
+These results are presented as a lower bound under \textsc{Replace-Fixed-Budget}; targeted upper-tail removal would achieve larger shifts.
 
 \subsection{Policy-Differentiation Summary}
 

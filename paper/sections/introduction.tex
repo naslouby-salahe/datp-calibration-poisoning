@@ -1,7 +1,7 @@
 \section{Introduction}
 \label{sec:intro}
 
-Federated learning (FL) has emerged as a natural fit for IoT anomaly detection: devices contribute to a shared model without exposing raw traffic, and personalized detection thresholds let each node adapt to its own traffic distribution~\cite{li2020federated,rey2022federated}.
+Federated learning (FL) is commonly used for IoT anomaly detection: devices contribute to a shared model without exposing raw traffic, and personalized detection thresholds let each node adapt to its own traffic distribution~\cite{li2020federated,rey2022federated}.
 The dominant security concern in federated anomaly detection focuses on the \emph{training phase}---Byzantine clients injecting adversarial gradients, label-flipping poisoning, or model-inversion attacks~\cite{biggio2012poisoning,bhagoji2019analyzing,tolpegin2020data}.
 Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{cao2020fltrust,blanchard2017machine,yin2018byzantine}.
 
@@ -9,23 +9,23 @@ Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactl
 The \emph{threshold-calibration stage} is the post-training, pre-deployment step in which each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
 Training- and aggregation-phase defenses studied in the FL-IDS literature do not monitor this post-training calibration stage: they complete before calibration begins and cannot observe it.
 If a single client's benign calibration buffer can be contaminated with scores derived from benign calibration records that are anomalously high (or low) relative to that client's own distribution, the resulting threshold shifts without any change to model weights, training data, labels, or gradients.
-We make no claim that a dedicated calibration-stage defense is impossible---only that the training- and aggregation-phase defenses studied in the FL-IDS literature do not cover this stage.
+No claim is made that a dedicated calibration-stage defense is impossible---only that the training- and aggregation-phase defenses studied in the FL-IDS literature do not cover this stage.
 
-\textbf{This paper.}
-We identify threshold calibration as an under-analyzed attack surface and characterize its vulnerability under a score-level contamination model.
+\textbf{Study focus.}
+The study identifies threshold calibration as an under-analyzed attack surface and characterizes its vulnerability under a score-level contamination model.
 Concretely, an adversary with access to a single client's calibration buffer replaces a fraction~$f$ of entries with tail-sampled scores drawn from the same client's benign distribution (\emph{calibration-stage poisoning}).
-We evaluate three threshold-policy families---\textsc{Global} (federation-wide mean), \textsc{Local} (per-client), and \textsc{Cluster} (cluster-averaged)---across all nine physical-device clients in the N-BaIoT dataset~\cite{meidan2018nbaiot} at four injection fractions.
+The evaluation covers three threshold-policy families---\textsc{Global} (federation-wide mean), \textsc{Local} (per-client), and \textsc{Cluster} (cluster-averaged)---across all nine physical-device clients in the N-BaIoT dataset~\cite{meidan2018nbaiot} at four injection fractions.
 
-To preempt the natural objection---``this is just data poisoning applied to calibration data''---we note that calibration-stage poisoning is structurally distinct along three axes (Table~\ref{tab:related}): it is \emph{temporally isolated} (strictly after model convergence, bypassing training-phase defenses); it exploits a \emph{phase-specific trust model} (calibration data is collected autonomously with no central validation gate); and its effects are \emph{policy-dependent} (the same injection fraction yields qualitatively different threshold shifts and threshold propagation depending on whether thresholds aggregate globally, locally, or by cluster).
+To address the objection---``this is just data poisoning applied to calibration data''---calibration-stage poisoning is structurally distinct along three axes (Table~\ref{tab:related}): it is \emph{temporally isolated} (strictly after model convergence, bypassing training-phase defenses); it exploits a \emph{phase-specific trust model} (calibration data is collected autonomously with no central validation gate); and its effects are \emph{policy-dependent} (the same injection fraction yields qualitatively different threshold shifts and threshold propagation depending on whether thresholds aggregate globally, locally, or by cluster).
 
 \textbf{Contributions.}
 \begin{enumerate}
-  \item We isolate the post-training threshold-calibration stage as an attack surface not covered by training-phase and aggregation-phase defenses, distinct from training-data and aggregation-phase poisoning (\S\ref{sec:threat}).
-  \item We present a controlled vulnerability characterization under score-level calibration contamination across three threshold policies, showing that the score-level raising attack reliably degrades victim detection rates by 2.4 to 7.9 percentage points across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 95\% bootstrap confidence intervals excluding zero (\S\ref{sec:results}).
-  \item We document policy-differentiated behavior: \textsc{Local} has the largest per-victim threshold shifts with harm confined to the victim (no cross-client threshold propagation); \textsc{Cluster} has potential intra-cluster threshold perturbation; downstream non-victim harm is not separately measured; \textsc{Global} has magnitude-diluted fleet-wide propagation; the lowering attack succeeds for \textsc{Local} and \textsc{Cluster} but is conditionally bounded for \textsc{Global} (\S\ref{sec:results}).
+  \item The analysis isolates the post-training threshold-calibration stage as an attack surface not covered by training-phase and aggregation-phase defenses, distinct from training-data and aggregation-phase poisoning (\S\ref{sec:threat}).
+  \item The evaluation presents a controlled vulnerability characterization under score-level calibration contamination across three threshold policies, showing that the score-level raising attack reliably degrades victim detection rates by 2.4 to 7.9 percentage points across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 95\% bootstrap confidence intervals excluding zero (\S\ref{sec:results}).
+  \item The results document policy-differentiated behavior: \textsc{Local} has the largest per-victim threshold shifts with harm confined to the victim (no cross-client threshold propagation); \textsc{Cluster} has potential intra-cluster threshold perturbation; downstream non-victim harm is not separately measured; \textsc{Global} has magnitude-diluted fleet-wide propagation; the lowering attack succeeds for \textsc{Local} and \textsc{Cluster} but is conditionally bounded for \textsc{Global} (\S\ref{sec:results}).
 \end{enumerate}
 
 \textbf{Scope.}
 All claims are bounded to the nine-device N-BaIoT setting with autoencoder detectors and FedAvg aggregation, and the poisoning mechanism operates at the score level; end-to-end traffic-generation realizability is future work (\S\ref{sec:discussion}).
-We do not claim deployability, evasion guarantees, or generalization beyond this setting.
-Defense design against calibration-stage poisoning is out of scope, though we discuss properties a defense would need to satisfy (\S\ref{sec:discussion}).
+No claim is made about deployability, evasion guarantees, or generalization beyond this setting.
+Defense design against calibration-stage poisoning is out of scope, though \S\ref{sec:discussion} discusses properties a defense would need to satisfy.
