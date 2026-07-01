@@ -1,20 +1,18 @@
-\begin{table}[tb]
-\caption{Clean-baseline dispersion statistics per threshold policy (N-BaIoT, $n{=}10$ seeds, 9 clients).
-CV: coefficient of variation (ddof\,=\,0; lower is more uniform).
-Worst~BA: minimum per-client balanced accuracy (higher better).
-P10 Macro-F1: 10th-percentile client macro-F1 (higher better).
-Bold\,=\,best per column.
-$^*$~Actual std\,$\approx$\,0.0002; rounds to zero at three decimals.}
+\begin{table}[!ht]
+\caption{Clean-baseline dispersion and detection statistics per threshold policy (N-BaIoT, $n{=}10$ seeds, 9 clients).
+CV: coefficient of variation (ddof\,=\,0; lower is more uniform); BA: balanced accuracy; FPR/TPR are client/seed means. Bold\,=\,best per column.
+$^*$~Actual std\,$\approx$\,0.0002; rounds to zero.}
 \label{tab:baseline}
 \centering
-\small
-\begin{tabular}{@{}lcccc@{}}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lccccccc@{}}
 \toprule
-Policy & CV(FPR) & CV(TPR) & Worst~BA & P10 Macro-F1 \\
+Policy & CV(FPR) & CV(TPR) & Worst~BA & P10 Macro-F1 & Mean FPR & Mean TPR \\
 \midrule
-\textsc{Global} & 0.905\,$\pm$\,0.039 & \textbf{0.255\,$\pm$\,0.030} & 0.657\,$\pm$\,0.008 & 0.398\,$\pm$\,0.053 \\
-\textsc{Local}  & \textbf{0.333\,$\pm$\,0.034} & 0.296\,$\pm$\,0.036 & 0.655\,$\pm$\,0.005 & 0.335\,$\pm$\,0.058 \\
-\textsc{Cluster}& 0.615\,$\pm$\,0.143 & 0.313\,$\pm$\,0.009 & 0.656\,$\pm$\,0.004 & 0.299\,$\pm$\,0.000$^*$ \\
+\textsc{Global} & 0.905\,$\pm$\,0.039 & \textbf{0.255\,$\pm$\,0.030} & 0.657\,$\pm$\,0.008 & 0.398\,$\pm$\,0.053 & 0.041 & 0.793 \\
+\textsc{Local}  & \textbf{0.333\,$\pm$\,0.034} & 0.296\,$\pm$\,0.036 & 0.655\,$\pm$\,0.005 & 0.335\,$\pm$\,0.058 & 0.043 & 0.777 \\
+\textsc{Cluster}& 0.615\,$\pm$\,0.143 & 0.313\,$\pm$\,0.009 & 0.656\,$\pm$\,0.004 & 0.299\,$\pm$\,0.000$^*$ & 0.043 & 0.742 \\
 \bottomrule
 \end{tabular}
 \end{table}
