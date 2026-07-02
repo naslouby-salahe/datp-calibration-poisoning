@@ -1,0 +1,99 @@
+% ================================================================
+% PAGE 1 — EXECUTIVE SCOPE
+% ================================================================
+
+% ---- Title block ----
+{\color{navyhead}\rule{\linewidth}{2pt}}
+
+\begin{center}
+  \vspace*{0.25em}
+  {\Huge\bfseries\color{navyhead} DATP-CP}\\[0.4em]
+  {\Large\bfseries\color{navyhead} Research Dossier}\\[0.6em]
+  {\large Calibration-Channel Poisoning in Federated IoT Anomaly Detection}\\[0.75em]
+  \small
+  \begin{tabular}{@{}ll@{}}
+    \textbf{Version:} & v1.0\\[2pt]
+    \textbf{Status:}  & Scientific and technical scoping document
+  \end{tabular}\\[0.55em]
+\end{center}
+{\color{navyhead}\rule{\linewidth}{1.2pt}}
+
+\vspace{0.4em}
+
+\begin{tcolorbox}[ambercallout]
+\small\textbf{Scope:} N-BaIoT threshold-scope study.
+Attack surface: benign calibration scores only.
+Training data, model weights, aggregation, test scores, and labels are not modified.
+\end{tcolorbox}
+
+\vspace{0.25em}
+
+% ---- Purpose ----
+\section{Purpose}
+
+\begin{itemize}
+  \item Study the post-training threshold-calibration stage as an attack surface.
+  \item Modify only benign calibration scores.
+  \item Preserve training data, aggregation, model weights, test scores, and test labels.
+  \item Compare \const{GLOBAL\_THRESHOLD}, \const{LOCAL\_THRESHOLD}, and
+    \const{CLUSTER\_THRESHOLD}.
+  \item Keep claims bounded to the tested N-BaIoT protocol.
+\end{itemize}
+
+% ---- Minimal pipeline ----
+\section{Minimal Pipeline}
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=0.9cm,
+  >=Stealth,
+  box/.style={
+    rectangle, draw=gray!55, fill=white,
+    rounded corners=3pt,
+    minimum width=2.7cm, minimum height=0.85cm,
+    text centered, font=\small, align=center
+  },
+  amberbox/.style={
+    rectangle, draw=amber!75, fill=amber!10,
+    rounded corners=3pt,
+    minimum width=2.7cm, minimum height=0.85cm,
+    text centered, font=\small, align=center,
+    line width=1pt
+  },
+  lbl/.style={font=\scriptsize, text width=2.7cm, align=center, text=gray!65!black}
+]
+  \node[box] (iot)  {IoT devices};
+  \node[box,  right=0.9cm of iot] (fl)  {FL training};
+  \node[amberbox, right=0.9cm of fl]  (cal) {Threshold\\calibration};
+  \node[box,  right=0.9cm of cal] (det) {Detection\\decision};
+
+  \draw[->, line width=0.6pt] (iot) -- (fl);
+  \draw[->, line width=0.6pt] (fl)  -- (cal);
+  \draw[->, line width=0.6pt] (cal) -- (det);
+
+  \node[lbl, below=0.2cm of iot] {N-BaIoT\\9 physical devices};
+  \node[lbl, below=0.2cm of fl]  {FedAvg autoencoder\\fixed weights};
+  \node[lbl, below=0.2cm of cal] {benign scores\\$q = 95$};
+  \node[lbl, below=0.2cm of det] {score $> \tau$};
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.1em}
+{\footnotesize\itshape
+Only the \textcolor{amber!80!black}{threshold calibration} step is within the attack surface.}
+
+% ---- Scope boundary ----
+\section{Scope Boundary}
+
+\begin{tcolorbox}[callout]
+\begin{itemize}
+  \item Calibration scores may change.
+  \item Training data does not change.
+  \item Model weights do not change.
+  \item Aggregation does not change.
+  \item Test scores and labels do not change.
+  \item AUROC invariance is a sanity check only.
+\end{itemize}
+\end{tcolorbox}
+
+\clearpage

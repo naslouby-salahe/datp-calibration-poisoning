@@ -1,0 +1,67 @@
+% ================================================================
+% PAGE 3 — CONTEXT AND POSITIONING
+% ================================================================
+
+\section{Context and Positioning}
+
+\subsection{DATP Baseline}
+
+\begin{itemize}
+  \item DATP studied threshold calibration scope in non-IID federated IoT anomaly detection.
+  \item It fixed the FedAvg autoencoder and varied only the threshold policy.
+  \item It showed that threshold scope governs per-client false-alarm disparity.
+  \item It established calibration as a decisive operating-point variable.
+\end{itemize}
+
+\subsection{DATP-CP Rationale}
+
+\begin{itemize}
+  \item DATP-CP asks whether the same calibration stage is vulnerable.
+  \item The attack occurs after training.
+  \item Existing FL defenses usually focus on training, updates, or aggregation.
+  \item DATP-CP studies the post-training calibration gap under strict causal isolation.
+\end{itemize}
+
+\subsection{Three-Branch Comparison}
+
+\vspace{0.3em}
+\begin{tabularx}{\linewidth}{@{} >{\bfseries\small}p{3.2cm}
+                                    >{\small}X
+                                    >{\small}X
+                                    >{\small}X @{}}
+\toprule
+\normalfont & \textbf{DATP} & \textbf{DATP-CP} & \textbf{Journal extension}\\
+\midrule
+Scientific role
+  & Performance study
+  & Security study
+  & Generalization study\\[4pt]
+Main question
+  & Which policy minimizes FPR disparity?
+  & Does calibration poisoning produce policy-dependent harm?
+  & Do findings generalize?\\[4pt]
+Primary variable
+  & Threshold policy
+  & Poison fraction $f$
+  & Dataset / FL protocol\\[4pt]
+Adversary
+  & None
+  & Single compromised client
+  & None\\[4pt]
+Claim boundary
+  & N-BaIoT, threshold-scope study
+  & N-BaIoT, single-client
+  & External datasets\\
+\bottomrule
+\end{tabularx}
+\vspace{0.3em}
+
+\subsection{Key Distinctions}
+
+\begin{itemize}
+  \item \textbf{DATP:} performance personalization.
+  \item \textbf{DATP-CP:} calibration-channel security.
+  \item \textbf{Journal extension:} external validation and generalization.
+\end{itemize}
+
+\clearpage

@@ -1,0 +1,82 @@
+% ================================================================
+% PAGE 5 — METHODOLOGY AND VALIDATION
+% ================================================================
+
+\section{Methodology and Validation}
+
+\subsection{Experimental Setup}
+
+\textbf{Dataset} — N-BaIoT; 9 physical IoT devices; one device equals one FL client;
+$n_{\text{cal}} \geq 100$.
+
+\textbf{Model} — Federated autoencoder; FedAvg; fixed model weights; clean and poisoned
+runs share the same model.
+
+\textbf{Calibration} — Benign reconstruction scores; p95 threshold rule; $q = 95$;
+policies: \const{GLOBAL}, \const{LOCAL}, \const{CLUSTER}.
+
+\subsection{Attack Mechanism}
+
+\begin{enumerate}
+  \item Select a victim client.
+  \item Choose poison fraction~$f$.
+  \item Select replacement positions in the benign calibration array.
+  \item Sample replacement values from the victim-local benign reservoir.
+  \item Recompute thresholds.
+  \item Evaluate on unchanged test scores and labels.
+\end{enumerate}
+
+\vspace{0.2em}
+\begin{minipage}[t]{0.54\linewidth}
+\subsection{Source Strategies}
+\begin{itemize}
+  \item \const{HIGH\_SCORE\_BENIGN} $\to$ \const{THRESHOLD\_RAISE}
+  \item \const{LOW\_SCORE\_BENIGN} $\to$ \const{THRESHOLD\_LOWER}
+  \item \const{RANDOM\_BENIGN} $\to$ negative control
+\end{itemize}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.42\linewidth}
+\subsection{Poison Fractions}
+\[f \in \{0.10,\; 0.20,\; 0.40\}\]
+\end{minipage}
+
+\vspace{0.3em}
+
+\subsection{Validation Criteria}
+
+\vspace{0.2em}
+\begin{tabularx}{\linewidth}{@{} l l X @{}}
+\toprule
+\textbf{Criterion} & \textbf{Metric} & \textbf{Interpretation}\\
+\midrule
+Signed $\Delta\tau$            & Direction             & Attack in correct direction\\[2pt]
+Material $|\Delta\tau|$        & Magnitude             & Effect exceeds materiality bound\\[2pt]
+$\Delta\text{TPR}$             & Detection drop        & Under \const{THRESHOLD\_RAISE}\\[2pt]
+$\Delta\text{CV}(\text{FPR})$  & Alarm dispersion      & Under \const{THRESHOLD\_LOWER}\\[2pt]
+Policy differentiation         & Differential response & Policies respond differently\\[2pt]
+\const{RANDOM\_BENIGN}        & Control audit         & Negative-control baseline\\[2pt]
+AUROC invariance               & Sanity check          & Not a primary metric\\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.4em}
+
+\subsection{Claim Gates}
+
+\begin{enumerate}
+  \item \textbf{Gate 1:} Material correctly signed $\Delta\tau$.
+  \item \textbf{Gate 2:} Directional effect exceeds \const{RANDOM\_BENIGN}.
+  \item \textbf{Gate 3:} Downstream harm metric moves as expected.
+\end{enumerate}
+
+\subsection{Claim Classes}
+
+\begin{itemize}
+  \item \textbf{Full vulnerability:} All gates pass.
+  \item \textbf{Mechanism-only:} Threshold movement only.
+  \item \textbf{Calibration instability:} Negative control also moves.
+  \item \textbf{Null or conditional:} Evidence insufficient.
+\end{itemize}
+
+\clearpage

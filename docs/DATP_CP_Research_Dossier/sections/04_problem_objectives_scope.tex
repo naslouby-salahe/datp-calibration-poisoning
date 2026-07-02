@@ -1,0 +1,72 @@
+% ================================================================
+% PAGE 4 — PROBLEM, RESEARCH QUESTION, OBJECTIVES, SCOPE
+% ================================================================
+
+\section{Problem}
+
+\begin{itemize}
+  \item Thresholds are computed after training.
+  \item Thresholds define the final operating point.
+  \item Benign calibration scores determine~$\tau$.
+  \item This stage is separate from model training and aggregation.
+  \item The calibration buffer may become an overlooked attack surface.
+\end{itemize}
+
+\subsection{Central Research Question}
+
+\begin{tcolorbox}[callout]
+\itshape
+Does poisoning only benign threshold-calibration scores produce material,
+policy-dependent downstream harm under \const{GLOBAL\_THRESHOLD},
+\const{LOCAL\_THRESHOLD}, and \const{CLUSTER\_THRESHOLD}?
+\end{tcolorbox}
+
+\section{Objectives}
+
+\begin{minipage}[t]{0.48\linewidth}
+\subsection*{Scientific objectives}
+\begin{itemize}
+  \item Isolate threshold calibration as an attack surface.
+  \item Measure material threshold movement.
+  \item Compare vulnerability across threshold policies.
+  \item Separate raising and lowering failure modes.
+  \item Preserve causal isolation.
+\end{itemize}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\subsection*{Technical objectives}
+\begin{itemize}
+  \item Validate clean DATP-compatible artifacts.
+  \item Implement controlled benign-score replacement.
+  \item Enforce valid source-objective pairs.
+  \item Run paired clean-vs-poisoned comparisons.
+  \item Produce reproducible outputs.
+\end{itemize}
+\end{minipage}
+
+\vspace{0.5em}
+
+\section{Scope}
+
+\vspace{0.2em}
+\begin{tabularx}{\linewidth}{@{} >{\small}X >{\small}X @{}}
+\toprule
+\textbf{Included} & \textbf{Excluded}\\
+\midrule
+N-BaIoT main study                    & Training-data poisoning\\[2pt]
+Physical device clients                & Model poisoning\\[2pt]
+Fixed FedAvg autoencoder               & Aggregation poisoning\\[2pt]
+Benign calibration-score poisoning     & Backdoors\\[2pt]
+Score-level proxy attack               & Evasion\\[2pt]
+\const{GLOBAL\_THRESHOLD}             & Privacy mechanisms\\[2pt]
+\const{LOCAL\_THRESHOLD}              & Deployment benchmarking\\[2pt]
+\const{CLUSTER\_THRESHOLD}            & Raw-traffic attack generation\\[2pt]
+$q = 95$                               & Journal-extension datasets as main evidence\\[2pt]
+Single-client main study               & Model-personalization comparators\\[2pt]
+Paired clean-vs-poisoned evaluation    & Universal FL robustness claims\\[2pt]
+\const{RANDOM\_BENIGN} control        & Privacy guarantee claims\\
+\bottomrule
+\end{tabularx}
+
+\clearpage
