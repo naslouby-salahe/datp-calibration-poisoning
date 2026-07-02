@@ -105,6 +105,15 @@ paper/*.synctex.gz
 paper/*.toc
 paper/*.lot
 paper/*.lof
+docs/DATP_CP_Research_Dossier/*.aux
+docs/DATP_CP_Research_Dossier/*.bbl
+docs/DATP_CP_Research_Dossier/*.blg
+docs/DATP_CP_Research_Dossier/*.fdb_latexmk
+docs/DATP_CP_Research_Dossier/*.fls
+docs/DATP_CP_Research_Dossier/*.log
+docs/DATP_CP_Research_Dossier/*.out
+docs/DATP_CP_Research_Dossier/*.synctex.gz
+docs/DATP_CP_Research_Dossier/*.toc
 docs/_build/
 
 # ---------------------------------------------------------------------------
