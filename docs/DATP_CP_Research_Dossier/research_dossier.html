@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DATP-CP Research Dossier — v1.0</title>
+<style>
+/* ── TOKENS ────────────────────────────────────── */
+:root {
+  --bg:      #F3F5F9;
+  --white:   #FFFFFF;
+  --navy:    #1C2D46;
+  --nmid:    #2C4870;
+  --acc:     #A97524;
+  --acc-bg:  #FAF3E4;
+  --acc-br:  #D4A040;
+  --bdr:     #BEC9D8;
+  --stripe:  #EBF0F6;
+  --txt:     #1A2030;
+  --mut:     #55627E;
+  --grn:     #1B5834;
+  --grn-bg:  #E7F2EB;
+  --grn-br:  #5FAA7A;
+  --red:     #8A1E1E;
+  --red-bg:  #FBF0EF;
+  --red-br:  #C88080;
+}
+/* ── RESET ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@page { size: A4 portrait; margin: 0; }
+body {
+  font-family: 'Ubuntu', 'Liberation Sans', Arial, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.5;
+  color: var(--txt);
+  background: #fff;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+  hyphens: none;
+  -webkit-hyphens: none;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+/* ── PAGE ──────────────────────────────────────── */
+.page {
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  page-break-after: always;
+  page-break-inside: avoid;
+}
+.page:last-child { page-break-after: auto; }
+
+/* ── HEADER ────────────────────────────────────── */
+.ph {
+  background: var(--navy);
+  color: #fff;
+  padding: 3mm 18mm 3mm 22mm;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  height: 12.5mm;
+}
+.ph-left { display: flex; align-items: baseline; gap: 3mm; }
+.ph-sec {
+  font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif;
+  font-size: 7pt;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.45);
+  line-height: 1;
+}
+.ph-title {
+  font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif;
+  font-size: 11pt;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.ph-pn {
+  font-size: 7.5pt;
+  color: rgba(255,255,255,.4);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── FOOTER ────────────────────────────────────── */
+.pf {
+  background: var(--navy);
+  color: rgba(255,255,255,.4);
+  padding: 2mm 18mm;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  height: 8mm;
+  font-size: 7pt;
+}
+
+/* ── CONTENT AREA ──────────────────────────────── */
+.co {
+  flex: 1;
+  padding: 8mm 18mm 6mm 22mm;
+  overflow: hidden;
+}
+
+/* ── SECTION HEADING ───────────────────────────── */
+h2.sh {
+  font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif;
+  font-size: 10.5pt;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 3.5mm;
+  padding-bottom: 2mm;
+  border-bottom: 1.5px solid var(--bdr);
+  line-height: 1.2;
+}
+h3.ssh {
+  font-size: 9pt;
+  font-weight: 700;
+  color: var(--nmid);
+  margin-bottom: 2.5mm;
+  line-height: 1.2;
+}
+p { margin-bottom: 2.5mm; font-size: 9.5pt; }
+p:last-child { margin-bottom: 0; }
+.lbl {
+  font-size: 7pt;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--mut);
+}
+
+/* ── GRIDS ─────────────────────────────────────── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5mm; }
+
+/* ── TABLES ────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+  font-variant-numeric: tabular-nums;
+}
+th {
+  background: var(--navy);
+  color: #fff;
+  padding: 2.5mm 3.5mm;
+  text-align: left;
+  font-size: 8pt;
+  font-weight: 600;
+  line-height: 1.25;
+}
+td {
+  padding: 2mm 3.5mm;
+  border-bottom: 1px solid var(--bdr);
+  vertical-align: top;
+  line-height: 1.4;
+  font-size: 8.5pt;
+}
+tr:nth-child(even) td { background: var(--stripe); }
+.th-mid   { background: var(--nmid); }
+.th-acc   { background: var(--acc); }
+.th-grn   { background: var(--grn); }
+.th-red   { background: var(--red); }
+.td-field { font-weight: 700; color: var(--navy); white-space: nowrap; }
+
+/* ── BOXES ─────────────────────────────────────── */
+.bx-navy {
+  background: var(--navy);
+  color: #fff;
+  padding: 4mm 5mm;
+  border-radius: 2px;
+}
+.bx-navy .lbl { color: rgba(255,255,255,.5); margin-bottom: 1.5mm; }
+.bx-navy p { color: rgba(255,255,255,.88); }
+.bx-acc {
+  background: var(--acc-bg);
+  border-left: 3px solid var(--acc);
+  padding: 3.5mm 4.5mm;
+}
+.bx-grn {
+  background: var(--grn-bg);
+  border-left: 3px solid var(--grn);
+  padding: 3.5mm 4.5mm;
+}
+.bx-bdr {
+  background: var(--white);
+  border: 1px solid var(--bdr);
+  border-radius: 2px;
+  padding: 3.5mm 4.5mm;
+}
+.bx-stripe {
+  background: var(--stripe);
+  border-left: 3px solid var(--bdr);
+  padding: 3mm 4.5mm;
+}
+.bx-red {
+  background: var(--red-bg);
+  border-left: 3px solid var(--red);
+  padding: 3mm 4.5mm;
+}
+
+/* ── COVER ─────────────────────────────────────── */
+.cover-top {
+  background: var(--navy);
+  color: #fff;
+  padding: 10mm 18mm 9mm 22mm;
+  flex-shrink: 0;
+}
+.cover-doc-type {
+  font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif;
+  font-size: 7pt;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.45);
+  margin-bottom: 4mm;
+}
+.cover-top h1 {
+  font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif;
+  font-size: 26pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  margin-bottom: 1mm;
+}
+.cover-top .sub {
+  font-size: 10pt;
+  color: rgba(255,255,255,.68);
+  line-height: 1.55;
+  max-width: 160mm;
+  margin-top: 3mm;
+}
+.cover-body {
+  flex: 1;
+  padding: 7mm 18mm 6mm 22mm;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 5mm;
+}
+
+/* ── MARKERS ───────────────────────────────────── */
+.chk { color: var(--grn); font-weight: 700; }
+.xmk { color: var(--red); font-weight: 700; }
+.pill {
+  display: inline-block;
+  padding: .5mm 2.5mm;
+  border-radius: 2px;
+  font-size: 7.5pt;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.p-navy { background: var(--navy); color: #fff; }
+.p-acc  { background: var(--acc);  color: #fff; }
+.p-grn  { background: var(--grn);  color: #fff; }
+.p-mid  { background: var(--nmid); color: #fff; }
+
+/* ── DIVIDER ───────────────────────────────────── */
+hr.rule { border: none; border-top: 1px solid var(--bdr); margin: 3mm 0; }
+
+/* ── OBJECTIVE LIST ────────────────────────────── */
+ol.obj { padding-left: 5mm; margin-top: 2mm; }
+ol.obj li { margin-bottom: 2.5mm; font-size: 9pt; line-height: 1.4; }
+ol.obj li:last-child { margin-bottom: 0; }
+
+/* ── WP ROW ────────────────────────────────────── */
+.wp-row { display: flex; gap: 2.5mm; align-items: flex-start; margin-bottom: 2mm; }
+.wp-tag {
+  min-width: 10mm;
+  background: var(--navy);
+  color: #fff;
+  font-size: 7pt;
+  font-weight: 700;
+  padding: 1mm 2mm;
+  border-radius: 2px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+.wp-body { font-size: 9pt; line-height: 1.4; flex: 1; padding-top: .5mm; }
+
+/* ── RISK ROW ──────────────────────────────────── */
+.rk-row { display: flex; gap: 2.5mm; align-items: flex-start; margin-bottom: 2mm; }
+.rk-tag {
+  min-width: 6mm;
+  font-size: 7.5pt;
+  font-weight: 700;
+  color: var(--acc);
+  flex-shrink: 0;
+  padding-top: .5mm;
+}
+.rk-body { font-size: 9pt; line-height: 1.4; flex: 1; }
+
+/* ── COMPACT TABLE (page 7 setup) ──────────────── */
+.ctbl td { padding: 1.5mm 2.5mm; font-size: 8pt; line-height: 1.35; }
+.ctbl .td-field { font-weight: 700; color: var(--navy); white-space: nowrap; width: 34%; }
+.ctbl .grp-hd { background: #3A5474; color: #fff; font-size: 7.5pt; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; padding: 1.5mm 2.5mm; }
+.vtbl td { padding: 1.5mm 2.5mm; font-size: 8pt; line-height: 1.35; }
+.vtbl th { padding: 2mm 2.5mm; font-size: 7.5pt; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 1: COVER
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="cover-top">
+    <div class="cover-doc-type">Research Dossier &nbsp;·&nbsp; Doctoral Thesis — Branch 2 &nbsp;·&nbsp; LAMSAD Laboratory</div>
+    <h1>DATP-CP</h1>
+    <h1 style="font-size:17pt;font-weight:400;letter-spacing:0;margin-top:1mm;opacity:.88">Research Dossier</h1>
+    <div class="sub">Scientific and Technical Scope for Calibration-Channel Poisoning<br>in Federated IoT Anomaly Detection</div>
+  </div>
+
+  <div class="cover-body" style="justify-content:space-between">
+
+    <!-- PIPELINE -->
+    <div class="bx-bdr" style="padding:5mm 5mm 4mm">
+      <div class="lbl" style="margin-bottom:3mm">Federated IoT detection pipeline — attack surface</div>
+      <svg viewBox="0 0 500 132" style="width:100%;height:46mm;display:block">
+        <defs>
+          <marker id="ar" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#BEC9D8"/>
+          </marker>
+          <marker id="ar-acc" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#A97524"/>
+          </marker>
+        </defs>
+
+        <!-- Step indicators -->
+        <circle cx="55" cy="13"  r="8" fill="#8A9BB5"/>
+        <text x="55" y="17" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="Ubuntu,sans-serif">1</text>
+        <circle cx="183" cy="13" r="8" fill="#8A9BB5"/>
+        <text x="183" y="17" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="Ubuntu,sans-serif">2</text>
+        <circle cx="316" cy="10" r="10" fill="#A97524"/>
+        <text x="316" y="14.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="white" font-family="Ubuntu,sans-serif">3</text>
+        <circle cx="445" cy="13" r="8" fill="#8A9BB5"/>
+        <text x="445" y="17" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="Ubuntu,sans-serif">4</text>
+
+        <!-- Box 1: IoT Devices -->
+        <rect x="5" y="25" width="100" height="82" rx="3" fill="white" stroke="#BEC9D8" stroke-width="1.5"/>
+        <text x="55" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#1C2D46" font-family="Ubuntu,sans-serif">IoT Devices</text>
+        <text x="55" y="65" text-anchor="middle" font-size="8" fill="#55627E" font-family="Ubuntu,sans-serif">9 physical devices</text>
+        <text x="55" y="77" text-anchor="middle" font-size="8" fill="#55627E" font-family="Ubuntu,sans-serif">N-BaIoT benchmark</text>
+        <text x="55" y="88" text-anchor="middle" font-size="7.5" fill="#99A0B0" font-family="Ubuntu,sans-serif">K = 9 FL clients</text>
+        <rect x="5" y="96" width="100" height="11" rx="0" fill="#EBF0F6"/>
+        <text x="55" y="104.5" text-anchor="middle" font-size="7" fill="#55627E" font-family="Ubuntu,sans-serif">heterogeneous traffic</text>
+
+        <!-- Arrow 1 -->
+        <line x1="108" y1="66" x2="127" y2="66" stroke="#BEC9D8" stroke-width="1.5" marker-end="url(#ar)"/>
+
+        <!-- Box 2: FL Training -->
+        <rect x="131" y="25" width="104" height="82" rx="3" fill="white" stroke="#BEC9D8" stroke-width="1.5"/>
+        <text x="183" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#1C2D46" font-family="Ubuntu,sans-serif">FL Training</text>
+        <text x="183" y="65" text-anchor="middle" font-size="8" fill="#55627E" font-family="Ubuntu,sans-serif">FedAvg · Autoencoder</text>
+        <text x="183" y="77" text-anchor="middle" font-size="8" fill="#55627E" font-family="Ubuntu,sans-serif">model weights fixed</text>
+        <text x="183" y="88" text-anchor="middle" font-size="7.5" fill="#99A0B0" font-family="Ubuntu,sans-serif">converges before calib.</text>
+        <rect x="131" y="96" width="104" height="11" fill="#EBF2EC"/>
+        <text x="183" y="104.5" text-anchor="middle" font-size="7" fill="#1B5834" font-family="Ubuntu,sans-serif">frozen post-training ✓</text>
+
+        <!-- Arrow 2 -->
+        <line x1="238" y1="66" x2="257" y2="66" stroke="#BEC9D8" stroke-width="1.5" marker-end="url(#ar)"/>
+
+        <!-- Box 3: Threshold Calibration — ATTACK SURFACE -->
+        <rect x="261" y="22" width="110" height="92" rx="3" fill="#FAF3E4" stroke="#A97524" stroke-width="2.5"/>
+        <text x="276" y="36" font-size="7" font-weight="700" fill="#A97524" font-family="Ubuntu,sans-serif">⚠  ATTACK SURFACE</text>
+        <text x="316" y="55" text-anchor="middle" font-size="12" font-weight="700" fill="#A97524" font-family="Ubuntu,sans-serif">Threshold</text>
+        <text x="316" y="70" text-anchor="middle" font-size="12" font-weight="700" fill="#A97524" font-family="Ubuntu,sans-serif">Calibration</text>
+        <text x="316" y="83" text-anchor="middle" font-size="8" fill="#A97524" font-family="Ubuntu,sans-serif">benign scores → τ</text>
+        <text x="316" y="93" text-anchor="middle" font-size="7.5" fill="#B8892C" font-family="Ubuntu,sans-serif">q = 95 · per client</text>
+        <rect x="261" y="103" width="110" height="11" fill="#D4A040"/>
+        <text x="316" y="111.5" text-anchor="middle" font-size="7" fill="white" font-weight="700" font-family="Ubuntu,sans-serif">DATP-CP target</text>
+
+        <!-- Arrow 3 -->
+        <line x1="374" y1="66" x2="393" y2="66" stroke="#BEC9D8" stroke-width="1.5" marker-end="url(#ar)"/>
+
+        <!-- Box 4: Detection Decision -->
+        <rect x="397" y="25" width="98" height="82" rx="3" fill="white" stroke="#BEC9D8" stroke-width="1.5"/>
+        <text x="446" y="48" text-anchor="middle" font-size="11" font-weight="700" fill="#1C2D46" font-family="Ubuntu,sans-serif">Detection</text>
+        <text x="446" y="63" text-anchor="middle" font-size="11" font-weight="700" fill="#1C2D46" font-family="Ubuntu,sans-serif">Decision</text>
+        <text x="446" y="76" text-anchor="middle" font-size="8" fill="#55627E" font-family="Ubuntu,sans-serif">score &gt; τ → alarm</text>
+        <text x="446" y="87" text-anchor="middle" font-size="7.5" fill="#99A0B0" font-family="Ubuntu,sans-serif">governed by τ</text>
+        <rect x="397" y="96" width="98" height="11" fill="#EBF0F6"/>
+        <text x="446" y="104.5" text-anchor="middle" font-size="7" fill="#55627E" font-family="Ubuntu,sans-serif">downstream harm</text>
+
+        <!-- Annotation -->
+        <text x="250" y="128" text-anchor="middle" font-size="7.5" fill="#8A9BB5" font-family="Ubuntu,sans-serif">DATP-CP modifies only step 3. Steps 1, 2, and 4 remain unchanged across all experimental runs.</text>
+      </svg>
+    </div>
+
+    <!-- IDENTITY INFO -->
+    <div class="g2" style="gap:5mm">
+      <div class="bx-bdr" style="padding:4mm 5mm">
+        <div class="lbl" style="margin-bottom:2mm">Author</div>
+        <div style="font-size:11pt;font-weight:700;color:var(--navy);font-family:'Liberation Serif','DejaVu Serif',serif">Salaheddine Naslouby</div>
+        <div style="font-size:8pt;color:var(--mut);margin-top:1.5mm;line-height:1.5">
+          LAMSAD Laboratory<br>
+          ENSA Hassan First University, Berrechid
+        </div>
+        <hr class="rule" style="margin:2mm 0">
+        <div style="font-size:8pt;color:var(--mut);line-height:1.6">
+          <strong style="color:var(--nmid)">Supervisors:</strong><br>
+          M. Lachgar (L2IS, UCA Marrakech)<br>
+          H. Hrimech (LAMSAD, ENSA Hassan I)
+        </div>
+      </div>
+      <div class="bx-bdr" style="padding:4mm 5mm">
+        <div class="lbl" style="margin-bottom:2mm">Document</div>
+        <div style="font-size:9pt;font-weight:700;color:var(--navy);line-height:1.5">
+          Research Dossier &nbsp;·&nbsp; v1.0
+        </div>
+        <div style="font-size:8pt;color:var(--mut);margin-top:1.5mm;line-height:1.6">
+          <strong style="color:var(--nmid)">Date:</strong> July 2026<br>
+          <strong style="color:var(--nmid)">Thesis:</strong> Collaborative Malware Detection with Federated Learning in IoT Networks<br>
+          <strong style="color:var(--nmid)">Branch:</strong> Branch 2 — Security<br>
+          <strong style="color:var(--nmid)">Status:</strong> Scientific scoping document
+        </div>
+      </div>
+    </div>
+
+    <!-- IN BRIEF -->
+    <div class="bx-navy" style="padding:4mm 5mm;flex-shrink:0">
+      <div class="lbl" style="margin-bottom:2mm">Research scope in brief</div>
+      <p style="font-size:9pt;margin:0;line-height:1.6;color:rgba(255,255,255,.88)">DATP-CP studies whether the post-training threshold-calibration stage in federated IoT anomaly detection is vulnerable to score-level poisoning. The attack modifies only benign calibration scores; training data, model weights, gradients, aggregation, test scores, and test labels remain unchanged throughout. The study compares <strong style="color:#fff">GLOBAL_THRESHOLD</strong>, <strong style="color:#fff">LOCAL_THRESHOLD</strong>, and <strong style="color:#fff">CLUSTER_THRESHOLD</strong> under single-client compromise using the N-BaIoT benchmark (9 physical IoT devices). No training poisoning, model poisoning, raw-traffic attack generation, privacy guarantee, or deployment-readiness claim is made.</p>
+    </div>
+
+    <!-- ACCENT BAR -->
+    <div style="height:2.5px;background:linear-gradient(90deg,var(--navy),var(--nmid),var(--acc));border-radius:1px;flex-shrink:0"></div>
+  </div>
+
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>p. 1 / 8</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 2: §1 PROJECT IDENTITY
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="ph">
+    <div class="ph-left">
+      <span class="ph-sec">§1</span>
+      <span class="ph-title">Project Identity</span>
+    </div>
+    <span class="ph-pn">p. 2 / 8</span>
+  </div>
+  <div class="co">
+
+    <table style="margin-bottom:5mm">
+      <tr>
+        <th style="width:30%">Field</th>
+        <th>Value</th>
+      </tr>
+      <tr>
+        <td class="td-field">Acronym</td>
+        <td>DATP-CP</td>
+      </tr>
+      <tr>
+        <td class="td-field">Full title</td>
+        <td>Calibration-Channel Poisoning in Federated IoT Anomaly Detection</td>
+      </tr>
+      <tr>
+        <td class="td-field">Document type</td>
+        <td>Research Dossier — Scientific and Technical Scoping Document</td>
+      </tr>
+      <tr>
+        <td class="td-field">Author</td>
+        <td>Salaheddine Naslouby</td>
+      </tr>
+      <tr>
+        <td class="td-field">Laboratory</td>
+        <td>LAMSAD Laboratory, ENSA Hassan First University, Berrechid</td>
+      </tr>
+      <tr>
+        <td class="td-field">Supervisors</td>
+        <td>M. Lachgar (L2IS, UCA Marrakech) &nbsp;·&nbsp; H. Hrimech (LAMSAD, ENSA Hassan I)</td>
+      </tr>
+      <tr>
+        <td class="td-field">Thesis line</td>
+        <td>Collaborative Malware Detection with Federated Learning in IoT Networks</td>
+      </tr>
+      <tr>
+        <td class="td-field">Research branch</td>
+        <td>Doctoral Thesis — Branch 2 (Security)</td>
+      </tr>
+      <tr>
+        <td class="td-field">Main dataset</td>
+        <td>N-BaIoT (9 physical IoT devices as FL clients)</td>
+      </tr>
+      <tr>
+        <td class="td-field">Object of study</td>
+        <td>Post-training threshold-calibration channel in federated anomaly detection</td>
+      </tr>
+      <tr>
+        <td class="td-field">Version</td>
+        <td>v1.0</td>
+      </tr>
+      <tr>
+        <td class="td-field">Date</td>
+        <td>July 2026</td>
+      </tr>
+      <tr>
+        <td class="td-field">Status</td>
+        <td>Official scientific scoping document — not a paper, not a presentation deck</td>
+      </tr>
+    </table>
+
+    <hr class="rule">
+
+    <h2 class="sh" style="margin-top:3.5mm">Document Purpose</h2>
+    <p>This document defines the scope, objectives, methodology, deliverables, validation criteria, and boundaries of the DATP-CP research branch. It is intended as an official scientific and technical framing document, not as a full paper or presentation deck.</p>
+    <p>DATP-CP is the security branch of the DATP doctoral research line. It asks whether the post-training threshold-calibration stage in federated IoT anomaly detection is vulnerable to adversarial manipulation, under the specific constraint that training data, model weights, gradients, aggregation, and test evaluation are held unchanged.</p>
+    <p>All claims in this document are bounded to the nine-device N-BaIoT setting with a fixed FedAvg autoencoder under three threshold policies: <strong>GLOBAL_THRESHOLD</strong>, <strong>LOCAL_THRESHOLD</strong>, and <strong>CLUSTER_THRESHOLD</strong>.</p>
+
+    <hr class="rule" style="margin:4mm 0 3.5mm">
+    <h2 class="sh">Document Organization</h2>
+    <table class="vtbl">
+      <thead><tr>
+        <th style="width:9%;text-align:center">§</th>
+        <th style="width:30%">Section</th>
+        <th>Contents</th>
+      </tr></thead>
+      <tbody>
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">1</td>
+        <td><strong>Project Identity</strong></td>
+        <td>Formal identity table and document purpose statement (this page)</td>
+      </tr>
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">2</td>
+        <td><strong>Context and Rationale</strong></td>
+        <td>DATP research line, three-branch structure, calibration coverage gap</td>
+      </tr>
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">3</td>
+        <td><strong>Problem Statement</strong></td>
+        <td>Problem, research problem, central research question, scientific boundary</td>
+      </tr>
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">4</td>
+        <td><strong>Objectives</strong></td>
+        <td>Scientific, technical, and doctoral objectives; pre-specified claim gates</td>
+      </tr>
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">5</td>
+        <td><strong>Scope and Exclusions</strong></td>
+        <td>Complete included and excluded elements with scope rationale</td>
+      </tr>
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">6</td>
+        <td><strong>Methodology and Validation</strong></td>
+        <td>Dataset, model, calibration, attack mechanism, and validation criteria</td>
+      </tr>
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">7</td>
+        <td><strong>Deliverables, Risks, Governance</strong></td>
+        <td>Deliverables, work packages, risks and limitations, closing statement</td>
+      </tr>
+      </tbody>
+    </table>
+
+  </div>
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>Salaheddine Naslouby &nbsp;·&nbsp; LAMSAD Laboratory</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 3: §2 CONTEXT AND RATIONALE
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="ph">
+    <div class="ph-left">
+      <span class="ph-sec">§2</span>
+      <span class="ph-title">Context and Rationale</span>
+    </div>
+    <span class="ph-pn">p. 3 / 8</span>
+  </div>
+  <div class="co">
+
+    <h2 class="sh">The DATP Research Line</h2>
+
+    <p>DATP (<em>Device-Aware Threshold Personalization</em>) established that the threshold-calibration stage — not model architecture or training strategy — is the decisive variable governing per-client false-alarm burden in non-IID federated IoT anomaly detection. Using nine physical devices from the N-BaIoT benchmark as FL clients, DATP showed that a shared global threshold imposes severely unequal false-positive rates across devices (CV(FPR) = 1.017), while per-client calibration reduces this disparity substantially (CV(FPR) = 0.299), and that an unsupervised cluster policy recovers a significant fraction of the improvement without requiring device taxonomy labels.</p>
+
+    <p>DATP's controlled experimental design — fixing the FedAvg autoencoder and varying only the threshold policy — yields causally attributable results: the effect is due to calibration scope, not to training or architecture differences.</p>
+
+    <p>DATP-CP is the security branch of this research line. It takes the logical next step: if threshold calibration is the decisive stage for detection performance and fairness, is it also a viable attack surface? This question is precisely what DATP-CP is designed to answer, under a controlled score-level contamination model that preserves all of DATP's isolation properties.</p>
+
+    <hr class="rule" style="margin:4mm 0">
+    <h2 class="sh">Three Branches — Distinct Scientific Roles</h2>
+
+    <table style="margin-bottom:4.5mm">
+      <tr>
+        <th style="width:18%">Branch</th>
+        <th class="th-mid" style="width:28%">DATP (Branch 1)</th>
+        <th class="th-acc" style="width:28%">DATP-CP (Branch 2)</th>
+        <th style="background:#2A5C2A;color:#fff;width:26%">Journal Extension (Branch 3)</th>
+      </tr>
+      <tr>
+        <td class="td-field" style="font-size:8pt">Scientific role</td>
+        <td>Threshold personalization and detection equity</td>
+        <td>Calibration-channel vulnerability analysis</td>
+        <td>Validation and generalization of DATP</td>
+      </tr>
+      <tr>
+        <td class="td-field" style="font-size:8pt">Primary variable</td>
+        <td>Threshold policy scope</td>
+        <td>Calibration buffer contamination fraction f</td>
+        <td>Dataset and comparator breadth</td>
+      </tr>
+      <tr>
+        <td class="td-field" style="font-size:8pt">Adversary</td>
+        <td>None — performance study</td>
+        <td>Gray-box, single compromised client</td>
+        <td>None — validation study</td>
+      </tr>
+      <tr>
+        <td class="td-field" style="font-size:8pt">Primary claim</td>
+        <td>Calibration scope governs detection equity</td>
+        <td>Calibration channel is a viable attack surface</td>
+        <td>DATP effect survives generalization pressure</td>
+      </tr>
+    </table>
+
+    <div class="bx-stripe" style="margin-bottom:4mm">
+      <div class="lbl" style="margin-bottom:1.5mm">Key principle</div>
+      <p style="font-size:9pt;margin:0">The three branches share a thesis line but have distinct scientific roles. DATP-CP is the adversarial robustness branch focused on the calibration stage. It does not absorb the journal extension's validation goals and does not duplicate DATP's personalization study. The journal extension — which targets external datasets, model-personalization comparators, and temporal recalibration — is explicitly out of scope for DATP-CP.</p>
+    </div>
+
+    <div class="bx-acc">
+      <div class="lbl" style="color:var(--acc);margin-bottom:1.5mm">Why calibration specifically?</div>
+      <p style="font-size:9pt;margin:0">Threshold calibration occurs after training convergence. Existing federated learning defenses — Byzantine-robust aggregation, gradient sanitization, model-integrity checks — have already exited by this stage. Each client autonomously collects its benign calibration window; the server cannot observe or sanitize it. This structural gap is the scientific motivation for DATP-CP.</p>
+    </div>
+
+  </div>
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>Salaheddine Naslouby &nbsp;·&nbsp; LAMSAD Laboratory</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 4: §3 PROBLEM STATEMENT
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="ph">
+    <div class="ph-left">
+      <span class="ph-sec">§3</span>
+      <span class="ph-title">Problem Statement and Research Question</span>
+    </div>
+    <span class="ph-pn">p. 4 / 8</span>
+  </div>
+  <div class="co">
+
+    <h2 class="sh">Problem</h2>
+    <div class="bx-bdr" style="margin-bottom:4mm">
+      <p style="font-size:9.5pt">Federated IoT anomaly detectors use benign calibration reconstruction scores to set per-client detection thresholds after training. This post-training calibration stage determines the operating point of the detector — it governs the balance between false alarms and missed detections for each client. It is structurally separate from training and aggregation, is executed autonomously by each client, and is never validated by a central authority.</p>
+    </div>
+
+    <h2 class="sh">Research Problem</h2>
+    <div class="bx-acc" style="margin-bottom:4mm">
+      <div class="lbl" style="color:var(--acc);margin-bottom:1.5mm">Core security question</div>
+      <p style="font-size:9.5pt;margin:0">Can a compromised client manipulate only its benign calibration buffer — without touching training data, labels, model weights, gradients, aggregation, test scores, or test labels — and still shift its detection threshold enough to produce material, interpretable downstream harm?</p>
+    </div>
+
+    <h2 class="sh">Central Research Question</h2>
+    <div class="bx-navy" style="margin-bottom:4mm">
+      <div class="lbl" style="margin-bottom:2mm">DATP-CP central research question</div>
+      <p style="font-size:10pt;line-height:1.55;color:#fff;margin:0">Does poisoning only the benign threshold-calibration scores of eligible clients produce material, policy-dependent downstream harm under <span class="pill p-mid">GLOBAL_THRESHOLD</span> <span class="pill" style="background:rgba(255,255,255,.2);color:#fff">LOCAL_THRESHOLD</span> and <span class="pill p-acc">CLUSTER_THRESHOLD</span> — and do these threshold policies exhibit different vulnerability profiles under the same calibration contamination?</p>
+    </div>
+
+    <h2 class="sh">Why This Matters</h2>
+    <div class="g2" style="gap:5mm">
+      <div class="bx-bdr">
+        <h3 class="ssh" style="margin-bottom:2mm">Security implications</h3>
+        <ul style="padding-left:4mm;font-size:9pt;line-height:1.6">
+          <li>Thresholds control detection decisions — false negatives and false positives.</li>
+          <li>Calibration is separate from training but equally security-critical.</li>
+          <li>No existing FL defense covers the post-training calibration stage.</li>
+          <li>Policy choice may determine victim sensitivity and collateral spillover.</li>
+        </ul>
+      </div>
+      <div class="bx-bdr">
+        <h3 class="ssh" style="margin-bottom:2mm">Scientific implications</h3>
+        <ul style="padding-left:4mm;font-size:9pt;line-height:1.6">
+          <li>DATP showed calibration scope governs performance equity.</li>
+          <li>DATP-CP asks whether that same stage is adversarially exploitable.</li>
+          <li>The causal isolation from training and aggregation is reproducible.</li>
+          <li>Policy-differentiated results inform threshold policy selection under adversarial conditions.</li>
+        </ul>
+      </div>
+    </div>
+
+    <hr class="rule" style="margin:4mm 0">
+    <div class="bx-red" style="font-size:8.5pt">
+      <strong style="color:var(--red)">Scientific boundary (non-negotiable):</strong>&nbsp;
+      DATP-CP never claims training poisoning, model poisoning, aggregation poisoning, raw-traffic attack generation, privacy guarantees, universal FL robustness, or deployment readiness. These exclusions are permanent scope controls, not provisional limitations.
+    </div>
+
+  </div>
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>Salaheddine Naslouby &nbsp;·&nbsp; LAMSAD Laboratory</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 5: §4 OBJECTIVES
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="ph">
+    <div class="ph-left">
+      <span class="ph-sec">§4</span>
+      <span class="ph-title">Objectives</span>
+    </div>
+    <span class="ph-pn">p. 5 / 8</span>
+  </div>
+  <div class="co">
+
+    <p style="margin-bottom:5mm">DATP-CP pursues three classes of objectives — scientific, technical, and doctoral — that jointly define what a successful research outcome requires and how it positions within the thesis.</p>
+
+    <div class="g3" style="margin-bottom:5mm">
+
+      <!-- Scientific -->
+      <div>
+        <div class="bx-navy" style="margin-bottom:3mm;padding:3mm 4mm">
+          <div style="font-size:8pt;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.55;margin-bottom:1mm">4.1</div>
+          <div style="font-size:10pt;font-weight:700">Scientific Objectives</div>
+        </div>
+        <ol class="obj">
+          <li>Isolate threshold calibration as an attack surface in federated IoT anomaly detection.</li>
+          <li>Measure material threshold movement under score-level benign calibration poisoning.</li>
+          <li>Compare vulnerability profiles across GLOBAL_THRESHOLD, LOCAL_THRESHOLD, and CLUSTER_THRESHOLD.</li>
+          <li>Characterize threshold-raising and threshold-lowering as separable failure modes.</li>
+          <li>Preserve causal isolation from training-phase and aggregation-phase poisoning throughout.</li>
+        </ol>
+      </div>
+
+      <!-- Technical -->
+      <div>
+        <div class="bx-navy" style="background:var(--nmid);margin-bottom:3mm;padding:3mm 4mm">
+          <div style="font-size:8pt;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.55;margin-bottom:1mm">4.2</div>
+          <div style="font-size:10pt;font-weight:700">Technical Objectives</div>
+        </div>
+        <ol class="obj">
+          <li>Validate or regenerate clean DATP-compatible artifacts for the N-BaIoT federation.</li>
+          <li>Implement controlled benign-score replacement under the REPLACE_FIXED_BUDGET injection rule.</li>
+          <li>Enforce valid source-objective combinations across all experimental conditions.</li>
+          <li>Produce paired clean-vs-poisoned comparisons across all threshold policies and poison fractions.</li>
+          <li>Generate reproducible figures, tables, manifests, and run logs for the reproducibility package.</li>
+        </ol>
+      </div>
+
+      <!-- Doctoral -->
+      <div>
+        <div class="bx-navy" style="background:var(--grn);margin-bottom:3mm;padding:3mm 4mm">
+          <div style="font-size:8pt;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.55;margin-bottom:1mm">4.3</div>
+          <div style="font-size:10pt;font-weight:700">Doctoral Objectives</div>
+        </div>
+        <ol class="obj">
+          <li>Position DATP-CP as the security branch of the doctoral thesis, complementary to DATP and separate from the journal extension.</li>
+          <li>Complement DATP without duplicating its performance and personalization results.</li>
+          <li>Remain fully separate from the journal extension's validation and generalization goals.</li>
+          <li>Produce a defensible conference-style contribution bounded by pre-specified claim gates.</li>
+        </ol>
+      </div>
+
+    </div>
+
+    <hr class="rule" style="margin-bottom:3.5mm">
+
+    <div class="g2" style="gap:5mm">
+      <div class="bx-stripe">
+        <h3 class="ssh" style="margin-bottom:2mm">Pre-specified claim gates</h3>
+        <table>
+          <tr><th style="width:22%">Gate</th><th>Pass condition</th></tr>
+          <tr><td><strong>Gate 1</strong></td><td>Seed-sign count ≥ 8/10 AND victim-majority count ≥ 8/10 for correctly-signed material Δτ</td></tr>
+          <tr><td><strong>Gate 2</strong></td><td>Directional excess over matched RANDOM_BENIGN control at ≥ 8/10 seeds</td></tr>
+          <tr><td><strong>Gate 3</strong></td><td>At least one downstream harm metric shows expected-sign support at ≥ 8/10 seeds</td></tr>
+        </table>
+      </div>
+      <div class="bx-acc">
+        <h3 class="ssh" style="margin-bottom:2mm;color:var(--acc)">Claim classes</h3>
+        <p style="font-size:9pt">Depending on gate outcomes, the final claim is classified as: <strong>full vulnerability</strong> (all three gates pass), <strong>mechanism-only</strong> (Gate 1 only), <strong>calibration instability</strong> (Gate 2 fails), or <strong>null / conditional</strong> result. This pre-specification prevents post-hoc claim adjustment.</p>
+      </div>
+    </div>
+
+  </div>
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>Salaheddine Naslouby &nbsp;·&nbsp; LAMSAD Laboratory</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 6: §5 SCOPE AND EXCLUSIONS
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="ph">
+    <div class="ph-left">
+      <span class="ph-sec">§5</span>
+      <span class="ph-title">Scope and Exclusions</span>
+    </div>
+    <span class="ph-pn">p. 6 / 8</span>
+  </div>
+  <div class="co">
+
+    <p style="margin-bottom:4.5mm">The following tables define the complete scope of DATP-CP. Items in the left table are required experimental and methodological elements. Items in the right table are permanently excluded. The exclusions are intentional scope controls that preserve causal isolation — not provisional limitations.</p>
+
+    <div class="g2" style="gap:5mm;margin-bottom:5mm">
+
+      <!-- INCLUDED -->
+      <div>
+        <table>
+          <tr><th class="th-grn" colspan="2">Included in DATP-CP</th></tr>
+          <tr>
+            <td style="width:10px;font-size:11pt" class="chk">✓</td>
+            <td>N-BaIoT — main study dataset</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>Physical IoT device as FL client</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>FedAvg autoencoder — fixed trained model</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>Benign calibration-score poisoning</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>Score-level proxy attack mechanism</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>GLOBAL_THRESHOLD policy</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>LOCAL_THRESHOLD policy</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>CLUSTER_THRESHOLD policy</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>q = 95 (p95 threshold calibration rule)</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>Single-client compromise — main study</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>Paired clean-vs-poisoned evaluation</td>
+          </tr>
+          <tr>
+            <td class="chk">✓</td>
+            <td>RANDOM_BENIGN negative control</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- EXCLUDED -->
+      <div>
+        <table>
+          <tr><th class="th-red" colspan="2">Excluded from DATP-CP</th></tr>
+          <tr>
+            <td style="width:10px;font-size:11pt" class="xmk">✗</td>
+            <td>Training-data poisoning</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Model poisoning</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Aggregation poisoning</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Backdoor attacks</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Evasion attacks</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Privacy mechanisms</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Deployment benchmarking</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Raw-traffic attack generation</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Journal-extension datasets as main evidence</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Model-personalization comparators</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Universal FL robustness claims</td>
+          </tr>
+          <tr>
+            <td class="xmk">✗</td>
+            <td>Privacy guarantee claims</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="bx-acc">
+      <div class="lbl" style="color:var(--acc);margin-bottom:1.5mm">Scope note</div>
+      <p style="font-size:9pt;margin:0">The exclusions are permanent scope controls, not provisional limitations. They preserve the causal isolation that makes the DATP-CP contribution defensible: any observed threshold shift is attributable to calibration contamination alone, since training, model, aggregation, and test evaluation are held unchanged across all experimental conditions. Relaxing these exclusions would invalidate the causal claim.</p>
+    </div>
+
+  </div>
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>Salaheddine Naslouby &nbsp;·&nbsp; LAMSAD Laboratory</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 7: §6 METHODOLOGY AND VALIDATION
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="ph">
+    <div class="ph-left">
+      <span class="ph-sec">§6</span>
+      <span class="ph-title">Methodology and Validation</span>
+    </div>
+    <span class="ph-pn">p. 7 / 8</span>
+  </div>
+  <div class="co">
+
+    <div class="g2" style="gap:5mm;margin-bottom:5mm">
+
+      <div>
+        <h2 class="sh">Experimental Setup</h2>
+
+        <table class="ctbl">
+          <thead><tr><th colspan="2" class="grp-hd">Dataset</th></tr></thead>
+          <tbody>
+          <tr><td class="td-field">Dataset</td><td>N-BaIoT</td></tr>
+          <tr><td class="td-field">Clients (K)</td><td>9 physical IoT devices</td></tr>
+          <tr><td class="td-field">Definition</td><td>One physical device = one FL client</td></tr>
+          <tr><td class="td-field">Device types</td><td>5 (camera, doorbell, webcam, router, baby monitor)</td></tr>
+          <tr><td class="td-field">Eligibility</td><td>n_cal ≥ 100 benign records</td></tr>
+          <tr><th colspan="2" class="grp-hd">Model</th></tr>
+          <tr><td class="td-field">Architecture</td><td>Federated autoencoder</td></tr>
+          <tr><td class="td-field">Aggregation</td><td>FedAvg</td></tr>
+          <tr><td class="td-field">Model state</td><td>Fixed — frozen across clean-vs-poisoned runs</td></tr>
+          <tr><th colspan="2" class="grp-hd">Calibration</th></tr>
+          <tr><td class="td-field">Input</td><td>Benign reconstruction scores</td></tr>
+          <tr><td class="td-field">Threshold rule</td><td>p95 — q = 95 (locked)</td></tr>
+          <tr><td class="td-field">Policies</td><td>GLOBAL · LOCAL · CLUSTER</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <h2 class="sh">Attack Mechanism</h2>
+
+        <h3 class="ssh">Injection rule: REPLACE_FIXED_BUDGET</h3>
+        <p style="font-size:9pt">For victim client <em>i</em> and poison fraction <em>f</em>, select m<sub>i</sub> = max(1, round(f × n<sub>i</sub>)) positions in the victim's benign calibration array and replace them with values sampled with replacement from the declared victim-local reservoir. Calibration size remains constant — no records are added, only replaced.</p>
+
+        <h3 class="ssh" style="margin-top:3mm">Source strategies and objectives</h3>
+        <table class="ctbl" style="margin-bottom:3.5mm">
+          <thead><tr>
+            <th style="width:38%">Strategy</th>
+            <th style="width:30%">Reservoir</th>
+            <th>Objective</th>
+          </tr></thead>
+          <tbody>
+          <tr style="background:var(--acc-bg)">
+            <td><strong>HIGH_SCORE_BENIGN</strong></td>
+            <td>Top 10% victim-local benign</td>
+            <td><strong>THRESHOLD_RAISE</strong></td>
+          </tr>
+          <tr>
+            <td><strong>LOW_SCORE_BENIGN</strong></td>
+            <td>Bottom 10% victim-local benign</td>
+            <td><strong>THRESHOLD_LOWER</strong></td>
+          </tr>
+          <tr>
+            <td><strong>RANDOM_BENIGN</strong></td>
+            <td>Uniform victim-local sample</td>
+            <td>Negative control</td>
+          </tr>
+          </tbody>
+        </table>
+
+        <div class="bx-stripe" style="font-size:8.5pt">
+          <strong>Poison fractions:</strong>&nbsp; f ∈ {0.10, 0.20, 0.40} &nbsp;·&nbsp;
+          <strong>Seeds:</strong>&nbsp; 10 training seeds (NBAIOT_MAIN)
+        </div>
+      </div>
+    </div>
+
+    <h2 class="sh">Validation Criteria</h2>
+    <table class="vtbl">
+      <thead><tr>
+        <th style="width:28%">Criterion</th>
+        <th style="width:42%">Measurement</th>
+        <th>Role</th>
+      </tr></thead>
+      <tbody>
+      <tr>
+        <td><strong>Signed Δτ</strong></td>
+        <td>Correctly signed threshold shift (positive for raise, negative for lower)</td>
+        <td>Mechanism validation</td>
+      </tr>
+      <tr>
+        <td><strong>Material |Δτ|</strong></td>
+        <td>Threshold shift exceeds pre-specified materiality threshold</td>
+        <td>Gate 1</td>
+      </tr>
+      <tr>
+        <td><strong>ΔTPR</strong></td>
+        <td>Victim true-positive rate decrease under THRESHOLD_RAISE</td>
+        <td>Downstream harm (raising)</td>
+      </tr>
+      <tr>
+        <td><strong>ΔCV(FPR)</strong></td>
+        <td>FPR dispersion increase under THRESHOLD_LOWER</td>
+        <td>Downstream harm (lowering)</td>
+      </tr>
+      <tr>
+        <td><strong>Policy differentiation</strong></td>
+        <td>Distinct vulnerability profiles across all three threshold policies</td>
+        <td>Gate 2</td>
+      </tr>
+      <tr>
+        <td><strong>Negative-control behavior</strong></td>
+        <td>RANDOM_BENIGN yields near-null Δτ in same conditions</td>
+        <td>Confounding audit</td>
+      </tr>
+      <tr>
+        <td><strong>AUROC invariance</strong></td>
+        <td>AUROC unchanged across clean and poisoned runs</td>
+        <td>Sanity check only — calibration-channel isolation</td>
+      </tr>
+      </tbody>
+    </table>
+
+  </div>
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>Salaheddine Naslouby &nbsp;·&nbsp; LAMSAD Laboratory</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE 8: §7 DELIVERABLES, RISKS, GOVERNANCE
+═══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="ph">
+    <div class="ph-left">
+      <span class="ph-sec">§7</span>
+      <span class="ph-title">Deliverables, Risks, and Governance</span>
+    </div>
+    <span class="ph-pn">p. 8 / 8</span>
+  </div>
+  <div class="co">
+
+    <div class="g2" style="gap:5mm;margin-bottom:5mm">
+
+      <!-- DELIVERABLES -->
+      <div>
+        <h2 class="sh">Deliverables</h2>
+        <table>
+          <tr><th style="width:12%">#</th><th>Deliverable</th></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D1</td><td>Protocol and roadmap (DATP_CP_Roadmap.md + this dossier)</td></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D2</td><td>Implementation — attack engine, calibration injector, and pipeline</td></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D3</td><td>Clean artifact audit — validated DATP-compatible artifacts</td></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D4</td><td>Poisoning experiment outputs — NBAIOT_MAIN results across all conditions</td></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D5</td><td>Figures and tables — paired clean-vs-poisoned visualizations</td></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D6</td><td>Conference manuscript — DATP-CP paper draft</td></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D7</td><td>Reproducibility package — code, manifests, seeds, and run logs</td></tr>
+          <tr><td style="text-align:center;font-weight:700;color:var(--navy)">D8</td><td>Presentation dossier — visual research overview (separate document)</td></tr>
+        </table>
+      </div>
+
+      <!-- WORK PACKAGES -->
+      <div>
+        <h2 class="sh">Work Packages</h2>
+        <div class="wp-row">
+          <span class="wp-tag">WP1</span>
+          <span class="wp-body"><strong>Protocol lock and scope audit</strong> — finalize roadmap, claim gates, and scientific boundaries</span>
+        </div>
+        <div class="wp-row">
+          <span class="wp-tag">WP2</span>
+          <span class="wp-body"><strong>Clean artifact validation</strong> — validate or regenerate DATP-compatible N-BaIoT artifacts</span>
+        </div>
+        <div class="wp-row">
+          <span class="wp-tag">WP3</span>
+          <span class="wp-body"><strong>Attack implementation and smoke tests</strong> — SYNTHETIC_SMOKE stage, unit validation</span>
+        </div>
+        <div class="wp-row">
+          <span class="wp-tag">WP4</span>
+          <span class="wp-body"><strong>N-BaIoT main execution</strong> — NBAIOT_MAIN, 10 seeds, all policies, all fractions</span>
+        </div>
+        <div class="wp-row">
+          <span class="wp-tag">WP5</span>
+          <span class="wp-body"><strong>Analysis, figures, and tables</strong> — confirmatory inference, policy-differentiation analysis</span>
+        </div>
+        <div class="wp-row">
+          <span class="wp-tag">WP6</span>
+          <span class="wp-body"><strong>Manuscript preparation</strong> — conference-style paper, bounded to pre-specified claim class</span>
+        </div>
+        <div class="wp-row">
+          <span class="wp-tag">WP7</span>
+          <span class="wp-body"><strong>Final audit and packaging</strong> — FINAL_AUDIT stage, reproducibility package, forbidden-phrase check</span>
+        </div>
+      </div>
+    </div>
+
+    <hr class="rule" style="margin-bottom:4mm">
+
+    <h2 class="sh">Risks and Limitations</h2>
+    <div class="g2" style="gap:5mm;margin-bottom:5mm">
+      <div>
+        <div class="rk-row"><span class="rk-tag">R1</span><span class="rk-body"><strong>Score-level proxy:</strong> operates at reconstruction-score level — raw-traffic realizability is not claimed and is out of scope.</span></div>
+        <div class="rk-row"><span class="rk-tag">R2</span><span class="rk-body"><strong>N-BaIoT-only main evidence:</strong> all confirmatory claims are bounded to the nine-device N-BaIoT setting.</span></div>
+        <div class="rk-row"><span class="rk-tag">R3</span><span class="rk-body"><strong>Single-client main claim:</strong> multi-client extension (optional) is not required for the primary contribution.</span></div>
+      </div>
+      <div>
+        <div class="rk-row"><span class="rk-tag">R4</span><span class="rk-body"><strong>No deployment benchmark:</strong> no claim is made about real-world FL system deployment or operational security.</span></div>
+        <div class="rk-row"><span class="rk-tag">R5</span><span class="rk-body"><strong>AUROC invariance is a sanity check only,</strong> not a contribution claim — it confirms the calibration channel was correctly isolated.</span></div>
+        <div class="rk-row"><span class="rk-tag">R6</span><span class="rk-body"><strong>With-replacement resampling</strong> at high fractions may duplicate score values — disclosed as a proxy limitation.</span></div>
+      </div>
+    </div>
+
+    <div class="bx-navy" style="padding:4.5mm 5.5mm">
+      <div class="lbl" style="margin-bottom:2mm">Closing statement</div>
+      <p style="font-size:9.5pt;line-height:1.6;margin:0;color:rgba(255,255,255,.9)">DATP-CP contributes a bounded, causally isolated, policy-differentiated analysis of a neglected post-training attack surface in federated IoT anomaly detection. By restricting the attack to the benign calibration channel and fixing training, model, aggregation, and test evaluation, the study achieves a causal attribution that broader observational comparisons cannot provide.</p>
+    </div>
+
+  </div>
+  <div class="pf">
+    <span>DATP-CP Research Dossier &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; July 2026</span>
+    <span>Salaheddine Naslouby &nbsp;·&nbsp; LAMSAD Laboratory</span>
+  </div>
+</div>
+
+</body>
+</html>

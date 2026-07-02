@@ -3,7 +3,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SRC="$DIR/dossier.html"
-FINAL="$DIR/DATP_CP_Dossier.pdf"
+FINAL="$DIR/DATP_CP_Research_Dossier_Presentation.pdf"
 
 echo "Building PDF from $SRC..."
 python3 - "$SRC" "$FINAL" <<'PYEOF'
