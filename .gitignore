@@ -116,10 +116,6 @@ claude/
 .antigravitycli/
 graphify-out/
 
-# Additional Docs
-Additional_Docs/
-docs/
-
 # ---------------------------------------------------------------------------
 # CI and quality tools
 # ---------------------------------------------------------------------------
