@@ -1,0 +1,99 @@
+\documentclass[11pt,a4paper]{article}
+
+% -------- Packages --------
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[a4paper, top=2cm, bottom=2.2cm, left=2.3cm, right=2.3cm, footskip=1.2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage[shortlabels]{enumitem}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins}
+\usepackage[hidelinks,
+  pdftitle={DATP-CP Research Dossier},
+  pdfsubject={Calibration-Channel Poisoning in Federated IoT Anomaly Detection},
+  pdfkeywords={federated learning, anomaly detection, calibration poisoning, N-BaIoT}
+]{hyperref}
+
+\usetikzlibrary{arrows.meta, positioning}
+
+% -------- Colors --------
+\definecolor{navyhead}{RGB}{22, 36, 72}
+\definecolor{amber}{RGB}{194, 140, 45}
+\definecolor{footgray}{RGB}{110, 110, 110}
+\definecolor{rulegray}{RGB}{160, 160, 160}
+\definecolor{boxbg}{RGB}{247, 247, 249}
+
+% -------- Callout box styles --------
+\tcbset{
+  callout/.style={
+    enhanced,
+    left=10pt, top=5pt, bottom=5pt, right=6pt,
+    boxrule=0.3pt, colframe=gray!30,
+    colback=boxbg,
+    borderline west={2.5pt}{0pt}{navyhead},
+    arc=2pt, outer arc=2pt
+  },
+  ambercallout/.style={
+    enhanced,
+    left=10pt, top=5pt, bottom=5pt, right=6pt,
+    boxrule=0.3pt, colframe=amber!40,
+    colback=amber!8,
+    borderline west={2.5pt}{0pt}{amber},
+    arc=2pt, outer arc=2pt
+  }
+}
+
+% -------- Section formatting --------
+\titleformat{\section}
+  {\large\bfseries\color{navyhead}}{}{0em}{}
+  [\vspace{0.15em}{\color{rulegray}\hrule height 0.45pt}\vspace{0.2em}]
+\titlespacing{\section}{0pt}{1.5ex plus 0.4ex minus 0.2ex}{0.5ex plus 0.2ex}
+
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{navyhead}}{}{0em}{}
+\titlespacing{\subsection}{0pt}{0.9ex plus 0.2ex minus 0.1ex}{0.3ex plus 0.1ex}
+
+% -------- Lists --------
+\setlist{nosep, topsep=3pt, itemsep=2pt, parsep=0pt, leftmargin=1.5em}
+\setlist[enumerate]{leftmargin=1.6em}
+
+% -------- Header / Footer --------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[C]{\small\color{footgray}DATP-CP Research Dossier \textperiodcentered\ v1.0}
+\fancyfoot[R]{\small\color{footgray}\thepage}
+
+\fancypagestyle{plain}{%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\small\color{footgray}DATP-CP Research Dossier \textperiodcentered\ v1.0}%
+  \fancyfoot[R]{\small\color{footgray}\thepage}%
+}
+
+% -------- Misc --------
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt plus 1pt}
+
+% Monospace constant — \hbox prevents mid-word line breaks
+\newcommand{\const}[1]{\texttt{\small\hbox{#1}}}
+
+\begin{document}
+\pagestyle{fancy}
+
+\input{sections/01_executive_scope}
+\input{sections/02_project_identity}
+\input{sections/03_context_positioning}
+\input{sections/04_problem_objectives_scope}
+\input{sections/05_methodology_validation}
+\input{sections/06_deliverables_risks}
+
+\end{document}
