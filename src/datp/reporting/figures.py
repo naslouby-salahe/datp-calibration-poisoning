@@ -53,32 +53,48 @@ def generate_figure1(
     style: StyleConfig,
 ) -> Path:
     """Generate a grouped bar chart of per-device FPR under GLOBAL vs LOCAL thresholds (Figure 1)."""
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    figure_font_size = style.font_size + 1
+    tick_font_size = style.font_size
+    plt.rcParams[_FONT_SIZE_KEY] = figure_font_size
     devices = sorted(per_device_fpr_global.keys())
-    x, width = np.arange(len(devices)), 0.35
-    fig, ax = plt.subplots(figsize=style.figsize_double_col)
+    x, width = np.arange(len(devices)), 0.40
+    fig_width, _ = style.figsize_double_col
+    fig, ax = plt.subplots(figsize=(fig_width, 3.35))
 
-    for offset, data, pol in [
-        (-width / 2, per_device_fpr_global, ThresholdPolicy.GLOBAL_THRESHOLD),
-        (width / 2, per_device_fpr_local, ThresholdPolicy.LOCAL_THRESHOLD),
+    for offset, data, pol, label in [
+        (
+            -width / 2,
+            per_device_fpr_global,
+            ThresholdPolicy.GLOBAL_THRESHOLD,
+            "Global threshold",
+        ),
+        (
+            width / 2,
+            per_device_fpr_local,
+            ThresholdPolicy.LOCAL_THRESHOLD,
+            "Local threshold",
+        ),
     ]:
         ax.bar(
             x + offset,
             [data[d] for d in devices],
             width,
-            label=style.policy_labels[pol],
+            label=label,
             color=style.policy_colors[pol],
         )
 
-    ax.set(xlabel="Device", ylabel="FPR")
+    ax.set_xlabel("Device", fontsize=figure_font_size)
+    ax.set_ylabel("FPR", fontsize=figure_font_size)
     ax.set_xticks(x)
     ax.set_xticklabels(
         [NBAIOT_DEVICE_SHORT_LABELS.get(d, d.replace("_", " ")) for d in devices],
         rotation=45,
         ha="right",
-        fontsize=style.font_size - 1,
+        fontsize=tick_font_size,
     )
-    ax.legend()
+    ax.tick_params(axis="y", labelsize=tick_font_size)
+    ax.set_xlim(-0.55, len(devices) - 0.45)
+    ax.legend(fontsize=tick_font_size, frameon=False, ncols=2)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
     return _save_figs(fig, output_dir / f"{FIGURE1_STEM}{seed}", style.dpi)
