@@ -2,7 +2,7 @@
 \label{sec:threat}
 
 \textbf{Attack surface.}
-The threshold-calibration stage occurs after global model convergence and before threshold-dependent detection begins.
+The threshold-calibration stage occurs after global model convergence and before threshold-dependent detection begins~(Fig.~\ref{fig:attack-surface}).
 Each client $i$ collects a benign calibration set $\mathcal{C}_i = \{s_1, \ldots, s_{n_i}\}$ of reconstruction scores from its own traffic, then sets its local threshold $\tau_i = \mathrm{quantile}(\mathcal{C}_i,\, q)$ at a fixed quantile $q$ (here $q{=}0.95$).
 Depending on the federation's threshold policy, $\tau_i$ may be used directly (\textsc{Local}), averaged across clients (\textsc{Global}), or averaged within a calibration-score cluster (\textsc{Cluster}).
 

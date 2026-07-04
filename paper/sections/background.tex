@@ -19,12 +19,12 @@ By construction, a detection threshold at fixed quantile $q$ is sensitive to the
 Kloft \& Laskov~\cite{kloft2010online} study online poisoning in centralized anomaly detection via a continuous training stream, assuming a trusted aggregator or persistent model-update access---both absent from FL's post-training calibration stage, where calibration data never leaves the client and no server-side sanitization is possible.
 FL model poisoning~\cite{bagdasaryan2020backdoor} also targets the gradient/weight surface.
 The literature reviewed for this study does not identify prior work that isolates post-training threshold calibration as the attacked channel in federated threshold-based IoT anomaly detection under otherwise-unchanged training, model, aggregation, and test artifacts (Table~\ref{tab:related}).
-No claim is made to a new class of poisoning in the abstract sense; the contribution is isolating the post-training calibration channel in federated threshold-based anomaly detection and showing policy-dependent victim effects and threshold propagation under a controlled score-level intervention.
-The closest neighbors treat the calibration/thresholding pipeline as trusted: Laridi et al.~\cite{laridi2024} propose summary-statistics-based federated thresholding without adversarial contamination, and S\'aez-de-C\'amara et al.~\cite{saezdecamara2023} propose a clustered federated IoT anomaly-detection architecture assuming a benign calibration pipeline; DATP-CP instead treats client-local benign calibration as the attacked channel.
+No claim is made to have introduced a new poisoning taxonomy; the contribution is isolating the post-training calibration channel in federated threshold-based anomaly detection and showing policy-dependent victim effects and threshold propagation under a controlled score-level intervention.
+The closest neighbors treat the calibration/thresholding pipeline as trusted: Laridi et al.~\cite{laridi2024} propose summary-statistics-based federated thresholding without adversarial contamination, and S\'aez-de-C\'amara et al.~\cite{saezdecamara2023} propose a clustered federated IoT anomaly-detection architecture assuming a benign calibration pipeline; calibration-stage poisoning instead treats client-local benign calibration as the attacked channel.
 \end{sloppypar}
 
 \begin{table}[tb]
-\caption{Positioning relative to adjacent poisoning literature. DATP-CP differs by acting strictly after training, on the autonomously collected benign calibration buffer, leaving model weights, gradients, training data, and test data unchanged.}
+\caption{Positioning relative to adjacent poisoning literature. Calibration-stage poisoning differs by acting strictly after training, on the autonomously collected benign calibration buffer, leaving model weights, gradients, training data, and test data unchanged.}
 \label{tab:related}
 \centering
 \footnotesize
@@ -32,9 +32,9 @@ The closest neighbors treat the calibration/thresholding pipeline as trusted: La
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{3.3cm}@{}}
 \toprule
-Prior work type & Attack surface & What changes & Distinction from DATP-CP \\
+Prior work type & Attack surface & What changes & Distinction from this work \\
 \midrule
-Training-data poisoning~\cite{biggio2012poisoning,tolpegin2020data} & Training set / labels & Model parameters & DATP-CP leaves training data and model unchanged \\
+Training-data poisoning~\cite{biggio2012poisoning,tolpegin2020data} & Training set / labels & Model parameters & Calibration-stage poisoning leaves training data and model unchanged \\
 \addlinespace[3pt]
 FL model poisoning~\cite{bhagoji2019analyzing,bagdasaryan2020backdoor} & Client gradients & Model weights & Needs no gradient access; acts after convergence \\
 \addlinespace[3pt]
@@ -44,7 +44,7 @@ Centralized AD poisoning~\cite{kloft2010online} & Central train stream & Decisio
 \addlinespace[3pt]
 Threshold personalization~\cite{ghosh2020efficient,sattler2020clustered} & Threshold policy & Per-client/cluster $\tau$ & Studies utility, not adversarial contamination \\
 \addlinespace[3pt]
-\textbf{DATP-CP} & Calibration scores & Threshold $\tau$ only & Score-level, post-training, single-client \\
+\textbf{This work} & Calibration scores & Threshold $\tau$ only & Score-level, post-training, single-client \\
 \bottomrule
 \end{tabular}
 \end{table}
