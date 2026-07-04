@@ -1,9 +1,10 @@
 \section{Introduction}
 \label{sec:intro}
 
-Federated learning (FL) is commonly used for IoT anomaly detection: devices contribute to a shared model without exposing raw traffic, and personalized detection thresholds let each node adapt to its own traffic distribution~\cite{li2020federated,rey2022federated}.
+Federated learning (FL) is commonly used for IoT anomaly detection: devices contribute to a shared model without exposing raw traffic, and personalized detection thresholds let each node adapt to its own traffic distribution~\cite{rey2022federated}.
 The dominant security concern in federated anomaly detection focuses on the \emph{training phase}---Byzantine clients injecting adversarial gradients, label-flipping poisoning, or model-inversion attacks~\cite{biggio2012poisoning,bhagoji2019analyzing,tolpegin2020data}.
 Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{cao2020fltrust,blanchard2017machine,yin2018byzantine}.
+Recent FL-IDS work extends this landscape with personalized, non-IID-robust, knowledge-distillation, and anti-poisoning designs~\cite{Belenguer2025FLIDSReview,Thein2024PFLIDS,Quyen2025FedKDIDS,Khang2026P4P}, all targeting the training or aggregation surface rather than the post-training calibration buffer.
 
 \textbf{A post-training coverage gap.}
 The \emph{threshold-calibration stage} is the post-training, pre-deployment step in which each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
