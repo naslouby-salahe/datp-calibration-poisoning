@@ -3,14 +3,11 @@
 
 \subsection{Clean-Baseline Policy Profile}
 
-Table~\ref{tab:baseline} reports clean-baseline dispersion statistics across all ten seeds.
-CV(FPR), the coefficient of variation of per-client false-positive rates (ddof\,=\,0), is lower when FPR treatment is more uniform across the federation.
-\textsc{Local} achieves the lowest CV(FPR) ($0.333 \pm 0.034$).
-\textsc{Global} exhibits the highest CV(FPR) ($0.905 \pm 0.039$) because a single federation-wide threshold cannot simultaneously fit nine devices with different traffic distributions.
-\textsc{Cluster} lies in between ($0.615 \pm 0.143$) with higher variance across seeds, reflecting sensitivity to cluster assignment.
-Bootstrap 95\% CIs on pairwise CV(FPR) differences exclude zero: Global$-$Local $= 0.572$ $[0.537, 0.607]$; Global$-$Cluster $= 0.291$ $[0.214, 0.358]$; Cluster$-$Local $= 0.281$ $[0.201, 0.374]$ (computed on unrounded per-seed aggregates).
+Table~\ref{tab:baseline} reports clean-baseline dispersion across all ten seeds.
+Lower CV(FPR) means more uniform per-client false-positive treatment: \textsc{Local} is lowest ($0.333 \pm 0.034$), \textsc{Global} highest ($0.905 \pm 0.039$), and \textsc{Cluster} intermediate ($0.615 \pm 0.143$) with cluster-assignment sensitivity.
+Pairwise CV(FPR) gaps are positive with bootstrap CIs excluding zero: G--L $0.572$ $[0.537, 0.607]$, G--C $0.291$ $[0.214, 0.358]$, and C--L $0.281$ $[0.201, 0.374]$ (unrounded per-seed aggregates).
 Figure~\ref{fig:clean-fpr} shows the per-client FPR distributions for \textsc{Global} and \textsc{Local} under the clean baseline.
-This fairness gain is not a uniform improvement: \textsc{Local} improves cross-client FPR equity but does not dominate all accuracy-oriented metrics. In particular, \textsc{Global} retains the best P10 Macro-F1 ($0.398$ vs.\ \textsc{Local} $0.335$, Table~\ref{tab:baseline}), so the worst-tail client is detected better under the federation-mean threshold. The evaluation therefore reports both fairness-style dispersion (CV(FPR)) and detection-quality (P10 Macro-F1) metrics, plus the underlying absolute mean FPR/TPR, rather than a single summary.
+This fairness gain is not a uniform accuracy improvement: \textsc{Global} retains the best P10 Macro-F1 ($0.398$ vs.\ \textsc{Local} $0.335$), so Table~\ref{tab:baseline} reports dispersion, detection quality, and mean FPR/TPR rather than a single summary.
 
 \input{tables/table_baseline}
 
@@ -28,20 +25,19 @@ All-seed dispersion, including \CLUSTER, is reported in Table~\ref{tab:baseline}
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.86\textwidth]{figures/fig_threshold_shift.pdf}
+\includegraphics[width=\textwidth]{figures/fig_threshold_shift.pdf}
 \caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for raising (a) and lowering (b) attacks.
-Error bars are 95\,\% bootstrap CIs over 10 seeds.
-\GLOBAL has the smallest magnitude due to $1/N$ averaging; \textsc{Random-Benign} controls are near-null (Table~\ref{tab:main-results}).}
+Error bars are 95\,\% bootstrap CIs over 10 seeds; \GLOBAL is diluted by $1/N$, and \textsc{Random-Benign} controls are near-null (Table~\ref{tab:main-results}).}
 \label{fig:threshold-shift}
 \end{figure}
 
-Table~\ref{tab:main-results} and Figure~\ref{fig:threshold-shift}(a) report threshold-shift and downstream detection harm for the \textsc{High-Score-Benign\,+\,Threshold-Raise} strategy.
+Table~\ref{tab:main-results} and Fig.~\ref{fig:threshold-shift}(a) report threshold shift and downstream detection harm for \textsc{High-Score-Benign\,+\,Threshold-Raise}.
 
 \textbf{All three policies pass all three gates.}
 The seed-level Gate-1 pass rate is 100\% (10/10 seeds) at every non-zero fraction for all three policies.
 For \textsc{Local} and \textsc{Cluster}, all nine clients are individually significant in every seed.
 For \textsc{Global} at $f{=}0.1$, two devices (Provision PT-737E and PT-838) are intermittently non-significant (2/10 and 4/10 seeds respectively), but the victim-majority condition ($\ge$5/9 per seed) still holds because the remaining seven clients are consistently significant.
-Bootstrap CIs on $\Delta\tau$ exclude zero and remain non-overlapping with the \textsc{Random-Benign} control, which gives CIs spanning zero, a $0\%$ Gate-1 pass rate, and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results} reports representative $f{=}0.4$ control rows; the artifact bundle contains the full near-null matrix).
+Bootstrap CIs on $\Delta\tau$ exclude zero and remain non-overlapping with the \textsc{Random-Benign} control, whose CIs span zero, Gate-1 pass rate is $0\%$, and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results} reports representative $f{=}0.4$ rows; the artifact contains the full near-null matrix).
 The targeted effects are therefore attributable to tail contamination, not position perturbation alone.
 
 \textbf{Policy magnitude.}
@@ -59,7 +55,7 @@ Under \textsc{Global}, all eight non-victims receive the identical $\Delta\tau$ 
 
 \subsection{Lowering Attack: Secondary Results (Conditional)}
 
-Figure~\ref{fig:threshold-shift}(b) shows threshold shift for the \textsc{Low-Score-Benign\,+\,Threshold-Lower} strategy.
+Fig.~\ref{fig:threshold-shift}(b) shows threshold shift for \textsc{Low-Score-Benign\,+\,Threshold-Lower}.
 The adversary's goal is to increase false-alarm burden; the $\Delta\mathrm{TPR}{>}0$ below is a threshold-displacement indicator, not a security benefit.
 
 \textbf{Local and Cluster succeed; Global is marginal.}
@@ -68,7 +64,7 @@ The adversary's goal is to increase false-alarm burden; the $\Delta\mathrm{TPR}{
 \textsc{Global} is structurally bounded: at $f{=}0.4$, $\Delta\tau = -0.018$ $[-0.020, -0.017]$, Gate-1 passes only at $f{\ge}0.2$, and $\Delta\mathrm{TPR} = +2.1$\,pp.
 
 \textbf{FPR disparity (operational harm).}
-The operational harm metric is $\Delta\mathrm{CV(FPR)}$ (change in coefficient of variation of per-client FPR, dimensionless): $+0.053$ (\textsc{Local}, 10/10 seeds) and $+0.060$ (\textsc{Cluster}, 8/10 seeds) at $f{=}0.4$, while \textsc{Global} shows $-0.019$ (shared-threshold proportional FPR rise reduces relative disparity).
+The operational harm metric is $\Delta\mathrm{CV(FPR)}$ (dimensionless): $+0.053$ (\textsc{Local}, 10/10 seeds) and $+0.060$ (\textsc{Cluster}, 8/10 seeds) at $f{=}0.4$, while \textsc{Global} shows $-0.019$ because shared-threshold proportional FPR rise reduces relative disparity.
 Under a shared threshold, $\Delta\mathrm{CV(FPR)}$ understates harm: the absolute FPR rises ($0.041{\to}0.043$, Table~\ref{tab:baseline}), so the negative value reflects dispersion reduction, not reduced alarm burden.
 Absolute clean$\to$poisoned FPR at $f{=}0.4$ (Table~\ref{tab:baseline} clean column): \textsc{Global} $0.041\to0.043$, \textsc{Local} $0.043\to0.046$, \textsc{Cluster} $0.043\to0.049$.
 
