@@ -9,15 +9,17 @@ Pairwise CV(FPR) gaps are positive with bootstrap CIs excluding zero: G--L $0.57
 Figure~\ref{fig:clean-fpr} shows the per-client FPR distributions for \textsc{Global} and \textsc{Local} under the clean baseline.
 This fairness gain is not a uniform accuracy improvement: \textsc{Global} retains the best P10 Macro-F1 ($0.398$ vs.\ \textsc{Local} $0.335$), so Table~\ref{tab:baseline} reports dispersion, detection quality, and mean FPR/TPR rather than a single summary.
 
-\input{tables/table_baseline}
-
-\begin{figure}[tb]
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.90\textwidth]{figures/fig_clean_fpr.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_clean_fpr.pdf}
 \caption{Clean-baseline FPR heterogeneity is larger under the shared \GLOBAL threshold than under \LOCAL calibration (seed 0).
 All-seed dispersion, including \CLUSTER, is reported in Table~\ref{tab:baseline}.}
 \label{fig:clean-fpr}
 \end{figure}
+
+\input{tables/table_baseline}
+
+\FloatBarrier
 
 \subsection{Raising Attack: Primary Results}
 
