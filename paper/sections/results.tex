@@ -21,17 +21,19 @@ All-seed dispersion, including \CLUSTER, is reported in Table~\ref{tab:baseline}
 
 \subsection{Raising Attack: Primary Results}
 
+Table~\ref{tab:main-results} and Fig.~\ref{fig:threshold-shift}(a) report threshold shift and downstream detection harm for \textsc{High-Score-Benign\,+\,Threshold-Raise}.
+
 \input{tables/table_main_results}
 
-\begin{figure}[tb]
+\clearpage
+
+\begin{figure}[!t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_threshold_shift.pdf}
 \caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for raising (a) and lowering (b) attacks.
 Error bars are 95\,\% bootstrap CIs over 10 seeds; \GLOBAL is diluted by $1/N$, and \textsc{Random-Benign} controls are near-null (Table~\ref{tab:main-results}).}
 \label{fig:threshold-shift}
 \end{figure}
-
-Table~\ref{tab:main-results} and Fig.~\ref{fig:threshold-shift}(a) report threshold shift and downstream detection harm for \textsc{High-Score-Benign\,+\,Threshold-Raise}.
 
 \textbf{All three policies pass all three gates.}
 The seed-level Gate-1 pass rate is 100\% (10/10 seeds) at every non-zero fraction for all three policies.
