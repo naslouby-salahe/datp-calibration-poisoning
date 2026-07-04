@@ -51,13 +51,13 @@ L2IS Laboratory, Higher Normal School (ENS), University Cadi Ayyad, Marrakech, M
 \maketitle
 
 \begin{abstract}
-Federated learning (FL) defenses for IoT anomaly detection focus on training and aggregation, while the post-training \emph{threshold-calibration stage} lets each client autonomously collect benign calibration scores and derive its detection threshold.
-The study characterizes this stage under a score-level contamination model: one compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the threshold without altering model weights, training data, gradients, aggregation, test scores, or labels.
+Federated learning (FL) defenses for IoT anomaly detection largely focus on training and aggregation, while the post-training \emph{threshold-calibration stage} lets each client autonomously collect benign calibration scores and derive its detection threshold.
+This paper characterizes that stage under a score-level contamination model: one compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the threshold without altering model weights, training data, gradients, aggregation, test scores, or labels.
 Across \textsc{Global}, \textsc{Local}, and \textsc{Cluster} threshold policies on the N-BaIoT nine-device federation, the score-level raising attack achieves a 100\% pass rate on the pre-specified materiality gate at all non-zero fractions and degrades victim true-positive rates by 2.4--7.9 percentage points (4.9--7.9\,pp at $f{=}0.4$).
 The lowering attack raises false-alarm indicators for \textsc{Local} and \textsc{Cluster}, increasing cross-client $\Delta\mathrm{CV}(\mathrm{FPR})$ by 0.05--0.06 under \textsc{Replace-Fixed-Budget}; the associated $\Delta\mathrm{TPR}{>}0$ is threshold displacement, not a security benefit.
 \textsc{Global} bounds lowering through $1/N$ dilution.
 Policy choice governs both magnitude and propagation: \textsc{Local} confines threshold harm to the compromised client, \textsc{Cluster} can transmit small co-cluster perturbations, and \textsc{Global} dilutes but propagates shifts federation-wide.
-The results are bounded to score substitution and characterize a calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
+The results are bounded to N-BaIoT and score substitution; they characterize a calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
 
 \keywords{Federated Learning \and Anomaly Detection \and IoT Security \and Poisoning Attack \and Threshold Calibration \and Vulnerability Analysis}
 \end{abstract}

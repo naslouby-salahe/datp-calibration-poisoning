@@ -6,7 +6,7 @@ The threshold-calibration stage occurs after global model convergence and before
 Each client $i$ collects a benign calibration set $\mathcal{C}_i = \{s_1, \ldots, s_{n_i}\}$ of reconstruction scores from its own traffic, then sets its local threshold $\tau_i = \mathrm{quantile}(\mathcal{C}_i,\, q)$ at a fixed quantile $q$ (here $q{=}0.95$).
 Depending on the federation's threshold policy, $\tau_i$ may be used directly (\textsc{Local}), averaged across clients (\textsc{Global}), or averaged within a calibration-score cluster (\textsc{Cluster}).
 
-No existing FL training-phase or aggregation-phase defense monitors or validates the calibration buffer: it is collected autonomously by the client after the aggregation round completes.
+The training-phase and aggregation-phase defenses considered in this study do not monitor or validate the calibration buffer: it is collected autonomously by the client after the aggregation round completes.
 
 \textbf{Adversary model.}
 The adversary controls a single compromised client $v$, called the \emph{poisoned client}.
@@ -37,5 +37,5 @@ Any effect attributable to score contamination rather than position perturbation
 \textbf{Scope boundary.}
 The analysis characterizes the vulnerability at the score level.
 A complete end-to-end attack would additionally require generating network traffic whose autoencoder reconstruction score lands in the target tail---this is future work (\S\ref{sec:discussion}).
-The score-level characterization is a controlled experiment, not a deployed attack: it isolates a necessary calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
+The score-level characterization is a controlled experiment, not a deployed attack: it isolates the calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
 Claims are bounded to the single-client, single-compromise scenario; multi-client collusion is not evaluated.

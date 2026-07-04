@@ -8,7 +8,7 @@ CV(FPR), the coefficient of variation of per-client false-positive rates (ddof\,
 \textsc{Local} achieves the lowest CV(FPR) ($0.333 \pm 0.034$).
 \textsc{Global} exhibits the highest CV(FPR) ($0.905 \pm 0.039$) because a single federation-wide threshold cannot simultaneously fit nine devices with different traffic distributions.
 \textsc{Cluster} lies in between ($0.615 \pm 0.143$) with higher variance across seeds, reflecting sensitivity to cluster assignment.
-Bootstrap 95\% CIs on the pairwise CV(FPR) difference exclude zero: Global$-$Local $= 0.572$ $[0.537, 0.607]$; Global$-$Cluster $= 0.291$ $[0.214, 0.358]$; Cluster$-$Local $= 0.281$ $[0.201, 0.374]$, confirming that all three policies are statistically distinguishable on baseline fairness (pairwise differences are computed on unrounded per-seed aggregates and may differ from subtraction of the rounded means by $\pm0.001$).
+Bootstrap 95\% CIs on pairwise CV(FPR) differences exclude zero: Global$-$Local $= 0.572$ $[0.537, 0.607]$; Global$-$Cluster $= 0.291$ $[0.214, 0.358]$; Cluster$-$Local $= 0.281$ $[0.201, 0.374]$ (computed on unrounded per-seed aggregates).
 Figure~\ref{fig:clean-fpr} shows the per-client FPR distributions for \textsc{Global} and \textsc{Local} under the clean baseline.
 This fairness gain is not a uniform improvement: \textsc{Local} improves cross-client FPR equity but does not dominate all accuracy-oriented metrics. In particular, \textsc{Global} retains the best P10 Macro-F1 ($0.398$ vs.\ \textsc{Local} $0.335$, Table~\ref{tab:baseline}), so the worst-tail client is detected better under the federation-mean threshold. The evaluation therefore reports both fairness-style dispersion (CV(FPR)) and detection-quality (P10 Macro-F1) metrics, plus the underlying absolute mean FPR/TPR, rather than a single summary.
 
@@ -16,10 +16,9 @@ This fairness gain is not a uniform improvement: \textsc{Local} improves cross-c
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.74\textwidth]{figures/fig_clean_fpr.pdf}
-\caption{Per-client FPR under the clean baseline for \GLOBAL and \LOCAL thresholds (seed 0).
-\GLOBAL uses one threshold for heterogeneous devices; \LOCAL fits each client's calibration distribution.
-All-seed CV(FPR) values, including \CLUSTER, are reported in Table~\ref{tab:baseline}.}
+\includegraphics[width=0.90\textwidth]{figures/fig_clean_fpr.pdf}
+\caption{Clean-baseline FPR heterogeneity is larger under the shared \GLOBAL threshold than under \LOCAL calibration (seed 0).
+All-seed dispersion, including \CLUSTER, is reported in Table~\ref{tab:baseline}.}
 \label{fig:clean-fpr}
 \end{figure}
 
@@ -42,26 +41,26 @@ Table~\ref{tab:main-results} and Figure~\ref{fig:threshold-shift}(a) report thre
 The seed-level Gate-1 pass rate is 100\% (10/10 seeds) at every non-zero fraction for all three policies.
 For \textsc{Local} and \textsc{Cluster}, all nine clients are individually significant in every seed.
 For \textsc{Global} at $f{=}0.1$, two devices (Provision PT-737E and PT-838) are intermittently non-significant (2/10 and 4/10 seeds respectively), but the victim-majority condition ($\ge$5/9 per seed) still holds because the remaining seven clients are consistently significant.
-Bootstrap CIs on $\Delta\tau$ exclude zero and remain non-overlapping with the \textsc{Random-Benign} control, which produces CIs spanning zero, a $0\%$ Gate-1 pass rate, and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results}, Neg.\,Ctrl rows, reports representative $f{=}0.4$ values; all fractions are similarly near-null and the complete matrix is archived in the artifact bundle). The targeted effects are therefore attributable to tail contamination, not to position perturbation alone.
+Bootstrap CIs on $\Delta\tau$ exclude zero and remain non-overlapping with the \textsc{Random-Benign} control, which gives CIs spanning zero, a $0\%$ Gate-1 pass rate, and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results} reports representative $f{=}0.4$ control rows; the artifact bundle contains the full near-null matrix).
+The targeted effects are therefore attributable to tail contamination, not position perturbation alone.
 
 \textbf{Policy magnitude.}
 Raising-attack magnitude differs by policy.
 \textsc{Local} and \textsc{Cluster} exhibit the largest threshold shifts: at $f{=}0.4$, $\Delta\tau = +0.902$ $[+0.864, +0.944]$ and $+0.899$ $[+0.859, +0.941]$ respectively.
 \textsc{Global} shows a structurally diluted but still significant shift: $+0.100$ $[+0.096, +0.105]$ at $f{=}0.4$.
-The dilution is expected by construction---\textsc{Global}'s threshold is the federation mean, so a single-client shift is divided by $N{=}9$---but the empirical question is whether the residual magnitude ($\approx$10\,\% of the local shift) suffices to produce measurable downstream harm.
-It does.
+The dilution is expected by construction---\textsc{Global}'s threshold is the federation mean, so a single-client shift is divided by $N{=}9$---but the residual magnitude ($\approx$10\,\% of the local shift) still produces measurable downstream harm.
 
 \textbf{Downstream harm (Gate 3).}
 Mean victim $\Delta\mathrm{TPR}$ is negative and directionally consistent across all seeds for all three policies.
 At $f{=}0.4$: \textsc{Local} $-7.9$\,pp, \textsc{Cluster} $-4.9$\,pp (plateauing from $f{=}0.2$), \textsc{Global} $-6.1$\,pp.
 Absolute clean$\to$poisoned victim TPR at $f{=}0.4$ (Table~\ref{tab:baseline} clean column): \textsc{Global} $0.793\to0.732$, \textsc{Local} $0.777\to0.698$, \textsc{Cluster} $0.742\to0.693$.
-The \textsc{Global} threshold propagation is notable: all eight non-victims receive the identical $\Delta\tau$ (Table~\ref{tab:spillover}); their TPR was not separately recomputed, so downstream non-victim TPR impact is inferred, not measured, and heterogeneity (CV(FPR)$=0.905$) means it could differ from the victim's. \textsc{Local}/\textsc{Cluster} non-victim threshold propagation is bounded by construction.
+Under \textsc{Global}, all eight non-victims receive the identical $\Delta\tau$ (Table~\ref{tab:spillover}); their TPR was not separately recomputed, so downstream non-victim impact is inferred, not measured, and heterogeneity (CV(FPR)$=0.905$) means it could differ from the victim's.
+\textsc{Local}/\textsc{Cluster} non-victim threshold propagation is bounded by construction.
 
 \subsection{Lowering Attack: Secondary Results (Conditional)}
 
 Figure~\ref{fig:threshold-shift}(b) shows threshold shift for the \textsc{Low-Score-Benign\,+\,Threshold-Lower} strategy.
-The adversary's goal is to increase the false alarm rate; the $\Delta\mathrm{TPR}{>}0$ below is a threshold-displacement indicator, not a security benefit.
-Elevated alarm burden may lead operators to disable the anomaly detector.
+The adversary's goal is to increase false-alarm burden; the $\Delta\mathrm{TPR}{>}0$ below is a threshold-displacement indicator, not a security benefit.
 
 \textbf{Local and Cluster succeed; Global is marginal.}
 \textsc{Local} achieves $\Delta\tau = -0.164$ $[-0.176, -0.154]$ at $f{=}0.4$ with elevated FPR disparity ($\Delta\mathrm{CV(FPR)} = +0.053$); Gate-3 $\Delta\mathrm{TPR} = +11.8$\,pp confirms threshold displacement.
@@ -85,7 +84,7 @@ These results are presented as a lower bound under \textsc{Replace-Fixed-Budget}
 Table~\ref{tab:spillover} quantifies the threshold-propagation contrast under the raising attack at $f{=}0.4$.
 \textsc{Global} propagates the threshold shift to all nine clients: the non-victim $\Delta\tau$ equals the victim $\Delta\tau$ by construction (shared threshold), and blast encompasses $\approx$8/8 non-victims in nearly every seed.
 \textsc{Cluster} achieves near-\textsc{Local} victim-level harm; non-victim threshold changes are small in magnitude (mean $\Delta\tau{\approx}0.0003$, std\,$=0.017$, driven by K-means cluster reassignment rather than aggregation), with 6/8 non-victims showing statistically significant but small-magnitude threshold perturbations.
-The blast count measures threshold significance, not downstream harm: non-victim rates were not recomputed for \textsc{Cluster}. The mean non-victim $\Delta\tau$ ($\approx$0.0003) is two to three orders of magnitude below the victim $\Delta\tau$ at the weakest injection fraction ($f{=}0.1$: $+0.033$ \textsc{Global}, $+0.253$ \textsc{Cluster}, $+0.298$ \textsc{Local}; Table~\ref{tab:main-results}), and even those victim-level shifts produce only $-2.4$ to $-6.0$\,pp of victim harm, so large non-victim $\Delta\mathrm{TPR}$ changes are implausible but unverified---unlike \textsc{Global}, which transmits $\Delta\tau$ to every non-victim by construction (also inferred, not measured).
+The blast count measures threshold significance, not downstream harm: non-victim rates were not recomputed for \textsc{Cluster}. The mean non-victim $\Delta\tau$ ($\approx$0.0003) is two to three orders of magnitude below the weakest victim shifts ($f{=}0.1$: $+0.033$ \textsc{Global}, $+0.253$ \textsc{Cluster}, $+0.298$ \textsc{Local}; Table~\ref{tab:main-results}), so large non-victim $\Delta\mathrm{TPR}$ changes are implausible but unverified---unlike \textsc{Global}, which transmits $\Delta\tau$ to every non-victim by construction (also inferred, not measured).
 \textsc{Local} yields the highest per-victim shift with zero non-victim blast by policy design.
 
 Policy design trades isolated per-victim exposure (\textsc{Local}) against diluted fleet-wide propagation (\textsc{Global}); \textsc{Cluster} carries churn-level threshold perturbations without direct aggregation propagation.
