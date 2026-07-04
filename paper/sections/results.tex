@@ -70,6 +70,7 @@ Elevated alarm burden may lead operators to disable the anomaly detector.
 
 \textbf{FPR disparity (operational harm).}
 The operational harm metric is $\Delta\mathrm{CV(FPR)}$ (change in coefficient of variation of per-client FPR, dimensionless): $+0.053$ (\textsc{Local}, 10/10 seeds) and $+0.060$ (\textsc{Cluster}, 8/10 seeds) at $f{=}0.4$, while \textsc{Global} shows $-0.019$ (shared-threshold proportional FPR rise reduces relative disparity).
+Under a shared threshold, $\Delta\mathrm{CV(FPR)}$ understates harm: the absolute FPR rises ($0.041{\to}0.043$, Table~\ref{tab:baseline}), so the negative value reflects dispersion reduction, not reduced alarm burden.
 Absolute clean$\to$poisoned FPR at $f{=}0.4$ (Table~\ref{tab:baseline} clean column): \textsc{Global} $0.041\to0.043$, \textsc{Local} $0.043\to0.046$, \textsc{Cluster} $0.043\to0.049$.
 
 \textbf{Mechanism and conditionality.}

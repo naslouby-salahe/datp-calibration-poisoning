@@ -80,7 +80,7 @@ Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and
 Threshold shift $\Delta\tau_v = \tau_v^{\mathrm{poisoned}} - \tau_v^{\mathrm{clean}}$ is computed per seed.
 A seed is \emph{Gate-1 significant} when $|\Delta\tau_v| > \delta\tau_v$ and the sign is consistent with the attack objective, where the materiality threshold is
 $\delta\tau_v = \max\!\bigl(0.1 \times \mathrm{IQR}(\mathcal{C}_v^{\mathrm{clean}}),\;0.01 \times \mathrm{median}_j(\mathrm{IQR}(\mathcal{C}_j^{\mathrm{clean}}))\bigr)$.
-Gate-1 passes when $\ge 8/10$ seeds are significant and the victim-majority condition ($\ge 5/9$ victims significant, i.e.\ a simple majority of the nine federation clients) holds.
+Gate-1 passes when $\ge 8/10$ seeds are significant and the victim-majority condition ($\ge$5/9 of the nine clients, each taken as victim in turn, are significant) holds.
 
 \textbf{Gate 2 (directional excess over control).}
 Bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the negative control (\textsc{Random-Benign}).
@@ -92,6 +92,7 @@ Mean victim TPR change, $\Delta\mathrm{TPR}$, is directionally consistent (negat
 All CIs are 95\% percentile bootstrap over 10 seed-level aggregates, with $B{=}10{,}000$ resamples.
 Primary claim gates are evaluated over these paired seed-level aggregates; the per-victim-seed cells are descriptive support, not independent units.
 With ten paired seeds, percentile-bootstrap intervals are approximate uncertainty estimates rather than exact coverage guarantees, and may deviate from nominal at the tails.
+A two-sided Wilcoxon signed-rank test on ten seed-level mean victim $\Delta\mathrm{TPR}$ values (raising, $f{=}0.4$) gives $W{=}0$, $p{=}0.002$ (exact) for all three policies.
 
 \textbf{Gate constant justification.}
 The 10\,\% IQR coefficient for Gate-1 materiality ($0.1{\times}\mathrm{IQR}$) exceeds the calibration instability observed in the clean baseline while remaining below the expected tail-injection shift at $f{=}0.1$; the 1\,\% cross-client floor ($0.01{\times}\mathrm{median}_j(\mathrm{IQR})$) prevents degenerate clients with near-zero score spread from counting as material on arbitrarily small shifts.
