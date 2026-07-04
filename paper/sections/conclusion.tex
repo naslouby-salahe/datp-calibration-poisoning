@@ -10,8 +10,7 @@ Future work should address traffic-level realizability, calibration-stage integr
 
 \begin{sloppypar}
 \textbf{Reproducibility.}
-All experiments are pipeline-generated and locally archived (code commit \texttt{396ea81}).
-The artifact bundle comprises the experiment configuration; seed scheme (training/poisoning/analysis seeds paired per run); split manifest with per-device calibration sizes; per-cell results; negative-control records; isolation sanity checks; and figure/table scripts.
-No poisoned metric was used for model checkpoint or hyperparameter selection.
-Code and artifacts will be released publicly on acceptance and are available to reviewers on request.
+The released artifact bundle is archived on Zenodo under DOI \texttt{10.5281/zenodo.21196568}.
+The bundle includes the experiment configuration, paired training/poisoning/analysis seeds, split manifest with per-device calibration sizes, per-cell results, negative-control records, isolation sanity checks, and figure/table scripts.
+Model checkpoints, hyperparameters, and analysis gates were fixed before poisoned runs; poisoned-run outcomes were not used for selection or tuning.
 \end{sloppypar}
