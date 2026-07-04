@@ -1,16 +1,16 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-The study characterized the post-training threshold-calibration stage in federated IoT anomaly detection as an attack surface that training-phase and aggregation-phase defenses do not address.
+This paper characterized the post-training threshold-calibration stage in federated IoT anomaly detection as an attack surface that the studied training-phase and aggregation-phase defenses do not address.
 Under a score-level contamination model on the N-BaIoT nine-device federation (FedAvg autoencoder, $q{=}0.95$, single compromised client), the raising attack degrades victim detection rates by 2.4--7.9\,pp across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 100\,\% Gate-1 pass rates and 95\,\% bootstrap CIs excluding zero; these intervals are descriptive uncertainty estimates over ten paired seeds.
 The lowering attack shifts thresholds downward, raising the operating-point-displacement indicator $\Delta\mathrm{TPR}$ by 10--12\,pp---not a security benefit---and the primary alarm-burden metric $\Delta\mathrm{CV(FPR)}$ by 0.05--0.06 (lower bound under \textsc{Replace-Fixed-Budget}) for \textsc{Local} and \textsc{Cluster}.
-The policy ordering---per-victim exposure maximized under \textsc{Local}, diluted but federation-wide threshold propagation under \textsc{Global}, small intra-cluster threshold perturbations under \textsc{Cluster}---implies calibration-stage hardening should be matched to the aggregation design, not only the training-phase defense.
+The policy ordering---per-victim exposure maximized under \textsc{Local}, diluted but federation-wide threshold propagation under \textsc{Global}, small intra-cluster threshold perturbations under \textsc{Cluster}---implies calibration-stage hardening should be matched to the threshold policy, not only the training-phase defense.
 These findings isolate a necessary calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
 Future work should address traffic-level realizability, calibration-stage integrity defenses, and generalization across detector architectures and datasets.
 
 \begin{sloppypar}
 \textbf{Reproducibility.}
 The released artifact bundle is archived on Zenodo under DOI \texttt{10.5281/zenodo.21196568}.
-The bundle includes the experiment configuration, paired training/poisoning/analysis seeds, split manifest with per-device calibration sizes, per-cell results, negative-control records, isolation sanity checks, and figure/table scripts.
-Model checkpoints, hyperparameters, and analysis gates were fixed before poisoned runs; poisoned-run outcomes were not used for selection or tuning.
+It contains the experiment configuration, paired training/poisoning/analysis seeds, split manifest with per-device calibration sizes, per-cell results, negative-control records, isolation sanity checks, and figure/table scripts.
+Model checkpoints, hyperparameters, and analysis gates were fixed before poisoned runs; no poisoned metric was used for checkpoint, hyperparameter, or gate selection.
 \end{sloppypar}

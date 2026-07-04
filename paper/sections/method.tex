@@ -6,7 +6,8 @@
 The evaluation uses N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical devices spanning five device types (doorbell, baby monitor, security camera, thermostat, webcam).
 Each device constitutes one federation client; all nine are eligible for calibration.
 Calibration set sizes range from 2,622 (Ecobee Thermostat) to 35,048 (Philips Baby Monitor) benign samples per device (all $\ge$100, satisfying the eligibility threshold).
-Each device's benign stream is partitioned chronologically into segments in a $60\%$ train / $1\%$ gap / $20\%$ calibration / $1\%$ gap / $18\%$ test ratio (the two $1\%$ gaps separate segments to avoid temporal leakage); training and calibration use benign traffic only, and test data, test labels, and training labels are never touched by the attack.
+Each device's benign stream is partitioned chronologically into a $60\%$ train / $1\%$ gap / $20\%$ calibration / $1\%$ gap / $18\%$ test split; the two gaps avoid temporal leakage.
+Training and calibration use benign traffic only, and the attack never touches test data, test labels, or training labels.
 Attack-labeled records are loaded from the N-BaIoT attack folders, scaled with the device scaler fitted on training data, scored as the \texttt{test\_attack} split, and used only as the positive class for TPR evaluation; they never enter FedAvg training, benign calibration arrays, poisoning reservoirs, threshold recomputation, or injected buffers.
 The federation trains a per-client autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg} for feature extraction, then enters the threshold-calibration stage at a fixed quantile $q{=}0.95$.
 Table~\ref{tab:repro} lists the autoencoder architecture, training hyperparameters, and the calibration size range; injection fractions, seeds, and the reservoir are detailed under Attack Parameterization below.
@@ -64,7 +65,7 @@ Three threshold-policy families are evaluated, covering the main design points i
 
 \subsection{Attack Parameterization}
 
-For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, the protocol runs 10 paired seeds: each seed selects a training configuration and an independent poisoning draw.
+For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, the protocol runs 10 paired seeds: each seed fixes a training configuration and an independent poisoning draw.
 A clean copy of the calibration array is preserved; only the poisoned copy is used for threshold computation.
 The four source-objective pairs are:
 (1)~\textsc{High-Score-Benign\,+\,Threshold-Raise} (primary raising attack),
@@ -72,7 +73,7 @@ The four source-objective pairs are:
 (3)~\textsc{Random-Benign\,+\,Threshold-Raise} (objective-matched negative control for the raising attack), and
 (4)~\textsc{Random-Benign} paired with \textsc{Threshold-Lower} (negative control for the lowering attack).
 The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ experimental cells total.
-Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, giving statistically independent stochasticity across training, calibration sampling, and bootstrap resampling.
+Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, separating training, calibration sampling, and bootstrap resampling stochasticity.
 
 \subsection{Statistical Analysis}
 
