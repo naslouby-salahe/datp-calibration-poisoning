@@ -61,6 +61,7 @@ Three threshold-policy families are evaluated, covering the main design points i
   Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, \texttt{random\_state}$=42$; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
   Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) reflects this cluster-assignment sensitivity.
   A compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}); clients in other clusters are unaffected.
+  Tail injection shifts all four fingerprint components upward, displacing the victim into an effectively singleton cluster whose mean collapses to the victim's own poisoned local threshold, producing near-\textsc{Local} victim-level shifts while co-cluster members absorb near-zero perturbation.
 \end{description}
 
 \subsection{Attack Parameterization}
