@@ -20,6 +20,16 @@
 
 \emergencystretch=1em
 
+% Keep DOI metadata visible without printing full URL prefixes in the bibliography.
+\AtBeginDocument{%
+  \renewcommand{\doi}[1]{\href{https://doi.org/\detokenize{#1}}{\nolinkurl{doi:#1}}}%
+}
+\let\origthebibliography\thebibliography
+\let\endorigthebibliography\endthebibliography
+\renewenvironment{thebibliography}[1]
+  {\origthebibliography{#1}\fontsize{8}{8.7}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}}
+  {\endorigthebibliography}
+
 % Float spacing — tighten gaps around floats to recover vertical whitespace
 \setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
 \setlength{\floatsep}{8pt plus 2pt minus 2pt}
@@ -49,7 +59,8 @@ Hamid Hrimech\inst{1}
 \authorrunning{S. Naslouby et al.}
 
 \institute{
-LAMSAD Laboratory, National School of Applied Sciences (ENSA), Hassan First University, Berrechid, Morocco
+LAMSAD Laboratory, National School of Applied Sciences (ENSA), Hassan First University, Berrechid, Morocco\\
+\email{naslouby.salahe@gmail.com}
 \and
 L2IS Laboratory, Higher Normal School (ENS), University Cadi Ayyad, Marrakech, Morocco
 }
