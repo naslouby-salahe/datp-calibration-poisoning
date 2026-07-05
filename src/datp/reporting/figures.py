@@ -1,7 +1,9 @@
-"""Matplotlib figure generators for paper figures 1–4."""
+"""Matplotlib figure generators for paper figures 1–4 and threshold-shift figure."""
 
 from __future__ import annotations
 
+import json
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib
@@ -17,6 +19,7 @@ from datp.reporting.constants import (
     FIGURE2_STEM,
     FIGURE3_STEM,
     FIGURE4_STEM,
+    FIGURE_THRESHOLD_SHIFT_STEM,
     NBAIOT_DEVICE_SHORT_LABELS,
 )
 
@@ -214,3 +217,85 @@ def generate_figure4(
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
     return _save_figs(fig, output_dir / FIGURE4_STEM, style.dpi)
+
+
+# Colors matching the committed fig_threshold_shift figure (default mpl cycle order)
+_THRESHOLD_SHIFT_POLICIES: list[tuple[str, str, str, str, str]] = [
+    ("global_threshold", "Global", "#1f77b4", "o", "-"),
+    ("local_threshold", "Local", "#ff7f0e", "s", "--"),
+    ("cluster_threshold", "Cluster", "#2ca02c", "^", "-."),
+]
+_THRESHOLD_SHIFT_PANELS: list[tuple[str, str, str]] = [
+    ("high_score_benign", "threshold_raise", "(a) Raising attack"),
+    ("low_score_benign", "threshold_lower", "(b) Lowering attack"),
+]
+_BOOTSTRAP_N = 10_000
+_BOOTSTRAP_CI = 0.95
+_BOOTSTRAP_SEED = 300
+
+
+def _seed_mean_delta_tau(
+    rows: list[dict],
+) -> np.ndarray:
+    """Return per-training-seed mean delta_tau as a float64 array."""
+    by_seed: defaultdict[int, list[float]] = defaultdict(list)
+    for r in rows:
+        by_seed[r["training_seed"]].append(float(r["delta_tau"]))
+    return np.array([float(np.mean(v)) for v in by_seed.values()], dtype=np.float64)
+
+
+def _percentile_bootstrap_ci(
+    values: np.ndarray,
+) -> tuple[float, float]:
+    """Percentile bootstrap 95 % CI over seed-level means."""
+    rng = np.random.default_rng(_BOOTSTRAP_SEED)
+    boot = rng.choice(values, size=(_BOOTSTRAP_N, len(values)), replace=True).mean(axis=1)
+    alpha = 1.0 - _BOOTSTRAP_CI
+    return float(np.percentile(boot, 100 * alpha / 2)), float(np.percentile(boot, 100 * (1 - alpha / 2)))
+
+
+def generate_figure_threshold_shift(
+    manifest_path: Path,
+    output_dir: Path,
+    style: StyleConfig,
+) -> Path:
+    """Generate threshold-shift vs injection-fraction line plots (raising/lowering panels)."""
+    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    results: list[dict] = json.loads(manifest_path.read_text())["results"]
+    fractions = sorted({float(r["fraction"]) for r in results})
+
+    fig, axes = plt.subplots(1, 2, figsize=style.figsize_double_col)
+
+    for ax, (source, objective, title) in zip(axes, _THRESHOLD_SHIFT_PANELS):
+        panel_rows = [r for r in results if r["source"] == source and r["objective"] == objective]
+        for policy, label, color, marker, linestyle in _THRESHOLD_SHIFT_POLICIES:
+            pol_rows = [r for r in panel_rows if r["policy"] == policy]
+            xs, means, lowers, uppers = [], [], [], []
+            for frac in fractions:
+                frac_rows = [r for r in pol_rows if float(r["fraction"]) == frac]
+                if not frac_rows:
+                    continue
+                seed_means = _seed_mean_delta_tau(frac_rows)
+                m = float(np.mean(seed_means))
+                ci_lo, ci_hi = _percentile_bootstrap_ci(seed_means)
+                xs.append(frac)
+                means.append(m)
+                lowers.append(m - ci_lo)
+                uppers.append(ci_hi - m)
+            ax.errorbar(
+                xs, means,
+                yerr=[lowers, uppers],
+                label=label, color=color, marker=marker,
+                linestyle=linestyle, linewidth=1.5, markersize=5, capsize=3,
+            )
+        ax.axhline(0, color="gray", linewidth=0.8, alpha=0.5)
+        ax.set_title(title, fontsize=style.font_size)
+        ax.set_xlabel(r"Injection fraction $f$", fontsize=style.font_size)
+        ax.set_ylabel(r"Mean threshold shift $\Delta\tau$", fontsize=style.font_size)
+        ax.grid(axis="y", alpha=0.3)
+        ax.tick_params(labelsize=style.font_size - 1)
+
+    axes[0].legend(fontsize=style.font_size - 1, frameon=True)
+    fig.tight_layout()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return _save_figs(fig, output_dir / FIGURE_THRESHOLD_SHIFT_STEM, style.dpi)

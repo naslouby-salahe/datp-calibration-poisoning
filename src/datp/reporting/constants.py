@@ -18,6 +18,7 @@ FIGURE1_STEM = "figure1_seed"
 FIGURE2_STEM = "figure2_ecdf"
 FIGURE3_STEM = "figure3_boxplots"
 FIGURE4_STEM = "figure4_alpha_sweep"
+FIGURE_THRESHOLD_SHIFT_STEM = "fig_threshold_shift"
 REPORTING_AUDIT_SCHEMA_VERSION: str = "1"
 NOT_CONFIRMATORY_WARNING: str = (
     "Representative seed only; descriptive evidence, not confirmatory."
