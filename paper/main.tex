@@ -20,6 +20,12 @@
 
 \emergencystretch=1em
 
+% Float spacing — tighten gaps around floats to recover vertical whitespace
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.7}
+
 % ---------- macros ----------
 \newcommand{\dtau}{\ensuremath{\Delta\tau}\xspace}
 \newcommand{\GLOBAL}{\textsc{Global}\xspace}

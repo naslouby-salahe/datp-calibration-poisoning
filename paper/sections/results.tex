@@ -7,9 +7,9 @@ Table~\ref{tab:baseline} reports clean-baseline dispersion across all ten seeds.
 Lower CV(FPR) means more uniform per-client false-positive treatment: \textsc{Local} is lowest ($0.333 \pm 0.034$), \textsc{Global} highest ($0.905 \pm 0.039$), and \textsc{Cluster} intermediate ($0.615 \pm 0.143$) with cluster-assignment sensitivity.
 Pairwise CV(FPR) gaps are positive with bootstrap CIs excluding zero: G--L $0.572$ $[0.537, 0.607]$, G--C $0.291$ $[0.214, 0.358]$, and C--L $0.281$ $[0.201, 0.374]$ (unrounded per-seed aggregates).
 Figure~\ref{fig:clean-fpr} shows the per-client FPR distributions for \textsc{Global} and \textsc{Local} under the clean baseline.
-This fairness gain is not a uniform accuracy improvement: \textsc{Global} retains the best P10 Macro-F1 ($0.398$ vs.\ \textsc{Local} $0.335$), so Table~\ref{tab:baseline} reports dispersion, detection quality, and mean FPR/TPR rather than a single summary.
+This fairness gain is not a uniform accuracy improvement: \textsc{Global} retains the best P10 Macro-F1 (10th-percentile of per-client macro-F1 across the nine clients; worst-case fairness metric) ($0.398$ vs.\ \textsc{Local} $0.335$), so Table~\ref{tab:baseline} reports dispersion, detection quality, and mean FPR/TPR rather than a single summary.
 
-\begin{figure}[!htbp]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/fig_clean_fpr.pdf}
 \caption{Clean-baseline FPR heterogeneity is larger under the shared \GLOBAL threshold than under \LOCAL calibration (seed 0).
@@ -27,9 +27,7 @@ Table~\ref{tab:main-results} and Fig.~\ref{fig:threshold-shift}(a) report thresh
 
 \input{tables/table_main_results}
 
-\clearpage
-
-\begin{figure}[!t]
+\begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_threshold_shift.pdf}
 \caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for raising (a) and lowering (b) attacks.
