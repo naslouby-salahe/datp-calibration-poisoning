@@ -15,16 +15,16 @@ No claim is made that a dedicated calibration-stage defense is impossible, only 
 \textbf{Study focus.}
 This paper identifies threshold calibration as an underexplored attack surface and characterizes its vulnerability under a score-level contamination model.
 Concretely, an adversary with access to a single client's calibration buffer replaces a fraction~$f$ of entries with tail-sampled scores drawn from the same client's benign distribution (\emph{calibration-stage poisoning}).
-The evaluation covers three threshold-policy families---\textsc{Global} (federation-wide mean), \textsc{Local} (per-client), and \textsc{Cluster} (cluster-averaged)---across all nine physical-device clients in the N-BaIoT dataset~\cite{meidan2018nbaiot} at four injection fractions.
+The evaluation covers three threshold-policy families---\GLOBAL (federation-wide mean), \LOCAL (per-client), and \CLUSTER (cluster-averaged)---across all nine physical-device clients in the N-BaIoT dataset~\cite{meidan2018nbaiot} at four injection fractions.
 
 Calibration-stage poisoning is not simply data poisoning relocated to calibration data (Table~\ref{tab:related}).
-It occurs strictly after model convergence, so training-phase defenses have already completed; it exploits a trust model specific to that phase, since calibration data is collected autonomously with no central validation gate; and its effect depends on the threshold policy, so the same injection fraction produces different shifts and different propagation under \textsc{Global}, \textsc{Local}, and \textsc{Cluster}.
+It occurs strictly after model convergence, so training-phase defenses have already completed; it exploits a trust model specific to that phase, since calibration data is collected autonomously with no central validation gate; and its effect depends on the threshold policy, so the same injection fraction produces different shifts and different propagation under \GLOBAL, \LOCAL, and \CLUSTER.
 
 \textbf{Contributions.}
 \begin{enumerate}
   \item The analysis isolates the post-training threshold-calibration stage as a distinct attack surface: contaminating one client's benign calibration scores can shift thresholds while model weights, training data, aggregation, test scores, and labels remain fixed (\S\ref{sec:threat}).
   \item The evaluation presents a controlled vulnerability characterization under score-level calibration contamination across three threshold policies, showing that the raising attack degrades victim detection rates by 2.4--7.9\,pp across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 95\% bootstrap confidence intervals excluding zero (\S\ref{sec:results}).
-  \item The results document policy-differentiated behavior: \textsc{Local} gives the largest per-victim threshold shifts with no cross-client threshold propagation; \textsc{Cluster} allows small intra-cluster threshold perturbations; \textsc{Global} dilutes shifts but propagates them federation-wide; lowering is secondary and conditionally bounded, especially under \textsc{Global} (\S\ref{sec:results}).
+  \item The results document policy-differentiated behavior: \LOCAL gives the largest per-victim threshold shifts with no cross-client threshold propagation; \CLUSTER allows small intra-cluster threshold perturbations; \GLOBAL dilutes shifts but propagates them federation-wide; lowering is secondary and conditionally bounded, especially under \GLOBAL (\S\ref{sec:results}).
 \end{enumerate}
 
 \textbf{Scope.}
