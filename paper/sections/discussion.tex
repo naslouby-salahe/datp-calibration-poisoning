@@ -9,9 +9,9 @@ A related implementation limitation: with-replacement sampling from the tail res
 Detectability remains an open problem.
 
 \textbf{\GLOBAL propagation and lowering bounds.}
-The $1/N$-diluted \textsc{Global} shift is definitional; what is empirical is that the residual magnitude remains measurable above the seed-to-seed variance.
-The \textsc{Local}/\textsc{Cluster} lowering results are a \emph{lower bound} under \textsc{Replace-Fixed-Budget} (\S\ref{sec:results}): adversaries with access to the buffer's rank structure could achieve larger threshold displacements and alarm-burden effects.
-These results reveal a trade-off in policy design: \textsc{Local} maximizes per-client isolation at the cost of the largest per-victim exposure, whereas \textsc{Global} limits per-victim shift via averaging but propagates residual threshold shifts federation-wide; defense designers must choose which risk to bound.
+The $1/N$-diluted \GLOBAL shift is definitional; what is empirical is that the residual magnitude remains measurable above the seed-to-seed variance.
+The \LOCAL/\CLUSTER lowering results are a \emph{lower bound} under Replace-Fixed-Budget (\S\ref{sec:results}): adversaries with access to the buffer's rank structure could achieve larger threshold displacements and alarm-burden effects.
+These results reveal a trade-off in policy design: \LOCAL maximizes per-client isolation at the cost of the largest per-victim exposure, whereas \GLOBAL limits per-victim shift via averaging but propagates residual threshold shifts federation-wide; defense designers must choose which risk to bound.
 
 \textbf{Scope limitations.}
 Claims are bounded to N-BaIoT (9 clients), the autoencoder architecture, FedAvg, and $q{=}0.95$; generalization to other datasets, detectors, FL algorithms, larger federations, and quantiles is open.

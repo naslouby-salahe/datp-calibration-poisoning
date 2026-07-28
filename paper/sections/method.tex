@@ -46,7 +46,7 @@ Threshold quantile $q$ & 0.95 \\
 Three threshold-policy families are evaluated, covering the main design points in the personalization literature:
 
 \begin{description}
-  \item[\textsc{Global}.]
+  \item[\GLOBAL.]
   \[
     \tau_i^{\mathrm{local}} = \operatorname{quantile}(\mathcal{C}_i,q),
     \qquad
@@ -54,14 +54,14 @@ Three threshold-policy families are evaluated, covering the main design points i
   \]
   Global assigns the same $\tau^{\mathrm{global}}$ to every client; a single poisoned local threshold contributes only $1/N$ of the shared threshold shift.
 
-  \item[\textsc{Local}.] Each client retains $\tau_i = \tau_i^{\mathrm{local}}$.
+  \item[\LOCAL.] Each client retains $\tau_i = \tau_i^{\mathrm{local}}$.
   Shifts are confined to the compromised client; no cross-client threshold propagation.
 
-  \item[\textsc{Cluster}.]
+  \item[\CLUSTER.]
   Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, random seed 42; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
-  Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) is consistent with this cluster-assignment sensitivity.
+  Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \CLUSTER CV(FPR) is consistent with this cluster-assignment sensitivity.
   A compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}); clients in other clusters are unaffected.
-  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, typically displacing the victim into an effectively singleton cluster whose mean collapses to the victim's own poisoned local threshold, producing near-\textsc{Local} victim-level shifts while co-cluster members see near-zero perturbation.
+  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, typically displacing the victim into an effectively singleton cluster whose mean collapses to the victim's own poisoned local threshold, producing near-\LOCAL victim-level shifts while co-cluster members see near-zero perturbation.
 \end{description}
 
 \subsection{Attack Parameterization}
@@ -69,10 +69,10 @@ Three threshold-policy families are evaluated, covering the main design points i
 For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, the protocol runs 10 paired seeds: each seed fixes a training configuration and an independent poisoning draw.
 A clean copy of the calibration array is preserved; only the poisoned copy is used for threshold computation.
 The four source-objective pairs are:
-(1)~\textsc{High-Score-Benign\,+\,Threshold-Raise} (primary raising attack),
-(2)~\textsc{Low-Score-Benign\,+\,Threshold-Lower} (lowering attack),
-(3)~\textsc{Random-Benign\,+\,Threshold-Raise} (objective-matched negative control for the raising attack), and
-(4)~\textsc{Random-Benign\,+\,Threshold-Lower} (negative control for the lowering attack).
+(1)~High-Score-Benign + Threshold-Raise (primary raising attack),
+(2)~Low-Score-Benign + Threshold-Lower (lowering attack),
+(3)~Random-Benign + Threshold-Raise (objective-matched negative control for the raising attack), and
+(4)~Random-Benign + Threshold-Lower (negative control for the lowering attack).
 The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ experimental cells total.
 Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, separating training, calibration sampling, and bootstrap resampling stochasticity.
 
@@ -86,7 +86,7 @@ A \emph{seed passes} when $\ge$5/9 of the nine clients, each taken as victim in 
 A (policy, fraction) configuration \emph{passes Gate 1} when $\ge 8/10$ seeds pass.
 
 \textbf{Gate 2 (directional excess over control).}
-Bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the negative control (\textsc{Random-Benign}).
+Bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the negative control (Random-Benign).
 
 \textbf{Gate 3 (downstream harm).}
 Mean victim TPR change, $\Delta\mathrm{TPR}$, is directionally consistent (negative for raising, positive for lowering) across $\ge 8/10$ seeds.
