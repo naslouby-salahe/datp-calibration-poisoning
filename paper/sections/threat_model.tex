@@ -22,7 +22,7 @@ The adversary operates at the score level; generating traffic that achieves a ta
 \textbf{Attack mechanics.}
 The evaluation considers two attack objectives:
 \begin{description}
-  \item[Raise.] Threshold-Raise (primary): $f{=}0$ is the unpoisoned clean baseline ($m{=}0$, no replacement); for $f{>}0$, replace $m=\max\!\bigl(1,\mathrm{round}(fn_v)\bigr)$ positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (High-Score-Benign source; this fixed-budget replacement rule is Replace-Fixed-Budget).
+  \item[Raise.] Threshold-Raise (primary): $f{=}0$ is the unpoisoned clean baseline ($m{=}0$, no replacement); for $f{>}0$, replace $m=\max\!\bigl(1,\mathrm{round}(fn_v)\bigr)$ positions in $\mathcal{C}_v$ with scores drawn with replacement from the top-10\% tail of $\mathcal{C}_v$ (\mbox{High-Score-Benign} source; this fixed-budget replacement rule is \mbox{Replace-Fixed-Budget}).
   All replacement scores are benign-origin reconstruction scores drawn from the victim's own clean calibration distribution; AUROC is invariant by construction (test scores and labels are unchanged under poisoning).
   A raised threshold $\tau_v$ increases the detection threshold, suppressing alarms at the victim site.
   \item[Lower.] Threshold-Lower (secondary, conditional): replace $m$ positions with scores from the bottom-10\% tail (Low-Score-Benign).
