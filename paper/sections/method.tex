@@ -4,16 +4,16 @@
 \subsection{Dataset and Federation}
 
 The evaluation uses N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical devices spanning five device types (doorbell, baby monitor, security camera, thermostat, webcam).
-Each device constitutes one federation client; all nine are eligible for calibration.
-Calibration set sizes range from 2,622 (Ecobee Thermostat) to 35,048 (Philips Baby Monitor) benign samples per device (all $\ge$100, satisfying the eligibility threshold).
+Each device constitutes one federation client.
+All nine satisfy the $\ge$100-sample calibration eligibility threshold (size range in Table~\ref{tab:repro}; per-device sizes in the released split manifest).
 Each device's benign stream is partitioned chronologically into a $60\%$ train / $1\%$ gap / $20\%$ calibration / $1\%$ gap / $18\%$ test split; the two gaps avoid temporal leakage.
 Training and calibration use benign traffic only, and the attack never touches test data, test labels, or training labels.
-Attack-labeled records are loaded from the N-BaIoT attack folders, scaled with the device scaler fitted on training data, scored as the \texttt{test\_attack} split, and used only as the positive class for TPR evaluation; they never enter FedAvg training, benign calibration arrays, poisoning reservoirs, threshold recomputation, or injected buffers.
-The federation trains a per-client autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg} for feature extraction, then enters the threshold-calibration stage at a fixed quantile $q{=}0.95$.
-Table~\ref{tab:repro} lists the autoencoder architecture, training hyperparameters, and the calibration size range; injection fractions, seeds, and the reservoir are detailed under Attack Parameterization below.
+Attack-labeled records are scaled with each device's training-fitted scaler and used only as the positive class for TPR; they never enter training, calibration, poisoning reservoirs, or injected buffers.
+The federation trains a shared autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg}; each client then scores its own traffic with the aggregated model and enters the threshold-calibration stage at a fixed quantile $q{=}0.95$.
+Table~\ref{tab:repro} lists the model and training configuration; injection fractions, seeds, and the reservoir are detailed below.
 
 \begin{table}[tb]
-\caption{Experimental configuration.}
+\caption{Experimental configuration: autoencoder architecture, federated training hyperparameters, and calibration settings.}
 \label{tab:repro}
 \centering
 \footnotesize
@@ -26,7 +26,7 @@ Input features & 115 (N-BaIoT statistical traffic features) \\
 Encoder layers & $115 \to 80 \to 40 \to 20$; decoder mirrors \\
 Activation & ReLU (no batch normalization) \\
 Loss & Mean squared reconstruction error \\
-Optimizer & Adam, lr\,=\,0.001, weight\_decay\,=\,0 \\
+Optimizer & Adam, learning rate 0.001, weight decay 0 \\
 \midrule
 \multicolumn{2}{@{}l}{\emph{Federated training (FedAvg)}} \\
 Local epochs & 1 \\
@@ -58,10 +58,10 @@ Three threshold-policy families are evaluated, covering the main design points i
   Shifts are confined to the compromised client; no cross-client threshold propagation.
 
   \item[\textsc{Cluster}.]
-  Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, \texttt{random\_state}$=42$; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
-  Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) reflects this cluster-assignment sensitivity.
+  Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, random seed 42; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
+  Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \textsc{Cluster} CV(FPR) is consistent with this cluster-assignment sensitivity.
   A compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}); clients in other clusters are unaffected.
-  Tail injection shifts all four fingerprint components upward, displacing the victim into an effectively singleton cluster whose mean collapses to the victim's own poisoned local threshold, producing near-\textsc{Local} victim-level shifts while co-cluster members absorb near-zero perturbation.
+  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, typically displacing the victim into an effectively singleton cluster whose mean collapses to the victim's own poisoned local threshold, producing near-\textsc{Local} victim-level shifts while co-cluster members see near-zero perturbation.
 \end{description}
 
 \subsection{Attack Parameterization}
@@ -70,9 +70,9 @@ For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0
 A clean copy of the calibration array is preserved; only the poisoned copy is used for threshold computation.
 The four source-objective pairs are:
 (1)~\textsc{High-Score-Benign\,+\,Threshold-Raise} (primary raising attack),
-(2)~\textsc{Low-Score-Benign\,+\,Threshold-Lower} (primary lowering attack),
+(2)~\textsc{Low-Score-Benign\,+\,Threshold-Lower} (lowering attack),
 (3)~\textsc{Random-Benign\,+\,Threshold-Raise} (objective-matched negative control for the raising attack), and
-(4)~\textsc{Random-Benign} paired with \textsc{Threshold-Lower} (negative control for the lowering attack).
+(4)~\textsc{Random-Benign\,+\,Threshold-Lower} (negative control for the lowering attack).
 The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ experimental cells total.
 Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, separating training, calibration sampling, and bootstrap resampling stochasticity.
 
@@ -80,9 +80,10 @@ Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and
 
 \textbf{Gate 1 (material shift, primary gate).}
 Threshold shift $\Delta\tau_v = \tau_v^{\mathrm{poisoned}} - \tau_v^{\mathrm{clean}}$ is computed per seed.
-A seed is \emph{Gate-1 significant} when $|\Delta\tau_v| > \delta\tau_v$ and the sign is consistent with the attack objective, where the materiality threshold is
+A (victim, seed) cell is \emph{material} when $|\Delta\tau_v| > \delta\tau_v$ and the sign is consistent with the attack objective, where the materiality threshold is
 $\delta\tau_v = \max\!\bigl(0.1 \times \mathrm{IQR}(\mathcal{C}_v^{\mathrm{clean}}),\;0.01 \times \mathrm{median}_j(\mathrm{IQR}(\mathcal{C}_j^{\mathrm{clean}}))\bigr)$.
-Gate-1 passes when $\ge 8/10$ seeds are significant and the victim-majority condition ($\ge$5/9 of the nine clients, each taken as victim in turn, are significant) holds.
+A \emph{seed passes} when $\ge$5/9 of the nine clients, each taken as victim in turn, are material.
+A (policy, fraction) configuration \emph{passes Gate 1} when $\ge 8/10$ seeds pass.
 
 \textbf{Gate 2 (directional excess over control).}
 Bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the negative control (\textsc{Random-Benign}).
@@ -97,10 +98,11 @@ With ten paired seeds, percentile-bootstrap intervals are approximate uncertaint
 A two-sided Wilcoxon signed-rank test on ten seed-level mean victim $\Delta\mathrm{TPR}$ values (raising, $f{=}0.4$) gives $W{=}0$, $p{=}0.002$ (exact) for all three policies.
 
 \textbf{Gate constant justification.}
-The 10\,\% IQR coefficient for Gate-1 materiality ($0.1{\times}\mathrm{IQR}$) exceeds the calibration instability observed in the clean baseline while remaining below the expected tail-injection shift at $f{=}0.1$; the 1\,\% cross-client floor ($0.01{\times}\mathrm{median}_j(\mathrm{IQR})$) prevents degenerate clients with near-zero score spread from counting as material on arbitrarily small shifts.
+The 10\% IQR coefficient for Gate-1 materiality ($0.1{\times}\mathrm{IQR}$) exceeds the calibration instability observed in the clean baseline while remaining below the shift implied by replacing 10\% of a calibration buffer with top-decile scores; the 1\% cross-client floor ($0.01{\times}\mathrm{median}_j(\mathrm{IQR})$) prevents degenerate clients with near-zero score spread from counting as material on arbitrarily small shifts.
 Both constants were locked from clean-artifact statistics before any poisoned run was executed.
 
 \subsection{Isolation Sanity Check}
 
-To confirm that the attack is confined to the calibration stage, the protocol verifies: (i)~AUROC is invariant under poisoning for all cells, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical.
+To confirm that the attack is confined to the calibration stage, the protocol verifies that (i)~AUROC is invariant under poisoning for all cells, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical.
 All three hold in all 4,320 cells.
+These quantities are invariant by construction, so the check establishes correct isolation of the intervention rather than providing independent evidence.

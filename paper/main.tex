@@ -14,29 +14,28 @@
 \usepackage{xcolor}
 \usepackage{amsmath}
 \usepackage[hidelinks]{hyperref}
+\makeatletter
+\def\UrlOrds{\do\*\do\~\do\'\do\"\do\:}% ":" ordinary => no break after the scheme
+\def\UrlBreaks{\do\/\do\.\do\-}
+\def\UrlBigBreaks{\do@url@hyp}
+\makeatother
 \usepackage{placeins}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,shadows,calc}
+\usepackage{orcidlink}
+\renewcommand{\orcidID}[1]{\,\orcidlink{#1}}
 
 \emergencystretch=1em
 
-% Keep DOI metadata visible without printing full URL prefixes in the bibliography.
 \AtBeginDocument{%
   \renewcommand{\doi}[1]{\href{https://doi.org/\detokenize{#1}}{\nolinkurl{doi:#1}}}%
 }
-\let\origthebibliography\thebibliography
-\let\endorigthebibliography\endthebibliography
-\renewenvironment{thebibliography}[1]
-  {\origthebibliography{#1}\fontsize{8}{8.7}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}}
-  {\endorigthebibliography}
 
-% Float spacing — tighten gaps around floats to recover vertical whitespace
 \setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
 \setlength{\floatsep}{8pt plus 2pt minus 2pt}
 \renewcommand{\textfraction}{0.07}
 \renewcommand{\floatpagefraction}{0.7}
 
-% ---------- macros ----------
 \newcommand{\dtau}{\ensuremath{\Delta\tau}\xspace}
 \newcommand{\GLOBAL}{\textsc{Global}\xspace}
 \newcommand{\LOCAL}{\textsc{Local}\xspace}
@@ -49,20 +48,18 @@
 \titlerunning{Calibration-Stage Poisoning in Federated IoT Anomaly Detection}
 
 \author{
-Salaheddine Naslouby\inst{1}
-\and
-Mohamed Lachgar\inst{2}
-\and
+Salaheddine Naslouby\inst{1}\orcidID{0009-0002-7295-7816}~\and
+Mohamed Lachgar\inst{2}~\and
 Hamid Hrimech\inst{1}
 }
 
 \authorrunning{S. Naslouby et al.}
 
 \institute{
-LAMSAD Laboratory, National School of Applied Sciences (ENSA), Hassan First University, Berrechid, Morocco\\
+Hassan First University, National School of Applied Sciences (ENSA), LAMSAD Laboratory, Berrechid, Morocco\\
 \email{naslouby.salahe@gmail.com}
 \and
-L2IS Laboratory, Higher Normal School (ENS), University Cadi Ayyad, Marrakech, Morocco
+Cadi Ayyad University, Higher Normal School (ENS), L2IS Laboratory, Marrakech, Morocco
 }
 
 \maketitle
@@ -70,25 +67,21 @@ L2IS Laboratory, Higher Normal School (ENS), University Cadi Ayyad, Marrakech, M
 \begin{abstract}
 Federated learning (FL) defenses for IoT anomaly detection largely focus on training and aggregation, while the post-training \emph{threshold-calibration stage} lets each client autonomously collect benign calibration scores and derive its detection threshold.
 This paper characterizes that stage under a score-level contamination model: one compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the threshold without altering model weights, training data, gradients, aggregation, test scores, or labels.
-Across \textsc{Global}, \textsc{Local}, and \textsc{Cluster} threshold policies on the N-BaIoT nine-device federation, the score-level raising attack achieves a 100\% pass rate on the pre-specified materiality gate at all non-zero fractions and degrades victim true-positive rates by 2.4--7.9 percentage points (4.9--7.9\,pp at $f{=}0.4$).
-The lowering attack raises false-alarm indicators for \textsc{Local} and \textsc{Cluster}, increasing cross-client $\Delta\mathrm{CV}(\mathrm{FPR})$ by 0.05--0.06 (at $f{=}0.4$) under \textsc{Replace-Fixed-Budget}; the associated $\Delta\mathrm{TPR}{>}0$ is threshold displacement, not a security benefit.
-\textsc{Global} bounds lowering through $1/N$ dilution.
+Across \textsc{Global}, \textsc{Local}, and \textsc{Cluster} threshold policies on the N-BaIoT nine-device federation, the raising attack achieves a 100\% pass rate on the pre-specified materiality gate at all non-zero fractions and degrades victim true-positive rates by 2.4--7.9 percentage points (4.9--7.9\,pp at $f{=}0.4$).
+The lowering attack increases false-alarm burden for \textsc{Local} and \textsc{Cluster}, raising cross-client $\Delta\mathrm{CV}(\mathrm{FPR})$ by 0.05--0.06 at $f{=}0.4$ under fixed-budget replacement; the associated $\Delta\mathrm{TPR}{>}0$ is threshold displacement, not a security benefit.
+\textsc{Global} bounds the lowering attack through $1/N$ dilution.
 Policy choice governs both magnitude and propagation: \textsc{Local} confines threshold harm to the compromised client, \textsc{Cluster} can transmit small co-cluster perturbations, and \textsc{Global} dilutes but propagates shifts federation-wide.
 The results are bounded to N-BaIoT and score substitution; they characterize a calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
 
 \keywords{Federated Learning \and Anomaly Detection \and IoT Security \and Poisoning Attack \and Threshold Calibration \and Vulnerability Analysis}
 \end{abstract}
 
-% -------------------------------------------------------
 \input{sections/introduction}
 
-% -------------------------------------------------------
 \input{sections/background}
 
-% -------------------------------------------------------
 \input{sections/threat_model}
 
-% Figure: TikZ attack-surface diagram
 \begin{figure}[tb]
 \centering
 \resizebox{0.86\textwidth}{!}{%
@@ -105,26 +98,22 @@ The results are bounded to N-BaIoT and score substitution; they characterize a c
   arr/.style={-Stealth, thick},
   darr/.style={-Stealth, thick, red!70!black, dashed}
 ]
-  %% Training phase
   \node[secure] (local) {Local\\Training};
   \node[secure, right=1.20cm of local] (agg)   {FedAvg\\Aggregation};
   \node[secure, right=1.20cm of agg]   (model) {Shared\\Model};
   \node[phaseLabel, above=0.45cm of agg] (trainLabel)
         {Training \& aggregation (within defense scope)};
 
-  %% Calibration stage
   \node[vuln,   below=1.80cm of model] (thresh) {Threshold~$\tau$};
   \node[vuln,   left=1.60cm of thresh] (cal)    {Calibration\\Buffer};
   \node[attack, left=1.60cm of cal]    (adv)    {Adversary\\(score-level)};
   \node[phaseLabel, text=red!70!black, above=0.45cm of cal] (calLabel)
         {Calibration stage (outside defense scope)};
 
-  %% Policy nodes
   \node[policy, below=0.75cm of thresh, xshift=-1.80cm] (pg) {\GLOBAL};
   \node[policy, below=0.75cm of thresh]                 (pl) {\LOCAL};
   \node[policy, below=0.75cm of thresh, xshift=+1.80cm] (pc) {\CLUSTER};
 
-  %% Phase background boxes
   \begin{scope}[on background layer]
     \node[draw=green!50!black, rounded corners=5pt, fill=green!7, inner sep=8pt,
           fit=(local)(agg)(model)(trainLabel)] {};
@@ -132,7 +121,6 @@ The results are bounded to N-BaIoT and score substitution; they characterize a c
           fit=(calLabel)(adv)(cal)(thresh)(pg)(pl)(pc)] {};
   \end{scope}
 
-  %% Arrows
   \draw[arr] (local) -- (agg);
   \draw[arr] (agg)   -- (model);
   \draw[arr] (model.south) -- (thresh.north);
@@ -151,25 +139,19 @@ Score-level access to one client's calibration buffer can shift~$\tau$ without m
 \label{fig:attack-surface}
 \end{figure}
 
-% -------------------------------------------------------
 \input{sections/method}
 
-% -------------------------------------------------------
 \input{sections/results}
 
-% -------------------------------------------------------
 \input{sections/discussion}
 
-% -------------------------------------------------------
 \input{sections/conclusion}
 
-% -------------------------------------------------------
 \begin{credits}
 \subsubsection{\discintname}
 The authors have no competing interests to declare that are relevant to the content of this article.
 \end{credits}
 
-% -------------------------------------------------------
 \bibliographystyle{splncs04}
 \bibliography{references}
 
