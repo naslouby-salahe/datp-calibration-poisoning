@@ -56,7 +56,7 @@ Three threshold-policy families are evaluated, covering the design points survey
   \item[\CLUSTER.]
   Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, random seed 42; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
   The shared threshold is the cluster mean, so a compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}) while other clusters are unaffected.
-  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, displacing the victim in the runs observed here into an effectively singleton cluster whose mean collapses to the victim's poisoned local threshold; this yields near-\LOCAL victim shifts while co-cluster members see perturbations small relative to the victim shift but not identically zero.
+  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, displacing the victim, in the runs observed here, into an effectively singleton cluster whose mean collapses to the victim's poisoned local threshold; this yields near-\LOCAL victim shifts while co-cluster members see perturbations small relative to the victim shift but not identically zero.
 \end{description}
 
 \subsection{Attack Parameterization}
@@ -86,22 +86,18 @@ is computed from the same seed's clean calibration arrays with $j$ over all nine
 A \emph{seed passes} when at least 5 of the 9 clients, each taken as victim in turn, are material, and a (policy, fraction) configuration \emph{passes Gate 1} when at least 8 of the 10 seeds pass; these majorities are conservative consistency requirements, not calibrated error rates.
 Passing supports the claim that the channel displaces thresholds by more than clean-baseline instability at a majority of victims and reproducibly across seeds; failure would mean the displacement is not separable from that instability.
 Both coefficients were locked from clean-artifact statistics beforehand, the 10\% IQR term exceeding the threshold instability observed across clean seeds and the 1\% cross-client floor stopping clients with near-zero score spread from counting as material on arbitrarily small shifts.
-Gate 1 is thus a pre-committed materiality floor, not a significance test, and its pass rates should be read together with the effect sizes in Table~\ref{tab:main-results}.
+Gate 1 is thus a pre-committed materiality floor rather than a significance test; its pass rates are reported alongside the effect sizes in Table~\ref{tab:main-results}.
 
-\textbf{Gate 2 (directional excess over control)} evaluates the mean $\Delta\tau$ over the ten seed-level aggregates; its label names the intended contrast, not an estimated one, and the locked rule is applied to each condition separately: the bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the Random-Benign control.
-No interval on the primary-minus-control difference was estimated, so Gate 2 alone does not establish that the conditions differ, and a control interval covering zero is not evidence of an exactly zero control effect; attribution rests instead on the magnitude gap between primary and control means and on the control's Gate-1 pass rate (Section~\ref{sec:results}).
+\textbf{Gate 2 (directional excess over control)} is an objective-matched paired contrast: within each cell the control $\Delta\tau$ is subtracted from the attack $\Delta\tau$, sign-oriented by objective, and the nine victim values are averaged to one value per seed.
+A configuration passes when at least 8 of the 10 seed values are strictly positive and their median is positive, with a percentile bootstrap CI on those ten contrast values computed alongside but not entering the rule.
 
 \textbf{Gate 3 (downstream operating-point displacement)} evaluates the mean victim $\Delta\mathrm{TPR}$ at the seed level and passes when its direction matches the threshold objective---negative for raising, positive for lowering---in at least 8 of the 10 seeds; failure means the operating point did not move consistently with the threshold shift.
 For raising, the threshold increase means reduced victim TPR and hence missed-detection harm.
 For lowering, the threshold decrease means a higher false-positive rate and greater cross-client FPR disparity, and the accompanying positive $\Delta\mathrm{TPR}$ is evidence of operating-point displacement only; the harm metric for that objective is $\Delta\mathrm{CV(FPR)}$.
 
 All CIs are 95\% percentile bootstrap over the 10 seed-level aggregates with $B{=}10{,}000$ resamples, reported per configuration, two-sided and without multiplicity adjustment; at ten paired seeds they are approximate uncertainty estimates, not exact coverage guarantees.
-% AUTHOR NOTE: the Wilcoxon sentence reports W and p only. Tie/zero-difference handling
-% and the exact-versus-asymptotic setting are not recorded in the released artifact
-% bundle; confirm from the analysis script before camera-ready, or drop "(exact)".
-As a supporting check, a two-sided Wilcoxon signed-rank test of the ten paired seed-level mean victim $\Delta\mathrm{TPR}$ differences against a zero-median null (raising, $f{=}0.4$) gives $W{=}0$, $p{=}0.002$ (exact) for all three policies; at $n{=}10$ that is the smallest attainable two-sided $p$-value, so the identical result across policies restates the unanimous sign agreement already captured by Gate 3, and effect sizes and intervals remain the primary evidence.
 
 \subsection{Isolation Sanity Check}
 
 To confirm that the attack is confined to the calibration stage, the protocol verifies that (i)~AUROC is invariant under poisoning, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical; all three hold in every cell, including the 3,240 with non-zero injection.
-These quantities are invariant by construction, so the check establishes correct isolation of the intervention rather than independent evidence.
+Being invariant by construction, these quantities verify implementation isolation rather than provide independent evidence.

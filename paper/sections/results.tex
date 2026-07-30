@@ -33,18 +33,20 @@ Panel (b) uses the legend of panel (a).}
 \label{fig:threshold-shift}
 \end{figure}
 
-All three policies clear every gate at every non-zero fraction, with a Gate-1 pass rate of 10/10 seeds throughout, a seed passing when at least 5 of its 9 victim clients show a material, sign-correct shift.
+Under raising, all three policies clear Gates 1 and 3 at every non-zero fraction, with a Gate-1 pass rate of 10/10 seeds throughout, a seed passing when at least 5 of its 9 victim clients show a material, sign-correct shift.
 For \LOCAL and \CLUSTER all nine clients are individually material in every seed; for \GLOBAL at $f{=}0.1$ two Provision security cameras (PT-737E and PT-838) are material in only 2/10 and 4/10 seeds respectively and one thermostat in 9/10, yet the victim-majority condition still holds because at least six of the nine are material in every seed.
-Gate 2 holds as specified, and the primary and control intervals are additionally disjoint everywhere---a descriptive observation, not a test of their difference.
-For the control, mean $\Delta\tau$ is two orders of magnitude smaller than the tail-injection shift at the same fraction, no seed meets the Gate-1 criterion (0/10), and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results} gives representative $f{=}0.4$ rows).
-That magnitude gap, rather than the control's non-significance, attributes the targeted effects to tail contamination instead of position perturbation.
+The primary and control $\Delta\tau$ intervals are disjoint everywhere, though a control interval covering zero does not imply an exactly zero control effect.
+For the control, mean $\Delta\tau$, averaged over the two objectives, is two orders of magnitude smaller than the tail-injection shift at the same fraction, no seed meets the Gate-1 criterion (0/10), and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results} gives representative $f{=}0.4$ rows).
+That magnitude gap is the basis for attributing the targeted effects to tail contamination rather than position perturbation.
+The pooled control rows provide a compact descriptive summary; Gate 2 is evaluated using the objective-matched Random-Benign conditions separately.
 
 Magnitude differs by policy: at $f{=}0.4$, \LOCAL and \CLUSTER give the largest shifts, $\Delta\tau = +0.902$ $[+0.864, +0.944]$ and $+0.899$ $[+0.859, +0.941]$, while \GLOBAL gives a diluted but still material $+0.100$ $[+0.096, +0.105]$.
 The $1/N$ dilution is definitional, yet the residual ($\approx$10\% of the local shift) still produces measurable harm.
 
 Mean victim $\Delta\mathrm{TPR}$ is negative and directionally consistent across all ten seeds for all three policies, so Gate 3 passes everywhere.
-At $f{=}0.4$: \LOCAL $-7.9$\,pp, \CLUSTER $-4.9$\,pp (equal to the $f{=}0.2$ point estimate to one decimal; no interval on that difference is estimated, so the apparent saturation is not separated from seed-level variation), \GLOBAL $-6.1$\,pp.
-Downstream harm need not track $\Delta\tau$ monotonically, consistent with each policy's clean threshold sitting at a different point of the victim's score distribution, which was not characterized here, so this is an interpretation, not a measured result.
+At $f{=}0.4$: \LOCAL $-7.9$\,pp, \CLUSTER $-4.9$\,pp, \GLOBAL $-6.1$\,pp.
+\CLUSTER equals its $f{=}0.2$ estimate to one decimal, but no interval on that difference was estimated, so this apparent saturation is not separated from seed-level variation.
+Downstream harm need not track $\Delta\tau$ monotonically, consistent with each policy's clean threshold sitting at a different point of the victim's score distribution; that distribution was not characterized here, so the explanation remains an interpretation.
 
 \subsection{Lowering Attack: Secondary Results (Conditional)}
 
@@ -53,10 +55,10 @@ At $f{=}0.4$, \LOCAL reaches $\Delta\tau = -0.164$ $[-0.176, -0.154]$ with $\Del
 \CLUSTER reaches $-0.154$ $[-0.167, -0.142]$ with $+10.3$\,pp.
 \GLOBAL is structurally bounded: $\Delta\tau = -0.018$ $[-0.020, -0.017]$, with $\Delta\mathrm{TPR} = +2.1$\,pp, and its Gate 1 passes only at $f{\ge}0.2$.
 
-The disparity metric $\Delta\mathrm{CV(FPR)}$ (dimensionless) is $+0.053$ for \LOCAL (10/10 seeds) and $+0.060$ for \CLUSTER (8/10 seeds, meeting the consistency requirement at its boundary), while \GLOBAL shows $-0.019$.
+The disparity metric $\Delta\mathrm{CV(FPR)}$ (dimensionless) is $+0.053$ for \LOCAL (positive in 10 of 10 seeds) and $+0.060$ for \CLUSTER (positive in 8 of 10 seeds), while \GLOBAL shows $-0.019$.
 Under a shared threshold every client's FPR moves in the same direction, which can reduce the coefficient of variation even as absolute FPR rises; that negative value reflects dispersion reduction, not reduced alarm burden.
 Absolute clean$\to$poisoned FPR at $f{=}0.4$: \GLOBAL $0.041\to0.043$, \LOCAL $0.043\to0.046$, \CLUSTER $0.043\to0.049$.
-Lowering a $q{=}0.95$ quantile requires displacing scores in the upper-tail support, which random position replacement achieves with probability $\approx f$, leaving 60\% of that support intact at $f{=}0.4$; \GLOBAL compounds the effect via $1/N$ dilution, so these results are a lower bound under Replace-Fixed-Budget.
+Lowering a $q{=}0.95$ quantile requires displacing scores in the upper-tail support, which random position replacement achieves with probability $\approx f$, leaving 60\% of that support intact at $f{=}0.4$; \GLOBAL compounds the effect via $1/N$ dilution, so Replace-Fixed-Budget may understate the displacement achievable by a rank-aware replacement strategy.
 
 \subsection{Policy-Differentiation Summary}
 
@@ -64,6 +66,7 @@ Lowering a $q{=}0.95$ quantile requires displacing scores in the upper-tail supp
 
 Table~\ref{tab:spillover} quantifies threshold propagation under the raising attack at $f{=}0.4$.
 \GLOBAL applies the same shift to all nine clients, so non-victim $\Delta\tau$ equals victim $\Delta\tau$ by construction; the material non-victim count nonetheless falls below 8/8 in a minority of seeds, because the Gate-1 floor $\delta\tau_{j,s}$ scales with each client's calibration IQR and a shared shift can fall below that floor at the widest-spread clients.
-\CLUSTER produces near-\LOCAL victim shifts ($+0.899$ vs.\ $+0.902$) with smaller victim $\Delta\mathrm{TPR}$ ($-4.9$ vs.\ $-7.9$\,pp), and its non-victim changes are signed and near-symmetric (mean $+0.0003$, std $0.017$, driven by $k$-means reassignment rather than aggregation), so the small mean reflects cancellation rather than negligible perturbation: 6/8 non-victims meet the Gate-1 criterion, with typical magnitudes about an order below \CLUSTER's own weakest victim shift ($+0.253$ at $f{=}0.1$).
-That count measures threshold materiality, not downstream harm, and \CLUSTER non-victim rates were likewise not recomputed.
+\CLUSTER produces near-\LOCAL victim shifts ($+0.899$ vs.\ $+0.902$) with smaller victim $\Delta\mathrm{TPR}$ ($-4.9$ vs.\ $-7.9$\,pp), and its non-victim changes are signed and near-symmetric (mean $+0.0003$; std $0.017$ across the 90 victim--seed cells, arising from cluster recomputation and assignment changes rather than aggregation).
+The small mean therefore reflects cancellation, not negligible perturbation: on average 6 of the 8 non-victims meet the Gate-1 criterion, at magnitudes about an order of magnitude below \CLUSTER's weakest victim shift ($+0.253$ at $f{=}0.1$).
+\CLUSTER non-victim true-positive rates were not recomputed.
 \LOCAL yields the highest per-victim shift with no material non-victim shifts at all, by policy design.

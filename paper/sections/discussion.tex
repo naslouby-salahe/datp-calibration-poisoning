@@ -4,11 +4,11 @@
 The experiment operates at the score level, replacing calibration-buffer scores programmatically rather than through generated traffic.
 A complete end-to-end attack would also require generating packets whose reconstruction error lands in the target tail, which means controlling feature-level statistics through the encoder-decoder nonlinearity under real network behavior; this work is a \emph{vulnerability-surface characterization}, not a deployed attack.
 With-replacement sampling from the tail reservoir at $f{=}0.4$ also leaves duplicate scores in the buffer---on the order of $10^3$ expected collision pairs for the smallest calibration set ($n_v{\approx}2{,}622$)---which a uniqueness check would flag.
-That is an artifact of the sampling used here rather than of the attack concept, since perturbing scores within the tail removes it at the cost of leaving the exact tail boundary; detecting a buffer contaminated without that artifact remains open.
+Perturbing scores within the tail removes the duplicates, at the cost of leaving the exact tail boundary, so the artifact belongs to the sampling rule rather than the attack; detecting a buffer contaminated without it remains open.
 
-The \LOCAL and \CLUSTER lowering results are a \emph{lower bound}: an adversary with access to the buffer's rank structure could achieve larger displacements and alarm-burden effects.
+The \LOCAL and \CLUSTER lowering results are \emph{conservative under the evaluated replacement rule}: an adversary exploiting the buffer's rank structure may achieve larger displacements and alarm-burden effects, which was not evaluated here.
 Within the evaluated setting the results are consistent with a trade-off in policy design: \LOCAL maximizes per-client isolation at the cost of the largest per-victim exposure, whereas \GLOBAL limits per-victim shift by averaging but applies residual shifts federation-wide.
 
 Claims are bounded to N-BaIoT (9 clients), the autoencoder architecture, FedAvg, and $q{=}0.95$; generalization to other datasets, detectors, FL algorithms, larger federations, and quantiles is open, as is multi-client collusion.
-Non-victim detection rates were not recomputed under any policy, so federation-wide impact under \GLOBAL and intra-cluster impact under \CLUSTER are characterized at the threshold level only, and interval precision is bounded by the ten-seed budget (Section~\ref{sec:method}).
+Non-victim true-positive rates were not recomputed, so federation-wide impact under \GLOBAL and intra-cluster impact under \CLUSTER are characterized at the threshold and fleet-FPR level only, and interval precision is bounded by the ten-seed budget (Section~\ref{sec:method}).
 Defense design for the calibration channel---threshold validation, calibration-set integrity constraints---is out of scope and merits independent study.
