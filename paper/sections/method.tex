@@ -56,7 +56,7 @@ Three threshold-policy families are evaluated, covering the design points survey
   \item[\CLUSTER.]
   Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, random seed 42; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
   The shared threshold is the cluster mean, so a compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}) while other clusters are unaffected.
-  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, displacing the victim, in the runs observed here, into an effectively singleton cluster whose mean collapses to the victim's poisoned local threshold; this yields near-\LOCAL victim shifts while co-cluster members see perturbations small relative to the victim shift but not identically zero.
+  Under Threshold-Raise, tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, displacing the victim, in the runs observed here, into an effectively singleton cluster whose mean collapses to the victim's poisoned local threshold; this yields near-\LOCAL victim shifts while co-cluster members see perturbations small relative to the victim shift but not identically zero.
 \end{description}
 
 \subsection{Attack Parameterization}
@@ -93,7 +93,7 @@ A configuration passes when at least 8 of the 10 seed values are strictly positi
 
 \textbf{Gate 3 (downstream operating-point displacement)} evaluates the mean victim $\Delta\mathrm{TPR}$ at the seed level and passes when its direction matches the threshold objective---negative for raising, positive for lowering---in at least 8 of the 10 seeds; failure means the operating point did not move consistently with the threshold shift.
 For raising, the threshold increase means reduced victim TPR and hence missed-detection harm.
-For lowering, the threshold decrease means a higher false-positive rate and greater cross-client FPR disparity, and the accompanying positive $\Delta\mathrm{TPR}$ is evidence of operating-point displacement only; the harm metric for that objective is $\Delta\mathrm{CV(FPR)}$.
+For lowering, the threshold decrease means a higher false-positive rate and, depending on policy, greater cross-client FPR disparity, and the accompanying positive $\Delta\mathrm{TPR}$ is evidence of operating-point displacement only; the harm metric for that objective is $\Delta\mathrm{CV(FPR)}$.
 
 All CIs are 95\% percentile bootstrap over the 10 seed-level aggregates with $B{=}10{,}000$ resamples, reported per configuration, two-sided and without multiplicity adjustment; at ten paired seeds they are approximate uncertainty estimates, not exact coverage guarantees.
 
