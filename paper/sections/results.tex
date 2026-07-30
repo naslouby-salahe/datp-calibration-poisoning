@@ -66,7 +66,7 @@ Lowering a $q{=}0.95$ quantile requires displacing scores in the upper-tail supp
 
 Table~\ref{tab:spillover} quantifies threshold propagation under the raising attack at $f{=}0.4$.
 \GLOBAL applies the same shift to all nine clients, so non-victim $\Delta\tau$ equals victim $\Delta\tau$ by construction; the material non-victim count nonetheless falls below 8/8 in a minority of seeds, because the Gate-1 floor $\delta\tau_{j,s}$ scales with each client's calibration IQR and a shared shift can fall below that floor at the widest-spread clients.
-\CLUSTER produces near-\LOCAL victim shifts ($+0.899$ vs.\ $+0.902$) with smaller victim $\Delta\mathrm{TPR}$ ($-4.9$ vs.\ $-7.9$\,pp), and its non-victim changes are signed and near-symmetric (mean $+0.0003$; std $0.017$ across the 90 victim--seed cells, arising from cluster recomputation and assignment changes rather than aggregation).
+\CLUSTER produces near-\LOCAL victim shifts ($+0.899$ vs.\ $+0.902$) with smaller victim $\Delta\mathrm{TPR}$ ($-4.9$ vs.\ $-7.9$\,pp), and its non-victim changes include positive and negative values (mean $+0.0003$; std $0.017$ across the 90 victim--seed cells, arising from cluster recomputation and assignment changes rather than aggregation).
 The small mean therefore reflects cancellation, not negligible perturbation: on average 6 of the 8 non-victims meet the Gate-1 criterion, at magnitudes about an order of magnitude below \CLUSTER's weakest victim shift ($+0.253$ at $f{=}0.1$).
 \CLUSTER non-victim true-positive rates were not recomputed.
 \LOCAL yields the highest per-victim shift with no material non-victim shifts at all, by policy design.
