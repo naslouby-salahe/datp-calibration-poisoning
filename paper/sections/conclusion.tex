@@ -1,14 +1,12 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper characterized the post-training threshold-calibration stage in federated IoT anomaly detection as an attack surface that the studied training-phase and aggregation-phase defenses do not address.
-Under a score-level contamination model on the N-BaIoT nine-device federation (FedAvg autoencoder, $q{=}0.95$, single compromised client), the raising attack degrades victim detection rates by 2.4--7.9\,pp across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 100\% Gate-1 pass rates and 95\% bootstrap CIs excluding zero.
-The lowering attack shifts thresholds downward, raising $\Delta\mathrm{TPR}$ by 10--12\,pp and the primary alarm-burden metric $\Delta\mathrm{CV(FPR)}$ by 0.05--0.06 for \LOCAL and \CLUSTER (at $f{=}0.4$, a lower bound under Replace-Fixed-Budget). The $\Delta\mathrm{TPR}$ increase reflects operating-point displacement rather than a security benefit.
-The policy ordering---per-victim exposure maximized under \LOCAL, diluted but federation-wide threshold propagation under \GLOBAL, small intra-cluster threshold perturbations under \CLUSTER---implies calibration-stage hardening should be matched to the threshold policy, not only the training-phase defense.
-These findings isolate a calibration-channel vulnerability mechanism, not a complete traffic-generation attack.
-Future work should address traffic-level realizability, calibration-stage integrity defenses, and generalization across detector architectures and datasets.
+This paper characterized the post-training threshold-calibration stage in federated IoT anomaly detection as an attack surface the studied training- and aggregation-phase defenses do not address.
+Under a score-level contamination model on the N-BaIoT nine-device federation (FedAvg autoencoder, $q{=}0.95$, single compromised client), the raising attack satisfied the pre-specified material threshold-displacement criterion in every evaluated non-zero policy--fraction condition, with 95\% bootstrap intervals on $\Delta\tau$ excluding zero, and degraded victim detection rates by 2.4--7.9\,pp, consistently signed in all ten seeds.
+The lowering attack shifts thresholds downward, raising the FPR-disparity metric $\Delta\mathrm{CV(FPR)}$ by 0.05--0.06 for \LOCAL and \CLUSTER at $f{=}0.4$, a lower bound under Replace-Fixed-Budget; the accompanying $\Delta\mathrm{TPR}$ increase reflects operating-point displacement, not a security benefit.
+The policy ordering---maximal exposure under \LOCAL, diluted but federation-wide threshold propagation under \GLOBAL, small intra-cluster perturbations under \CLUSTER---suggests that in settings resembling this one, calibration-stage hardening should be matched to the threshold policy rather than left to training-phase defenses.
+These findings isolate a calibration-channel vulnerability mechanism, not a complete traffic-generation attack; traffic-level realizability, calibration-stage integrity defenses, and generalization across detectors and datasets remain open.
 
 \textbf{Reproducibility.}
-The released artifact bundle is archived on Zenodo at \doi{10.5281/zenodo.21196568}.
-It contains the experiment configuration, paired training/poisoning/analysis seeds, the split manifest, per-cell results, negative-control records, isolation checks, and figure/table scripts.
-Model checkpoints, hyperparameters, and analysis gates were fixed before poisoned runs; no poisoned metric was used for checkpoint, hyperparameter, or gate selection.
+The artifact bundle archived on Zenodo at \doi{10.5281/zenodo.21196568} contains the configuration, paired seeds, split manifest, per-cell results, negative-control records, isolation checks, and figure/table scripts.
+Checkpoints, hyperparameters, and analysis gates were fixed before poisoned runs; no poisoned metric informed any of those choices.

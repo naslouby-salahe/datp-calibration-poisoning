@@ -1,26 +1,28 @@
 \section{Background and Related Work}
 \label{sec:background}
 
-\textbf{Federated anomaly detection for IoT.}
-Federated intrusion and anomaly detection for IoT has moved beyond plain FedAvg training~\cite{Belenguer2025FLIDSReview,Khang2026P4P,Quyen2025FedKDIDS,rey2022federated,Thein2024PFLIDS}.
-These studies improve training-time collaboration and robustness metrics, while thresholded autoencoder pipelines still rely on a benign post-training calibration step.
-The N-BaIoT benchmark~\cite{meidan2018nbaiot} provides labeled benign and Mirai/BASHLITE traffic for nine physical devices, establishing a widely used evaluation platform for FL-IDS research.
+\subsection{Federated IoT Anomaly Detection and Training-Side Defenses}
 
-\textbf{Defenses.}
-Existing defenses target the \emph{training phase}.
-Byzantine-robust rules, including Krum~\cite{blanchard2017machine}, Trimmed-Mean, and Median~\cite{yin2018byzantine}, filter or downweight outlier gradients before aggregation.
-FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
-These defenses operate on gradients or model updates; they complete before the threshold-calibration stage begins.
-Recent FL-IDS defenses extend this training-side view with personalized poisoning defenses, knowledge-distillation verifiers, and probe-guided anti-poisoning pipelines under non-IID IoT data~\cite{Khang2026P4P,Quyen2025FedKDIDS,Thein2024PFLIDS}; the defenses reviewed here do not observe the later client-local calibration buffer.
+Federated intrusion and anomaly detection for IoT has moved beyond plain FedAvg training~\cite{Belenguer2025FLIDSReview,Khang2026P4P,Quyen2025FedKDIDS,rey2022federated,Thein2024PFLIDS}: these studies improve training-time collaboration and robustness metrics, while thresholded autoencoder pipelines still rely on a benign post-training calibration step.
+The N-BaIoT benchmark~\cite{meidan2018nbaiot}, which provides labeled benign and Mirai/BASHLITE traffic for nine physical devices, is a widely used FL-IDS evaluation platform.
+
+The defenses developed for this setting act on the training phase.
+Byzantine-robust rules, including Krum~\cite{blanchard2017machine}, Trimmed-Mean, and Median~\cite{yin2018byzantine}, filter or downweight outlier gradients before aggregation, and FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
+Recent FL-IDS work extends this training-side view with personalized poisoning defenses, knowledge-distillation verifiers, and probe-guided anti-poisoning pipelines under non-IID IoT data~\cite{Khang2026P4P,Quyen2025FedKDIDS,Thein2024PFLIDS}.
+All of them inspect training data, gradients, model updates, or aggregation inputs; none is specified to observe the later client-local calibration buffer or designed for the post-training calibration channel considered here---a statement about the defenses reviewed here, not a claim that no calibration-stage defense could be built.
+
+\subsection{Threshold Calibration and Adjacent Work}
+
+Kloft \& Laskov~\cite{kloft2010online} study online poisoning in centralized anomaly detection via a continuous training stream, assuming a trusted aggregator or persistent model-update access---both absent from FL's post-training calibration stage, where calibration data never leaves the client and the pipelines considered here perform no server-side sanitization.
+FL model poisoning~\cite{bagdasaryan2020backdoor} likewise targets the gradient and weight surface.
+The closest work treats calibration and thresholding as trusted: Laridi et al.~\cite{laridi2024} propose summary-statistics-based federated thresholding without adversarial contamination, and S\'aez-de-C\'amara et al.~\cite{saezdecamara2023} a clustered federated IoT anomaly-detection architecture that assumes a benign calibration pipeline.
+The \GLOBAL, \LOCAL, and \CLUSTER policies evaluated here, defined in Section~\ref{sec:method}, follow the partitioning structures of that literature~\cite{ghosh2020efficient,laridi2024,sattler2020clustered}.
 
 \begin{sloppypar}
-\textbf{Threshold calibration and poisoning.}
-By construction, a detection threshold at fixed quantile $q$ is sensitive to the scores admitted to the calibration distribution: tail-high contamination raises the boundary (missed detections); tail-low contamination lowers it (false alarms).
-Kloft \& Laskov~\cite{kloft2010online} study online poisoning in centralized anomaly detection via a continuous training stream, assuming a trusted aggregator or persistent model-update access---both absent from FL's post-training calibration stage, where calibration data never leaves the client and the pipelines considered here perform no server-side sanitization.
-FL model poisoning~\cite{bagdasaryan2020backdoor} also targets the gradient/weight surface.
-No prior work in the reviewed literature isolates post-training threshold calibration as the attacked channel in federated threshold-based IoT anomaly detection under otherwise-unchanged training, model, aggregation, and test artifacts (Table~\ref{tab:related}).
-This is not a new poisoning taxonomy; the contribution is isolating this channel and showing policy-dependent victim effects and threshold propagation under a controlled score-level intervention.
-The closest related work treats the calibration/thresholding pipeline as trusted: Laridi et al.~\cite{laridi2024} propose summary-statistics-based federated thresholding without adversarial contamination, and S\'aez-de-C\'amara et al.~\cite{saezdecamara2023} propose a clustered federated IoT anomaly-detection architecture assuming a benign calibration pipeline; calibration-stage poisoning instead treats client-local benign calibration as the attacked channel.
+Table~\ref{tab:related} positions this study against those lines of work.
+Within the reviewed literature, no prior study isolates post-training threshold calibration as the attacked channel while training data, model, aggregation, and test artifacts remain unchanged, and the security implications of the three policies have not been examined under a calibration-stage adversary.
+This is not a new poisoning taxonomy; the contribution is isolating the channel and measuring policy-dependent victim effects and threshold propagation under a controlled score-level intervention.
+Section~\ref{sec:threat} states the adversary model.
 \end{sloppypar}
 
 \begin{table}[tb]
@@ -48,6 +50,3 @@ Threshold / model personalization~\cite{ghosh2020efficient,laridi2024,sattler202
 \bottomrule
 \end{tabular}
 \end{table}
-
-\textbf{Threshold policies.}
-The \GLOBAL/\LOCAL/\CLUSTER threshold policies evaluated here follow the client-partitioning and personalization structures used in federated personalization work~\cite{ghosh2020efficient,laridi2024,sattler2020clustered} (defined precisely in \S\ref{sec:method}); their security implications have not been studied under calibration-stage adversaries.

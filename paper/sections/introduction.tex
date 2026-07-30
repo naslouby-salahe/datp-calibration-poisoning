@@ -3,30 +3,24 @@
 
 Federated learning (FL) is commonly used for IoT anomaly detection: devices contribute to a shared model without centralizing raw traffic, and personalized detection thresholds let each node adapt to its own traffic distribution~\cite{rey2022federated}.
 Security work on federated anomaly detection has concentrated on the \emph{training phase}: Byzantine clients injecting adversarial gradients, label-flipping poisoning, or model-inversion attacks~\cite{bhagoji2019analyzing,biggio2012poisoning,tolpegin2020data}.
-Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{blanchard2017machine,cao2020fltrust,yin2018byzantine}.
-Recent FL-IDS work adds personalized, non-IID-robust, knowledge-distillation, and anti-poisoning designs~\cite{Belenguer2025FLIDSReview,Khang2026P4P,Quyen2025FedKDIDS,Thein2024PFLIDS}, all targeting the training or aggregation surface rather than the post-training calibration buffer.
+Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{blanchard2017machine,cao2020fltrust,yin2018byzantine}, and recent FL-IDS work adds personalized, non-IID-robust, knowledge-distillation, and anti-poisoning designs~\cite{Belenguer2025FLIDSReview,Khang2026P4P,Quyen2025FedKDIDS,Thein2024PFLIDS}, all acting on training data, gradients, model updates, or aggregation inputs.
 
-\textbf{A post-training coverage gap.}
-The \emph{threshold-calibration stage} is the post-training, pre-deployment step in which each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
-Training- and aggregation-phase defenses complete before calibration begins and cannot observe the calibration buffer.
-If a single client's benign calibration buffer can be contaminated with benign scores drawn from the upper (or lower) tail of that client's own distribution, the resulting threshold shifts without any change to model weights, training data, labels, or gradients.
-No claim is made that a dedicated calibration-stage defense is impossible, only that the training- and aggregation-phase defenses studied in the FL-IDS literature do not cover this stage.
+The step that follows has received much less attention: in the \emph{threshold-calibration stage}, each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
+Training- and aggregation-phase defenses complete before this stage begins, and none of the designs cited above is specified to observe or validate the client-local calibration buffer.
+If a single client's benign calibration buffer is contaminated with benign scores from the upper (or lower) tail of that client's own distribution, its threshold moves.
 
-\textbf{Study focus.}
-This paper identifies threshold calibration as an underexplored attack surface and characterizes its vulnerability under a score-level contamination model.
-Concretely, an adversary with access to a single client's calibration buffer replaces a fraction~$f$ of entries with tail-sampled scores drawn from the same client's benign distribution (\emph{calibration-stage poisoning}).
-The evaluation covers three threshold-policy families---\GLOBAL (federation-wide mean), \LOCAL (per-client), and \CLUSTER (cluster-averaged)---across all nine physical-device clients in the N-BaIoT dataset~\cite{meidan2018nbaiot} at four injection fractions.
+This paper characterizes that stage under a score-level contamination model in which an adversary controlling one client replaces a fraction~$f$ of that client's calibration buffer with tail-sampled scores from the same client's benign calibration split.
+Model weights, training data, labels, gradients, aggregation, test scores, test labels, and the threshold-policy definition all stay fixed, so ranking-based detection quality is unaffected and only the operating point moves.
+The intervention is therefore not data poisoning relocated to calibration data (Table~\ref{tab:related}): it acts strictly after model convergence and exploits a trust assumption specific to this stage.
+Its consequences depend on how the federation turns local thresholds into deployed ones.
+That last dependence is the research question: does the choice of a federation-wide, per-client, or cluster-averaged threshold change how far one contaminated buffer reaches and how much detection it costs?
+The evaluation covers all three policies---\GLOBAL (federation-wide mean), \LOCAL (per-client), and \CLUSTER (cluster-averaged)---with each of the nine physical-device clients of N-BaIoT~\cite{meidan2018nbaiot} taken as the compromised client in turn, at four injection fractions.
 
-Calibration-stage poisoning is not simply data poisoning relocated to calibration data (Table~\ref{tab:related}).
-It occurs strictly after model convergence, so training-phase defenses have already completed; it exploits a trust model specific to that phase, since calibration data is collected autonomously with no central validation gate; and its effect depends on the threshold policy, so the same injection fraction produces different shifts and different propagation under \GLOBAL, \LOCAL, and \CLUSTER.
+The paper makes three contributions.
+First, it formalizes a single-client, calibration-only threat model and states the invariants it preserves, isolating the post-training calibration buffer as the attacked channel.
+Second, it reports a paired-seed evaluation of threshold raising and threshold lowering across the three threshold policies, each with a matched Random-Benign negative control that keeps the injection budget fixed but removes the tail structure.
+Third, it characterizes the resulting policy-differentiated behavior: sensitivity at the compromised client, threshold propagation to non-victims, and downstream operating-point harm.
+All claims are bounded to the nine-device N-BaIoT setting with autoencoder detectors and FedAvg aggregation; the mechanism operates at the score level, and defense design is out of scope.
 
-\textbf{Contributions.}
-\begin{enumerate}
-  \item The analysis isolates the post-training threshold-calibration stage as a distinct attack surface: contaminating one client's benign calibration scores can shift thresholds while model weights, training data, aggregation, test scores, and labels remain fixed (\S\ref{sec:threat}).
-  \item The evaluation presents a controlled vulnerability characterization under score-level calibration contamination across three threshold policies, showing that the raising attack degrades victim detection rates by 2.4--7.9\,pp across non-zero injection fractions (4.9--7.9\,pp at $f{=}0.4$) with 95\% bootstrap confidence intervals excluding zero (\S\ref{sec:results}).
-  \item The results document policy-differentiated behavior: \LOCAL gives the largest per-victim threshold shifts with no cross-client threshold propagation; \CLUSTER allows small intra-cluster threshold perturbations; \GLOBAL dilutes shifts but propagates them federation-wide; lowering is secondary and conditionally bounded, especially under \GLOBAL (\S\ref{sec:results}).
-\end{enumerate}
-
-\textbf{Scope.}
-All claims are bounded to the nine-device N-BaIoT setting with autoencoder detectors and FedAvg aggregation, and the poisoning mechanism operates at the score level; no claim is made about deployability, evasion guarantees, or generalization beyond this setting.
-Defense design against calibration-stage poisoning is out of scope, though \S\ref{sec:discussion} discusses properties a defense would need to satisfy.
+The remainder of this paper is organized as follows.
+Section~\ref{sec:background} reviews federated IoT anomaly detection, training-side defenses, and adjacent threshold-calibration work; Section~\ref{sec:threat} defines the threat model and attack construction; Section~\ref{sec:method} describes the protocol, threshold policies, attack parameterization, and statistical analysis; Section~\ref{sec:results} presents the clean-baseline and poisoning results; Section~\ref{sec:discussion} discusses findings and limitations; and Section~\ref{sec:conclusion} concludes.
