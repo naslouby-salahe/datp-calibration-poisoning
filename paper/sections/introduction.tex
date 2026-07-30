@@ -10,10 +10,10 @@ Training- and aggregation-phase defenses complete before this stage begins, and 
 If a single client's benign calibration buffer is contaminated with benign scores from the upper (or lower) tail of that client's own distribution, its threshold moves.
 
 This paper characterizes that stage under a score-level contamination model in which an adversary controlling one client replaces a fraction~$f$ of that client's calibration buffer with tail-sampled scores from the same client's benign calibration split.
-Model weights, training data, labels, gradients, aggregation, test scores, test labels, and the threshold-policy definition all stay fixed, so ranking-based detection quality is unaffected and only the operating point moves.
+Model weights, training data, labels, gradients, aggregation, test scores, test labels, and the threshold-policy definition all stay fixed, so score ranking is invariant by construction and only the operating point moves.
 The intervention is therefore not data poisoning relocated to calibration data (Table~\ref{tab:related}): it acts strictly after model convergence and exploits a trust assumption specific to this stage.
 Its consequences depend on how the federation turns local thresholds into deployed ones.
-That last dependence is the research question: does the choice of a federation-wide, per-client, or cluster-averaged threshold change how far one contaminated buffer reaches and how much detection it costs?
+That last dependence is the research question: does the choice of a federation-wide, per-client, or cluster-averaged threshold change how far one contaminated buffer propagates and how much it reduces detection?
 The evaluation covers all three policies---\GLOBAL (federation-wide mean), \LOCAL (per-client), and \CLUSTER (cluster-averaged)---with each of the nine physical-device clients of N-BaIoT~\cite{meidan2018nbaiot} taken as the compromised client in turn, at four injection fractions.
 
 The paper makes three contributions.

@@ -15,7 +15,7 @@
 \usepackage{amsmath}
 \usepackage[hidelinks]{hyperref}
 \makeatletter
-\def\UrlOrds{\do\*\do\~\do\'\do\"\do\:}% ":" ordinary => no break after the scheme
+\def\UrlOrds{\do\*\do\~\do\'\do\"\do\:}%
 \def\UrlBreaks{\do\/\do\.\do\-}
 \def\UrlBigBreaks{\do@url@hyp}
 \makeatother
@@ -69,10 +69,11 @@ Cadi Ayyad University, Higher Normal School (ENS), L2IS Laboratory, Marrakech, M
 \begin{abstract}
 Federated learning (FL) defenses for IoT anomaly detection largely target training and aggregation, while the post-training \emph{threshold-calibration stage} lets each client autonomously collect benign calibration scores and derive its detection threshold.
 This paper characterizes that stage under a score-level contamination model: one compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the threshold without altering model weights, training data, gradients, aggregation, test scores, or labels.
-Across \GLOBAL, \LOCAL, and \CLUSTER threshold policies on the N-BaIoT nine-device federation, the raising attack meets a pre-specified material-displacement criterion in every evaluated non-zero policy--fraction condition and costs the compromised client 2.4--7.9 percentage points (pp) of true-positive rate, including 4.9--7.9\,pp at $f{=}0.4$.
+Across \GLOBAL, \LOCAL, and \CLUSTER threshold policies on the N-BaIoT nine-device federation, the raising attack meets a pre-specified material-displacement criterion in every evaluated non-zero policy--fraction condition and reduces the compromised client's true-positive rate by 2.4--7.9 percentage points (pp), including 4.9--7.9\,pp at $f{=}0.4$.
 The lowering attack raises cross-client false-positive-rate disparity for \LOCAL and \CLUSTER, increasing $\mathrm{CV}(\mathrm{FPR})$ by 0.05--0.06 at $f{=}0.4$ under fixed-budget replacement; the associated rise in true-positive rate reflects threshold displacement, not a security benefit.
-Policy choice governs both magnitude and threshold propagation: \LOCAL confines the shift to the compromised client, \CLUSTER induces small non-victim perturbations through cluster reassignment, and \GLOBAL dilutes the shift by $1/N$ but applies it federation-wide.
-Non-victim detection rates were not recomputed, so effects beyond the compromised client are characterized at the threshold level only, and the results---bounded to N-BaIoT and score substitution---describe a vulnerability mechanism, not a complete traffic-generation attack.
+Policy choice governs both magnitude and threshold propagation: \LOCAL confines the shift to the compromised client, \CLUSTER produces smaller non-victim threshold perturbations through cluster recomputation and assignment changes, and \GLOBAL dilutes the shift by $1/N$ but applies it federation-wide.
+Non-victim true-positive rates were not recomputed, so effects beyond the compromised client are characterized at the threshold level and, for lowering, at the fleet-FPR level.
+Bounded to N-BaIoT and score substitution, the results describe a vulnerability mechanism rather than a complete traffic-generation attack.
 
 \keywords{Federated Learning \and Anomaly Detection \and IoT Security \and Poisoning Attack \and Threshold Calibration \and Vulnerability Analysis}
 \end{abstract}
@@ -109,7 +110,7 @@ Non-victim detection rates were not recomputed, so effects beyond the compromise
   \node[vuln,   left=1.60cm of thresh] (cal)    {Calibration\\Buffer};
   \node[attack, left=1.60cm of cal]    (adv)    {Adversary\\(score-level)};
   \node[phaseLabel, text=red!70!black, above=0.45cm of cal] (calLabel)
-        {Calibration stage (not covered by them)};
+        {Calibration stage (outside the surveyed defenses' scope)};
 
   \node[policy, below=0.75cm of thresh, xshift=-1.80cm] (pg) {\GLOBAL};
   \node[policy, below=0.75cm of thresh]                 (pl) {\LOCAL};
