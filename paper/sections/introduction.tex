@@ -1,7 +1,7 @@
 \section{Introduction}
 \label{sec:intro}
 
-Federated learning (FL) is commonly used for IoT anomaly detection: devices contribute to a shared model without centralizing raw traffic, and personalized detection thresholds let each node adapt to its own traffic distribution~\cite{rey2022federated}.
+Federated learning has been widely studied for IoT anomaly detection, allowing devices to contribute to a shared model without centralizing raw traffic~\cite{rey2022federated}. Threshold calibration then determines the operating point used by each detector.
 Security work on federated anomaly detection has concentrated on the \emph{training phase}: Byzantine clients injecting adversarial gradients, label-flipping poisoning, or model-inversion attacks~\cite{bhagoji2019analyzing,biggio2012poisoning,tolpegin2020data}.
 Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{blanchard2017machine,cao2020fltrust,yin2018byzantine}, and recent FL-IDS work adds personalized, non-IID-robust, knowledge-distillation, and anti-poisoning designs~\cite{Belenguer2025FLIDSReview,Khang2026P4P,Quyen2025FedKDIDS,Thein2024PFLIDS}, all acting on training data, gradients, model updates, or aggregation inputs.
 
