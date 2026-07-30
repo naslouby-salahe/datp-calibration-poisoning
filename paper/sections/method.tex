@@ -3,17 +3,13 @@
 
 \subsection{Dataset and Federation}
 
-The evaluation uses N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT network traffic dataset covering nine physical devices spanning five device types (doorbell, baby monitor, security camera, thermostat, webcam).
-Each device constitutes one federation client.
-All nine satisfy the $\ge$100-sample calibration eligibility threshold (size range in Table~\ref{tab:repro}; per-device sizes in the released split manifest).
-Each device's benign stream is partitioned chronologically into a $60\%$ train / $1\%$ gap / $20\%$ calibration / $1\%$ gap / $18\%$ test split; the two gaps avoid temporal leakage.
-Training and calibration use benign traffic only, and the attack never touches test data, test labels, or training labels.
+The evaluation uses N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT traffic dataset covering nine physical devices across five types (doorbell, baby monitor, security camera, thermostat, webcam), each device forming one federation client; all nine satisfy the $\ge$100-sample calibration eligibility threshold (size range in Table~\ref{tab:repro}).
+Each device's benign stream is partitioned chronologically into a $60\%$ train / $1\%$ gap / $20\%$ calibration / $1\%$ gap / $18\%$ test split, the gaps avoiding temporal leakage, and training and calibration use benign traffic only.
 Attack-labeled records are scaled with each device's training-fitted scaler and used only as the positive class for TPR; they never enter training, calibration, poisoning reservoirs, or injected buffers.
-The federation trains a shared autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg}; each client then scores its own traffic with the aggregated model and enters the threshold-calibration stage at a fixed quantile $q{=}0.95$.
-Table~\ref{tab:repro} lists the model and training configuration; injection fractions, seeds, and the reservoir are detailed below.
+The federation trains a shared autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg} (Table~\ref{tab:repro}); each client then scores its own traffic with the aggregated model and enters the threshold-calibration stage at $q{=}0.95$.
 
 \begin{table}[tb]
-\caption{Experimental configuration: autoencoder architecture, federated training hyperparameters, and calibration settings.}
+\caption{Experimental configuration: architecture, federated training hyperparameters, and calibration settings.}
 \label{tab:repro}
 \centering
 \footnotesize
@@ -43,7 +39,7 @@ Threshold quantile $q$ & 0.95 \\
 
 \subsection{Threshold Policies}
 
-Three threshold-policy families are evaluated, covering the main design points in the personalization literature:
+Three threshold-policy families are evaluated, covering the design points surveyed in Section~\ref{sec:background}.
 
 \begin{description}
   \item[\GLOBAL.]
@@ -52,57 +48,60 @@ Three threshold-policy families are evaluated, covering the main design points i
     \qquad
     \tau^{\mathrm{global}} = \frac{1}{N}\sum_{i=1}^{N}\tau_i^{\mathrm{local}} .
   \]
-  Global assigns the same $\tau^{\mathrm{global}}$ to every client; a single poisoned local threshold contributes only $1/N$ of the shared threshold shift.
+  Every client receives the same $\tau^{\mathrm{global}}$, so a single poisoned local threshold contributes only $1/N$ of the shared shift.
 
   \item[\LOCAL.] Each client retains $\tau_i = \tau_i^{\mathrm{local}}$.
   Shifts are confined to the compromised client; no cross-client threshold propagation.
 
   \item[\CLUSTER.]
   Clients are grouped on a standard-scaled 4-feature fingerprint (mean, std, skew, $p_{95}$ of $\mathcal{C}_i$) via $k$-means++~\cite{arthur2007kmeanspp} ($K{=}3$, random seed 42; clustering recomputed after each attack draw so a poisoned fingerprint can change the compromised client's cluster assignment).
-  Within each cluster, the shared threshold is the cluster mean; the higher seed-to-seed variance in \CLUSTER CV(FPR) is consistent with this cluster-assignment sensitivity.
-  A compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}); clients in other clusters are unaffected.
-  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, typically displacing the victim into an effectively singleton cluster whose mean collapses to the victim's own poisoned local threshold, producing near-\LOCAL victim-level shifts while co-cluster members see near-zero perturbation.
+  The shared threshold is the cluster mean, so a compromised client may perturb the threshold for co-cluster members (\emph{intra-cluster threshold perturbation}) while other clusters are unaffected.
+  Tail injection raises the mean, $p_{95}$, and dispersion components of the fingerprint, displacing the victim in the runs observed here into an effectively singleton cluster whose mean collapses to the victim's poisoned local threshold; this yields near-\LOCAL victim shifts while co-cluster members see perturbations small relative to the victim shift but not identically zero.
 \end{description}
 
 \subsection{Attack Parameterization}
 
-For each (policy, attack objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination, the protocol runs 10 paired seeds: each seed fixes a training configuration and an independent poisoning draw.
-A clean copy of the calibration array is preserved; only the poisoned copy is used for threshold computation.
-The four source-objective pairs are:
-(1)~High-Score-Benign + Threshold-Raise (primary raising attack),
-(2)~Low-Score-Benign + Threshold-Lower (lowering attack),
-(3)~Random-Benign + Threshold-Raise (objective-matched negative control for the raising attack), and
-(4)~Random-Benign + Threshold-Lower (negative control for the lowering attack).
-The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ experimental cells total.
-Training seed $i \in \{0,\ldots,9\}$ is paired with poisoning seed $i{+}100$ and analysis seed $i{+}300$, separating training, calibration sampling, and bootstrap resampling stochasticity.
+For each (policy, objective, injection fraction $f \in \{0.0, 0.1, 0.2, 0.4\}$) combination the protocol runs 10 seeds, each fixing a training configuration and an independent poisoning draw; a clean copy of the calibration array is preserved and only the poisoned copy is used for threshold computation.
+The four source-objective pairs are High-Score-Benign + Threshold-Raise (primary), Low-Score-Benign + Threshold-Lower, and Random-Benign with each objective as matched negative controls.
+The attack is applied to each of the nine clients as victim in turn (single-client scope), yielding 4~source-objective pairs $\times$ 3~threshold policies $\times$ 4~injection fractions $\times$ 9~victim clients $\times$ 10~seeds $= 4{,}320$ evaluated cells, 3,240 of them with non-zero injection; the 1,080 cells at $f{=}0$ are the clean comparators and coincide across source-objective pairs.
+Training seed $i$ is combined with poisoning seed $i{+}100$ and analysis seed $i{+}300$, separating training, calibration-sampling, and resampling stochasticity.
 
 \subsection{Statistical Analysis}
 
-\textbf{Gate 1 (material shift, primary gate).}
-Threshold shift $\Delta\tau_v = \tau_v^{\mathrm{poisoned}} - \tau_v^{\mathrm{clean}}$ is computed per seed.
-A (victim, seed) cell is \emph{material} when $|\Delta\tau_v| > \delta\tau_v$ and the sign is consistent with the attack objective, where the materiality threshold is
-$\delta\tau_v = \max\!\bigl(0.1 \times \mathrm{IQR}(\mathcal{C}_v^{\mathrm{clean}}),\;0.01 \times \mathrm{median}_j(\mathrm{IQR}(\mathcal{C}_j^{\mathrm{clean}}))\bigr)$.
-A \emph{seed passes} when $\ge$5/9 of the nine clients, each taken as victim in turn, are material.
-A (policy, fraction) configuration \emph{passes Gate 1} when $\ge 8/10$ seeds pass.
+Clean and poisoned conditions are paired: for a policy, victim $v$, and seed $s$, the clean comparator is the $f{=}0$ cell produced by the same trained model and the same calibration array before replacement, so every reported difference is within-seed and within-victim,
+\[
+  \Delta\tau_{v,s} \;=\; \tau^{\mathrm{poisoned}}_{v,s} - \tau^{\mathrm{clean}}_{v,s},
+\]
+and likewise for $\Delta\mathrm{TPR}$ and $\Delta\mathrm{CV(FPR)}$.
+The nine victim values within a seed are averaged into one seed-level aggregate, and the ten paired aggregates are the inferential units: bootstrap resampling is over those ten seeds, never over the ninety victim--seed cells, which share a trained model within a seed and are descriptive support, not independent runs.
+Three gates, all fixed before any poisoned run, structure the claims below.
 
-\textbf{Gate 2 (directional excess over control).}
-Bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the negative control (Random-Benign).
+\textbf{Gate 1 (material shift, primary gate)} evaluates the signed displacement $\Delta\tau_{v,s}$ at the victim--seed cell.
+A cell is \emph{material} when $|\Delta\tau_{v,s}| > \delta\tau_{v,s}$ and its sign matches the objective---positive for raising, negative for lowering---so displacement in the wrong direction never counts, where
+\[
+  \delta\tau_{v,s} = \max\!\bigl(0.1\,\mathrm{IQR}(\mathcal{C}_{v,s}^{\mathrm{clean}}),\;
+  0.01\,\mathrm{median}_j(\mathrm{IQR}(\mathcal{C}_{j,s}^{\mathrm{clean}}))\bigr)
+\]
+is computed from the same seed's clean calibration arrays with $j$ over all nine clients.
+A \emph{seed passes} when at least 5 of the 9 clients, each taken as victim in turn, are material, and a (policy, fraction) configuration \emph{passes Gate 1} when at least 8 of the 10 seeds pass; these majorities are conservative consistency requirements, not calibrated error rates.
+Passing supports the claim that the channel displaces thresholds by more than clean-baseline instability at a majority of victims and reproducibly across seeds; failure would mean the displacement is not separable from that instability.
+Both coefficients were locked from clean-artifact statistics beforehand, the 10\% IQR term exceeding the threshold instability observed across clean seeds and the 1\% cross-client floor stopping clients with near-zero score spread from counting as material on arbitrarily small shifts.
+Gate 1 is thus a pre-committed materiality floor, not a significance test, and its pass rates should be read together with the effect sizes in Table~\ref{tab:main-results}.
 
-\textbf{Gate 3 (downstream harm).}
-Mean victim TPR change, $\Delta\mathrm{TPR}$, is directionally consistent (negative for raising, positive for lowering) across $\ge 8/10$ seeds.
+\textbf{Gate 2 (directional excess over control)} evaluates the mean $\Delta\tau$ over the ten seed-level aggregates; its label names the intended contrast, not an estimated one, and the locked rule is applied to each condition separately: the bootstrap 95\% CI on mean $\Delta\tau$ excludes zero for the primary strategy but spans zero for the Random-Benign control.
+No interval on the primary-minus-control difference was estimated, so Gate 2 alone does not establish that the conditions differ, and a control interval covering zero is not evidence of an exactly zero control effect; attribution rests instead on the magnitude gap between primary and control means and on the control's Gate-1 pass rate (Section~\ref{sec:results}).
 
-\textbf{Confidence intervals.}
-All CIs are 95\% percentile bootstrap over 10 seed-level aggregates, with $B{=}10{,}000$ resamples.
-Primary claim gates are evaluated over these paired seed-level aggregates; the per-victim-seed cells are descriptive support, not independent units.
-With ten paired seeds, percentile-bootstrap intervals are approximate uncertainty estimates rather than exact coverage guarantees, and may deviate from nominal at the tails.
-A two-sided Wilcoxon signed-rank test on ten seed-level mean victim $\Delta\mathrm{TPR}$ values (raising, $f{=}0.4$) gives $W{=}0$, $p{=}0.002$ (exact) for all three policies.
+\textbf{Gate 3 (downstream operating-point displacement)} evaluates the mean victim $\Delta\mathrm{TPR}$ at the seed level and passes when its direction matches the threshold objective---negative for raising, positive for lowering---in at least 8 of the 10 seeds; failure means the operating point did not move consistently with the threshold shift.
+For raising, the threshold increase means reduced victim TPR and hence missed-detection harm.
+For lowering, the threshold decrease means a higher false-positive rate and greater cross-client FPR disparity, and the accompanying positive $\Delta\mathrm{TPR}$ is evidence of operating-point displacement only; the harm metric for that objective is $\Delta\mathrm{CV(FPR)}$.
 
-\textbf{Gate constant justification.}
-The 10\% IQR coefficient for Gate-1 materiality ($0.1{\times}\mathrm{IQR}$) exceeds the calibration instability observed in the clean baseline while remaining below the shift implied by replacing 10\% of a calibration buffer with top-decile scores; the 1\% cross-client floor ($0.01{\times}\mathrm{median}_j(\mathrm{IQR})$) prevents degenerate clients with near-zero score spread from counting as material on arbitrarily small shifts.
-Both constants were locked from clean-artifact statistics before any poisoned run was executed.
+All CIs are 95\% percentile bootstrap over the 10 seed-level aggregates with $B{=}10{,}000$ resamples, reported per configuration, two-sided and without multiplicity adjustment; at ten paired seeds they are approximate uncertainty estimates, not exact coverage guarantees.
+% AUTHOR NOTE: the Wilcoxon sentence reports W and p only. Tie/zero-difference handling
+% and the exact-versus-asymptotic setting are not recorded in the released artifact
+% bundle; confirm from the analysis script before camera-ready, or drop "(exact)".
+As a supporting check, a two-sided Wilcoxon signed-rank test of the ten paired seed-level mean victim $\Delta\mathrm{TPR}$ differences against a zero-median null (raising, $f{=}0.4$) gives $W{=}0$, $p{=}0.002$ (exact) for all three policies; at $n{=}10$ that is the smallest attainable two-sided $p$-value, so the identical result across policies restates the unanimous sign agreement already captured by Gate 3, and effect sizes and intervals remain the primary evidence.
 
 \subsection{Isolation Sanity Check}
 
-To confirm that the attack is confined to the calibration stage, the protocol verifies that (i)~AUROC is invariant under poisoning for all cells, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical.
-All three hold in all 4,320 cells.
-These quantities are invariant by construction, so the check establishes correct isolation of the intervention rather than providing independent evidence.
+To confirm that the attack is confined to the calibration stage, the protocol verifies that (i)~AUROC is invariant under poisoning, (ii)~per-client rank ordering of clean anomaly scores is unchanged, and (iii)~model weights before and after calibration are bitwise identical; all three hold in every cell, including the 3,240 with non-zero injection.
+These quantities are invariant by construction, so the check establishes correct isolation of the intervention rather than independent evidence.
