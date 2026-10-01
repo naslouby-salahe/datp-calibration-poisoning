@@ -118,6 +118,10 @@ class PoisonLayout:
         """Return path to the N-BaIoT main experiment manifest."""
         return self.poison_output_root / ManifestFile.NBAIOT_MAIN_MANIFEST
 
+    def sensitivity_manifest(self) -> Path:
+        """Return path to the sensitivity-analysis manifest."""
+        return self.poison_output_root / ManifestFile.SENSITIVITY_MANIFEST
+
     def paper_figure_manifest(self) -> Path:
         """Return path to the paper figure manifest."""
         return self.poison_output_root / ManifestFile.PAPER_FIGURE_MANIFEST

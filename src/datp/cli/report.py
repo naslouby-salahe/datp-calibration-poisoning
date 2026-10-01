@@ -13,11 +13,15 @@ from datp.reporting.build import (
     BuildOutputs,
     build_all,
     build_figures,
+    build_poisoning_figures,
     build_stats,
     build_tables,
     validate_results,
 )
-from datp.reporting.poisoning import build_poisoning_summaries
+from datp.reporting.poisoning import (
+    build_poisoning_summaries,
+    build_sensitivity_summaries,
+)
 
 app = typer.Typer()
 console = Console()
@@ -65,6 +69,20 @@ def poisoning(base_dir: Path = typer.Option(...)) -> None:
     """Build and write poisoning summaries."""
     try:
         result = build_poisoning_summaries(base_dir)
+        for path in result.paths:
+            console.print(f"[green]wrote[/green] {path}")
+        for path in build_poisoning_figures(base_dir, BASE_CONFIG).paths:
+            console.print(f"[green]wrote[/green] {path}")
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=CliExitCode.ERROR.value) from exc
+
+
+@app.command(ReportCommand.SENSITIVITY.value)
+def sensitivity(base_dir: Path = typer.Option(...)) -> None:
+    """Build and write sensitivity summaries."""
+    try:
+        result = build_sensitivity_summaries(base_dir)
         for path in result.paths:
             console.print(f"[green]wrote[/green] {path}")
     except (FileNotFoundError, ValueError) as exc:

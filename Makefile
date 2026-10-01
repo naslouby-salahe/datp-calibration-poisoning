@@ -55,6 +55,10 @@ datp-cp-dry-run: ## [3] Enumerate the N-BaIoT main run plan without execution.
 datp-cp-run: ## [4] Run the authorized N-BaIoT main calibration-poisoning matrix.
 	$(DATP_CLI) poison run-bounded-sweep --base-dir=$(OUTPUTS_DIR)
 
+.PHONY: datp-cp-sensitivity
+datp-cp-sensitivity: ## [4b] Run cluster-stability, scale-normalization and distinct-draw sensitivity analyses.
+	$(DATP_CLI) poison run-sensitivity --base-dir=$(OUTPUTS_DIR)
+
 .PHONY: audit-results
 audit-results: ## [5] Audit completed result artifacts and manifest provenance.
 	$(DATP_CLI) audit results --base-dir=$(OUTPUTS_DIR) --data-root=.
@@ -66,6 +70,8 @@ status: ## Show current experiment artifact status (complete/missing/aborted cou
 .PHONY: datp-cp-report
 datp-cp-report: ## [6] Build report artifacts (figures, tables, statistics) from completed outputs.
 	$(DATP_CLI) report all --base-dir=$(OUTPUTS_DIR)
+	$(DATP_CLI) report poisoning --base-dir=$(OUTPUTS_DIR)
+	$(DATP_CLI) report sensitivity --base-dir=$(OUTPUTS_DIR)
 
 # ---------------------------------------------------------------------------
 # Cleanup

@@ -117,3 +117,25 @@ def _fpr(test_benign: np.ndarray, threshold: float) -> float:
     if test_benign.size == 0:
         return float("nan")
     return float(np.mean(test_benign > threshold))
+
+
+def duplicate_rate(values: np.ndarray) -> float:
+    """Return the fraction of entries that repeat an earlier value in the array."""
+    return 1.0 - len(np.unique(values)) / values.size if values.size else float("nan")
+
+
+def tau_bound_utilization(
+    *,
+    clean_cal: np.ndarray,
+    tau_clean: float,
+    tau_pois: float,
+    objective: AttackerObjective,
+) -> float:
+    """Return the share of the buffer-reachable threshold range consumed by the shift."""
+    if objective == AttackerObjective.THRESHOLD_RAISE:
+        reachable = float(clean_cal.max()) - tau_clean
+        shift = tau_pois - tau_clean
+    else:
+        reachable = tau_clean - float(clean_cal.min())
+        shift = tau_clean - tau_pois
+    return shift / reachable if reachable > 0.0 else float("nan")

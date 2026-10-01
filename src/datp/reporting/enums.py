@@ -6,12 +6,14 @@ import enum
 
 
 class FigureName(enum.StrEnum):
-    """Canonical figure identifiers for the four paper figures."""
+    """Canonical figure identifiers for the six paper figures."""
 
     FIGURE_1 = "figure_1"
     FIGURE_2 = "figure_2"
     FIGURE_3 = "figure_3"
     FIGURE_4 = "figure_4"
+    FIGURE_5 = "figure_5"
+    FIGURE_6 = "figure_6"
 
 
 class MechanismWording(enum.StrEnum):
@@ -70,3 +72,5 @@ class SidecarField(enum.StrEnum):
     PAIRED_SEED_CV_FPR_DELTA = "paired_seed_cv_fpr_delta_global_minus_local"
     TAU_GLOBAL = "tau_global"
     MAX_POINTS_PER_CLIENT = "max_points_per_client"
+    SEED_SELECTION_RULE = "seed_selection_rule"
+    CLIENT_SELECTION_RULE = "client_selection_rule"

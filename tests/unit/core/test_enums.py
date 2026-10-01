@@ -205,9 +205,9 @@ class TestSeedScope:
 class TestFigureName:
     """Tests for validating figure name enum values."""
 
-    def test_four_figures_defined(self) -> None:
-        """Verify exactly four figures are defined in the enum."""
-        assert len(FigureName) == 4
+    def test_six_figures_defined(self) -> None:
+        """Verify exactly six figures are defined in the enum."""
+        assert len(FigureName) == 6
 
     def test_figure_values(self) -> None:
         """Verify FigureName mapping values match standard identifiers."""
@@ -215,6 +215,8 @@ class TestFigureName:
         assert FigureName.FIGURE_2 == "figure_2"
         assert FigureName.FIGURE_3 == "figure_3"
         assert FigureName.FIGURE_4 == "figure_4"
+        assert FigureName.FIGURE_5 == "figure_5"
+        assert FigureName.FIGURE_6 == "figure_6"
 
     def test_is_str_compatible(self) -> None:
         """Ensure all FigureName members are string-compatible."""

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import shutil
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -14,6 +15,8 @@ import numpy as np
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile
+from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy
+from datp.attacks.manifests.bounded_sweep_manifest import BoundedSweepResultRow
 from datp.checkpointing.enums import EvidenceRole
 from datp.config.models import DatpConfig
 from datp.config.models import ExperimentStage
@@ -41,8 +44,11 @@ from datp.evaluation.metrics import (
     recompute_binary_metrics,
 )
 from datp.reporting.constants import (
+    CLIENT_SELECTION_RULE,
     NOT_CONFIRMATORY_WARNING,
+    POISONING_FIGURE_FRACTION,
     REPORTING_AUDIT_SCHEMA_VERSION,
+    SEED_SELECTION_RULE,
 )
 from datp.reporting.enums import (
     ComparisonLabel,
@@ -50,7 +56,14 @@ from datp.reporting.enums import (
     HeterogeneityContextResult,
     SidecarField,
 )
-from datp.reporting.figures import generate_figure1, generate_figure2, generate_figure3
+from datp.reporting.poisoning import load_poisoning_manifest
+from datp.reporting.figures import (
+    generate_figure1,
+    generate_figure2,
+    generate_figure3,
+    generate_figure5,
+    generate_figure6,
+)
 from datp.reporting.tables import generate_table3
 from datp.scoring.loading import ScoreProvider
 from datp.scoring.manifest import SCORE_COLUMN
@@ -499,6 +512,7 @@ def _figure1_sidecar_data(
         SidecarField.METRIC_NAMES: [MetricName.FPR.value],
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
         SidecarField.SEED_SCOPE: SeedScope.REPRESENTATIVE_SEED.value,
+        SidecarField.SEED_SELECTION_RULE: SEED_SELECTION_RULE,
         SidecarField.NOT_CONFIRMATORY_WARNING: NOT_CONFIRMATORY_WARNING,
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
         SidecarField.POLICIES: [ThresholdPolicy.GLOBAL_THRESHOLD.value, ThresholdPolicy.LOCAL_THRESHOLD.value],
@@ -549,6 +563,7 @@ def _figure2_sidecar_data(
         SidecarField.METRIC_NAMES: [SCORE_COLUMN, PayloadKey.THRESHOLD_VALUE],
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
         SidecarField.SEED_SCOPE: SeedScope.REPRESENTATIVE_SEED.value,
+        SidecarField.SEED_SELECTION_RULE: SEED_SELECTION_RULE,
         SidecarField.NOT_CONFIRMATORY_WARNING: NOT_CONFIRMATORY_WARNING,
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS.value,
         SidecarField.POLICIES: [ThresholdPolicy.GLOBAL_THRESHOLD.value],
@@ -557,6 +572,7 @@ def _figure2_sidecar_data(
         SidecarField.AXIS_LABELS: {"x": "Reconstruction Error", "y": "Density"},
         SidecarField.TAU_GLOBAL: tau_g,
         SidecarField.CLIENT_IDS: rep,
+        SidecarField.CLIENT_SELECTION_RULE: CLIENT_SELECTION_RULE,
         SidecarField.MAX_POINTS_PER_CLIENT: max_points,
     }
 
@@ -634,8 +650,12 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
         cfg.reporting.metric_tol,
     )
 
-    s0g = nbaiot[ThresholdPolicy.GLOBAL_THRESHOLD][0]
-    s0l = nbaiot[ThresholdPolicy.LOCAL_THRESHOLD][0]
+    global_results = nbaiot[ThresholdPolicy.GLOBAL_THRESHOLD]
+    rep_idx = sorted(range(len(global_results)), key=lambda i: global_results[i].cv_fpr)[
+        (len(global_results) - 1) // 2
+    ]
+    s0g = global_results[rep_idx]
+    s0l = nbaiot[ThresholdPolicy.LOCAL_THRESHOLD][rep_idx]
     g_fpr, l_fpr, ids1 = _eligible_intersection_fprs(s0g, s0l)
     sc1 = write_json_atomic(
         fig_dir / f"{FigureName.FIGURE_1.value}_data.json",
@@ -696,6 +716,121 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
     )
 
     return BuildOutputs([sc1, *p1, sc2, *p2, sc3, *p3])
+
+
+_FIGURE_5_PANELS: tuple[tuple[AttackerObjective, PoisoningSourceStrategy, str, str], ...] = (
+    (
+        AttackerObjective.THRESHOLD_RAISE,
+        PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        "victim_delta_tpr",
+        r"Victim $\Delta$TPR",
+    ),
+    (
+        AttackerObjective.THRESHOLD_LOWER,
+        PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+        "victim_delta_fpr",
+        r"Victim $\Delta$FPR",
+    ),
+)
+
+_FIGURE_6_PANELS: tuple[tuple[AttackerObjective, PoisoningSourceStrategy, str, str], ...] = (
+    (
+        AttackerObjective.THRESHOLD_RAISE,
+        PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+        "victim_delta_tpr",
+        r"RAISE: victim $\Delta$TPR",
+    ),
+    (
+        AttackerObjective.THRESHOLD_LOWER,
+        PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+        "victim_delta_fpr",
+        r"LOWER: victim $\Delta$FPR",
+    ),
+    (
+        AttackerObjective.THRESHOLD_LOWER,
+        PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+        "delta_cv_fpr",
+        r"LOWER: $\Delta$CV(FPR)",
+    ),
+)
+
+
+def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:
+    """Generate client-level effect and seed-level distribution figures from the bounded-sweep manifest."""
+    manifest = load_poisoning_manifest(base_dir)
+    fig_dir = base_dir / ArtifactDir.FIGURES
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    rows = [r for r in manifest.results if r.fraction == POISONING_FIGURE_FRACTION]
+
+    def select(objective: AttackerObjective, source: PoisoningSourceStrategy):
+        return [r for r in rows if r.objective == objective and r.source == source]
+
+    client_effects = {
+        label: {
+            pol: _per_victim_seed_values(
+                [r for r in select(obj, src) if r.policy == pol], metric
+            )
+            for pol in manifest.policies
+        }
+        for obj, src, metric, label in _FIGURE_5_PANELS
+    }
+    seed_effects = {
+        label: {
+            pol: _seed_means([r for r in select(obj, src) if r.policy == pol], metric)
+            for pol in manifest.policies
+        }
+        for obj, src, metric, label in _FIGURE_6_PANELS
+    }
+
+    sidecars = []
+    for name, data in (
+        (FigureName.FIGURE_5, client_effects),
+        (FigureName.FIGURE_6, seed_effects),
+    ):
+        sidecars.append(
+            write_json_atomic(
+                fig_dir / f"{name.value}_data.json",
+                {
+                    SidecarField.FIGURE: name.value,
+                    SidecarField.DATASET: DatasetID.NBAIOT.value,
+                    SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN.value,
+                    SidecarField.SEEDS: list(manifest.training_seeds),
+                    SidecarField.SEED_SCOPE: "all_training_seeds",
+                    SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE.value,
+                    SidecarField.VALUES: data,
+                    "fraction": POISONING_FIGURE_FRACTION,
+                },
+            )
+        )
+    p5 = _save_figure_copies(
+        fig_dir,
+        FigureName.FIGURE_5.value,
+        generate_figure5(client_effects, fig_dir, cfg.reporting.style),
+    )
+    p6 = _save_figure_copies(
+        fig_dir,
+        FigureName.FIGURE_6.value,
+        generate_figure6(seed_effects, fig_dir, cfg.reporting.style),
+    )
+    return BuildOutputs([*sidecars, *p5, *p6])
+
+
+def _per_victim_seed_values(
+    rows: list[BoundedSweepResultRow], metric: str
+) -> dict[str, list[float]]:
+    """Group a row metric by victim, one value per training seed."""
+    out: dict[str, list[float]] = defaultdict(list)
+    for r in rows:
+        out[r.victim_id].append(float(getattr(r, metric)))
+    return dict(out)
+
+
+def _seed_means(rows: list[BoundedSweepResultRow], metric: str) -> list[float]:
+    """Return the per-training-seed mean of a row metric over victims."""
+    by_seed: dict[int, list[float]] = defaultdict(list)
+    for r in rows:
+        by_seed[r.training_seed].append(float(getattr(r, metric)))
+    return [float(np.nanmean(v)) for _, v in sorted(by_seed.items())]
 
 
 def build_tables(base_dir: Path, cfg: DatpConfig) -> BuildOutputs:

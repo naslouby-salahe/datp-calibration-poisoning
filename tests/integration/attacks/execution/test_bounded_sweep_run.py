@@ -18,7 +18,8 @@ from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.compose import BASE_CONFIG
 from datp.config.models import ConvergenceConfig, DatpConfig, FederationConfig
 from datp.core.device import resolve_device
-from datp.core.enums import ScoringStage
+from datp.attacks.enums import PoisoningSourceStrategy, ReservoirDraw
+from datp.core.enums import ScoringStage, ThresholdPolicy
 from datp.core.identity import TrainingCellId
 from datp.config.models import ExperimentStage
 from datp.core.seeds import set_seeds
@@ -78,21 +79,32 @@ def _make_cfg() -> DatpConfig:
     )
 
 
-@pytest.mark.integration
-def test_run_nbaiot_main_sweep_end_to_end(tmp_path) -> None:
-    """Full nbaiot_main sweep trains all cells, runs poisoning, and writes a manifest with AUROC invariance."""
+@pytest.fixture(scope="module")
+def trained_base_dir(tmp_path_factory):
+    """Train all seeds once and return the base directory shared by the sweep tests."""
+    base_dir = tmp_path_factory.mktemp("trained")
     cfg = _make_cfg()
     for training_seed in _CONFIG.seeds.training:
         set_seeds(training_seed)
-        client_data = _make_client_data(training_seed)
         run_fl_training(
             cfg=cfg,
-            client_data=client_data,
+            client_data=_make_client_data(training_seed),
             seed=training_seed,
-            base_dir=tmp_path,
+            base_dir=base_dir,
         )
+    return base_dir
 
-    manifest = run_nbaiot_main(base_dir=tmp_path, config=_CONFIG)
+
+@pytest.fixture(scope="module")
+def sweep_manifest(trained_base_dir):
+    """Run the bounded sweep once on the trained base directory."""
+    return run_nbaiot_main(base_dir=trained_base_dir, config=_CONFIG)
+
+
+@pytest.mark.integration
+def test_run_nbaiot_main_sweep_end_to_end(sweep_manifest) -> None:
+    """Full nbaiot_main sweep runs poisoning and writes a manifest with AUROC invariance."""
+    manifest = sweep_manifest
 
     assert manifest.n_cells == len(_CONFIG.seeds.training) * _N_CLIENTS * 3 * 4 * 4
     assert len(manifest.results) == manifest.n_cells
@@ -120,6 +132,122 @@ def test_run_nbaiot_main_sweep_end_to_end(tmp_path) -> None:
         assert hasattr(row, "victim_delta_tpr")
         assert hasattr(row, "victim_ba_clean")
         assert hasattr(row, "victim_delta_ba")
+
+
+@pytest.mark.integration
+def test_sweep_rows_carry_non_victim_and_absolute_burden(sweep_manifest) -> None:
+    """Non-victim downstream effects and absolute counts are populated and consistent."""
+    for row in sweep_manifest.results:
+        assert row.victim_fp_poisoned >= 0
+        assert row.victim_fn_poisoned >= 0
+        assert row.victim_n_test_benign > 0
+        assert row.victim_delta_fpr == pytest.approx(
+            row.victim_fpr_poisoned - row.victim_fpr_clean
+        )
+        assert math.isfinite(row.nonvictim_mean_delta_tpr)
+        assert math.isfinite(row.nonvictim_mean_delta_fpr)
+    zero = [r for r in sweep_manifest.results if r.fraction == 0.0]
+    assert all(r.nonvictim_delta_fp_total == 0 for r in zero)
+    assert all(r.nonvictim_delta_fn_total == 0 for r in zero)
+    assert all(r.n_replaced == 0 for r in zero)
+
+
+@pytest.mark.integration
+def test_global_policy_shifts_shared_threshold(sweep_manifest) -> None:
+    """Under GLOBAL_THRESHOLD a targeted raise moves the shared threshold upward."""
+    rows = [
+        r
+        for r in sweep_manifest.results
+        if r.policy == ThresholdPolicy.GLOBAL_THRESHOLD
+        and r.fraction == 0.4
+        and r.source == PoisoningSourceStrategy.HIGH_SCORE_BENIGN
+    ]
+    assert rows
+    assert any(r.delta_tau > 0.0 for r in rows)
+
+
+@pytest.mark.integration
+def test_cluster_rows_have_transition_and_fixed_assignment_fields(
+    sweep_manifest,
+) -> None:
+    """Cluster rows carry sizes, reassignments, and frozen-assignment effects; others are empty."""
+    cluster = [
+        r
+        for r in sweep_manifest.results
+        if r.policy == ThresholdPolicy.CLUSTER_THRESHOLD
+    ]
+    other = [
+        r
+        for r in sweep_manifest.results
+        if r.policy != ThresholdPolicy.CLUSTER_THRESHOLD
+    ]
+    assert all(r.cluster_sizes_clean and sum(r.cluster_sizes_clean) == _N_CLIENTS for r in cluster)
+    assert all(math.isfinite(r.fixed_cluster_victim_delta_tau) for r in cluster)
+    assert all(r.cluster_n_reassigned >= 0 for r in cluster)
+    assert all(not r.cluster_sizes_clean for r in other)
+    assert all(math.isnan(r.fixed_cluster_victim_delta_tau) for r in other)
+    zero = [r for r in cluster if r.fraction == 0.0]
+    assert all(r.cluster_n_reassigned == 0 for r in zero)
+    assert all(
+        r.fixed_cluster_victim_delta_tau == pytest.approx(0.0, abs=1e-12) for r in zero
+    )
+
+
+@pytest.mark.integration
+def test_duplicate_rates_and_bound_utilization(sweep_manifest) -> None:
+    """Poisoned buffers never have fewer duplicates than clean ones; utilization stays bounded."""
+    for row in sweep_manifest.results:
+        assert row.cal_duplicate_rate_poisoned >= row.cal_duplicate_rate_clean - 1e-12
+        if math.isfinite(row.delta_tau_bound_utilization):
+            assert row.delta_tau_bound_utilization <= 1.0 + 1e-9
+
+
+@pytest.mark.integration
+def test_sensitivity_run_end_to_end(trained_base_dir, monkeypatch) -> None:
+    """Sensitivity analyses produce cluster, scale, and distinct-draw rows."""
+    from datp.attacks.execution import sensitivity_run
+
+    monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_K_GRID", (2, 3))
+    monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_RANDOM_STATES", (0, 1))
+    monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_N_INIT_GRID", (1,))
+    manifest = sensitivity_run.run_sensitivity(trained_base_dir, _CONFIG)
+
+    n_tasks = len(_CONFIG.seeds.training) * _N_CLIENTS * 4 * 3
+    assert len(manifest.scale_normalization) == n_tasks
+    assert len(manifest.cluster_stability) == n_tasks * 2 * 2
+    assert len(manifest.draw_variants) == n_tasks * 3 * 3
+    assert len(manifest.trust_boundary) == n_tasks * 3
+    for row in manifest.draw_variants:
+        assert 0.0 <= row.duplicate_rate_variant <= 1.0
+        assert row.effective_n_replaced <= row.requested_n_replaced
+        if row.draw == ReservoirDraw.INTERPOLATED_TAIL:
+            assert row.effective_n_replaced == row.requested_n_replaced
+        if row.draw == ReservoirDraw.WITHOUT_REPLACEMENT:
+            assert row.effective_n_replaced == min(
+                row.requested_n_replaced, row.pool_size
+            )
+    for row in manifest.trust_boundary:
+        assert math.isfinite(row.delta_tau_undefended)
+        assert math.isfinite(row.delta_tau_trim_primary)
+        assert math.isfinite(row.residual_vs_clean_trim_appendix)
+    for row in manifest.scale_normalization:
+        assert math.isfinite(row.raw_global_victim_delta_tau)
+        assert math.isfinite(row.normalized_global_victim_delta_tau)
+
+
+@pytest.mark.integration
+def test_sensitivity_manifest_is_written(trained_base_dir, monkeypatch) -> None:
+    """The sensitivity manifest is written to the poisoning layout and validates on reload."""
+    from datp.artifacts.poison_layout import PoisonLayout
+    from datp.attacks.execution import sensitivity_run
+    from datp.attacks.manifests.sensitivity_manifest import SensitivityManifest
+
+    monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_K_GRID", (2,))
+    monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_RANDOM_STATES", (0,))
+    monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_N_INIT_GRID", (1,))
+    path = sensitivity_run.write_sensitivity_manifest(trained_base_dir)
+    assert path == PoisonLayout(base_dir=trained_base_dir).sensitivity_manifest()
+    SensitivityManifest.model_validate_json(path.read_text())
 
 
 _SEED = 42

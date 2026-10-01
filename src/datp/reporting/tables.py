@@ -12,7 +12,11 @@ from datp.config.models import StyleConfig
 from datp.core.enums import MAIN_BODY_POLICIES, ThresholdPolicy
 from datp.evaluation.metrics import EvaluationResult
 
-MANDATORY_FOOTNOTE = "† Eligible clients only."
+MANDATORY_FOOTNOTE = (
+    "† Eligible clients only. CV is the population standard deviation divided by the mean. "
+    "Worst BA is the minimum per-client balanced accuracy, (TPR + TNR) / 2. "
+    "P10 client Macro-F1 is the 10th percentile of per-client macro-F1, the mean of the benign-class and attack-class F1."
+)
 
 
 def validate_main_body_role(policies: list[ThresholdPolicy]) -> None:

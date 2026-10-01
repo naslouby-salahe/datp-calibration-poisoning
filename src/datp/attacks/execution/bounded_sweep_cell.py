@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+
 from datp.attacks.constants import THRESHOLD_QUANTILE
 from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy
 from datp.attacks.execution.cell_runner import (
+    InjectionOutcome,
     InjectionSpec,
     PolicyPair,
     inject_single_victim,
@@ -79,6 +82,8 @@ class SweepCellResult:
     thresholds_under_poisoning: PolicyPair
     clean_metrics: MetricResult
     poisoned_metrics: MetricResult
+    victim_cal_poisoned: np.ndarray
+    n_replaced: int
 
     @property
     def training_seed(self) -> int:
@@ -97,8 +102,8 @@ def _cell_injection_and_metrics(
     *,
     fraction: float,
     mu_flag_threshold: float | None,
-) -> tuple[PolicyPair, MetricResult]:
-    """Inject at the given fraction and compute the threshold pair and metrics."""
+) -> tuple[PolicyPair, MetricResult, InjectionOutcome]:
+    """Inject at the given fraction and compute the threshold pair, metrics, and injection outcome."""
     outcome = inject_single_victim(
         config.collection,
         victim_id=spec.victim_id,
@@ -119,7 +124,7 @@ def _cell_injection_and_metrics(
             auroc_set=config.auroc_set,
         )
     )
-    return pair, metrics
+    return pair, metrics, outcome
 
 
 def run_sweep_cell(spec: SweepCellSpec, *, config: SweepCellConfig) -> SweepCellResult:
@@ -130,10 +135,10 @@ def run_sweep_cell(spec: SweepCellSpec, *, config: SweepCellConfig) -> SweepCell
     )
     assert_valid_source_objective_pair(spec.source, spec.objective)
 
-    clean_pair, clean_metrics = _cell_injection_and_metrics(
+    clean_pair, clean_metrics, _ = _cell_injection_and_metrics(
         spec, config, fraction=0.0, mu_flag_threshold=None
     )
-    poisoned_pair, poisoned_metrics = _cell_injection_and_metrics(
+    poisoned_pair, poisoned_metrics, outcome = _cell_injection_and_metrics(
         spec, config, fraction=spec.fraction, mu_flag_threshold=config.mu_flag_threshold
     )
 
@@ -148,4 +153,6 @@ def run_sweep_cell(spec: SweepCellSpec, *, config: SweepCellConfig) -> SweepCell
         thresholds_under_poisoning=poisoned_pair,
         clean_metrics=clean_metrics,
         poisoned_metrics=poisoned_metrics,
+        victim_cal_poisoned=outcome.poisoned_cal_set.for_client(spec.victim_id).cal,
+        n_replaced=outcome.injection.n_replaced,
     )

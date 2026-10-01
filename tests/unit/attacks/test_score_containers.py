@@ -109,3 +109,23 @@ class TestVictimSet:
         for pid in col.pending_ids:
             with pytest.raises(ValueError, match="is not eligible"):
                 vs.victim_cal(pid)
+
+
+def test_score_collection_survives_pickle_round_trip() -> None:
+    """Collections must pickle so process-based workers can receive them."""
+    import pickle
+
+    import numpy as np
+
+    from datp.attacks.score_containers import build_score_collection
+
+    collection = build_score_collection(
+        {
+            "a": (np.arange(200.0), np.zeros(5), np.ones(5)),
+            "b": (np.arange(150.0), np.zeros(4), np.ones(4)),
+        }
+    )
+    restored = pickle.loads(pickle.dumps(collection))
+    assert restored.all_ids == collection.all_ids
+    assert restored.eligible_ids == collection.eligible_ids
+    assert np.array_equal(restored.for_client("a").cal, collection.for_client("a").cal)

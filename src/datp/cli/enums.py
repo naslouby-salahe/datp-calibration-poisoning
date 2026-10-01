@@ -89,6 +89,7 @@ class PoisonCommand(StrEnum):
     DRY_RUN = "dry-run"
     SMOKE = "smoke"
     RUN_BOUNDED_SWEEP = "run-bounded-sweep"
+    RUN_SENSITIVITY = "run-sensitivity"
     STAGES = "stages"
 
 
@@ -116,6 +117,7 @@ class ReportCommand(StrEnum):
     FIGURES = "figures"
     TABLES = "tables"
     POISONING = "poisoning"
+    SENSITIVITY = "sensitivity"
     ALL = "all"
 
 

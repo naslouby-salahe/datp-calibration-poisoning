@@ -21,6 +21,7 @@ from datp.attacks.manifests.run_manifest import ProvenanceRecord
 from datp.core.enums import ThresholdPolicy
 from datp.core.provenance import REPOSITORY_NAME
 from datp.core.seeds import SeedPair, derive_seed_record
+from tests.fixtures.sweep_rows import extended_row_fields
 
 
 def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResultRow:
@@ -81,6 +82,7 @@ def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResul
         cluster_delta_tau_normalization_gap=math.nan,
         cluster_victim_effect=math.nan,
         cluster_non_victim_effect=math.nan,
+        **extended_row_fields(ThresholdPolicy.GLOBAL_THRESHOLD),
     )
 
 

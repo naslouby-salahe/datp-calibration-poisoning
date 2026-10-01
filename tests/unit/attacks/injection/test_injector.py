@@ -7,7 +7,11 @@ import math
 import numpy as np
 import pytest
 
-from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy
+from datp.attacks.enums import (
+    AttackerObjective,
+    PoisoningSourceStrategy,
+    ReservoirDraw,
+)
 from datp.attacks.execution.cell_runner import cell_child_index
 from datp.attacks.injection.injector import inject_fixed_budget
 from datp.attacks.reservoirs.reservoir import (
@@ -405,3 +409,151 @@ class TestInjectionStreamIndependence:
             np.sort(res_10.positions_replaced),
             np.sort(res_40.positions_replaced),
         )
+
+
+class TestWithoutReplacement:
+    """Distinct-draw injection mode."""
+
+    def test_draws_are_distinct_when_pool_suffices(self) -> None:
+        """Without-replacement injection never repeats a reservoir value."""
+        c = make_eligible_client()
+        reservoir = _reservoir(c.cal)
+        result = inject_fixed_budget(
+            clean_cal=c.cal,
+            reservoir=reservoir,
+            fraction=0.10,
+            rng=_rng(),
+            draw=ReservoirDraw.WITHOUT_REPLACEMENT,
+        )
+        replaced = result.poisoned_cal[result.positions_replaced]
+        assert len(np.unique(replaced)) == len(replaced)
+
+    def test_oversized_budget_is_rejected(self) -> None:
+        """A budget larger than the pool cannot be drawn without replacement."""
+        c = make_eligible_client()
+        reservoir = build_reservoir(
+            clean_cal=c.cal,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            tail_mass=0.10,
+        )
+        with pytest.raises(ValueError, match="without replacement"):
+            inject_fixed_budget(
+                clean_cal=c.cal,
+                reservoir=reservoir,
+                fraction=0.40,
+                rng=_rng(),
+                draw=ReservoirDraw.WITHOUT_REPLACEMENT,
+            )
+
+    def test_default_draw_matches_explicit_with_replacement(self) -> None:
+        """The default mode equals explicit with-replacement for the same RNG stream."""
+        c = make_eligible_client()
+        reservoir = _reservoir(c.cal)
+        default = inject_fixed_budget(
+            clean_cal=c.cal, reservoir=reservoir, fraction=0.20, rng=_rng()
+        )
+        explicit = inject_fixed_budget(
+            clean_cal=c.cal,
+            reservoir=reservoir,
+            fraction=0.20,
+            rng=_rng(),
+            draw=ReservoirDraw.WITH_REPLACEMENT,
+        )
+        assert np.array_equal(default.poisoned_cal, explicit.poisoned_cal)
+
+
+class TestInterpolatedTail:
+    """Distribution-constrained synthesis from the reservoir hull."""
+
+    def test_values_stay_inside_pool_range_and_are_new(self) -> None:
+        c = make_eligible_client()
+        reservoir = build_reservoir(
+            clean_cal=c.cal,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            tail_mass=0.10,
+        )
+        result = inject_fixed_budget(
+            clean_cal=c.cal,
+            reservoir=reservoir,
+            fraction=0.40,
+            rng=_rng(),
+            draw=ReservoirDraw.INTERPOLATED_TAIL,
+        )
+        injected = result.poisoned_cal[result.positions_replaced]
+        assert injected.min() >= reservoir.pool.min()
+        assert injected.max() <= reservoir.pool.max()
+        assert len(np.unique(injected)) == len(injected)
+        assert result.n_replaced == round(0.40 * c.cal.size)
+
+    def test_degenerate_pool_is_rejected(self) -> None:
+        reservoir = ReservoirResult(
+            pool=np.array([1.0]),
+            status=ReservoirStatus.FEASIBLE,
+            source=PoisoningSourceStrategy.RANDOM_BENIGN,
+            n_pool=1,
+            n_distinct=1,
+        )
+        with pytest.raises(ValueError, match="at least 2"):
+            inject_fixed_budget(
+                clean_cal=np.arange(200.0),
+                reservoir=reservoir,
+                fraction=0.10,
+                rng=_rng(),
+                draw=ReservoirDraw.INTERPOLATED_TAIL,
+            )
+
+
+class TestDisjointReservoir:
+    """Separate reservoir built only from entries that are not replaced."""
+
+    def test_replacement_values_come_from_untouched_entries(self) -> None:
+        from datp.attacks.injection.injector import inject_disjoint_reservoir
+
+        c = make_eligible_client()
+        result, reservoir = inject_disjoint_reservoir(
+            clean_cal=c.cal,
+            source=PoisoningSourceStrategy.RANDOM_BENIGN,
+            tail_mass=0.10,
+            fraction=0.20,
+            rng=_rng(),
+        )
+        keep = np.ones(c.cal.size, dtype=bool)
+        keep[result.positions_replaced] = False
+        injected = result.poisoned_cal[result.positions_replaced]
+        assert np.isin(injected, c.cal[keep]).all()
+        assert len(reservoir.pool) == int(keep.sum())
+        assert np.array_equal(result.poisoned_cal[keep], c.cal[keep])
+
+    def test_tail_budget_is_capped_by_disjoint_pool(self) -> None:
+        from datp.attacks.injection.injector import (
+            disjoint_budget,
+            inject_disjoint_reservoir,
+        )
+
+        c = make_eligible_client()
+        n = c.cal.size
+        result, _ = inject_disjoint_reservoir(
+            clean_cal=c.cal,
+            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+            tail_mass=0.10,
+            fraction=0.40,
+            rng=_rng(),
+        )
+        assert result.n_replaced == disjoint_budget(
+            n, round(0.40 * n), 0.10, PoisoningSourceStrategy.HIGH_SCORE_BENIGN
+        )
+        assert result.n_replaced < round(0.40 * n)
+
+    def test_zero_fraction_changes_nothing(self) -> None:
+        from datp.attacks.injection.injector import inject_disjoint_reservoir
+
+        c = make_eligible_client()
+        result, _ = inject_disjoint_reservoir(
+            clean_cal=c.cal,
+            source=PoisoningSourceStrategy.RANDOM_BENIGN,
+            tail_mass=0.10,
+            fraction=0.0,
+            rng=_rng(),
+        )
+        assert result.n_replaced == 0
+        assert np.array_equal(result.poisoned_cal, c.cal)

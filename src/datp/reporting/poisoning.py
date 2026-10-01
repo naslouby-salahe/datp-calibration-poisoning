@@ -8,6 +8,8 @@ import math
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import lru_cache
+from itertools import product
 from pathlib import Path
 from typing import Any
 
@@ -20,18 +22,49 @@ from datp.attacks.constants import (
     BOOTSTRAP_CI,
     BOOTSTRAP_MIN_FINITE,
     BOOTSTRAP_N,
+    IQR_FLOOR_FACTOR,
+    MATERIALITY_FACTOR,
+    SENSITIVITY_IQR_FLOOR_GRID,
+    SENSITIVITY_MATERIALITY_GRID,
+    SENSITIVITY_SIGN_CONSISTENCY_GRID,
+    SENSITIVITY_VICTIM_MAJORITY_GRID,
     SIGN_CONSISTENCY_THRESHOLD,
+    VICTIM_MAJORITY_THRESHOLD,
 )
-from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy
+from datp.attacks.enums import (
+    SYNTHESIZED_DRAWS,
+    AttackerObjective,
+    PoisoningSourceStrategy,
+)
 from datp.attacks.manifests.bounded_sweep_manifest import (
     BoundedSweepManifest,
     BoundedSweepResultRow,
 )
+from datp.attacks.manifests.sensitivity_manifest import SensitivityManifest
+from datp.attacks.metrics.delta_tau import materiality_scale
 from datp.core.enums import ThresholdPolicy
+from datp.reporting.constants import METRIC_DEFINITIONS
 from datp.statistics.aggregates import iqr
 from datp.statistics.bootstrap import bootstrap_ci
+from datp.statistics.permutation import sign_flip_p_value
 
-_VICTIM_MAJORITY = 5
+
+@dataclass(frozen=True, slots=True)
+class GateParams:
+    """Operational thresholds behind the claim gates."""
+
+    sign_consistency: int
+    victim_majority: int
+    materiality_factor: float
+    iqr_floor_factor: float
+
+
+DEFAULT_GATE = GateParams(
+    sign_consistency=SIGN_CONSISTENCY_THRESHOLD,
+    victim_majority=VICTIM_MAJORITY_THRESHOLD,
+    materiality_factor=MATERIALITY_FACTOR,
+    iqr_floor_factor=IQR_FLOOR_FACTOR,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +85,7 @@ class _DownstreamContext:
 
 def build_poisoning_summaries(base_dir: Path) -> BuildPoisoningSummariesResult:
     """Load the bounded-sweep manifest and generate all poisoning analysis summaries."""
-    manifest = _load_manifest(base_dir)
+    manifest = load_poisoning_manifest(base_dir)
     analysis_dir = base_dir / ArtifactDir.ANALYSIS
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
@@ -65,6 +98,11 @@ def build_poisoning_summaries(base_dir: Path) -> BuildPoisoningSummariesResult:
         ("downstream_harm_lowering", _downstream_lowering_summary(manifest)),
         ("cluster_diagnostics_summary", _cluster_diagnostics_summary(manifest)),
         ("claim_gate_decisions", _claim_gate_decisions(manifest)),
+        ("downstream_extended", _downstream_extended_summary(manifest)),
+        ("client_level_effects", _client_level_effects(manifest)),
+        ("cluster_stability_summary", _cluster_stability_summary(manifest)),
+        ("duplicate_and_bound_summary", _duplicate_and_bound_summary(manifest)),
+        ("gate_sensitivity", _gate_sensitivity_summary(manifest)),
     ]
 
     paths = [
@@ -73,10 +111,213 @@ def build_poisoning_summaries(base_dir: Path) -> BuildPoisoningSummariesResult:
     paths.append(
         _write_json(analysis_dir / "manifest_summary.json", _manifest_summary(manifest))
     )
+    paths.append(
+        _write_json(analysis_dir / "metric_definitions.json", METRIC_DEFINITIONS)
+    )
     return BuildPoisoningSummariesResult(paths=paths)
 
 
-def _load_manifest(base_dir: Path) -> BoundedSweepManifest:
+def build_sensitivity_summaries(base_dir: Path) -> BuildPoisoningSummariesResult:
+    """Load the sensitivity manifest and generate cluster, scale-normalization and distinct-draw summaries."""
+    if not (path := PoisonLayout(base_dir=base_dir).sensitivity_manifest()).exists():
+        raise FileNotFoundError(f"Missing sensitivity manifest: {path}")
+    manifest = SensitivityManifest.model_validate_json(path.read_text())
+    analysis_dir = base_dir / ArtifactDir.ANALYSIS
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    outputs = [
+        ("cluster_stability_sensitivity", _cluster_sensitivity_summary(manifest)),
+        ("scale_normalization_summary", _scale_normalization_summary(manifest)),
+        ("draw_variant_summary", _draw_variant_summary(manifest)),
+        ("trust_boundary_summary", _trust_boundary_summary(manifest)),
+    ]
+    return BuildPoisoningSummariesResult(
+        paths=[
+            p for stem, recs in outputs for p in _write_records(analysis_dir, stem, recs)
+        ]
+    )
+
+
+def _group_by(
+    rows: Iterable[Any], keys: tuple[str, ...]
+) -> dict[tuple[Any, ...], list[Any]]:
+    """Group rows by the values of the named attributes, rendering enums as their values."""
+    grouped = defaultdict(list)
+    for r in rows:
+        grouped[
+            tuple(getattr(v := getattr(r, k), "value", v) for k in keys)
+        ].append(r)
+    return dict(grouped)
+
+
+def _cluster_sensitivity_summary(manifest: SensitivityManifest) -> list[dict[str, Any]]:
+    """Summarize victim threshold shift and assignment transitions across K, initialization and seeds."""
+    records = []
+    for (src, obj, frac, k, n_init), rows in sorted(
+        _group_by(
+            manifest.cluster_stability,
+            ("source", "objective", "fraction", "k", "n_init"),
+        ).items()
+    ):
+        by_cell = defaultdict(list)
+        for r in rows:
+            by_cell[(r.training_seed, r.victim_id)].append(r.victim_delta_tau)
+        init_sd = [float(np.std(v, ddof=1)) for v in by_cell.values() if len(v) > 1]
+        records.append(
+            {
+                "source": src,
+                "objective": obj,
+                "fraction": frac,
+                "k": k,
+                "n_init": n_init,
+                "n_rows": len(rows),
+                "mean_victim_delta_tau": _finite_mean(r.victim_delta_tau for r in rows),
+                "mean_fixed_victim_delta_tau": _finite_mean(
+                    r.fixed_victim_delta_tau for r in rows
+                ),
+                "mean_init_sd_victim_delta_tau": _finite_mean(init_sd),
+                "victim_singleton_poisoned_rate": float(
+                    np.mean([r.victim_size_poisoned == 1 for r in rows])
+                ),
+                "reassignment_rate": float(np.mean([r.n_reassigned > 0 for r in rows])),
+                "mean_n_reassigned": float(np.mean([r.n_reassigned for r in rows])),
+                "mean_silhouette_clean": _finite_mean(r.silhouette_clean for r in rows),
+                "mean_silhouette_poisoned": _finite_mean(
+                    r.silhouette_poisoned for r in rows
+                ),
+            }
+        )
+    return records
+
+
+def _scale_normalization_summary(manifest: SensitivityManifest) -> list[dict[str, Any]]:
+    """Summarize raw versus normalized GLOBAL_THRESHOLD effects and clean per-client scale dispersion."""
+    records = []
+    for (src, obj, frac), rows in sorted(
+        _group_by(manifest.scale_normalization, ("source", "objective", "fraction")).items()
+    ):
+        def mean_of(attr: str) -> float:
+            return _finite_mean(float(getattr(r, attr)) for r in rows)
+
+        records.append(
+            {
+                "source": src,
+                "objective": obj,
+                "fraction": frac,
+                "n_rows": len(rows),
+                "mean_tau_local_cv_clean": mean_of("tau_local_cv_clean"),
+                "mean_tau_local_max_min_ratio_clean": mean_of(
+                    "tau_local_max_min_ratio_clean"
+                ),
+                "mean_score_scale_cv_clean": mean_of("score_scale_cv_clean"),
+                "raw_global_victim_delta_tau": mean_of("raw_global_victim_delta_tau"),
+                "normalized_global_victim_delta_tau": mean_of(
+                    "normalized_global_victim_delta_tau"
+                ),
+                "raw_global_victim_delta_fpr": mean_of("raw_global_victim_delta_fpr"),
+                "normalized_global_victim_delta_fpr": mean_of(
+                    "normalized_global_victim_delta_fpr"
+                ),
+                "raw_global_cv_fpr_clean": mean_of("raw_global_cv_fpr_clean"),
+                "normalized_global_cv_fpr_clean": mean_of(
+                    "normalized_global_cv_fpr_clean"
+                ),
+                "raw_global_cv_fpr_poisoned": mean_of("raw_global_cv_fpr_poisoned"),
+                "normalized_global_cv_fpr_poisoned": mean_of(
+                    "normalized_global_cv_fpr_poisoned"
+                ),
+            }
+        )
+    return records
+
+
+def _draw_variant_summary(manifest: SensitivityManifest) -> list[dict[str, Any]]:
+    """Summarize threshold shift and duplicate rates for each alternative draw mode against with-replacement."""
+    records = []
+    for (pol, src, obj, frac, draw), rows in sorted(
+        _group_by(
+            manifest.draw_variants,
+            ("policy", "source", "objective", "fraction", "draw"),
+        ).items()
+    ):
+        base = _finite_mean(r.delta_tau_with_replacement for r in rows)
+        variant = _finite_mean(r.delta_tau_variant for r in rows)
+        records.append(
+            {
+                "policy": pol,
+                "source": src,
+                "objective": obj,
+                "fraction": frac,
+                "draw": draw,
+                "synthesized_values": draw in {d.value for d in SYNTHESIZED_DRAWS},
+                "n_rows": len(rows),
+                "mean_requested_n_replaced": float(
+                    np.mean([r.requested_n_replaced for r in rows])
+                ),
+                "mean_effective_n_replaced": float(
+                    np.mean([r.effective_n_replaced for r in rows])
+                ),
+                "mean_pool_size": float(np.mean([r.pool_size for r in rows])),
+                "full_budget_feasible_rate": float(
+                    np.mean(
+                        [r.effective_n_replaced == r.requested_n_replaced for r in rows]
+                    )
+                ),
+                "mean_delta_tau_with_replacement": base,
+                "mean_delta_tau_variant": variant,
+                "variant_to_baseline_ratio": variant / base
+                if math.isfinite(base) and base != 0.0
+                else math.nan,
+                "mean_duplicate_rate_with_replacement": _finite_mean(
+                    r.duplicate_rate_with_replacement for r in rows
+                ),
+                "mean_duplicate_rate_variant": _finite_mean(
+                    r.duplicate_rate_variant for r in rows
+                ),
+            }
+        )
+    return records
+
+
+def _trust_boundary_summary(manifest: SensitivityManifest) -> list[dict[str, Any]]:
+    """Summarize the buffer attack against trimmed-calibration defenses and the direct-overwrite reference."""
+    records = []
+    for (pol, src, obj, frac), rows in sorted(
+        _group_by(
+            manifest.trust_boundary, ("policy", "source", "objective", "fraction")
+        ).items()
+    ):
+        def mean_of(attr: str) -> float:
+            return _finite_mean(float(getattr(r, attr)) for r in rows)
+
+        undefended = mean_of("delta_tau_undefended")
+        records.append(
+            {
+                "policy": pol,
+                "source": src,
+                "objective": obj,
+                "fraction": frac,
+                "n_rows": len(rows),
+                "mean_delta_tau_undefended": undefended,
+                "mean_delta_tau_trim_primary": mean_of("delta_tau_trim_primary"),
+                "mean_delta_tau_trim_appendix": mean_of("delta_tau_trim_appendix"),
+                "mean_residual_vs_clean_trim_primary": mean_of(
+                    "residual_vs_clean_trim_primary"
+                ),
+                "mean_residual_vs_clean_trim_appendix": mean_of(
+                    "residual_vs_clean_trim_appendix"
+                ),
+                "mean_overwrite_reference_shift": mean_of("overwrite_reference_shift"),
+                "mean_buffer_to_overwrite_ratio": mean_of("buffer_to_overwrite_ratio"),
+                "trim_primary_reduction": 1.0
+                - mean_of("delta_tau_trim_primary") / undefended
+                if math.isfinite(undefended) and undefended != 0.0
+                else math.nan,
+            }
+        )
+    return records
+
+
+def load_poisoning_manifest(base_dir: Path) -> BoundedSweepManifest:
     """Load and parse the bounded-sweep manifest from the N-BaIoT main poison layout path."""
     if not (path := PoisonLayout(base_dir=base_dir).nbaiot_main_manifest()).exists():
         raise FileNotFoundError(f"Missing bounded 10-seed manifest: {path}")
@@ -144,6 +385,15 @@ def _support_count(seed_values: dict[int, float]) -> int:
     return sum(1 for v in seed_values.values() if math.isfinite(v) and v > 0.0)
 
 
+def _finite_mean(values: Iterable[float]) -> float:
+    """Return the mean of finite values, or NaN if none are finite."""
+    return (
+        float(np.mean(f))
+        if (f := [v for v in values if math.isfinite(v)])
+        else math.nan
+    )
+
+
 def _median(values: Iterable[float]) -> float:
     """Return the median of finite values, or NaN if none are finite."""
     return (
@@ -157,26 +407,37 @@ def _bootstrap_payload(
     seed_values: dict[int, float], analysis_seed: int
 ) -> dict[str, Any]:
     """Compute bootstrap CI for seed-aggregated values and return a stats dict, or NaN placeholders if too few seeds."""
-    finite = [v for v in seed_values.values() if math.isfinite(v)]
+    return dict(
+        _cached_bootstrap(
+            tuple(v for v in seed_values.values() if math.isfinite(v)), analysis_seed
+        )
+    )
+
+
+@lru_cache(maxsize=None)
+def _cached_bootstrap(
+    finite: tuple[float, ...], analysis_seed: int
+) -> tuple[tuple[str, float | int], ...]:
+    """Cache bootstrap payloads keyed on the finite seed values and analysis seed."""
     if len(finite) < BOOTSTRAP_MIN_FINITE:
-        return {
-            "bootstrap_ci_lower": math.nan,
-            "bootstrap_ci_upper": math.nan,
-            "bootstrap_mean": math.nan,
-            "bootstrap_n_seed_aggregates": len(finite),
-        }
+        return (
+            ("bootstrap_ci_lower", math.nan),
+            ("bootstrap_ci_upper", math.nan),
+            ("bootstrap_mean", math.nan),
+            ("bootstrap_n_seed_aggregates", len(finite)),
+        )
     res = bootstrap_ci(
         np.array(finite, dtype=np.float64),
         n_bootstrap=BOOTSTRAP_N,
         ci=BOOTSTRAP_CI,
         seed=analysis_seed,
     )
-    return {
-        "bootstrap_ci_lower": res.ci_lower,
-        "bootstrap_ci_upper": res.ci_upper,
-        "bootstrap_mean": res.mean_delta,
-        "bootstrap_n_seed_aggregates": res.n_seeds,
-    }
+    return (
+        ("bootstrap_ci_lower", res.ci_lower),
+        ("bootstrap_ci_upper", res.ci_upper),
+        ("bootstrap_mean", res.mean_delta),
+        ("bootstrap_n_seed_aggregates", res.n_seeds),
+    )
 
 
 def _exact_support(seed_support: int, n_seeds: int) -> dict[str, Any]:
@@ -192,8 +453,28 @@ def _exact_support(seed_support: int, n_seeds: int) -> dict[str, Any]:
     }
 
 
-def _victim_majority_count(rows: list[BoundedSweepResultRow], absolute: bool) -> int:
-    """Count seeds where at least _VICTIM_MAJORITY victims show a significant shift in the expected direction."""
+def _is_significant(r: BoundedSweepResultRow, gate: GateParams) -> bool:
+    """Return the victim materiality flag, recomputed when gate parameters differ from the defaults."""
+    if (
+        gate.materiality_factor == MATERIALITY_FACTOR
+        and gate.iqr_floor_factor == IQR_FLOOR_FACTOR
+    ):
+        return r.is_victim_significant
+    scale = materiality_scale(
+        r.victim_delta_tau_scale_base,
+        r.iqr_median_clean,
+        gate.materiality_factor,
+        gate.iqr_floor_factor,
+    )
+    return not math.isnan(scale) and abs(r.delta_tau) >= scale
+
+
+def _victim_majority_count(
+    rows: list[BoundedSweepResultRow],
+    absolute: bool,
+    gate: GateParams = DEFAULT_GATE,
+) -> int:
+    """Count seeds where at least gate.victim_majority victims show a significant shift in the expected direction."""
     by_seed = defaultdict(list)
     for r in rows:
         by_seed[r.training_seed].append(r)
@@ -203,7 +484,7 @@ def _victim_majority_count(rows: list[BoundedSweepResultRow], absolute: bool) ->
         if sum(
             1
             for r in s_rows
-            if r.is_victim_significant
+            if _is_significant(r, gate)
             and (
                 absolute
                 or (1 if r.objective == AttackerObjective.THRESHOLD_RAISE else -1)
@@ -211,11 +492,13 @@ def _victim_majority_count(rows: list[BoundedSweepResultRow], absolute: bool) ->
                 > 0.0
             )
         )
-        >= _VICTIM_MAJORITY
+        >= gate.victim_majority
     )
 
 
-def _threshold_shift_summary(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+def _threshold_shift_summary(
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
+) -> list[dict[str, Any]]:
     """Summarize threshold-shift statistics for every (policy, objective, source, fraction) group."""
     records = []
     for (pol, obj, src, frac), rows in sorted(_group_rows(manifest.results).items()):
@@ -235,13 +518,13 @@ def _threshold_shift_summary(manifest: BoundedSweepManifest) -> list[dict[str, A
                 "median_delta_tau": _median(r.delta_tau for r in rows),
                 "iqr_delta_tau": iqr(np.array([r.delta_tau for r in rows])),
                 "material_signed_rate": (
-                    len([r for r in rows if r.is_victim_significant and sign * r.delta_tau > 0.0])
+                    len([r for r in rows if _is_significant(r, gate) and sign * r.delta_tau > 0.0])
                     / len(rows)
                     if rows
                     else math.nan
                 ),
                 "seed_sign_count": s_count,
-                "victim_majority_count": _victim_majority_count(rows, absolute=False),
+                "victim_majority_count": _victim_majority_count(rows, False, gate),
                 **_bootstrap_payload(s_vals, manifest.analysis_seeds[0]),
                 **_exact_support(s_count, len(s_vals)),
             }
@@ -274,7 +557,9 @@ def _excess_by_seed(
     return {s: float(np.mean(v)) for s, v in sorted(bucket.items())}
 
 
-def _directional_excess_summary(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+def _directional_excess_summary(
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
+) -> list[dict[str, Any]]:
     """Summarize directional excess of targeted strategies over the random baseline for each group."""
     records = []
     for obj, src_tgt in [
@@ -308,9 +593,18 @@ def _directional_excess_summary(manifest: BoundedSweepManifest) -> list[dict[str
                     "objective": obj.value,
                     "source": src,
                     "fraction": frac,
+                    "control_source": PoisoningSourceStrategy.RANDOM_BENIGN.value,
+                    "control_objective": obj.value,
                     "directional_excess_seed_support": s_count,
                     "median_directional_excess": _median(s_vals.values()),
-                    "gate2_pass": s_count >= SIGN_CONSISTENCY_THRESHOLD
+                    "mean_directional_excess": _finite_mean(s_vals.values()),
+                    "per_seed_directional_excess": {
+                        str(k): v for k, v in s_vals.items()
+                    },
+                    "permutation_p": sign_flip_p_value(
+                        np.array(list(s_vals.values()), dtype=np.float64)
+                    ),
+                    "gate2_pass": s_count >= gate.sign_consistency
                     and _median(s_vals.values()) > 0.0,
                     **_bootstrap_payload(s_vals, manifest.analysis_seeds[0]),
                     **_exact_support(s_count, len(s_vals)),
@@ -319,7 +613,9 @@ def _directional_excess_summary(manifest: BoundedSweepManifest) -> list[dict[str
     return records
 
 
-def _random_instability_summary(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+def _random_instability_summary(
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
+) -> list[dict[str, Any]]:
     """Summarize random-control instability count and flag for each RANDOM_BENIGN group."""
     return [
         {
@@ -329,9 +625,9 @@ def _random_instability_summary(manifest: BoundedSweepManifest) -> list[dict[str
             "source": src,
             "fraction": frac,
             "random_control_instability_count": (
-                cnt := _victim_majority_count(rows, absolute=True)
+                cnt := _victim_majority_count(rows, True, gate)
             ),
-            "random_control_unstable": cnt >= SIGN_CONSISTENCY_THRESHOLD,
+            "random_control_unstable": cnt >= gate.sign_consistency,
         }
         for (pol, obj, src, frac), rows in sorted(_group_rows(manifest.results).items())
         if src == PoisoningSourceStrategy.RANDOM_BENIGN.value
@@ -339,7 +635,7 @@ def _random_instability_summary(manifest: BoundedSweepManifest) -> list[dict[str
 
 
 def _leave_one_victim_out_summary(
-    manifest: BoundedSweepManifest,
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
 ) -> list[dict[str, Any]]:
     """Summarize leave-one-victim-out sensitivity of the threshold-shift signal per group."""
     records = []
@@ -360,7 +656,7 @@ def _leave_one_victim_out_summary(
             )
             med = _median(s_vals.values())
             excl_means.append(med)
-            if _support_count(s_vals) >= SIGN_CONSISTENCY_THRESHOLD and med > 0.0:
+            if _support_count(s_vals) >= gate.sign_consistency and med > 0.0:
                 stable += 1
         records.append(
             {
@@ -379,31 +675,54 @@ def _leave_one_victim_out_summary(
     return records
 
 
+def _metric_value(r: BoundedSweepResultRow, metric: str) -> float:
+    """Return a row metric, resolving derived absolute error-count deltas."""
+    match metric:
+        case "victim_delta_fp":
+            return float(r.victim_fp_poisoned - r.victim_fp_clean)
+        case "victim_delta_fn":
+            return float(r.victim_fn_poisoned - r.victim_fn_clean)
+        case _:
+            return float(getattr(r, metric))
+
+
 def _downstream_metric_record(
-    analysis_seed: int, ctx: _DownstreamContext, metric: str, transform: float, agg: str
+    analysis_seed: int,
+    ctx: _DownstreamContext,
+    metric: str,
+    transform: float,
+    agg: str,
+    gate: GateParams = DEFAULT_GATE,
 ) -> dict[str, Any]:
-    """Build a single downstream harm record for one metric, sign transform, and seed aggregation method."""
+    """Build a single downstream record for one metric, sign transform, and seed aggregation method."""
     by_seed = defaultdict(list)
     for r in ctx.rows:
-        if math.isfinite(v := transform * float(getattr(r, metric))):
+        if math.isfinite(v := transform * _metric_value(r, metric)):
             by_seed[r.training_seed].append(v)
     s_vals = {
         s: max(v) if agg == "max" else float(np.mean(v)) for s, v in by_seed.items()
     }
+    arr = np.array(list(s_vals.values()), dtype=np.float64)
     return {
         "objective": ctx.objective.value,
         "source": ctx.source.value,
         "metric": metric,
         "expected_sign_seed_support": (s_cnt := _support_count(s_vals)),
+        "n_seeds_negative": int(np.sum(arr < 0.0)),
         "median_harm": _median(s_vals.values()),
-        "gate3_metric_pass": s_cnt >= SIGN_CONSISTENCY_THRESHOLD
+        "mean_effect": _finite_mean(s_vals.values()),
+        "per_seed_values": {str(k): v for k, v in sorted(s_vals.items())},
+        "permutation_p": sign_flip_p_value(arr),
+        "gate3_metric_pass": s_cnt >= gate.sign_consistency
         and _median(s_vals.values()) > 0.0,
         **_bootstrap_payload(s_vals, analysis_seed),
         **_exact_support(s_cnt, len(s_vals)),
     }
 
 
-def _downstream_raising_summary(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+def _downstream_raising_summary(
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
+) -> list[dict[str, Any]]:
     """Summarize downstream TPR/BA/macro-F1 harm for HIGH_SCORE_BENIGN THRESHOLD_RAISE groups."""
     metrics = [
         ("victim_delta_tpr", -1.0, "mean"),
@@ -423,6 +742,7 @@ def _downstream_raising_summary(manifest: BoundedSweepManifest) -> list[dict[str
                 m,
                 t,
                 a,
+                gate,
             ),
             "dataset": manifest.dataset.value,
             "policy": pol,
@@ -443,7 +763,7 @@ def _downstream_raising_summary(manifest: BoundedSweepManifest) -> list[dict[str
 
 
 def _downstream_lowering_summary(
-    manifest: BoundedSweepManifest,
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
 ) -> list[dict[str, Any]]:
     """Summarize downstream FPR-dispersion harm metrics for LOW_SCORE_BENIGN THRESHOLD_LOWER groups."""
     metrics = [
@@ -465,6 +785,7 @@ def _downstream_lowering_summary(
                 m,
                 1.0,
                 "mean",
+                gate,
             ),
             "dataset": manifest.dataset.value,
             "policy": pol,
@@ -520,33 +841,35 @@ def _cluster_diagnostics_summary(
     ]
 
 
-def _claim_gate_decisions(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+def _claim_gate_decisions(
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
+) -> list[dict[str, Any]]:
     """Apply the three-gate claim logic and classify each claim-bearing group into a claim class."""
     excess = {
         (r["policy"], r["objective"], r["source"], r["fraction"]): r
-        for r in _directional_excess_summary(manifest)
+        for r in _directional_excess_summary(manifest, gate)
     }
     r_instab = {
         (r["policy"], r["objective"], r["fraction"]): r["random_control_unstable"]
-        for r in _random_instability_summary(manifest)
+        for r in _random_instability_summary(manifest, gate)
     }
     d_pass: defaultdict[tuple[str, str, str, float], bool] = defaultdict(bool)
-    for r in _downstream_raising_summary(manifest) + _downstream_lowering_summary(
-        manifest
+    for r in _downstream_raising_summary(manifest, gate) + _downstream_lowering_summary(
+        manifest, gate
     ):
         d_pass[(r["policy"], r["objective"], r["source"], r["fraction"])] |= bool(
             r["gate3_metric_pass"]
         )
 
     records = []
-    for t_rec in _threshold_shift_summary(manifest):
+    for t_rec in _threshold_shift_summary(manifest, gate):
         if not t_rec["claim_bearing"]:
             continue
         pol, obj, src, frac = t_rec["policy"], t_rec["objective"], t_rec["source"], t_rec["fraction"]
         key = (pol, obj, src, frac)
         g1 = (
-            t_rec["seed_sign_count"] >= SIGN_CONSISTENCY_THRESHOLD
-            and t_rec["victim_majority_count"] >= SIGN_CONSISTENCY_THRESHOLD
+            t_rec["seed_sign_count"] >= gate.sign_consistency
+            and t_rec["victim_majority_count"] >= gate.sign_consistency
         )
         g2, g3 = bool(excess.get(key, {}).get("gate2_pass", False)), d_pass[key]
         r_unstable = bool(r_instab.get((pol, obj, frac), False))
@@ -570,6 +893,251 @@ def _claim_gate_decisions(manifest: BoundedSweepManifest) -> list[dict[str, Any]
                 "gate3_pass": g3,
                 "random_control_unstable": r_unstable,
                 "claim_class": c_class,
+            }
+        )
+    return records
+
+
+_EXTENDED_METRICS: tuple[str, ...] = (
+    "victim_delta_tpr",
+    "victim_delta_fpr",
+    "victim_delta_fn",
+    "victim_delta_fp",
+    "victim_delta_ba",
+    "victim_delta_macro_f1",
+    "nonvictim_mean_delta_tpr",
+    "nonvictim_worst_delta_tpr",
+    "nonvictim_mean_delta_fpr",
+    "nonvictim_worst_delta_fpr",
+    "nonvictim_mean_delta_ba",
+    "nonvictim_mean_delta_macro_f1",
+    "nonvictim_delta_fn_total",
+    "nonvictim_delta_fp_total",
+    "delta_mean_fpr",
+    "delta_cv_fpr",
+)
+
+_FIXED_CLUSTER_METRICS: tuple[str, ...] = (
+    "fixed_cluster_victim_delta_tau",
+    "fixed_cluster_victim_delta_tpr",
+    "fixed_cluster_victim_delta_fpr",
+    "fixed_cluster_delta_cv_fpr",
+    "fixed_cluster_delta_mean_fpr",
+    "fixed_cluster_nonvictim_mean_delta_tpr",
+    "fixed_cluster_nonvictim_mean_delta_fpr",
+)
+
+
+def _downstream_extended_summary(
+    manifest: BoundedSweepManifest, gate: GateParams = DEFAULT_GATE
+) -> list[dict[str, Any]]:
+    """Summarize signed victim, non-victim, absolute-burden and fixed-cluster effects with seed-level CIs."""
+    records = []
+    for (pol, obj, src, frac), rows in sorted(
+        _group_rows(r for r in manifest.results if r.fraction > 0.0).items()
+    ):
+        ctx = _DownstreamContext(
+            rows, AttackerObjective(obj), PoisoningSourceStrategy(src)
+        )
+        metrics = _EXTENDED_METRICS + (
+            _FIXED_CLUSTER_METRICS if pol == ThresholdPolicy.CLUSTER_THRESHOLD.value else ()
+        )
+        records.extend(
+            {
+                **_downstream_metric_record(
+                    manifest.analysis_seeds[0], ctx, m, 1.0, "mean", gate
+                ),
+                "dataset": manifest.dataset.value,
+                "policy": pol,
+                "fraction": frac,
+                "summary_metric": m,
+            }
+            for m in metrics
+        )
+    return records
+
+
+_CLIENT_LEVEL_METRICS: tuple[str, ...] = (
+    "delta_tau",
+    "victim_delta_tpr",
+    "victim_delta_fpr",
+    "delta_cv_fpr",
+    "nonvictim_mean_delta_tpr",
+    "nonvictim_mean_delta_fpr",
+)
+
+
+def _client_level_effects(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+    """Summarize per-victim effects across training seeds for every claim-bearing and control group."""
+    records = []
+    for (pol, obj, src, frac), rows in sorted(
+        _group_rows(r for r in manifest.results if r.fraction > 0.0).items()
+    ):
+        by_victim = defaultdict(list)
+        for r in rows:
+            by_victim[r.victim_id].append(r)
+        for victim, v_rows in sorted(by_victim.items()):
+            record: dict[str, Any] = {
+                "dataset": manifest.dataset.value,
+                "policy": pol,
+                "objective": obj,
+                "source": src,
+                "fraction": frac,
+                "victim_id": victim,
+                "n_seeds": len({r.training_seed for r in v_rows}),
+            }
+            for m in _CLIENT_LEVEL_METRICS:
+                vals = [
+                    v for r in v_rows if math.isfinite(v := _metric_value(r, m))
+                ]
+                record[f"{m}_mean"] = float(np.mean(vals)) if vals else math.nan
+                record[f"{m}_std"] = (
+                    float(np.std(vals, ddof=1)) if len(vals) > 1 else math.nan
+                )
+                record[f"{m}_min"] = min(vals) if vals else math.nan
+                record[f"{m}_max"] = max(vals) if vals else math.nan
+            records.append(record)
+    return records
+
+
+def _cluster_stability_summary(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+    """Compare attack-time recomputed clusters with fixed clean assignments and report assignment transitions."""
+    records = []
+    for (pol, obj, src, frac), rows in sorted(
+        _group_rows(
+            r
+            for r in manifest.results
+            if r.policy == ThresholdPolicy.CLUSTER_THRESHOLD and r.fraction > 0.0
+        ).items()
+    ):
+        def mean_of(attr: str) -> float:
+            return _finite_mean(float(getattr(r, attr)) for r in rows)
+
+        records.append(
+            {
+                "dataset": manifest.dataset.value,
+                "policy": pol,
+                "objective": obj,
+                "source": src,
+                "fraction": frac,
+                "n_rows": len(rows),
+                "mean_n_reassigned": mean_of("cluster_n_reassigned"),
+                "max_n_reassigned": max(r.cluster_n_reassigned for r in rows),
+                "reassignment_rate": float(
+                    np.mean([r.cluster_n_reassigned > 0 for r in rows])
+                ),
+                "victim_singleton_clean_rate": float(
+                    np.mean([r.cluster_victim_size_clean == 1 for r in rows])
+                ),
+                "victim_singleton_poisoned_rate": float(
+                    np.mean([r.cluster_victim_size_poisoned == 1 for r in rows])
+                ),
+                "mean_victim_size_clean": mean_of("cluster_victim_size_clean"),
+                "mean_victim_size_poisoned": mean_of("cluster_victim_size_poisoned"),
+                "mean_silhouette_clean": mean_of("cluster_silhouette_clean"),
+                "mean_silhouette_poisoned": mean_of("cluster_silhouette_poisoned"),
+                "modal_sizes_clean": list(
+                    max(
+                        {r.cluster_sizes_clean for r in rows},
+                        key=[r.cluster_sizes_clean for r in rows].count,
+                    )
+                ),
+                "modal_sizes_poisoned": list(
+                    max(
+                        {r.cluster_sizes_poisoned for r in rows},
+                        key=[r.cluster_sizes_poisoned for r in rows].count,
+                    )
+                ),
+                "recomputed_victim_delta_tau": mean_of("cluster_victim_effect"),
+                "fixed_victim_delta_tau": mean_of("fixed_cluster_victim_delta_tau"),
+                "recomputed_victim_delta_tpr": mean_of("victim_delta_tpr"),
+                "fixed_victim_delta_tpr": mean_of("fixed_cluster_victim_delta_tpr"),
+                "recomputed_victim_delta_fpr": mean_of("victim_delta_fpr"),
+                "fixed_victim_delta_fpr": mean_of("fixed_cluster_victim_delta_fpr"),
+                "recomputed_delta_cv_fpr": mean_of("delta_cv_fpr"),
+                "fixed_delta_cv_fpr": mean_of("fixed_cluster_delta_cv_fpr"),
+                "recomputed_nonvictim_delta_tpr": mean_of("nonvictim_mean_delta_tpr"),
+                "fixed_nonvictim_delta_tpr": mean_of(
+                    "fixed_cluster_nonvictim_mean_delta_tpr"
+                ),
+                "recomputed_nonvictim_delta_fpr": mean_of("nonvictim_mean_delta_fpr"),
+                "fixed_nonvictim_delta_fpr": mean_of(
+                    "fixed_cluster_nonvictim_mean_delta_fpr"
+                ),
+            }
+        )
+    return records
+
+
+def _duplicate_and_bound_summary(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+    """Summarize duplicate-score rates after injection and the share of reachable threshold range consumed."""
+    records = []
+    for (pol, obj, src, frac), rows in sorted(
+        _group_rows(r for r in manifest.results if r.fraction > 0.0).items()
+    ):
+        bound = [
+            r.delta_tau_bound_utilization
+            for r in rows
+            if math.isfinite(r.delta_tau_bound_utilization)
+        ]
+        records.append(
+            {
+                "dataset": manifest.dataset.value,
+                "policy": pol,
+                "objective": obj,
+                "source": src,
+                "fraction": frac,
+                "mean_n_replaced": float(np.mean([r.n_replaced for r in rows])),
+                "mean_duplicate_rate_clean": _finite_mean(
+                    r.cal_duplicate_rate_clean for r in rows
+                ),
+                "mean_duplicate_rate_poisoned": _finite_mean(
+                    r.cal_duplicate_rate_poisoned for r in rows
+                ),
+                "mean_bound_utilization": float(np.mean(bound)) if bound else math.nan,
+                "max_bound_utilization": max(bound) if bound else math.nan,
+            }
+        )
+    return records
+
+
+def _gate_sensitivity_summary(manifest: BoundedSweepManifest) -> list[dict[str, Any]]:
+    """Re-evaluate claim classes over a grid of gate parameters and report class counts and flips."""
+    default = {
+        (r["policy"], r["objective"], r["source"], r["fraction"]): r["claim_class"]
+        for r in _claim_gate_decisions(manifest, DEFAULT_GATE)
+    }
+    records = []
+    for sc, vm, mf, fl in product(
+        SENSITIVITY_SIGN_CONSISTENCY_GRID,
+        SENSITIVITY_VICTIM_MAJORITY_GRID,
+        SENSITIVITY_MATERIALITY_GRID,
+        SENSITIVITY_IQR_FLOOR_GRID,
+    ):
+        decisions = _claim_gate_decisions(manifest, GateParams(
+                sign_consistency=sc,
+                victim_majority=vm,
+                materiality_factor=mf,
+                iqr_floor_factor=fl,
+            ))
+        classes = [d["claim_class"] for d in decisions]
+        records.append(
+            {
+                "dataset": manifest.dataset.value,
+                "sign_consistency": sc,
+                "victim_majority": vm,
+                "materiality_factor": mf,
+                "iqr_floor_factor": fl,
+                "n_groups": len(decisions),
+                "n_full_vulnerability": classes.count("full_vulnerability"),
+                "n_mechanism_only": classes.count("mechanism_only"),
+                "n_null_or_conditional": classes.count("null_or_conditional"),
+                "n_calibration_instability": classes.count("calibration_instability"),
+                "n_changed_vs_default": sum(
+                    d["claim_class"]
+                    != default[(d["policy"], d["objective"], d["source"], d["fraction"])]
+                    for d in decisions
+                ),
             }
         )
     return records

@@ -11,6 +11,7 @@ from rich.console import Console
 
 from datp.attacks.constants import NBAIOT_MAIN_SOURCE_OBJECTIVE_PAIRS
 from datp.attacks.execution.bounded_sweep_run import write_nbaiot_main_manifest
+from datp.attacks.execution.sensitivity_run import write_sensitivity_manifest
 from datp.cli.enums import (
     _EXECUTION_GATE_NOTICE,
     CliExitCode,
@@ -116,6 +117,21 @@ def run_bounded_sweep(base_dir: Path = typer.Option(...)) -> None:
 
     out_path = write_nbaiot_main_manifest(base_dir)
     _stdout.print(f"[bold green]Wrote bounded-sweep manifest:[/bold green] {out_path}")
+
+
+@app.command(PoisonCommand.RUN_SENSITIVITY.value)
+def run_sensitivity(base_dir: Path = typer.Option(...)) -> None:
+    """Execute the sensitivity analyses and write their manifest."""
+    cfg = get_stage_config(ExperimentStage.NBAIOT_MAIN)
+
+    if not cfg.allow_run:
+        _stderr.print(
+            f"[red]Refusing to run:[/red] {ExperimentStage.NBAIOT_MAIN!r} allow_run is False (gate {cfg.gate!r} not satisfied)."
+        )
+        raise typer.Exit(code=CliExitCode.ERROR.value)
+
+    out_path = write_sensitivity_manifest(base_dir)
+    _stdout.print(f"[bold green]Wrote sensitivity manifest:[/bold green] {out_path}")
 
 
 @app.command(PoisonCommand.STAGES.value)

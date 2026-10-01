@@ -90,13 +90,60 @@ class BoundedSweepResultRow(BaseModel):
     cluster_victim_effect: NanFloat
     cluster_non_victim_effect: NanFloat
 
+    victim_fpr_clean: float
+    victim_fpr_poisoned: float
+    victim_delta_fpr: float
+    victim_fp_clean: int
+    victim_fp_poisoned: int
+    victim_fn_clean: int
+    victim_fn_poisoned: int
+    victim_n_test_benign: int
+    victim_n_test_attack: int
+
+    nonvictim_mean_tpr_clean: NanFloat
+    nonvictim_mean_tpr_poisoned: NanFloat
+    nonvictim_mean_delta_tpr: NanFloat
+    nonvictim_worst_delta_tpr: NanFloat
+    nonvictim_mean_fpr_clean: NanFloat
+    nonvictim_mean_fpr_poisoned: NanFloat
+    nonvictim_mean_delta_fpr: NanFloat
+    nonvictim_worst_delta_fpr: NanFloat
+    nonvictim_mean_delta_ba: NanFloat
+    nonvictim_mean_delta_macro_f1: NanFloat
+    nonvictim_delta_fp_total: int
+    nonvictim_delta_fn_total: int
+
+    victim_delta_tau_scale_base: NanFloat
+    iqr_median_clean: NanFloat
+    delta_tau_bound_utilization: NanFloat
+
+    n_replaced: int
+    cal_duplicate_rate_clean: NanFloat
+    cal_duplicate_rate_poisoned: NanFloat
+
+    cluster_sizes_clean: tuple[int, ...]
+    cluster_sizes_poisoned: tuple[int, ...]
+    cluster_victim_size_clean: NanFloat
+    cluster_victim_size_poisoned: NanFloat
+    cluster_n_reassigned: NanFloat
+    cluster_silhouette_clean: NanFloat
+    cluster_silhouette_poisoned: NanFloat
+
+    fixed_cluster_victim_delta_tau: NanFloat
+    fixed_cluster_victim_delta_tpr: NanFloat
+    fixed_cluster_victim_delta_fpr: NanFloat
+    fixed_cluster_delta_cv_fpr: NanFloat
+    fixed_cluster_delta_mean_fpr: NanFloat
+    fixed_cluster_nonvictim_mean_delta_tpr: NanFloat
+    fixed_cluster_nonvictim_mean_delta_fpr: NanFloat
+
 
 class BoundedSweepManifest(BaseModel):
     """Top-level bounded-sweep manifest with provenance, sweep axes, and result rows."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: str = "1"
+    schema_version: str = "2"
     generated_at_utc: str
     dataset: DatasetID = DatasetID.NBAIOT
     stage: ExperimentStage = ExperimentStage.NBAIOT_MAIN

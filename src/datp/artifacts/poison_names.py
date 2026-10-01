@@ -12,6 +12,7 @@ class ManifestFile(StrEnum):
     CLEAN_SCORE_ARTIFACTS = "clean_score_artifacts.json"
     SYNTHETIC_SMOKE_MANIFEST = "synthetic_smoke_manifest.json"
     NBAIOT_MAIN_MANIFEST = "nbaiot_main_manifest.json"
+    SENSITIVITY_MANIFEST = "sensitivity_manifest.json"
     CLUSTER_THRESHOLD_MANIFEST = "cluster_threshold_manifest.json"
     RESERVOIR_MANIFEST = "reservoir_manifest.json"
     INFEASIBLE_CELLS = "infeasible_cells.json"

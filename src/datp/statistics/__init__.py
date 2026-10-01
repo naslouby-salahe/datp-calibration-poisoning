@@ -17,6 +17,7 @@ from datp.statistics.divergence import (
     pairwise_js_summary,
 )
 from datp.statistics.effect_size import CliffsDeltaResult, cliffs_delta
+from datp.statistics.permutation import sign_flip_p_value
 from datp.statistics.spearman import SpearmanResult, spearman_correlation
 from datp.statistics.wilcoxon import (
     BonferroniResult,
@@ -46,6 +47,7 @@ __all__ = [
     "pairwise_js_divergence",
     "pairwise_js_from_distributions",
     "pairwise_js_summary",
+    "sign_flip_p_value",
     "spearman_correlation",
     "SpearmanResult",
     "StatsField",

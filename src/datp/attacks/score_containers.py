@@ -43,6 +43,10 @@ class ClientScoresTuple:
         self._clients = ordered
         self._map = MappingProxyType({c.client_id: c for c in ordered})
 
+    def __reduce__(self) -> tuple[type[ClientScoresTuple], tuple[tuple[ClientScores, ...]]]:
+        """Pickle by rebuilding from the ordered client tuple."""
+        return ClientScoresTuple, (self._clients,)
+
     def __iter__(self) -> Iterator[ClientScores]:
         """Iterate over clients in insertion order."""
         return iter(self._clients)

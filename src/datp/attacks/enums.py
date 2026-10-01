@@ -14,7 +14,10 @@ __all__ = [
     "PoisoningKnowledge",
     "PoisoningSourceStrategy",
     "PoisoningTargetScope",
+    "ReservoirDraw",
     "ReservoirStatus",
+    "SYNTHESIZED_DRAWS",
+    "SensitivityAnalysis",
     "is_diagnostic_knowledge",
     "is_diagnostic_scope",
     "is_diagnostic_source",
@@ -44,6 +47,29 @@ class CalibrationInjectionRule(enum.StrEnum):
     """How poisoned values replace calibration entries."""
 
     REPLACE_FIXED_BUDGET = "replace_fixed_budget"
+
+
+class ReservoirDraw(enum.StrEnum):
+    """How reservoir values are drawn at injection; only WITH_REPLACEMENT is used by the bounded sweep."""
+
+    WITH_REPLACEMENT = "with_replacement"
+    WITHOUT_REPLACEMENT = "without_replacement"
+    DISJOINT_RESERVOIR = "disjoint_reservoir"
+    INTERPOLATED_TAIL = "interpolated_tail"
+
+
+SYNTHESIZED_DRAWS: frozenset[ReservoirDraw] = frozenset(
+    {ReservoirDraw.INTERPOLATED_TAIL}
+)
+
+
+class SensitivityAnalysis(enum.StrEnum):
+    """Sensitivity analyses that sit beside the bounded sweep."""
+
+    CLUSTER_STABILITY = "cluster_stability"
+    SCALE_NORMALIZATION = "scale_normalization"
+    DRAW_VARIANT = "draw_variant"
+    TRUST_BOUNDARY = "trust_boundary"
 
 
 class PoisoningKnowledge(enum.StrEnum):

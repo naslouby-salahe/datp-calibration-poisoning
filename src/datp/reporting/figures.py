@@ -17,6 +17,8 @@ from datp.reporting.constants import (
     FIGURE2_STEM,
     FIGURE3_STEM,
     FIGURE4_STEM,
+    FIGURE5_STEM,
+    FIGURE6_STEM,
     NBAIOT_DEVICE_SHORT_LABELS,
 )
 
@@ -198,3 +200,96 @@ def generate_figure4(
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
     return _save_figs(fig, output_dir / FIGURE4_STEM, style.dpi)
+
+
+def generate_figure5(
+    client_effects: dict[str, dict[ThresholdPolicy, dict[str, list[float]]]],
+    output_dir: Path,
+    style: StyleConfig,
+) -> Path:
+    """Generate per-victim effect plots: seed mean with min-max seed range, one panel per objective (Figure 5)."""
+    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    panels = list(client_effects)
+    fig, axes = plt.subplots(
+        1, len(panels), figsize=style.figsize_double_col, squeeze=False
+    )
+    for ax, label in zip(axes[0], panels):
+        by_policy = client_effects[label]
+        victims = sorted({v for per in by_policy.values() for v in per})
+        policies = sorted(by_policy)
+        width = 0.8 / max(len(policies), 1)
+        for i, pol in enumerate(policies):
+            xs, means, lows, highs = [], [], [], []
+            for j, v in enumerate(victims):
+                vals = by_policy[pol].get(v)
+                if not vals:
+                    continue
+                xs.append(j + (i - (len(policies) - 1) / 2) * width)
+                means.append(float(np.mean(vals)))
+                lows.append(float(np.mean(vals)) - min(vals))
+                highs.append(max(vals) - float(np.mean(vals)))
+            ax.errorbar(
+                xs,
+                means,
+                yerr=[lows, highs],
+                fmt="o",
+                markersize=3,
+                capsize=2,
+                linewidth=1.0,
+                color=style.policy_colors[pol],
+                label=style.policy_labels[pol],
+            )
+        ax.axhline(0.0, color="black", linewidth=0.6)
+        ax.set_xticks(np.arange(len(victims)))
+        ax.set_xticklabels(
+            [NBAIOT_DEVICE_SHORT_LABELS.get(v, v.replace("_", " ")) for v in victims],
+            rotation=60,
+            ha="right",
+            fontsize=style.font_size - 2,
+        )
+        ax.set(ylabel=label)
+    axes[0][0].legend(fontsize=style.font_size - 2)
+    fig.tight_layout()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return _save_figs(fig, output_dir / FIGURE5_STEM, style.dpi)
+
+
+def generate_figure6(
+    seed_effects: dict[str, dict[ThresholdPolicy, list[float]]],
+    output_dir: Path,
+    style: StyleConfig,
+) -> Path:
+    """Generate seed-level distribution plots of victim-averaged effects, one panel per metric (Figure 6)."""
+    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    panels = list(seed_effects)
+    fig, axes = plt.subplots(
+        1, len(panels), figsize=style.figsize_double_col, squeeze=False
+    )
+    rng = np.random.default_rng(0)
+    for ax, label in zip(axes[0], panels):
+        by_policy = seed_effects[label]
+        policies = sorted(by_policy)
+        for i, pol in enumerate(policies):
+            vals = np.asarray(by_policy[pol], dtype=np.float64)
+            ax.scatter(
+                i + rng.uniform(-0.12, 0.12, vals.size),
+                vals,
+                s=14,
+                color=style.policy_colors[pol],
+                alpha=0.8,
+            )
+            ax.hlines(
+                float(np.nanmean(vals)), i - 0.3, i + 0.3, color="black", linewidth=1.2
+            )
+        ax.axhline(0.0, color="black", linewidth=0.6, linestyle=":")
+        ax.set_xticks(np.arange(len(policies)))
+        ax.set_xticklabels(
+            [style.policy_labels[p] for p in policies],
+            rotation=30,
+            ha="right",
+            fontsize=style.font_size - 2,
+        )
+        ax.set(ylabel=label)
+    fig.tight_layout()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return _save_figs(fig, output_dir / FIGURE6_STEM, style.dpi)

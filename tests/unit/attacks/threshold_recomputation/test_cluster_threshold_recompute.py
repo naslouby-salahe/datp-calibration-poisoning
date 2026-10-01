@@ -201,3 +201,48 @@ class TestNoClientLabelComparison:
             assert not hasattr(entry, "cluster_label"), (
                 "Decomposition entries must not store raw cluster labels."
             )
+
+
+class TestFixedAssignmentAndTransitions:
+    """Frozen-assignment thresholds, assignments, and silhouettes."""
+
+    def test_fixed_assignment_equals_agg_decomposition(self) -> None:
+        col = _make_collection()
+        pois_cal, _ = _make_poisoned_cal(col)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        for cid in col.eligible_ids:
+            assert pair.fixed_assignment_thresholds[cid] == pytest.approx(
+                pair.decomposition[cid].tau_agg
+            )
+
+    def test_assignments_cover_eligible_clients(self) -> None:
+        col = _make_collection()
+        pois_cal, _ = _make_poisoned_cal(col)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        assert set(pair.clean_assignments) == set(col.eligible_ids)
+        assert set(pair.poisoned_assignments) == set(col.eligible_ids)
+
+    def test_zero_fraction_keeps_assignments_and_thresholds(self) -> None:
+        col = _make_collection()
+        pois_cal, _ = _make_poisoned_cal(col, fraction=0.0)
+        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        assert dict(pair.clean_assignments) == dict(pair.poisoned_assignments)
+        for cid in col.eligible_ids:
+            assert pair.thresholds_pois[cid] == pytest.approx(
+                pair.thresholds_clean[cid]
+            )
+            assert pair.fixed_assignment_thresholds[cid] == pytest.approx(
+                pair.thresholds_clean[cid]
+            )
+
+    def test_hyperparams_change_cluster_count(self) -> None:
+        from datp.attacks.threshold_recomputation.cluster_threshold_recompute import (
+            ClusterHyperparams,
+        )
+
+        col = _make_collection()
+        pois_cal, _ = _make_poisoned_cal(col)
+        pair = compute_cluster_pair(
+            col, pois_cal, THRESHOLD_QUANTILE, ClusterHyperparams(k=2)
+        )
+        assert len(set(pair.clean_assignments.values())) == 2

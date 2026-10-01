@@ -25,6 +25,7 @@ from datp.core.provenance import REPOSITORY_NAME
 from datp.core.seeds import derive_seed_record
 from datp.core.seeds import SeedPair
 from datp.reporting.poisoning import build_poisoning_summaries
+from tests.fixtures.sweep_rows import extended_row_fields
 
 _VICTIMS = tuple(f"c{i}" for i in range(9))
 _TRAINING = tuple(range(10))
@@ -129,6 +130,7 @@ def _row(
         n_non_victims=8,
         **_victim_harm_fields(objective),
         **_cluster_fields(policy, delta_tau),
+        **extended_row_fields(policy),
     )
 
 
@@ -291,3 +293,141 @@ def test_five_seed_manifest_is_rejected() -> None:
             }
         )
         BoundedSweepManifest.model_validate(payload)
+
+
+def _build_and_load(tmp_path: Path, stem: str) -> list[dict]:
+    _write_manifest(tmp_path, _manifest(_synthetic_rows()))
+    build_poisoning_summaries(tmp_path)
+    return json.loads((tmp_path / "analysis" / f"{stem}.json").read_text())
+
+
+def test_new_summaries_and_definitions_are_written(tmp_path: Path) -> None:
+    _write_manifest(tmp_path, _manifest(_synthetic_rows()))
+    names = {p.name for p in build_poisoning_summaries(tmp_path).paths}
+    assert {
+        "downstream_extended.json",
+        "client_level_effects.json",
+        "cluster_stability_summary.json",
+        "duplicate_and_bound_summary.json",
+        "gate_sensitivity.json",
+        "metric_definitions.json",
+    }.issubset(names)
+    definitions = json.loads(
+        (tmp_path / "analysis" / "metric_definitions.json").read_text()
+    )
+    assert "p10_macro_f1" in definitions
+    assert "worst_ba" in definitions
+
+
+def test_gate2_records_are_objective_matched_and_carry_distributions(
+    tmp_path: Path,
+) -> None:
+    data = _build_and_load(tmp_path, "directional_excess_over_random")
+    assert data
+    for row in data:
+        assert row["control_objective"] == row["objective"]
+        assert row["control_source"] == PoisoningSourceStrategy.RANDOM_BENIGN.value
+        assert len(row["per_seed_directional_excess"]) == 10
+        assert row["permutation_p"] == pytest.approx(2 / 1024)
+        assert row["mean_directional_excess"] == pytest.approx(1.0)
+
+
+def test_downstream_records_carry_seed_values_and_intervals(tmp_path: Path) -> None:
+    data = _build_and_load(tmp_path, "downstream_extended")
+    row = next(
+        r
+        for r in data
+        if r["summary_metric"] == "victim_delta_tpr"
+        and r["policy"] == ThresholdPolicy.LOCAL_THRESHOLD.value
+    )
+    assert len(row["per_seed_values"]) == 10
+    assert row["bootstrap_ci_lower"] <= row["mean_effect"] <= row["bootstrap_ci_upper"]
+    assert 0.0 <= row["permutation_p"] <= 1.0
+
+
+def test_fixed_cluster_metrics_only_for_cluster_policy(tmp_path: Path) -> None:
+    data = _build_and_load(tmp_path, "downstream_extended")
+    fixed = [r for r in data if r["summary_metric"].startswith("fixed_cluster_")]
+    assert fixed
+    assert {r["policy"] for r in fixed} == {ThresholdPolicy.CLUSTER_THRESHOLD.value}
+
+
+def test_nonvictim_and_absolute_burden_metrics_present(tmp_path: Path) -> None:
+    data = _build_and_load(tmp_path, "downstream_extended")
+    metrics = {r["summary_metric"] for r in data}
+    assert {
+        "nonvictim_mean_delta_tpr",
+        "nonvictim_delta_fn_total",
+        "nonvictim_delta_fp_total",
+        "victim_delta_fn",
+        "victim_delta_fp",
+        "victim_delta_fpr",
+    }.issubset(metrics)
+
+
+def test_client_level_effects_one_record_per_victim(tmp_path: Path) -> None:
+    data = _build_and_load(tmp_path, "client_level_effects")
+    group = [
+        r
+        for r in data
+        if r["policy"] == ThresholdPolicy.LOCAL_THRESHOLD.value
+        and r["source"] == PoisoningSourceStrategy.HIGH_SCORE_BENIGN.value
+    ]
+    assert {r["victim_id"] for r in group} == set(_VICTIMS)
+    assert all(r["n_seeds"] == 10 for r in group)
+
+
+def test_cluster_stability_summary_compares_fixed_and_recomputed(
+    tmp_path: Path,
+) -> None:
+    data = _build_and_load(tmp_path, "cluster_stability_summary")
+    assert {r["policy"] for r in data} == {ThresholdPolicy.CLUSTER_THRESHOLD.value}
+    row = data[0]
+    assert row["recomputed_victim_delta_tau"] is not None
+    assert row["fixed_victim_delta_tau"] == pytest.approx(0.05)
+    assert row["reassignment_rate"] == 0.0
+    assert row["modal_sizes_clean"] == [4, 3, 2]
+
+
+def test_gate_sensitivity_default_cell_matches_protocol(tmp_path: Path) -> None:
+    data = _build_and_load(tmp_path, "gate_sensitivity")
+    assert len(data) == 5 * 5 * 3 * 3
+    default = next(
+        r
+        for r in data
+        if (
+            r["sign_consistency"],
+            r["victim_majority"],
+            r["materiality_factor"],
+            r["iqr_floor_factor"],
+        )
+        == (8, 5, 0.1, 0.01)
+    )
+    assert default["n_changed_vs_default"] == 0
+    assert default["n_full_vulnerability"] == default["n_groups"]
+
+
+def test_materiality_factor_changes_significance_and_claim_class() -> None:
+    from datp.reporting.poisoning import (
+        DEFAULT_GATE,
+        GateParams,
+        _claim_gate_decisions,
+    )
+
+    manifest = _manifest(_synthetic_rows())
+    strict = GateParams(
+        sign_consistency=DEFAULT_GATE.sign_consistency,
+        victim_majority=DEFAULT_GATE.victim_majority,
+        materiality_factor=100.0,
+        iqr_floor_factor=DEFAULT_GATE.iqr_floor_factor,
+    )
+    default_classes = {d["claim_class"] for d in _claim_gate_decisions(manifest)}
+    strict_classes = {d["claim_class"] for d in _claim_gate_decisions(manifest, strict)}
+    assert default_classes == {"full_vulnerability"}
+    assert "full_vulnerability" not in strict_classes
+
+
+def test_duplicate_summary_reports_rates(tmp_path: Path) -> None:
+    data = _build_and_load(tmp_path, "duplicate_and_bound_summary")
+    assert all(r["mean_duplicate_rate_poisoned"] == pytest.approx(0.05) for r in data)
+    assert all(r["mean_n_replaced"] == pytest.approx(10.0) for r in data)

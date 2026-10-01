@@ -133,3 +133,6 @@ reports/
 .pdm-python
 .pdm-build/
 .pypirc
+
+# Local backup of prior outputs/results
+backup_runs/

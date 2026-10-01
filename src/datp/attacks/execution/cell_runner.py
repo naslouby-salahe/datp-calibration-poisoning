@@ -14,9 +14,14 @@ from datp.attacks.constants import TAIL_MASS, THRESHOLD_QUANTILE
 from datp.attacks.enums import (
     AttackerObjective,
     PoisoningSourceStrategy,
+    ReservoirDraw,
     is_diagnostic_source,
 )
-from datp.attacks.injection.injector import InjectionResult, inject_fixed_budget
+from datp.attacks.injection.injector import (
+    InjectionResult,
+    inject_disjoint_reservoir,
+    inject_fixed_budget,
+)
 from datp.attacks.planning.guardrails import (
     assert_no_inplace_mutation,
     assert_reservoir_not_test_or_training,
@@ -65,6 +70,7 @@ class InjectionSpec:
     objective: AttackerObjective | None
     scope_idx: int = 0
     tail_mass: float = TAIL_MASS
+    draw: ReservoirDraw = ReservoirDraw.WITH_REPLACEMENT
 
 
 @dataclass(frozen=True)
@@ -102,9 +108,6 @@ def inject_single_victim(
             f"Source {spec.source!r} is diagnostic-only and must not enter "
             "the bounded/full experiment matrix."
         )
-    res = build_reservoir(
-        clean_cal=v_clean, source=spec.source, tail_mass=spec.tail_mass
-    )
     rng = make_seed_rng(
         SeedRecord(
             pair=spec.seed_pair,
@@ -113,10 +116,25 @@ def inject_single_victim(
         ),
         child_index=cell_child_index(spec.source, spec.objective, spec.fraction),
     )
-
-    inj = inject_fixed_budget(
-        clean_cal=v_clean, reservoir=res, fraction=spec.fraction, rng=rng
-    )
+    if spec.draw == ReservoirDraw.DISJOINT_RESERVOIR:
+        inj, res = inject_disjoint_reservoir(
+            clean_cal=v_clean,
+            source=spec.source,
+            tail_mass=spec.tail_mass,
+            fraction=spec.fraction,
+            rng=rng,
+        )
+    else:
+        res = build_reservoir(
+            clean_cal=v_clean, source=spec.source, tail_mass=spec.tail_mass
+        )
+        inj = inject_fixed_budget(
+            clean_cal=v_clean,
+            reservoir=res,
+            fraction=spec.fraction,
+            rng=rng,
+            draw=spec.draw,
+        )
     assert_no_inplace_mutation(_clean_snapshot, v_clean, "victim_cal")
 
     return InjectionOutcome(

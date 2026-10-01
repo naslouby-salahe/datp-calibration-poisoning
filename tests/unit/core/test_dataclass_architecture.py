@@ -85,6 +85,7 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/execution/bounded_sweep_cell.py", "SweepCellConfig", "cluster_seed"),
         ("attacks/execution/cell_runner.py", "InjectionSpec", "scope_idx"),
         ("attacks/execution/cell_runner.py", "InjectionSpec", "tail_mass"),
+        ("attacks/execution/cell_runner.py", "InjectionSpec", "draw"),
         (
             "attacks/threshold_recomputation/cluster_threshold_recompute.py",
             "ClusterHyperparams",

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections import UserDict
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -72,6 +74,11 @@ class ClusterThresholdPair(ThresholdPairBase):
     """Threshold pair with cluster-decomposition metadata."""
 
     decomposition: ClusterDecomposition
+    fixed_assignment_thresholds: ClientThresholdsCollection
+    clean_assignments: Mapping[str, str]
+    poisoned_assignments: Mapping[str, str]
+    silhouette_clean: float
+    silhouette_poisoned: float
 
 
 def compute_cluster_pair(
@@ -158,6 +165,12 @@ def compute_cluster_pair(
         for info in clean_res.metadata.cluster.cluster_info
         for member in info.members
     }
+    assert pois_res.metadata.cluster is not None
+    client_to_pois_cluster = {
+        member: info.cluster_id
+        for info in pois_res.metadata.cluster.cluster_info
+        for member in info.members
+    }
 
     clean_fp = compute_fingerprints(clean_cal, eligible_ids, q=q)
     pois_fp = compute_fingerprints(pois_cal, eligible_ids, q=q)
@@ -235,4 +248,15 @@ def compute_cluster_pair(
             eff_pois, ThresholdPolicy.CLUSTER_THRESHOLD
         ),
         decomposition=decomposition,
+        fixed_assignment_thresholds=ClientThresholdsCollection.from_mapping(
+            tau_agg_map, ThresholdPolicy.CLUSTER_THRESHOLD
+        ),
+        clean_assignments=MappingProxyType(
+            {cid: client_to_clean_cluster[cid] for cid in eligible_ids}
+        ),
+        poisoned_assignments=MappingProxyType(
+            {cid: client_to_pois_cluster[cid] for cid in eligible_ids}
+        ),
+        silhouette_clean=clean_res.metadata.cluster.silhouette,
+        silhouette_poisoned=pois_res.metadata.cluster.silhouette,
     )
