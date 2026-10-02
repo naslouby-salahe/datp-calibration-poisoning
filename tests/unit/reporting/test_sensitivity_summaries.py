@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from datp.artifacts.poison_layout import PoisonLayout
+from datp.artifacts.layout import sensitivity_manifest_path
 from datp.attacks.enums import (
     AttackerObjective,
     PoisoningSourceStrategy,
@@ -126,7 +126,7 @@ def _manifest() -> SensitivityManifest:
 
 
 def _write(base_dir: Path) -> None:
-    path = PoisonLayout(base_dir=base_dir).sensitivity_manifest()
+    path = sensitivity_manifest_path(base_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_manifest().model_dump_json())
 

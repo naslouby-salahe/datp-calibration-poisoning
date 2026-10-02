@@ -25,7 +25,7 @@ from datp.attacks.score_containers import build_score_collection
 from datp.attacks.types import PoisonedCalibrationSet
 from datp.core.enums import ThresholdPolicy
 from datp.core.seeds import SeedPair
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     make_standard_score_set,
 )
@@ -104,8 +104,8 @@ def test_apply_defense_none_is_identity() -> None:
         ),
     )
     poisoned_cal = {
-        cid: outcome.poisoned_cal_set.for_client(cid).cal
-        for cid in outcome.poisoned_cal_set.client_ids
+        cid: outcome.poisoned_cal_set[cid].cal
+        for cid in outcome.poisoned_cal_set
     }
     col2, pois2 = apply_defense(
         col, poisoned_cal, defense=PoisoningDefense.NONE, trim_fraction=0.05
@@ -193,8 +193,8 @@ def test_defense_runs_end_to_end_through_recompute_pipeline() -> None:
     work_col, work_pois = apply_defense(
         col,
         {
-            cid: outcome.poisoned_cal_set.for_client(cid).cal
-            for cid in outcome.poisoned_cal_set.client_ids
+            cid: outcome.poisoned_cal_set[cid].cal
+            for cid in outcome.poisoned_cal_set
         },
         defense=PoisoningDefense.TRIMMED_CALIBRATION,
         trim_fraction=0.05,

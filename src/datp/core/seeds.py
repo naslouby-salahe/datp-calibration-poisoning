@@ -1,8 +1,13 @@
-"""Deterministic seed management for training, poisoning, and analysis reproducibility."""
+from datp.types import (
+    Index,
+    RandomSeed,
+    SignedCount,
+)
 
 import os
 import random
 from dataclasses import dataclass
+from typing import Protocol, cast
 
 import numpy as np
 import torch
@@ -10,23 +15,25 @@ from pydantic import ConfigDict
 
 from datp.core.types import FrozenModel
 
+
+class _TorchSeedApi(Protocol):
+    def manual_seed(self, seed: int) -> torch.Generator: ...
+
 # Ensure deterministic cuBLAS operations by fixing the workspace size.
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 
 @dataclass(frozen=True, slots=True)
 class SeedPair:
-    """A (training_seed, poisoning_seed) pair that identifies one experiment cell."""
 
-    training_seed: int
-    poisoning_seed: int
+    training_seed: RandomSeed
+    poisoning_seed: RandomSeed
 
 
-def set_seeds(seed: int) -> None:
-    """Seed Python, NumPy, and PyTorch RNGs for deterministic execution."""
+def set_seeds(seed: RandomSeed) -> None:
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
+    cast(_TorchSeedApi, torch).manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
@@ -35,26 +42,22 @@ def set_seeds(seed: int) -> None:
 
 
 class SeedRecord(FrozenModel):
-    """Full seed context: seed pair plus client and scope indices for deterministic RNG derivation."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
     pair: SeedPair
-    client_idx: int
-    scope_idx: int
+    client_idx: Index
+    scope_idx: Index
 
     @property
-    def training_seed(self) -> int:
-        """Training seed from the underlying seed pair."""
+    def training_seed(self) -> RandomSeed:
         return self.pair.training_seed
 
     @property
-    def poisoning_seed(self) -> int:
-        """Poisoning seed from the underlying seed pair."""
+    def poisoning_seed(self) -> RandomSeed:
         return self.pair.poisoning_seed
 
     @property
-    def entropy(self) -> tuple[int, int, int, int]:
-        """Return a 4-tuple entropy source for downstream RNG derivation."""
+    def entropy(self) -> tuple[SignedCount, SignedCount, SignedCount, SignedCount]:
         return (
             self.training_seed,
             self.poisoning_seed,
@@ -63,14 +66,6 @@ class SeedRecord(FrozenModel):
         )
 
 
-def make_seed_rng(record: SeedRecord, *, child_index: int = 0) -> np.random.Generator:
-    """Derive a deterministic NumPy Generator from a SeedRecord via SeedSequence."""
+def make_seed_rng(record: SeedRecord, *, child_index: Index = 0) -> np.random.Generator:
     parent = np.random.SeedSequence(list(record.entropy))
     return np.random.default_rng(parent.spawn(child_index + 1)[child_index])
-
-
-def derive_seed_record(
-    pair: SeedPair, *, client_idx: int, scope_idx: int
-) -> SeedRecord:
-    """Create a SeedRecord from a SeedPair with client and scope indices."""
-    return SeedRecord(pair=pair, client_idx=client_idx, scope_idx=scope_idx)

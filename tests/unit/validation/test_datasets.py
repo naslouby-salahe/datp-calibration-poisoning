@@ -8,6 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from datp.types import ClientId, ClusterId, RandomSeed
 from datp.config.models import ExperimentStage
 from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 from datp.data.splits import Split, filename_for_split
@@ -21,9 +22,14 @@ from datp.validation.datasets import (
 def _assignments(
     *items: tuple[int, tuple[tuple[str, int], ...]],
 ) -> tuple[ClusterAssignments, ...]:
-    """Helper to build ClusterAssignments tuples."""
     return tuple(
-        ClusterAssignments(seed=seed, assignments=client_assignments)
+        ClusterAssignments(
+            seed=RandomSeed(seed),
+            assignments={
+                ClientId(client): ClusterId(str(cluster))
+                for client, cluster in client_assignments
+            },
+        )
         for seed, client_assignments in items
     )
 

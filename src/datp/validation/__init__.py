@@ -1,4 +1,3 @@
-"""Validation and audit primitives: invariants, provenance gates, metric reproduction, and verdicts."""
 
 from datp.validation.enums import ScoreCheckCode
 from datp.validation.schemas import ScoreCellVerification

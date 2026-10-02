@@ -11,7 +11,7 @@ from datp.attacks.enums import (
     is_diagnostic_source,
 )
 from datp.attacks.reservoirs.reservoir import build_reservoir
-from datp.testsupport.synthetic_scores import make_eligible_client
+from tests_support.synthetic_scores import make_eligible_client
 
 _TAIL_MASS = 0.10
 

@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from datp.attacks.constants import N_MIN
-from datp.scoring.manifest import SCORE_COLUMN
-from datp.testsupport.synthetic_scores import (
+from datp.scoring.manifest import ScoringColumn
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     SyntheticClientSpec,
     make_degenerate_tail_client,
@@ -72,9 +72,9 @@ class TestMakeSyntheticClient:
         assert np.mean(c.test_attack) > np.mean(c.test_benign)
 
     def test_score_column_attribute(self) -> None:
-        """Verify that score_column attribute matches SCORE_COLUMN constant."""
+        """Verify that score_column attribute matches its enum member."""
         c = make_synthetic_client(SyntheticClientSpec(client_id="c0"))
-        assert c.score_column == SCORE_COLUMN
+        assert c.score_column == ScoringColumn.RECONSTRUCTION_ERROR
 
 
 class TestEligibility:
@@ -84,13 +84,13 @@ class TestEligibility:
         """Verify that make_eligible_client returns eligible clients exceeding N_MIN."""
         c = make_eligible_client()
         assert c.is_eligible
-        assert c.n_cal >= N_MIN
+        assert c.cal.size >= N_MIN
 
     def test_pending_client_is_not_eligible(self) -> None:
         """Verify that make_pending_client returns pending clients below N_MIN."""
         c = make_pending_client()
         assert not c.is_eligible
-        assert c.n_cal < N_MIN
+        assert c.cal.size < N_MIN
 
     def test_boundary_eligible(self) -> None:
         """Verify that a sample count exactly at N_MIN is classified as eligible."""
@@ -119,14 +119,14 @@ class TestDegenerateTailClient:
     def test_upper_tail_degenerate(self) -> None:
         """Verify that upper tail contains only one unique degenerate value."""
         c = make_degenerate_tail_client()
-        n_tail = max(1, int(0.10 * c.n_cal))
+        n_tail = max(1, int(0.10 * c.cal.size))
         upper_tail = np.sort(c.cal)[-n_tail:]
         assert len(np.unique(upper_tail)) < 2
 
     def test_lower_tail_degenerate(self) -> None:
         """Verify that lower tail contains only one unique degenerate value."""
         c = make_degenerate_tail_client()
-        n_tail = max(1, int(0.10 * c.n_cal))
+        n_tail = max(1, int(0.10 * c.cal.size))
         lower_tail = np.sort(c.cal)[:n_tail]
         assert len(np.unique(lower_tail)) < 2
 

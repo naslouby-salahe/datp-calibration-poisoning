@@ -1,9 +1,38 @@
-"""Pydantic models for experiment configuration: stages, dataset, model, federation, and thresholds."""
-
 from __future__ import annotations
+
+from datp.types import (
+    BatchSize,
+    BinCount,
+    BootstrapCount,
+    ByteCount,
+    DurationSeconds,
+    EpochCount,
+    ExperimentName,
+    FeatureCount,
+    GpuShare,
+    IntervalBound,
+    IterationCount,
+    LearningRate,
+    MemoryAmount,
+    NarrativeText,
+    Patience,
+    PoisonFraction,
+    RandomSeed,
+    RoundCount,
+    SampleCount,
+    ScoreValue,
+    SignedCount,
+    SignificanceLevel,
+    Threshold,
+    Tolerance,
+    TrackingUri,
+    WorkerCount,
+)
+
 
 import enum
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -14,11 +43,16 @@ from datp.checkpointing.enums import (
     CheckpointProtocolMode,
     PrimaryCheckpointSelectionRule,
 )
-from datp.core.enums import Activation, DatasetID, ThresholdPolicy
+from datp.core.enums import (
+    Activation,
+    DatasetID,
+    LogLevel,
+    ThresholdPolicy,
+    NBaIoTBalancePolicy,
+)
 
 
 class ExperimentStage(enum.StrEnum):
-    """Execution stages, ordered lightest to heaviest."""
 
     FINAL_AUDIT = "final_audit"
     SYNTHETIC_SMOKE = "synthetic_smoke"
@@ -29,13 +63,21 @@ class ExperimentStage(enum.StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ExperimentStageConfig:
-    """Metadata for an experiment stage: dataset, run gate, and description."""
 
     stage: ExperimentStage
     dataset: DatasetID | None
     allow_run: bool
-    gate: str | None
-    description: str
+    gate: ExperimentGate | None
+    description: NarrativeText
+
+
+class ExperimentGate(StrEnum):
+
+    FINAL_AUDIT_PASS = "final_audit_pass"
+    SMOKE_DIAGNOSTICS_SIGNOFF = "smoke_diagnostics_signoff"
+    NBAIOT_MAIN_RUN_LOCK = "nbaiot_main_run_lock"
+    FULL_SCOPE_CONTINUE_DECISION = "full_scope_continue_decision"
+    STRETCH_DIAGNOSTIC_SIGNOFF = "stretch_diagnostic_signoff"
 
 
 _STAGE_CONFIGS: dict[ExperimentStage, ExperimentStageConfig] = {
@@ -43,122 +85,112 @@ _STAGE_CONFIGS: dict[ExperimentStage, ExperimentStageConfig] = {
         stage=ExperimentStage.FINAL_AUDIT,
         dataset=None,
         allow_run=False,
-        gate="final_audit_pass",
+        gate=ExperimentGate.FINAL_AUDIT_PASS,
         description="Protocol audit and provenance validation before execution.",
     ),
     ExperimentStage.SYNTHETIC_SMOKE: ExperimentStageConfig(
         stage=ExperimentStage.SYNTHETIC_SMOKE,
         dataset=None,
         allow_run=True,
-        gate="smoke_diagnostics_signoff",
+        gate=ExperimentGate.SMOKE_DIAGNOSTICS_SIGNOFF,
         description="Synthetic invariant validation; must pass before N-BaIoT main.",
     ),
     ExperimentStage.NBAIOT_MAIN: ExperimentStageConfig(
         stage=ExperimentStage.NBAIOT_MAIN,
         dataset=DatasetID.NBAIOT,
         allow_run=True,
-        gate="nbaiot_main_run_lock",
+        gate=ExperimentGate.NBAIOT_MAIN_RUN_LOCK,
         description="Primary N-BaIoT single-client calibration-poisoning experiment.",
     ),
     ExperimentStage.NBAIOT_FULL_OPTIONAL: ExperimentStageConfig(
         stage=ExperimentStage.NBAIOT_FULL_OPTIONAL,
         dataset=DatasetID.NBAIOT,
         allow_run=False,
-        gate="full_scope_continue_decision",
+        gate=ExperimentGate.FULL_SCOPE_CONTINUE_DECISION,
         description="Optional multi-client extension (pairs and triples).",
     ),
     ExperimentStage.STRETCH_DIAGNOSTIC_ONLY: ExperimentStageConfig(
         stage=ExperimentStage.STRETCH_DIAGNOSTIC_ONLY,
         dataset=None,
         allow_run=False,
-        gate="stretch_diagnostic_signoff",
+        gate=ExperimentGate.STRETCH_DIAGNOSTIC_SIGNOFF,
         description="Diagnostic-only stretch contrast; cannot support main claims.",
     ),
 }
 
 
 def get_stage_config(stage: ExperimentStage) -> ExperimentStageConfig:
-    """Return the ExperimentStageConfig for a given stage."""
     return _STAGE_CONFIGS[stage]
 
 
 def all_stage_configs() -> list[ExperimentStageConfig]:
-    """Return all experiment stage configs."""
     return list(_STAGE_CONFIGS.values())
 
 
 class StrictModel(BaseModel):
-    """Base Pydantic model with extra fields forbidden, frozen, and protected namespaces off."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, protected_namespaces=())
 
 
 class SafetyBounds(StrictModel):
-    """Safety limits for batch sizes."""
 
-    max_batch_size_train: int
+    max_batch_size_train: BatchSize
 
 
 class ConvergenceConfig(StrictModel):
-    """Convergence detection parameters for federated training."""
 
-    rounds_initial: int
-    rounds_max: int
-    relative_threshold: float
-    window: int
-    round_timeout_s: float
+    rounds_initial: RoundCount
+    rounds_max: RoundCount
+    relative_threshold: Threshold
+    window: RoundCount
+    round_timeout_s: DurationSeconds
 
 
 class ModelConfig(StrictModel):
-    """Autoencoder model architecture and training hyperparameters."""
 
-    input_dim: int
-    encoder_dims: list[int]
-    lr: float
-    epochs: int
-    patience: int
+    input_dim: FeatureCount
+    encoder_dims: list[SignedCount]
+    lr: LearningRate
+    epochs: EpochCount
+    patience: Patience
     activation: Activation
     use_bn: bool
 
 
 class DatasetConfig(StrictModel):
-    """Dataset dimensions, caps, and attack-reserve fraction."""
 
-    feature_count: int
-    n_min: int
-    cap: int
-    attack_reserve_fraction: float
-    nbaiot_balanced_test: bool
+    feature_count: FeatureCount
+    n_min: SampleCount
+    cap: SignedCount
+    attack_reserve_fraction: PoisonFraction
+    nbaiot_test_balance: NBaIoTBalancePolicy
 
 
 class MachineConfig(StrictModel):
-    """Compute resource configuration: batch sizes, CUDA, Ray, RAM, and caching."""
 
-    batch_size_train: int = Field(gt=0)
-    scoring_batch_size: int = Field(default=256, gt=0)
+    batch_size_train: BatchSize = Field(gt=0)
+    scoring_batch_size: BatchSize = Field(default=256, gt=0)
     require_cuda: bool = False
-    ray_num_gpus_per_client: float = Field(default=0.0, ge=0)
-    per_client_ram_gb: float = Field(gt=0)
-    reserve_ram_gb: float = Field(ge=0)
-    max_concurrent_override: int | None = Field(gt=0, default=None)
-    ray_object_store_mb: int = Field(gt=0)
-    cache_maxsize: int = Field(gt=0)
+    ray_num_gpus_per_client: GpuShare = Field(default=0.0, ge=0)
+    per_client_ram_gb: MemoryAmount = Field(gt=0)
+    reserve_ram_gb: MemoryAmount = Field(ge=0)
+    max_concurrent_override: WorkerCount | None = Field(gt=0, default=None)
+    ray_object_store_mb: ByteCount = Field(gt=0)
+    cache_maxsize: SignedCount = Field(gt=0)
     safety_bounds: SafetyBounds
 
 
 class FederationConfig(StrictModel):
-    """Federated learning configuration: convergence and local epochs."""
 
     convergence: ConvergenceConfig
-    local_epochs: int
+    local_epochs: RoundCount
 
 
 class CheckpointProtocolConfig(StrictModel):
-    """Configuration for the checkpoint protocol: mode, milestones, and selection rule."""
 
     mode: CheckpointProtocolMode
-    max_rounds: int = Field(gt=0)
-    milestones: tuple[int, ...]
+    max_rounds: RoundCount = Field(gt=0)
+    milestones: tuple[SignedCount, ...]
     convergence_mode: Literal[
         CheckpointConvergenceMode.LOG_ONLY, CheckpointConvergenceMode.EARLY_STOP
     ]
@@ -169,8 +201,9 @@ class CheckpointProtocolConfig(StrictModel):
 
     @field_validator("milestones")
     @classmethod
-    def validate_milestones(cls, v: tuple[int, ...]) -> tuple[int, ...]:
-        """Validate milestones are sorted, unique, and positive."""
+    def validate_milestones(
+        cls, v: tuple[SignedCount, ...]
+    ) -> tuple[SignedCount, ...]:
         if not v:
             raise ValueError("milestones must not be empty")
         if tuple(sorted(v)) != v or len(set(v)) != len(v):
@@ -181,96 +214,88 @@ class CheckpointProtocolConfig(StrictModel):
 
     @model_validator(mode="after")
     def validate_max_rounds(self) -> "CheckpointProtocolConfig":
-        """Validate that no milestone exceeds max_rounds."""
         if max(self.milestones) > self.max_rounds:
             raise ValueError("milestones cannot exceed max_rounds")
         return self
 
     @property
     def enabled(self) -> bool:
-        """True when the checkpoint protocol mode is ENABLED."""
-        return self.mode == CheckpointProtocolMode.ENABLED
+        if self.mode is CheckpointProtocolMode.ENABLED:
+            return True
+        if self.mode is CheckpointProtocolMode.DISABLED:
+            return False
+        raise ValueError(f"Unsupported checkpoint protocol mode: {self.mode!r}")
 
 
 class ThresholdConfig(StrictModel):
-    """Threshold configuration: n_min, quantile, and clustering parameters."""
 
-    n_min: int
+    n_min: SampleCount
     q: Literal[95]
     cluster_k_nbaiot: Literal[3]
-    cluster_n_init: int
-    cluster_max_iter: int
+    cluster_n_init: IterationCount
+    cluster_max_iter: IterationCount
     cluster_random_state: Literal[42]
 
 
 class ExperimentConfig(StrictModel):
-    """Experiment-level configuration: seed list."""
 
-    seeds: list[int]
+    seeds: list[RandomSeed]
 
 
 class StatisticsConfig(StrictModel):
-    """Statistical testing and bootstrap configuration."""
 
-    n_bootstrap: int
-    ci_level: float
-    bootstrap_seed: int
-    significance_alpha: float
-    dispersion_threshold: float
+    n_bootstrap: BootstrapCount
+    ci_level: IntervalBound
+    bootstrap_seed: RandomSeed
+    significance_alpha: SignificanceLevel
+    dispersion_threshold: Threshold
 
 
 class QualityGateConfig(StrictModel):
-    """Quality gate parameters including JS divergence bins."""
 
-    js_divergence_n_bins: int
+    js_divergence_n_bins: BinCount
 
 
 class StyleConfig(StrictModel):
-    """Figure and table styling: DPI, font size, and policy colors/labels."""
 
-    dpi: int
-    font_size: int
-    figsize_single_col: tuple[float, float]
-    figsize_double_col: tuple[float, float]
-    policy_colors: dict[ThresholdPolicy, str]
-    policy_labels: dict[ThresholdPolicy, str]
+    dpi: SignedCount
+    font_size: SignedCount
+    figsize_single_col: tuple[ScoreValue, ScoreValue]
+    figsize_double_col: tuple[ScoreValue, ScoreValue]
+    policy_colors: dict[ThresholdPolicy, NarrativeText]
+    policy_labels: dict[ThresholdPolicy, NarrativeText]
 
 
 class LoggingConfig(StrictModel):
-    """Logging configuration: level, format, rotation, and training progress interval."""
 
-    level: str
+    level: LogLevel
     json_format: bool
-    max_bytes: int
-    backup_count: int
-    training_progress_interval: int
+    max_bytes: ByteCount
+    backup_count: SampleCount
+    training_progress_interval: SignedCount
 
 
 class RuntimeConfig(StrictModel):
-    """Runtime configuration: lock timeout and Ray memory threshold."""
 
-    lock_timeout_seconds: float
-    ray_memory_threshold: float
+    lock_timeout_seconds: DurationSeconds
+    ray_memory_threshold: Threshold
 
 
 class TrackingConfig(StrictModel):
-    """MLflow tracking configuration."""
 
-    experiment_name: str
-    tracking_uri: str
+    experiment_name: ExperimentName
+    tracking_uri: TrackingUri
 
 
 class ReportingConfig(StrictModel):
-    """Reporting configuration: figure limits, metric tolerance, and styling."""
 
-    figure2_max_points: int
-    figure2_rng_seed: int
-    metric_tol: float
+    figure2_max_points: SignedCount
+    figure2_rng_seed: RandomSeed
+    metric_tol: Tolerance
     style: StyleConfig
 
 
 class DatpConfig(StrictModel):
-    """Top-level validated configuration composing all sub-configs."""
 
     model: ModelConfig
     dataset: DatasetConfig
@@ -288,11 +313,10 @@ class DatpConfig(StrictModel):
 
     stage: ExperimentStage | None = None
     policy: ThresholdPolicy | None = None
-    seed: int | None = None
+    seed: RandomSeed | None = None
 
     @model_validator(mode="after")
     def cross_field_validations(self) -> "DatpConfig":
-        """Validate consistency between model, dataset, threshold, and machine configs."""
         if self.model.input_dim != self.dataset.feature_count:
             raise ValueError(
                 f"model.input_dim ({self.model.input_dim}) != dataset.feature_count"

@@ -1,6 +1,13 @@
-"""Convergence monitor with sliding-window relative-change criterion."""
-
 from __future__ import annotations
+
+from datp.types import (
+    RoundCount,
+    RoundIndex,
+    SampleCount,
+    ScoreValue,
+    Threshold,
+)
+
 
 import math
 from collections import deque
@@ -11,16 +18,14 @@ if TYPE_CHECKING:
 
 
 class ConvergenceMonitor:
-    """Tracks weighted validation loss and signals early stopping on convergence."""
 
     def __init__(
         self,
-        rounds_initial: int,
-        rounds_max: int,
-        relative_threshold: float,
-        window: int,
+        rounds_initial: RoundCount,
+        rounds_max: RoundCount,
+        relative_threshold: Threshold,
+        window: RoundCount,
     ) -> None:
-        """Initialize with initial-round guard, max rounds, relative-change threshold, and window size."""
         if rounds_initial < 1 or rounds_max < rounds_initial or window < 2:
             raise ValueError(
                 f"Invalid convergence settings: initial={rounds_initial}, max={rounds_max}, window={window}"
@@ -30,40 +35,34 @@ class ConvergenceMonitor:
         self._rounds_max = rounds_max
         self._relative_threshold = relative_threshold
         self._window = window
-        self._losses: deque[float] = deque(maxlen=rounds_max)
-        self._converged_round: int | None = None
-        self._latest_relative_change: float | None = None
+        self._losses: deque[ScoreValue] = deque(maxlen=rounds_max)
+        self._converged_round: RoundIndex | None = None
+        self._latest_relative_change: ScoreValue | None = None
 
     @property
-    def converged_round(self) -> int | None:
-        """Round at which convergence was detected, or None."""
+    def converged_round(self) -> RoundIndex | None:
         return self._converged_round
 
     @property
-    def num_recorded(self) -> int:
-        """Number of loss values recorded so far."""
+    def num_recorded(self) -> SampleCount:
         return len(self._losses)
 
     @property
-    def loss_history(self) -> list[float]:
-        """Copy of the full loss history."""
+    def loss_history(self) -> list[ScoreValue]:
         return list(self._losses)
 
     @property
-    def latest_relative_change(self) -> float | None:
-        """Most recent relative change between consecutive windows."""
+    def latest_relative_change(self) -> ScoreValue | None:
         return self._latest_relative_change
 
-    def record(self, weighted_loss: float) -> None:
-        """Append a new weighted validation loss value."""
+    def record(self, weighted_loss: ScoreValue) -> None:
         if not math.isfinite(weighted_loss):
             raise ValueError(f"Non-finite loss recorded: {weighted_loss}")
         self._losses.append(weighted_loss)
 
     def should_stop(
-        self, server_round: int, *, stop_on_convergence: bool = True
+        self, server_round: RoundIndex, *, stop_on_convergence: bool = True
     ) -> bool:
-        """Return True if training should stop due to convergence or max rounds."""
         if self._converged_round is not None:
             return stop_on_convergence
         if server_round >= self._rounds_max:
@@ -88,9 +87,13 @@ class ConvergenceMonitor:
         return False
 
     @classmethod
-    def from_config(cls, cfg: "DatpConfig") -> "ConvergenceMonitor":
-        """Construct a monitor from the federation convergence config section."""
+    def from_config(
+        cls, cfg: DatpConfig, *, rounds_max: RoundCount | None = None
+    ) -> ConvergenceMonitor:
         conv = cfg.federation.convergence
         return cls(
-            conv.rounds_initial, conv.rounds_max, conv.relative_threshold, conv.window
+            conv.rounds_initial,
+            rounds_max if rounds_max is not None else conv.rounds_max,
+            conv.relative_threshold,
+            conv.window,
         )

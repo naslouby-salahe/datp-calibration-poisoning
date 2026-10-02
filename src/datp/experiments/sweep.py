@@ -1,10 +1,17 @@
-"""NBAIOT_MAIN sweep orchestration: matrix building, validation, and group execution."""
-
 from __future__ import annotations
+
+from datp.types import (
+    DurationSeconds,
+    Index,
+    NarrativeText,
+    RandomSeed,
+    RoundIndex,
+    SignedCount,
+)
+
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 
 from datp.artifacts.existence import results_exist
@@ -24,10 +31,8 @@ from datp.core.seeds import set_seeds
 from datp.core.tracking import (
     TrackingMetric,
     TrackingMetricKey,
-    TrackingMetrics,
     TrackingParam,
     TrackingParamKey,
-    TrackingParams,
     init_tracking,
     log_metrics,
     tracking_run,
@@ -38,7 +43,7 @@ from datp.experiments.executor import (
     SharedTrainingExecutor,
     ThresholdEvaluationExecutor,
 )
-from datp.experiments.models import PolicyRunStatus, SweepStep
+from datp.experiments.models import PolicyRunStatus, SweepResult, SweepStep
 from datp.experiments.stages.prepare_data import (
     PreparedDataRequest,
     ensure_prepared_data,
@@ -47,21 +52,10 @@ from datp.experiments.stages.prepare_data import (
 logger = get_logger(__name__)
 
 
-@dataclass(slots=True)
-class SweepResult:
-    """Mutable tally of sweep outcomes: total, completed, skipped, and failed cells."""
-
-    total: int = 0
-    completed: int = 0
-    skipped: int = 0
-    failed: int = 0
-
-
 def validate_sweep(
     cells: list[PolicyRunId],
-) -> tuple[list[str], dict[PolicyRunId, DatpConfig]]:
-    """Validate the experiment matrix by composing configs for every cell."""
-    errors: list[str] = []
+) -> tuple[list[NarrativeText], dict[PolicyRunId, DatpConfig]]:
+    errors: list[NarrativeText] = []
     configs: dict[PolicyRunId, DatpConfig] = {}
     for cell in cells:
         try:
@@ -74,7 +68,6 @@ def validate_sweep(
 
 
 def build_experiment_matrix() -> list[PolicyRunId]:
-    """Build the Cartesian product of controlled policies times seeds for NBAIOT_MAIN."""
     return [
         PolicyRunId(
             cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed),
@@ -94,17 +87,14 @@ def _run_sweep_groups(
 ) -> None:
     total_groups = len(groups)
     for group_idx, (key, group_cells) in enumerate(
-        sorted(groups.items(), key=lambda kv: (kv[0].stage.value, kv[0].seed)), start=1
+        sorted(groups.items(), key=lambda kv: (kv[0].stage, kv[0].seed)), start=1
     ):
         with tracking_run(
             run_name=f"{key.stage}_seed{key.seed}",
-            params=TrackingParams(
-                (
-                    TrackingParam(TrackingParamKey.STAGE, key.stage),
-                    TrackingParam(TrackingParamKey.SEED, key.seed),
-                )
+            params=(
+                TrackingParam(TrackingParamKey.STAGE, key.stage),
+                TrackingParam(TrackingParamKey.SEED, key.seed),
             ),
-            tags=None,
         ):
             _process_group(
                 key,
@@ -118,16 +108,14 @@ def _run_sweep_groups(
             )
 
 
-def _log_sweep_metrics(result: SweepResult, total_elapsed: float) -> None:
+def _log_sweep_metrics(result: SweepResult, total_elapsed: DurationSeconds) -> None:
     log_metrics(
-        TrackingMetrics(
-            (
-                TrackingMetric(TrackingMetricKey.SWEEP_TOTAL, result.total),
-                TrackingMetric(TrackingMetricKey.SWEEP_COMPLETED, result.completed),
-                TrackingMetric(TrackingMetricKey.SWEEP_SKIPPED, result.skipped),
-                TrackingMetric(TrackingMetricKey.SWEEP_FAILED, result.failed),
-                TrackingMetric(TrackingMetricKey.SWEEP_ELAPSED_S, total_elapsed),
-            )
+        (
+            TrackingMetric(TrackingMetricKey.SWEEP_TOTAL, result.total),
+            TrackingMetric(TrackingMetricKey.SWEEP_COMPLETED, result.completed),
+            TrackingMetric(TrackingMetricKey.SWEEP_SKIPPED, result.skipped),
+            TrackingMetric(TrackingMetricKey.SWEEP_FAILED, result.failed),
+            TrackingMetric(TrackingMetricKey.SWEEP_ELAPSED_S, total_elapsed),
         ),
         step=None,
         prefix=None,
@@ -137,7 +125,6 @@ def _log_sweep_metrics(result: SweepResult, total_elapsed: float) -> None:
 def run_sweep(
     *, dry_run: bool, base_dir: Path, data_root: Path | None = None
 ) -> SweepResult:
-    """Orchestrate the full sweep: build matrix, validate, group, and execute."""
     t_start = time.monotonic()
     console.print_step(SweepStep.BUILD_MATRIX, detail="")
     cells = build_experiment_matrix()
@@ -163,7 +150,7 @@ def run_sweep(
 
     groups: dict[TrainingCellId, list[PolicyRunId]] = defaultdict(list)
     for cell in cells:
-        groups[cell.shared_training_key()].append(cell)
+        groups[cell.cell].append(cell)
 
     _run_sweep_groups(
         groups,
@@ -187,7 +174,7 @@ def _cell_is_done(cell: PolicyRunId, base_dir: Path) -> bool:
     ):
         layout = ArtifactLayout(base_dir=base_dir, stage=cell.stage)
         return all(
-            layout.policy_run_for_round(cell, r).metrics_path.exists()
+            layout.policy_run(cell, r).metrics_path.exists()
             for r in ckpt_proto.milestones
         )
     return results_exist(cell.policy, cell.stage, cell.seed, base_dir=base_dir)
@@ -205,8 +192,8 @@ def _process_group(
     pre_composed_configs: dict[PolicyRunId, DatpConfig],
     base_dir: Path,
     result: SweepResult,
-    group_idx: int,
-    total_groups: int,
+    group_idx: Index,
+    total_groups: SignedCount,
     data_root: Path,
 ) -> None:
     console.print_group_header(
@@ -241,7 +228,7 @@ def _process_group(
 
 def _prepare_group_data(
     stage: ExperimentStage,
-    seed: int,
+    seed: RandomSeed,
     pending_cells: list[PolicyRunId],
     group_cells: list[PolicyRunId],
     result: SweepResult,
@@ -270,7 +257,7 @@ def _prepare_group_data(
         return False
 
 
-def _enabled_checkpoint_rounds(cfg: DatpConfig) -> tuple[int | None, ...]:
+def _enabled_checkpoint_rounds(cfg: DatpConfig) -> tuple[RoundIndex | None, ...]:
     return (
         tuple(cfg.checkpoint_protocol.milestones)
         if cfg.checkpoint_protocol and cfg.checkpoint_protocol.enabled
@@ -283,12 +270,12 @@ def _run_checkpoint_round(
     evaluator: ThresholdEvaluationExecutor,
     key: TrainingCellId,
     group_cells: list[PolicyRunId],
-    checkpoint_round: int | None,
+    checkpoint_round: RoundIndex | None,
     cfg: DatpConfig,
     base_dir: Path,
     prepared_dir: Path,
     pre_composed_configs: dict[PolicyRunId, DatpConfig],
-) -> tuple[int, int]:
+) -> tuple[RoundIndex, RoundIndex]:
     context_request = PipelineRequest(
         key=key,
         policy=ThresholdPolicy.GLOBAL_THRESHOLD,
@@ -348,7 +335,7 @@ def _run_shared_fl_group(
     pre_composed_configs: dict[PolicyRunId, DatpConfig],
     base_dir: Path,
     data_root: Path | None = None,
-) -> tuple[int, int]:
+) -> tuple[SignedCount, SignedCount]:
     first_cell = group_cells[0]
     stage, seed = first_cell.stage, first_cell.seed
     cfg = pre_composed_configs[first_cell]
@@ -365,7 +352,7 @@ def _run_shared_fl_group(
             if r is not None:
                 output_dir = (
                     ArtifactLayout(base_dir=base_dir, stage=cell.stage)
-                    .policy_run_for_round(cell, r)
+                    .policy_run(cell, r)
                     .result_dir
                 )
             else:
@@ -376,7 +363,7 @@ def _run_shared_fl_group(
                 )
             write_resolved_config(pre_composed_configs[cell], output_dir)
 
-    key = TrainingCellId(stage=stage, seed=seed)
+    key = TrainingCellId(stage=stage, seed=RandomSeed(seed))
     set_seeds(seed)
 
     trainer = SharedTrainingExecutor(

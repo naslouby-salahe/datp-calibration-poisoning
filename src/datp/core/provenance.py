@@ -1,32 +1,32 @@
-"""Content-addressable hashing and provenance helpers for artifacts and source files."""
-
 from __future__ import annotations
 
+from datp.types import (
+    ContentHash,
+    JsonValue,
+    NarrativeText,
+    RepositoryName,
+    ScoreVector,
+)
 import hashlib
 import json
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 
-MISSING_MANIFEST_HASH = "MISSING_MANIFEST_HASH"
-REPOSITORY_NAME = "datp-calibration-poisoning"
+REPOSITORY_NAME: RepositoryName = RepositoryName("datp-calibration-poisoning")
 
 
-def utc_timestamp() -> str:
-    """Return the current UTC time as an ISO-8601 string."""
+def utc_timestamp() -> NarrativeText:
     return datetime.now(UTC).isoformat()
 
 
-def sha256_bytes(payload: bytes) -> str:
-    """Return the hex-encoded SHA-256 digest of raw bytes."""
+def sha256_bytes(payload: bytes) -> NarrativeText:
     return hashlib.sha256(payload).hexdigest()
 
 
-def hash_file(path: Path) -> str:
-    """Return the SHA-256 hex digest of a file, or 'MISSING' if absent."""
+def hash_file(path: Path) -> ContentHash:
     if not path.exists():
         return "MISSING"
     digest = hashlib.sha256()
@@ -36,15 +36,13 @@ def hash_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def hash_jsonable(payload: Any) -> str:
-    """Return a deterministic SHA-256 hex digest of a JSON-serializable value."""
+def hash_jsonable(payload: JsonValue) -> ContentHash:
     return sha256_bytes(
         json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
     )
 
 
-def git_commit() -> str:
-    """Return the current HEAD commit hash, or 'GIT_UNAVAILABLE' on failure."""
+def git_commit() -> NarrativeText:
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "HEAD"],
@@ -56,8 +54,7 @@ def git_commit() -> str:
         return "GIT_UNAVAILABLE"
 
 
-def source_hash(paths: list[Path]) -> str:
-    """Return a combined SHA-256 digest over a sorted list of file paths and their contents."""
+def source_hash(paths: list[Path]) -> ContentHash:
     digest = hashlib.sha256()
     for path in paths:
         digest.update(str(path).encode("utf-8"))
@@ -65,6 +62,5 @@ def source_hash(paths: list[Path]) -> str:
     return digest.hexdigest()
 
 
-def array_hash(arr: np.ndarray) -> str:
-    """Return a deterministic SHA-256 hex digest of a float64 numpy array's raw bytes."""
+def array_hash(arr: ScoreVector) -> ContentHash:
     return sha256_bytes(np.asarray(arr, dtype=np.float64).tobytes(order="C"))

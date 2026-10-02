@@ -1,6 +1,18 @@
-"""Fake checkpoint metric builders and artifact scaffolding for protocol smoke tests."""
-
 from __future__ import annotations
+
+from datp.types import (
+    BootstrapCount,
+    ClassificationScore,
+    ClientId,
+    FalsePositiveRate,
+    RandomSeed,
+    RoundIndex,
+    RunId,
+    SchemaVersion,
+    ScoreValue,
+    TruePositiveRate,
+)
+
 
 import itertools
 from dataclasses import dataclass
@@ -22,7 +34,9 @@ from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.provenance import hash_file
 from datp.core.types import MetricsProvenance
 from datp.data.catalog import DatasetID
+from datp.scoring.manifest import ScoringManifestStatus
 from datp.thresholding.metrics_serialization import (
+    ConfusionMatrix,
     METRIC_SCHEMA_VERSION,
     METRICS_SCHEMA_VERSION,
     THRESHOLD_SCHEMA_VERSION,
@@ -30,35 +44,34 @@ from datp.thresholding.metrics_serialization import (
     SweepMetrics,
 )
 
-_SMOKE_CLIENT_IDS: tuple[str, ...] = ("c1", "c2")
-_SMOKE_SCORE_SPLITS: tuple[str, ...] = (
-    ScoringStage.CAL.value,
-    ScoringStage.TEST_BENIGN.value,
-    ScoringStage.TEST_ATTACK.value,
+_SMOKE_CLIENT_IDS: tuple[ClientId, ...] = (ClientId("c1"), ClientId("c2"))
+_SMOKE_SCORE_SPLITS: tuple[ScoringStage, ...] = (
+    ScoringStage.CAL,
+    ScoringStage.TEST_BENIGN,
+    ScoringStage.TEST_ATTACK,
 )
-_SMOKE_MANIFEST_SCHEMA_VERSION = "1"
-_SMOKE_MANIFEST_COMPLETION_STATUS = "complete"
+_SMOKE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "1"
 _SMOKE_FAKE_CHECKPOINT_TEMPLATE = "fake checkpoint {seed} {round}\n"
 
 
 @dataclass(frozen=True, slots=True)
 class _FakeMetricSpec:
     policy: ThresholdPolicy
-    seed: int
-    checkpoint_round: int
-    cv_fpr: float
-    worst_fpr: float
-    p10_macro_f1: float
-    worst_ba: float
+    seed: RandomSeed
+    checkpoint_round: RoundIndex
+    cv_fpr: FalsePositiveRate
+    worst_fpr: FalsePositiveRate
+    p10_macro_f1: ClassificationScore
+    worst_ba: ScoreValue
 
 
 @dataclass(frozen=True, slots=True)
 class _FakePolicyBaseline:
     policy: ThresholdPolicy
-    cv_fpr: float
-    worst_fpr: float
-    p10_macro_f1: float
-    worst_ba: float
+    cv_fpr: FalsePositiveRate
+    worst_fpr: FalsePositiveRate
+    p10_macro_f1: ClassificationScore
+    worst_ba: ScoreValue
 
 
 _FAKE_POLICY_BASELINES: tuple[_FakePolicyBaseline, ...] = (
@@ -70,10 +83,9 @@ _FAKE_POLICY_BASELINES: tuple[_FakePolicyBaseline, ...] = (
 
 def build_fake_checkpoint_metrics(
     *,
-    rounds: tuple[int, ...],
-    seeds: tuple[int, ...],
+    rounds: tuple[RoundIndex, ...],
+    seeds: tuple[RandomSeed, ...],
 ) -> tuple[SweepMetrics, ...]:
-    """Build fake SweepMetrics across all checkpoint-round x seed x policy combinations."""
     metrics: list[SweepMetrics] = []
     for checkpoint_round, seed in itertools.product(rounds, seeds):
         for baseline in _FAKE_POLICY_BASELINES:
@@ -81,7 +93,7 @@ def build_fake_checkpoint_metrics(
                 _fake_metric(
                     _FakeMetricSpec(
                         policy=baseline.policy,
-                        seed=seed,
+                        seed=RandomSeed(seed),
                         checkpoint_round=checkpoint_round,
                         cv_fpr=baseline.cv_fpr + 0.01 * seed,
                         worst_fpr=baseline.worst_fpr + 0.01 * seed,
@@ -98,7 +110,9 @@ def _fake_metric(spec: _FakeMetricSpec) -> SweepMetrics:
         schema_version=METRICS_SCHEMA_VERSION,
         metric_schema_version=METRIC_SCHEMA_VERSION,
         threshold_schema_version=THRESHOLD_SCHEMA_VERSION,
-        run_id=f"nbaiot_main_{spec.policy.value}_seed{spec.seed}_round{spec.checkpoint_round}",
+        run_id=RunId(
+            f"nbaiot_main_{spec.policy}_seed{spec.seed}_round{spec.checkpoint_round}"
+        ),
         run_kind=RunKind.CORE_LADDER,
         policy=spec.policy,
         stage=ExperimentStage.NBAIOT_MAIN,
@@ -106,7 +120,7 @@ def _fake_metric(spec: _FakeMetricSpec) -> SweepMetrics:
         checkpoint_round=spec.checkpoint_round,
         dataset=DatasetID.NBAIOT,
         threshold_scope=THRESHOLD_AGGREGATION_BY_POLICY[spec.policy],
-        threshold_strategy_name=spec.policy.value,
+        threshold_strategy_name=spec.policy,
         tau_global=0.5,
         eligible_ids=_SMOKE_CLIENT_IDS,
         pending_ids=(),
@@ -141,7 +155,9 @@ def _fake_metric(spec: _FakeMetricSpec) -> SweepMetrics:
     )
 
 
-def _build_aggregate(spec: _FakeMetricSpec) -> dict[MetricName, float | str | None]:
+def _build_aggregate(
+    spec: _FakeMetricSpec,
+) -> dict[MetricName, ScoreValue | ClientId | None]:
     return {
         MetricName.CV_FPR: spec.cv_fpr,
         MetricName.MEAN_FPR: spec.worst_fpr - 0.025,
@@ -179,13 +195,13 @@ def _build_per_client(spec: _FakeMetricSpec) -> tuple[MetricsClientDetail, ...]:
 
 
 def _client_detail(
-    client_id: str,
+    client_id: ClientId,
     policy: ThresholdPolicy,
     *,
-    fpr: float,
-    tpr: float,
-    macro_f1: float,
-    ba: float,
+    fpr: FalsePositiveRate,
+    tpr: TruePositiveRate,
+    macro_f1: ClassificationScore,
+    ba: ScoreValue,
 ) -> MetricsClientDetail:
     return MetricsClientDetail(
         client_id=client_id,
@@ -197,7 +213,7 @@ def _client_detail(
         recall=tpr,
         balanced_accuracy=ba,
         macro_f1=macro_f1,
-        confusion_matrix={"tp": 10, "fp": 1, "tn": 9, "fn": 0},
+        confusion_matrix=ConfusionMatrix(tp=10, fp=1, tn=9, fn=0),
         n_benign=10,
         n_attack=10,
         calibration_pending=False,
@@ -207,26 +223,27 @@ def _client_detail(
     )
 
 
-SMOKE_ROUNDS: tuple[int, ...] = (25, 50)
-SMOKE_SEEDS: tuple[int, ...] = (0, 1, 2)
-SMOKE_N_BOOTSTRAP: int = 200
+SMOKE_ROUNDS: tuple[RoundIndex, ...] = (25, 50)
+SMOKE_SEEDS: tuple[RandomSeed, ...] = tuple(RandomSeed(seed) for seed in (0, 1, 2))
+SMOKE_N_BOOTSTRAP: BootstrapCount = 200
 
 
-def _require_checkpoint_round(metric: SweepMetrics) -> int:
+def _require_checkpoint_round(metric: SweepMetrics) -> RoundIndex:
     if metric.checkpoint_round is None:
         raise RuntimeError("smoke metric lacks checkpoint_round")
     return metric.checkpoint_round
 
 
 def build_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
-    """Write fake checkpoint, score-manifest, and metrics artifacts."""
     metrics = build_fake_checkpoint_metrics(rounds=SMOKE_ROUNDS, seeds=SMOKE_SEEDS)
     layout = ArtifactLayout(base_dir=artifact_root, stage=ExperimentStage.NBAIOT_MAIN)
 
     for checkpoint_round, seed in itertools.product(SMOKE_ROUNDS, SMOKE_SEEDS):
-        cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed)
+        cell = TrainingCellId(
+            stage=ExperimentStage.NBAIOT_MAIN, seed=RandomSeed(seed)
+        )
         ckpt_path = (
-            layout.checkpoint_dir_for_round(cell, checkpoint_round)
+            layout.checkpoint_dir(cell, checkpoint_round)
             / ArtifactFile.MODEL_CHECKPOINT
         )
         ckpt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -240,13 +257,13 @@ def build_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
 
     for metric in metrics:
         checkpoint_round = _require_checkpoint_round(metric)
-        cell = TrainingCellId(stage=metric.stage, seed=metric.seed)
-        manifest_path = layout.score_cell_for_round(
+        cell = TrainingCellId(stage=metric.stage, seed=RandomSeed(metric.seed))
+        manifest_path = layout.score_cell(
             cell,
             checkpoint_round,
         ).manifest_path
         ckpt_path = (
-            layout.checkpoint_dir_for_round(cell, checkpoint_round)
+            layout.checkpoint_dir(cell, checkpoint_round)
             / ArtifactFile.MODEL_CHECKPOINT
         )
 
@@ -260,7 +277,7 @@ def build_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
                 )
             }
         )
-        metrics_path = layout.policy_run_for_round(
+        metrics_path = layout.policy_run(
             PolicyRunId(cell=cell, policy=metric.policy),
             checkpoint_round,
         ).metrics_path
@@ -272,11 +289,11 @@ def build_smoke_fixture(artifact_root: Path) -> tuple[SweepMetrics, ...]:
 def _write_smoke_manifest(
     layout: ArtifactLayout,
     cell: TrainingCellId,
-    checkpoint_round: int,
+    checkpoint_round: RoundIndex,
     checkpoint_path: Path,
 ) -> None:
     write_json_atomic(
-        layout.score_cell_for_round(cell, checkpoint_round).manifest_path,
+        layout.score_cell(cell, checkpoint_round).manifest_path,
         {
             "schema_version": _SMOKE_MANIFEST_SCHEMA_VERSION,
             "checkpoint_round": checkpoint_round,
@@ -284,6 +301,6 @@ def _write_smoke_manifest(
             "expected_client_ids": list(_SMOKE_CLIENT_IDS),
             "expected_splits": list(_SMOKE_SCORE_SPLITS),
             "records": [],
-            "completion_status": _SMOKE_MANIFEST_COMPLETION_STATUS,
+            "completion_status": ScoringManifestStatus.COMPLETE,
         },
     )

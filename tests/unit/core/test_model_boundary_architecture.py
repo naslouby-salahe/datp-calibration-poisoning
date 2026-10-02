@@ -74,20 +74,13 @@ class TestThresholdResultStructure:
             f"ThresholdResult must not have loose identity fields: {present}"
         )
 
-    def test_threshold_metadata_exists(self) -> None:
-        """Confirm ThresholdMetadata class is available in types module."""
-        module = importlib.import_module("datp.core.types")
-        assert hasattr(module, "ThresholdMetadata"), (
-            "ThresholdMetadata must exist in datp.core.types"
-        )
+    def test_threshold_result_carries_cluster_metadata_directly(self) -> None:
+        """Keep optional cluster metadata on the result without a forwarding wrapper."""
+        from datp.core.types import ThresholdResult
 
-    def test_threshold_metadata_has_cluster(self) -> None:
-        """Confirm ThresholdMetadata contains cluster information."""
-        from datp.core.types import ThresholdMetadata
-
-        assert dataclasses.is_dataclass(ThresholdMetadata)
-        field_names = {f.name for f in dataclasses.fields(ThresholdMetadata)}
-        assert "cluster" in field_names, "ThresholdMetadata must have cluster field"
+        field_names = {f.name for f in dataclasses.fields(ThresholdResult)}
+        assert "cluster" in field_names
+        assert "metadata" not in field_names
 
     def test_threshold_result_eligible_count_is_property(self) -> None:
         """Verify that eligible_count is exposed as a computed property."""

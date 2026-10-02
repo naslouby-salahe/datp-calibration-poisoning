@@ -1,7 +1,7 @@
 """Unit tests for metric recomputation from saved artifacts."""
 
 from __future__ import annotations
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 
 import math
 
@@ -20,7 +20,7 @@ class TestRecomputeBinaryMetrics:
         ct = ClientThreshold(
             client_id="c",
             threshold=0.5,
-            calibration_pending=False,
+            status=ClientStatus.ELIGIBLE,
             strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         )
         cr = compute_client_record("c", benign, attack, ct)

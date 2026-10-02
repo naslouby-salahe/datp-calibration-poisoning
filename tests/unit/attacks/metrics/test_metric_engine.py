@@ -23,10 +23,10 @@ from datp.attacks.threshold_recomputation.threshold_recompute import (
     compute_global_pair,
     compute_local_pair,
 )
-from datp.attacks.types import MetricEngineInput
+from datp.attacks.types import MetricEngineInput, PoisonedCalibrationSet
 from datp.core.enums import ThresholdPolicy
 from datp.core.seeds import SeedPair, SeedRecord, make_seed_rng
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     make_standard_score_set,
 )
@@ -40,9 +40,15 @@ def _make_collection():
     return build_score_collection(raw)
 
 
+def _clean_calibration_set(collection):
+    return PoisonedCalibrationSet.from_mapping(
+        {cid: collection.clients[cid].cal.copy() for cid in collection.eligibility.eligible_ids}
+    )
+
+
 def _inject_one_victim(col, victim_idx: int = 0, fraction: float = 0.40):
     """Helper to run single victim calibration poisoning injection."""
-    eligible_ids = list(col.eligible_ids)
+    eligible_ids = list(col.eligibility.eligible_ids)
     victim_id = eligible_ids[victim_idx]
     cal = col.clients[victim_id].cal
     reservoir = build_reservoir(
@@ -62,7 +68,7 @@ def _inject_one_victim(col, victim_idx: int = 0, fraction: float = 0.40):
         cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
         for cid in eligible_ids
     }
-    return pois_cal, victim_id
+    return PoisonedCalibrationSet.from_mapping(pois_cal), victim_id
 
 
 class TestDeltaTau:
@@ -79,7 +85,7 @@ class TestDeltaTau:
             compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean,
         )
         dt = compute_delta_tau(col, local_pair)
-        assert set(dt.keys()) == set(col.eligible_ids)
+        assert set(dt.keys()) == set(col.eligibility.eligible_ids)
 
     def test_victim_has_nonzero_delta(self) -> None:
         """Verify that poisoned victim clients get a nonzero threshold delta."""
@@ -97,7 +103,7 @@ class TestDeltaTau:
     def test_f0_all_delta_zero(self) -> None:
         """Verify that clean baseline (unpoisoned) results in delta_tau values of exactly 0.0."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         dt = compute_delta_tau(col, global_pair)
         for entry in dt.values():
@@ -119,7 +125,7 @@ class TestDeltaTau:
     def test_delta_tau_scale_positive(self) -> None:
         """Verify that scale denominators used in relative calculation are strictly positive."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         dt = compute_delta_tau(col, global_pair)
         for entry in dt.values():
@@ -128,7 +134,7 @@ class TestDeltaTau:
     def test_policy_recorded(self) -> None:
         """Verify that the tested threshold policy is recorded correctly on delta entries."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         dt = compute_delta_tau(col, global_pair)
         for entry in dt.values():
@@ -141,7 +147,7 @@ class TestFleetFpr:
     def test_coverage_ratio_correct(self) -> None:
         """Verify that coverage ratio matches fraction of eligible clients over total clients."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         fleet = compute_fleet_fpr(col, global_pair, None)
         assert fleet.coverage_ratio == pytest.approx(5 / 6)
@@ -149,7 +155,7 @@ class TestFleetFpr:
     def test_n_eligible_and_n_total(self) -> None:
         """Verify that eligible and total count properties match the source dataset split size."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         fleet = compute_fleet_fpr(col, global_pair, None)
         assert fleet.n_eligible == 5
@@ -158,15 +164,13 @@ class TestFleetFpr:
     def test_cv_fpr_no_epsilon(self) -> None:
         """Verify that CV(FPR) is NaN when mean FPR is exactly 0.0 to prevent divide-by-zero."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
 
-        from datp.attacks.threshold_recomputation.threshold_recompute import (
-            ThresholdPair,
-        )
+        from datp.attacks.types import ThresholdPairBase
 
         high_tau = 1e9
-        high_pair = ThresholdPair(
+        high_pair = ThresholdPairBase(
             policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             tau_global_clean=global_pair.tau_global_clean,
             tau_global_pois=high_tau,
@@ -182,7 +186,7 @@ class TestFleetFpr:
     def test_mu_flag_not_triggered_by_default(self) -> None:
         """Verify that clean baselines do not trigger the anomalous threshold mu flag."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         fleet = compute_fleet_fpr(col, global_pair, None)
         assert not fleet.mu_flag_triggered
@@ -225,14 +229,14 @@ class TestAurocRecords:
         """Verify that AUROC records are generated for all eligible client devices."""
         col = _make_collection()
         records = compute_auroc_records(col)
-        assert set(records.keys()) == set(col.eligible_ids)
+        assert set(records.records.keys()) == set(col.eligibility.eligible_ids)
 
     def test_auroc_invariant_test_scores_unchanged(self) -> None:
         """Verify that AUROCs remain invariant across repeated evaluations since test scores are clean."""
         col = _make_collection()
         r1 = compute_auroc_records(col)
         r2 = compute_auroc_records(col)
-        for cid in col.eligible_ids:
+        for cid in col.eligibility.eligible_ids:
             assert r1[cid].auroc is not None
             assert r2[cid].auroc is not None
             assert r1[cid].auroc == pytest.approx(r2[cid].auroc)
@@ -280,7 +284,7 @@ class TestComputeMetrics:
     def test_all_fields_populated(self) -> None:
         """Verify that delta_tau maps, AUROC maps, and mu threshold properties are all populated."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         local_pair = compute_local_pair(
             col,
             pois_cal,
@@ -290,8 +294,8 @@ class TestComputeMetrics:
         result = compute_metrics(
             MetricEngineInput(collection=col, pair=local_pair, mu_flag_threshold=0.05)
         )
-        assert set(result.delta_tau.keys()) == set(col.eligible_ids)
-        assert set(result.auroc_records.keys()) == set(col.eligible_ids)
+        assert set(result.delta_tau.keys()) == set(col.eligibility.eligible_ids)
+        assert set(result.auroc_records.records.keys()) == set(col.eligibility.eligible_ids)
         assert result.mu_flag_threshold == pytest.approx(0.05)
 
 
@@ -301,14 +305,12 @@ class TestAbsoluteDispersionWhenCvNan:
     def test_iqr_fpr_finite_when_cv_fpr_nan(self) -> None:
         """Verify that companion dispersion IQR/gap metrics remain finite even when cv_fpr is NaN."""
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = _clean_calibration_set(col)
         global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        from datp.attacks.threshold_recomputation.threshold_recompute import (
-            ThresholdPair,
-        )
+        from datp.attacks.types import ThresholdPairBase
 
         high_tau = 1e9
-        high_pair = ThresholdPair(
+        high_pair = ThresholdPairBase(
             policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             tau_global_clean=global_pair.tau_global_clean,
             tau_global_pois=high_tau,

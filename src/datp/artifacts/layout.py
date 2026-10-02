@@ -1,6 +1,10 @@
-"""Resolved filesystem paths for checkpoints, scores, results, and logs by stage."""
 
 from __future__ import annotations
+from datp.types import ClientId
+from datp.types import (
+    RandomSeed,
+    RoundIndex,
+)
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,8 +19,7 @@ from datp.core.identity import (
 )
 
 
-def _get_seg(seed: int, checkpoint_round: int | None = None) -> Path:
-    """Build the path segment for a seed, optionally including a checkpoint round."""
+def _get_seg(seed: RandomSeed, checkpoint_round: RoundIndex | None = None) -> Path:
     seg = Path(seed_segment(seed))
     if checkpoint_round is not None:
         if checkpoint_round <= 0:
@@ -25,57 +28,60 @@ def _get_seg(seed: int, checkpoint_round: int | None = None) -> Path:
     return seg
 
 
+def nbaiot_main_manifest_path(base_dir: Path) -> Path:
+    return (
+        poisoning_output_root(base_dir)
+        / ArtifactFile.NBAIOT_MAIN_MANIFEST
+    )
+
+
+def poisoning_output_root(base_dir: Path) -> Path:
+    return Path(base_dir) / ArtifactDir.CALIBRATION_POISONING
+
+
+def sensitivity_manifest_path(base_dir: Path) -> Path:
+    return poisoning_output_root(base_dir) / ArtifactFile.SENSITIVITY_MANIFEST
+
+
 @dataclass(frozen=True, slots=True)
 class ScoreCellPaths:
-    """Resolved paths for a scoring cell."""
 
     cell: TrainingCellId
     checkpoint_dir: Path
     score_dir: Path
     manifest_path: Path
-    checkpoint_round: int | None = None
+    checkpoint_round: RoundIndex | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class PolicyRunPaths:
-    """Resolved paths for a single policy run."""
 
     run: PolicyRunId
     result_dir: Path
     log_dir: Path
     metrics_path: Path
-    checkpoint_round: int | None = None
+    checkpoint_round: RoundIndex | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ArtifactLayout:
-    """Directory layout for checkpoints, scores, results, and logs by stage."""
 
     base_dir: Path
     stage: ExperimentStage
 
-    def _root(self, d_type: str) -> Path:
-        """Return the root directory for a given artifact type and stage."""
-        return self.base_dir / d_type / self.stage.value
+    def _root(self, artifact_dir: ArtifactDir) -> Path:
+        return self.base_dir / artifact_dir / self.stage
 
     def checkpoint_dir(
-        self, cell: TrainingCellId, checkpoint_round: int | None = None
+        self, cell: TrainingCellId, checkpoint_round: RoundIndex | None = None
     ) -> Path:
-        """Return the checkpoint directory for a training cell and optional round."""
         return self._root(ArtifactDir.CHECKPOINTS) / _get_seg(
             cell.seed, checkpoint_round
         )
 
-    def checkpoint_dir_for_round(
-        self, cell: TrainingCellId, checkpoint_round: int
-    ) -> Path:
-        """Return the checkpoint directory for a specific round."""
-        return self.checkpoint_dir(cell, checkpoint_round)
-
     def score_cell(
-        self, cell: TrainingCellId, checkpoint_round: int | None = None
+        self, cell: TrainingCellId, checkpoint_round: RoundIndex | None = None
     ) -> ScoreCellPaths:
-        """Return ScoreCellPaths for a training cell and optional round."""
         seg = _get_seg(cell.seed, checkpoint_round)
         score_dir = self._root(ArtifactDir.SCORES) / seg
         return ScoreCellPaths(
@@ -86,18 +92,24 @@ class ArtifactLayout:
             checkpoint_round=checkpoint_round,
         )
 
-    def score_cell_for_round(
-        self, cell: TrainingCellId, checkpoint_round: int
-    ) -> ScoreCellPaths:
-        """Return ScoreCellPaths for a specific round."""
-        return self.score_cell(cell, checkpoint_round)
+    def score_file(
+        self,
+        cell: TrainingCellId,
+        stage: ScoringStage,
+        client_id: ClientId,
+        checkpoint_round: RoundIndex | None = None,
+    ) -> Path:
+        return (
+            self.score_cell(cell, checkpoint_round).score_dir
+            / stage
+            / f"{client_id}{PathToken.PARQUET_EXT}"
+        )
 
     def policy_run(
-        self, run: PolicyRunId, checkpoint_round: int | None = None
+        self, run: PolicyRunId, checkpoint_round: RoundIndex | None = None
     ) -> PolicyRunPaths:
-        """Return PolicyRunPaths for a policy run and optional round."""
         seg = _get_seg(run.seed, checkpoint_round)
-        policy_val = run.policy.value
+        policy_val = run.policy
         result_dir = self._root(ArtifactDir.RESULTS) / policy_val / seg
         return PolicyRunPaths(
             run=run,
@@ -106,33 +118,3 @@ class ArtifactLayout:
             log_dir=self._root(ArtifactDir.LOGS) / policy_val / seg,
             checkpoint_round=checkpoint_round,
         )
-
-    def policy_run_for_round(
-        self, run: PolicyRunId, checkpoint_round: int
-    ) -> PolicyRunPaths:
-        """Return PolicyRunPaths for a specific round."""
-        return self.policy_run(run, checkpoint_round)
-
-    def score_file(
-        self,
-        cell: TrainingCellId,
-        stage: ScoringStage,
-        client_id: str,
-        checkpoint_round: int | None = None,
-    ) -> Path:
-        """Return the path to a Parquet score file for a client, stage, and optional round."""
-        return (
-            self.score_cell(cell, checkpoint_round).score_dir
-            / stage
-            / f"{client_id}{PathToken.PARQUET_EXT}"
-        )
-
-    def score_file_for_round(
-        self,
-        cell: TrainingCellId,
-        stage: ScoringStage,
-        client_id: str,
-        checkpoint_round: int,
-    ) -> Path:
-        """Return the path to a Parquet score file for a specific round."""
-        return self.score_file(cell, stage, client_id, checkpoint_round)

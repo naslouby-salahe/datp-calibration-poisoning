@@ -1,16 +1,25 @@
-"""Flower NumPyClient wrapping local AE training and calibration evaluation."""
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from datp.types import (
+    ClientId,
+    NarrativeText,
+    SampleCount,
+)
 
-import numpy as np
+
+from typing import TYPE_CHECKING
+
 import torch
 from flwr.client import NumPyClient
+from flwr.common import NDArrays, Scalar
 
 from datp.federated.local_training import evaluate_benign, train_local
 from datp.federated.parameters import get_parameters, set_parameters
-from datp.federated.types import ClientMetricKey, validate_tensor_input
+from datp.federated.types import (
+    ClientMetricKey,
+    FederatedTensorLabel,
+    validate_tensor_input,
+)
 from datp.modeling.autoencoder import Autoencoder
 
 if TYPE_CHECKING:
@@ -18,20 +27,19 @@ if TYPE_CHECKING:
 
 
 class DatpClient(NumPyClient):
-    """Per-client federated worker that trains and evaluates a local autoencoder."""
 
     def __init__(
         self,
-        cid: str,
+        cid: NarrativeText,
         model: Autoencoder,
         train_data: torch.Tensor,
         cal_data: torch.Tensor,
         cfg: DatpConfig,
     ) -> None:
-        """Initialize with client ID, model, training/calibration tensors, and config."""
-        validate_tensor_input(train_data, "train_data", cid)
-        validate_tensor_input(cal_data, "cal_data", cid)
-        self.cid = cid
+        client_id = ClientId(cid)
+        validate_tensor_input(train_data, FederatedTensorLabel.TRAIN_DATA, client_id)
+        validate_tensor_input(cal_data, FederatedTensorLabel.CALIBRATION_DATA, client_id)
+        self.cid = client_id
         self.model = model
         self.train_data = train_data
         self.cal_data = cal_data
@@ -39,14 +47,12 @@ class DatpClient(NumPyClient):
         self._batch_size = cfg.machine.batch_size_train
         self._lr = cfg.model.lr
 
-    def get_parameters(self, config: dict[str, Any]) -> list[np.ndarray]:
-        """Return current model parameters as numpy arrays."""
+    def get_parameters(self, config: dict[str, Scalar]) -> NDArrays:
         return get_parameters(self.model)
 
     def fit(
-        self, parameters: list[np.ndarray], config: dict[str, Any]
-    ) -> tuple[list[np.ndarray], int, dict[str, Any]]:
-        """Run local training for the configured number of epochs."""
+        self, parameters: NDArrays, config: dict[str, Scalar]
+    ) -> tuple[NDArrays, SampleCount, dict[str, Scalar]]:
         set_parameters(self.model, parameters)
         self.model.train()
         last_loss = train_local(
@@ -63,9 +69,8 @@ class DatpClient(NumPyClient):
         )
 
     def evaluate(
-        self, parameters: list[np.ndarray], config: dict[str, Any]
-    ) -> tuple[float, int, dict[str, Any]]:
-        """Evaluate MSE reconstruction loss on local calibration data."""
+        self, parameters: NDArrays, config: dict[str, Scalar]
+    ) -> tuple[float, SampleCount, dict[str, Scalar]]:
         set_parameters(self.model, parameters)
         loss = evaluate_benign(self.model, self.cal_data)
         return loss, len(self.cal_data), {ClientMetricKey.VAL_LOSS: loss}

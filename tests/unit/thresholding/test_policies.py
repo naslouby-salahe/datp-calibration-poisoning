@@ -14,7 +14,7 @@ from datp.attacks.constants import (
     THRESHOLD_QUANTILE,
 )
 from datp.config.models import ExperimentStage
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import ThresholdResult
 from datp.thresholding.eligibility import (
@@ -79,7 +79,11 @@ class TestGlobalThreshold:
             q=THRESHOLD_QUANTILE,
             run=_run(ThresholdPolicy.GLOBAL_THRESHOLD),
         )
-        pending_cts = [ct for ct in result.client_thresholds if ct.calibration_pending]
+        pending_cts = [
+            ct
+            for ct in result.client_thresholds
+            if ct.status is ClientStatus.CALIBRATION_PENDING
+        ]
         assert len(pending_cts) == 1
         assert pending_cts[0].client_id == "client_d"
         assert result.pending_count == 1
@@ -89,8 +93,8 @@ class TestGlobalThreshold:
         self, client_errors: dict[str, np.ndarray]
     ) -> None:
         """Verify global threshold is the unweighted mean of eligible client percentiles."""
-        eligible, _ = identify_eligible(client_errors, n_min=N_MIN)
-        taus = compute_client_thresholds(client_errors, eligible, q=THRESHOLD_QUANTILE)
+        eligibility = identify_eligible(client_errors, n_min=N_MIN)
+        taus = compute_client_thresholds(client_errors, eligibility, q=THRESHOLD_QUANTILE)
         expected = sum(taus.values()) / len(taus)
         result = compute_global(
             client_errors,
@@ -134,7 +138,7 @@ class TestLocalThreshold:
             run=_run(ThresholdPolicy.LOCAL_THRESHOLD),
         )
         eligible_cts = [
-            ct for ct in result.client_thresholds if not ct.calibration_pending
+            ct for ct in result.client_thresholds if ct.status is ClientStatus.ELIGIBLE
         ]
         for ct in eligible_cts:
             expected = float(
@@ -152,7 +156,11 @@ class TestLocalThreshold:
             q=THRESHOLD_QUANTILE,
             run=_run(ThresholdPolicy.LOCAL_THRESHOLD),
         )
-        pending_cts = [ct for ct in result.client_thresholds if ct.calibration_pending]
+        pending_cts = [
+            ct
+            for ct in result.client_thresholds
+            if ct.status is ClientStatus.CALIBRATION_PENDING
+        ]
         for ct in pending_cts:
             assert ct.threshold == pytest.approx(tau_global)
 
@@ -188,15 +196,15 @@ class TestClusterThresholdFingerprints:
 
     def test_four_scalars(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify that fingerprint tensors contain exactly 4 scalars per client."""
-        eligible, _ = identify_eligible(client_errors, n_min=N_MIN)
-        fps = compute_fingerprints(client_errors, eligible, q=THRESHOLD_QUANTILE)
-        for cid in eligible:
+        eligibility = identify_eligible(client_errors, n_min=N_MIN)
+        fps = compute_fingerprints(client_errors, eligibility.eligible_ids, q=THRESHOLD_QUANTILE)
+        for cid in eligibility.eligible_ids:
             assert fps[cid].shape == (4,)
 
     def test_pending_excluded(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify that pending clients are completely excluded from fingerprint output."""
-        eligible, _ = identify_eligible(client_errors, n_min=N_MIN)
-        fps = compute_fingerprints(client_errors, eligible, q=THRESHOLD_QUANTILE)
+        eligibility = identify_eligible(client_errors, n_min=N_MIN)
+        fps = compute_fingerprints(client_errors, eligibility.eligible_ids, q=THRESHOLD_QUANTILE)
         assert "client_d" not in fps
 
 
@@ -241,8 +249,8 @@ class TestClusterThreshold:
             max_iter=CLUSTER_MAX_ITER,
             run=_run(ThresholdPolicy.CLUSTER_THRESHOLD),
         )
-        assert result.metadata.cluster is not None
-        assert result.metadata.cluster.k == CLUSTER_K_NBAIOT
+        assert result.cluster is not None
+        assert result.cluster.k == CLUSTER_K_NBAIOT
 
     def test_adaptive_k_selection_rejected(
         self, large_errors: dict[str, np.ndarray]
@@ -280,7 +288,7 @@ class TestClusterThreshold:
         ct_pending = next(
             ct for ct in result.client_thresholds if ct.client_id == "pending"
         )
-        assert ct_pending.calibration_pending is True
+        assert ct_pending.status is ClientStatus.CALIBRATION_PENDING
         assert ct_pending.threshold == pytest.approx(tau_global)
 
     def test_eligible_never_pending_in_cluster(
@@ -300,9 +308,9 @@ class TestClusterThreshold:
         )
         for ct in result.client_thresholds:
             if ct.client_id == "pending":
-                assert ct.calibration_pending is True
+                assert ct.status is ClientStatus.CALIBRATION_PENDING
             else:
-                assert ct.calibration_pending is False
+                assert ct.status is ClientStatus.ELIGIBLE
 
     def test_return_type(self, large_errors: dict[str, np.ndarray]) -> None:
         """Verify compute_cluster returns a valid ThresholdResult containing cluster metadata."""
@@ -319,8 +327,8 @@ class TestClusterThreshold:
         )
         assert isinstance(result, ThresholdResult)
         assert result.run.policy == ThresholdPolicy.CLUSTER_THRESHOLD
-        assert result.metadata.cluster is not None
-        assert result.metadata.cluster.cluster_info
+        assert result.cluster is not None
+        assert result.cluster.cluster_info
 
     def test_cluster_metadata_complete(
         self, large_errors: dict[str, np.ndarray]
@@ -337,9 +345,9 @@ class TestClusterThreshold:
             max_iter=CLUSTER_MAX_ITER,
             run=_run(ThresholdPolicy.CLUSTER_THRESHOLD),
         )
-        assert result.metadata.cluster is not None
-        cluster_info = result.metadata.cluster.cluster_info
-        total_eligible = sum(len(info.members) for info in cluster_info.values())
+        assert result.cluster is not None
+        cluster_info = result.cluster.cluster_info
+        total_eligible = sum(len(info.members) for info in cluster_info)
         assert total_eligible == result.eligible_count
 
     def test_pending_absent_from_fingerprints_metadata(
@@ -357,5 +365,8 @@ class TestClusterThreshold:
             max_iter=CLUSTER_MAX_ITER,
             run=_run(ThresholdPolicy.CLUSTER_THRESHOLD),
         )
-        assert result.metadata.cluster is not None
-        assert "pending" not in result.metadata.cluster.fingerprints
+        assert result.cluster is not None
+        assert all(
+            fingerprint.client_id != "pending"
+            for fingerprint in result.cluster.fingerprints
+        )

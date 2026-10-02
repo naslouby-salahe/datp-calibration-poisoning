@@ -1,8 +1,8 @@
-"""Core domain types, enums, and utilities re-exported for convenience."""
 
 from datp.checkpointing.enums import EvidenceRole
 from datp.core.enums import (
     CLUSTER_FINGERPRINT_FEATURES,
+    ClusterFingerprintFeature,
     CONTROLLED_POLICIES,
     ClientStatus,
     SeedScope,
@@ -10,6 +10,7 @@ from datp.core.enums import (
 
 __all__ = [
     "CLUSTER_FINGERPRINT_FEATURES",
+    "ClusterFingerprintFeature",
     "CONTROLLED_POLICIES",
     "ClientStatus",
     "EvidenceRole",

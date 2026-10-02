@@ -17,7 +17,7 @@ from datp.attacks.constants import (
     THRESHOLD_QUANTILE,
 )
 from datp.config.models import ExperimentStage
-from datp.core.enums import CLUSTER_FINGERPRINT_FEATURES, ThresholdPolicy
+from datp.core.enums import ClientStatus, CLUSTER_FINGERPRINT_FEATURES, ThresholdPolicy
 from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.thresholding.policies import compute_cluster, compute_fingerprints
 
@@ -63,8 +63,8 @@ class TestClusterThresholdFixedMode:
             max_iter=CLUSTER_MAX_ITER,
             run=_run(),
         )
-        assert result.metadata.cluster is not None
-        assert result.metadata.cluster.k == CLUSTER_K_NBAIOT
+        assert result.cluster is not None
+        assert result.cluster.k == CLUSTER_K_NBAIOT
 
     def test_fixed_k_pending_excluded(
         self, eligible_errors: dict[str, np.ndarray]
@@ -81,8 +81,11 @@ class TestClusterThresholdFixedMode:
             max_iter=CLUSTER_MAX_ITER,
             run=_run(),
         )
-        assert result.metadata.cluster is not None
-        assert "pending" not in result.metadata.cluster.fingerprints
+        assert result.cluster is not None
+        assert all(
+            fingerprint.client_id != "pending"
+            for fingerprint in result.cluster.fingerprints
+        )
 
 
 class TestClusterThresholdKLock:
@@ -118,10 +121,11 @@ class TestClusterThresholdKLock:
             max_iter=CLUSTER_MAX_ITER,
             run=_run(),
         )
-        assert result.metadata.cluster is not None
-        assert set(result.metadata.cluster.silhouette_scores.keys()) <= {
-            str(CLUSTER_K_NBAIOT)
-        }
+        assert result.cluster is not None
+        assert {
+            score.cluster_count
+            for score in result.cluster.silhouette_scores
+        } <= {CLUSTER_K_NBAIOT}
 
 
 class TestClusterThresholdFingerprintRobustness:
@@ -250,7 +254,9 @@ class TestClusterThresholdFingerprintRobustness:
             run=_run(),
         )
         pending_ct = next(
-            ct for ct in result.client_thresholds if ct.calibration_pending
+            ct
+            for ct in result.client_thresholds
+            if ct.status is ClientStatus.CALIBRATION_PENDING
         )
         assert pending_ct.threshold == pytest.approx(tau_global)
 

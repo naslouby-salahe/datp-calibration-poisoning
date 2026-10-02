@@ -1,4 +1,3 @@
-"""Canonical artifact directory names and run-state sentinel values."""
 
 from __future__ import annotations
 
@@ -15,14 +14,13 @@ __all__ = [
 
 
 class ArtifactDir(StrEnum):
-    """Canonical artifact directory names."""
 
     OUTPUTS = "outputs"
     RESULTS = "results"
+    CALIBRATION_POISONING = "conference_calibration_poisoning"
     CHECKPOINTS = "checkpoints"
     SCORES = "scores"
     LOGS = "logs"
-    CONSOLE_LOGS = "console_logs"
     ANALYSIS = "analysis"
     FIGURES = "figures"
     TABLES = "tables"
@@ -30,7 +28,6 @@ class ArtifactDir(StrEnum):
 
 
 class RunState(StrEnum):
-    """Sentinel-based run state values."""
 
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"

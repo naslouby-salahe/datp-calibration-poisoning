@@ -12,10 +12,11 @@ from datp.attacks.threshold_recomputation.cluster_threshold_recompute import (
 from datp.attacks.injection.injector import inject_fixed_budget
 from datp.attacks.reservoirs.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
+from datp.attacks.types import PoisonedCalibrationSet
 from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.seeds import SeedRecord, make_seed_rng
 from datp.core.seeds import SeedPair
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     make_standard_score_set,
 )
@@ -30,7 +31,7 @@ def _make_collection():
 
 def _make_poisoned_cal(col, victim_idx: int = 0, fraction: float = 0.40):
 
-    eligible_ids = list(col.eligible_ids)
+    eligible_ids = list(col.eligibility.eligible_ids)
     victim_id = eligible_ids[victim_idx]
     victim_cal = col.clients[victim_id].cal
     reservoir = build_reservoir(
@@ -52,7 +53,7 @@ def _make_poisoned_cal(col, victim_idx: int = 0, fraction: float = 0.40):
         cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
         for cid in eligible_ids
     }
-    return poisoned_cal, victim_id
+    return PoisonedCalibrationSet.from_mapping(poisoned_cal), victim_id
 
 
 class TestClusterThresholdPairBasics:
@@ -68,20 +69,20 @@ class TestClusterThresholdPairBasics:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
         pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        assert set(pair.thresholds_clean.keys()) == set(col.eligible_ids)
-        assert set(pair.thresholds_pois.keys()) == set(col.eligible_ids)
+        assert set(pair.thresholds_clean.keys()) == set(col.eligibility.eligible_ids)
+        assert set(pair.thresholds_pois.keys()) == set(col.eligibility.eligible_ids)
 
     def test_decomposition_covers_eligible(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
         pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        assert set(pair.decomposition.keys()) == set(col.eligible_ids)
+        assert set(pair.decomposition.keys()) == set(col.eligibility.eligible_ids)
 
     def test_pending_not_in_thresholds(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
         pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        for pid in col.pending_ids:
+        for pid in col.eligibility.pending_ids:
             assert pid not in pair.thresholds_clean
             assert pid not in pair.thresholds_pois
 
@@ -148,8 +149,12 @@ class TestDecompositionFrozenScaler:
     def test_f0_frozen_scaler_zero(self) -> None:
 
         col = _make_collection()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids}
+        pair = compute_cluster_pair(
+            col,
+            PoisonedCalibrationSet.from_mapping(pois_cal),
+            THRESHOLD_QUANTILE,
+        )
         for entry in pair.decomposition.values():
             assert entry.delta_tau_frozen_scaler == pytest.approx(0.0, abs=1e-10)
             assert entry.delta_tau_normalization_gap == pytest.approx(0.0, abs=1e-10)
@@ -162,8 +167,12 @@ class TestFractionZero:
 
         col = _make_collection()
 
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
-        pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
+        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids}
+        pair = compute_cluster_pair(
+            col,
+            PoisonedCalibrationSet.from_mapping(pois_cal),
+            THRESHOLD_QUANTILE,
+        )
         for entry in pair.decomposition.values():
             assert entry.delta_tau_total == pytest.approx(0.0, abs=1e-10)
             assert entry.delta_tau_agg == pytest.approx(0.0, abs=1e-10)
@@ -180,7 +189,7 @@ class TestDeterminism:
         pois_cal, _ = _make_poisoned_cal(col)
         p1 = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         p2 = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        for cid in col.eligible_ids:
+        for cid in col.eligibility.eligible_ids:
             assert p1.thresholds_clean[cid] == p2.thresholds_clean[cid]
             assert p1.thresholds_pois[cid] == p2.thresholds_pois[cid]
             assert (
@@ -210,7 +219,7 @@ class TestFixedAssignmentAndTransitions:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
         pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        for cid in col.eligible_ids:
+        for cid in col.eligibility.eligible_ids:
             assert pair.fixed_assignment_thresholds[cid] == pytest.approx(
                 pair.decomposition[cid].tau_agg
             )
@@ -219,15 +228,15 @@ class TestFixedAssignmentAndTransitions:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col)
         pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        assert set(pair.clean_assignments) == set(col.eligible_ids)
-        assert set(pair.poisoned_assignments) == set(col.eligible_ids)
+        assert set(pair.clean_assignments) == set(col.eligibility.eligible_ids)
+        assert set(pair.poisoned_assignments) == set(col.eligibility.eligible_ids)
 
     def test_zero_fraction_keeps_assignments_and_thresholds(self) -> None:
         col = _make_collection()
         pois_cal, _ = _make_poisoned_cal(col, fraction=0.0)
         pair = compute_cluster_pair(col, pois_cal, THRESHOLD_QUANTILE)
         assert dict(pair.clean_assignments) == dict(pair.poisoned_assignments)
-        for cid in col.eligible_ids:
+        for cid in col.eligibility.eligible_ids:
             assert pair.thresholds_pois[cid] == pytest.approx(
                 pair.thresholds_clean[cid]
             )

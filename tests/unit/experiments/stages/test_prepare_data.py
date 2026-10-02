@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from datp.artifacts.names import ArtifactFile
@@ -48,6 +49,12 @@ def _patch_paths(monkeypatch, prepared_dir: Path, raw_dir: Path) -> None:
 
     monkeypatch.setattr(mod, "processed_root", lambda *a, **kw: prepared_dir)
     monkeypatch.setattr(mod, "raw_root", lambda *a, **kw: raw_dir)
+    monkeypatch.setattr(
+        mod,
+        "load_scaler",
+        lambda _: SimpleNamespace(n_features_in_=mod.dataset_spec("nbaiot").feature_count),
+    )
+    monkeypatch.setattr(mod, "run_schema_audit", Mock())
 
 
 def test_existing_processed_data_is_verified_and_reused(
@@ -91,6 +98,7 @@ def test_missing_processed_data_runs_preparation_then_verifies(
     def prepare(*, raw_dir, output_dir, **kwargs) -> None:
         _write_processed_client(prepared_dir)
         _write_manifest(prepared_dir, raw_dir, raw_file)
+        return {}
 
     prepare_mock = Mock(side_effect=prepare)
     monkeypatch.setattr(

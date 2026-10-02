@@ -102,8 +102,8 @@ def test_load_real_score_collection_matches_trained_clients(tmp_path) -> None:
     )
 
     assert sorted(collection.clients.keys()) == client_ids
-    assert collection.eligible_ids == tuple(client_ids)
-    assert collection.pending_ids == ()
+    assert collection.eligibility.eligible_ids == tuple(client_ids)
+    assert collection.eligibility.pending_ids == ()
     for cid in client_ids:
         client = collection.clients[cid]
         assert client.cal.shape[0] == _N_CAL

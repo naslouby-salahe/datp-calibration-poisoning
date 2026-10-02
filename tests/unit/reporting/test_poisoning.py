@@ -9,21 +9,22 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from datp.artifacts.poison_layout import PoisonLayout
+from datp.artifacts.layout import nbaiot_main_manifest_path
 from datp.attacks.enums import (
     AttackerObjective,
+    ManifestProvenanceSource,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
 )
 from datp.attacks.manifests.bounded_sweep_manifest import (
+    ArtifactProvenance,
     BoundedSweepManifest,
     BoundedSweepResultRow,
 )
 from datp.attacks.manifests.run_manifest import ProvenanceRecord
 from datp.core.enums import ThresholdPolicy
 from datp.core.provenance import REPOSITORY_NAME
-from datp.core.seeds import derive_seed_record
-from datp.core.seeds import SeedPair
+from datp.core.seeds import SeedPair, SeedRecord
 from datp.reporting.poisoning import build_poisoning_summaries
 from tests.fixtures.sweep_rows import extended_row_fields
 
@@ -101,8 +102,8 @@ def _row(
     fraction: float = 0.10,
     policy: ThresholdPolicy = ThresholdPolicy.LOCAL_THRESHOLD,
 ) -> BoundedSweepResultRow:
-    seed_record = derive_seed_record(
-        SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
+    seed_record = SeedRecord(
+        pair=SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
         client_idx=int(victim_id[1:]),
         scope_idx=0,
     )
@@ -159,7 +160,9 @@ def _manifest(rows: tuple[BoundedSweepResultRow, ...]) -> BoundedSweepManifest:
         poisoning_seeds=_POISONING,
         analysis_seeds=_ANALYSIS,
         config_hash="config-hash",
-        artifact_provenance={"source": "synthetic-test"},
+        artifact_provenance=ArtifactProvenance(
+            source=ManifestProvenanceSource.NBAIOT_MAIN_SWEEP
+        ),
         mu_flag_threshold_by_training_seed=dict.fromkeys(_TRAINING, 0.01),
         n_cells=len(rows),
         results=rows,
@@ -167,7 +170,7 @@ def _manifest(rows: tuple[BoundedSweepResultRow, ...]) -> BoundedSweepManifest:
 
 
 def _write_manifest(base_dir: Path, manifest: BoundedSweepManifest) -> None:
-    path = PoisonLayout(base_dir=base_dir).nbaiot_main_manifest()
+    path = nbaiot_main_manifest_path(base_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(manifest.model_dump_json(indent=2))
 
@@ -223,7 +226,7 @@ def _synthetic_rows() -> tuple[BoundedSweepResultRow, ...]:
 def test_build_poisoning_summaries_writes_required_outputs(tmp_path: Path) -> None:
     _write_manifest(tmp_path, _manifest(_synthetic_rows()))
     result = build_poisoning_summaries(tmp_path)
-    names = {path.name for path in result.paths}
+    names = {path.name for path in result}
     assert {
         "threshold_shift_summary.csv",
         "threshold_shift_summary.json",
@@ -303,7 +306,7 @@ def _build_and_load(tmp_path: Path, stem: str) -> list[dict]:
 
 def test_new_summaries_and_definitions_are_written(tmp_path: Path) -> None:
     _write_manifest(tmp_path, _manifest(_synthetic_rows()))
-    names = {p.name for p in build_poisoning_summaries(tmp_path).paths}
+    names = {p.name for p in build_poisoning_summaries(tmp_path)}
     assert {
         "downstream_extended.json",
         "client_level_effects.json",
@@ -413,6 +416,7 @@ def test_materiality_factor_changes_significance_and_claim_class() -> None:
         GateParams,
         _claim_gate_decisions,
     )
+    from datp.attacks.enums import ClaimClassification
 
     manifest = _manifest(_synthetic_rows())
     strict = GateParams(
@@ -421,10 +425,10 @@ def test_materiality_factor_changes_significance_and_claim_class() -> None:
         materiality_factor=100.0,
         iqr_floor_factor=DEFAULT_GATE.iqr_floor_factor,
     )
-    default_classes = {d["claim_class"] for d in _claim_gate_decisions(manifest)}
-    strict_classes = {d["claim_class"] for d in _claim_gate_decisions(manifest, strict)}
-    assert default_classes == {"full_vulnerability"}
-    assert "full_vulnerability" not in strict_classes
+    default_classes = {d.claim_class for d in _claim_gate_decisions(manifest)}
+    strict_classes = {d.claim_class for d in _claim_gate_decisions(manifest, strict)}
+    assert default_classes == {ClaimClassification.FULL_VULNERABILITY}
+    assert ClaimClassification.FULL_VULNERABILITY not in strict_classes
 
 
 def test_duplicate_summary_reports_rates(tmp_path: Path) -> None:

@@ -18,8 +18,8 @@ from datp.config.models import ExperimentStage
 from datp.core.enums import CONTROLLED_POLICIES
 import datp.experiments.sweep as sweep_module
 from datp.core.identity import PolicyRunId, TrainingCellId
+from datp.experiments.models import SweepResult
 from datp.experiments.sweep import (
-    SweepResult,
     _cell_is_done,
     build_experiment_matrix,
     run_sweep,
@@ -148,7 +148,7 @@ class TestCheckpointProtocolCompletion:
         )
         layout = ArtifactLayout(base_dir=tmp_path, stage=_STAGE)
         for checkpoint_round in protocol.milestones:
-            result_dir = layout.policy_run_for_round(run, checkpoint_round).result_dir
+            result_dir = layout.policy_run(run, checkpoint_round).result_dir
             result_dir.mkdir(parents=True, exist_ok=True)
             (result_dir / "metrics.json").write_text(
                 valid_metrics_json("global_threshold", "nbaiot_main", 0)

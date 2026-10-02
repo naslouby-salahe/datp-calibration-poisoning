@@ -1,77 +1,73 @@
-"""N-BaIoT dataset constants and canonical DatasetSpec."""
-
 from __future__ import annotations
 
+from datp.types import (
+    FeatureCount,
+    Ratio,
+    SampleCount,
+)
+
+
 from datp.data.specs import (
-    ClientIdentity,
     DatasetID,
     DatasetSpec,
-    RawLayout,
     SplitPolicy,
-    SplitPolicyKind,
     SplitPolicyRole,
 )
-
-FEATURE_COUNT: int = 115
-CHRONOLOGICAL_SPLIT: bool = True
-BENIGN_ONLY_CALIBRATION: bool = True
-
-DEVICE_DIRS: tuple[str, ...] = (
-    "Danmini_Doorbell",
-    "Ecobee_Thermostat",
-    "Ennio_Doorbell",
-    "Philips_B120N10_Baby_Monitor",
-    "Provision_PT_737E_Security_Camera",
-    "Provision_PT_838_Security_Camera",
-    "Samsung_SNH_1011_N_Webcam",
-    "SimpleHome_XCS7_1002_WHT_Security_Camera",
-    "SimpleHome_XCS7_1003_WHT_Security_Camera",
+from datp.core.enums import (
+    NBaIoTAttackFamily,
+    NBaIoTDevice,
+    NBaIoTDeviceFamily,
 )
 
-NUM_DEVICES: int = len(DEVICE_DIRS)
-DEVICE_FAMILY_MAP: dict[str, str] = {
-    "Danmini_Doorbell": "doorbell",
-    "Ecobee_Thermostat": "other",
-    "Ennio_Doorbell": "doorbell",
-    "Philips_B120N10_Baby_Monitor": "other",
-    "Provision_PT_737E_Security_Camera": "camera",
-    "Provision_PT_838_Security_Camera": "camera",
-    "Samsung_SNH_1011_N_Webcam": "camera",
-    "SimpleHome_XCS7_1002_WHT_Security_Camera": "camera",
-    "SimpleHome_XCS7_1003_WHT_Security_Camera": "camera",
+FEATURE_COUNT: FeatureCount = 115
+
+DEVICE_DIRS: tuple[NBaIoTDevice, ...] = (
+    NBaIoTDevice.DANMINI_DOORBELL,
+    NBaIoTDevice.ECOBEE_THERMOSTAT,
+    NBaIoTDevice.ENNIO_DOORBELL,
+    NBaIoTDevice.PHILIPS_B120N10_BABY_MONITOR,
+    NBaIoTDevice.PROVISION_PT_737E_SECURITY_CAMERA,
+    NBaIoTDevice.PROVISION_PT_838_SECURITY_CAMERA,
+    NBaIoTDevice.SAMSUNG_SNH_1011_N_WEBCAM,
+    NBaIoTDevice.SIMPLEHOME_XCS7_1002_WHT_SECURITY_CAMERA,
+    NBaIoTDevice.SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA,
+)
+
+NUM_DEVICES: SampleCount = len(DEVICE_DIRS)
+DEVICE_FAMILY_MAP: dict[NBaIoTDevice, NBaIoTDeviceFamily] = {
+    NBaIoTDevice.DANMINI_DOORBELL: NBaIoTDeviceFamily.DOORBELL,
+    NBaIoTDevice.ECOBEE_THERMOSTAT: NBaIoTDeviceFamily.OTHER,
+    NBaIoTDevice.ENNIO_DOORBELL: NBaIoTDeviceFamily.DOORBELL,
+    NBaIoTDevice.PHILIPS_B120N10_BABY_MONITOR: NBaIoTDeviceFamily.OTHER,
+    NBaIoTDevice.PROVISION_PT_737E_SECURITY_CAMERA: NBaIoTDeviceFamily.CAMERA,
+    NBaIoTDevice.PROVISION_PT_838_SECURITY_CAMERA: NBaIoTDeviceFamily.CAMERA,
+    NBaIoTDevice.SAMSUNG_SNH_1011_N_WEBCAM: NBaIoTDeviceFamily.CAMERA,
+    NBaIoTDevice.SIMPLEHOME_XCS7_1002_WHT_SECURITY_CAMERA: NBaIoTDeviceFamily.CAMERA,
+    NBaIoTDevice.SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA: NBaIoTDeviceFamily.CAMERA,
 }
 
-DEVICE_FAMILIES: frozenset[str] = frozenset(DEVICE_FAMILY_MAP.values())
-BENIGN_TRAFFIC_FILE = "benign_traffic.csv"
-ATTACK_FAMILY_DIRS: tuple[str, ...] = ("gafgyt_attacks", "mirai_attacks")
+ATTACK_FAMILY_DIRS: tuple[NBaIoTAttackFamily, ...] = (
+    NBaIoTAttackFamily.GAFGYT,
+    NBaIoTAttackFamily.MIRAI,
+)
 
-SPLIT_RATIOS: dict[SplitPolicyRole, float] = {
+SPLIT_RATIOS: dict[SplitPolicyRole, Ratio] = {
     SplitPolicyRole.TRAIN: 0.60,
     SplitPolicyRole.GAP1: 0.01,
     SplitPolicyRole.CAL: 0.20,
     SplitPolicyRole.GAP2: 0.01,
 }
 
-BALANCED_TEST_DEFAULT: bool = False
-
 NBAIOT_SPEC = DatasetSpec(
     id=DatasetID.NBAIOT,
     display_name="N-BaIoT",
-    processed_slug=DatasetID.NBAIOT.value,
+    processed_slug=DatasetID.NBAIOT,
     feature_count=FEATURE_COUNT,
     feature_columns=None,
     label_column=None,
     benign_label=None,
-    client_identity=ClientIdentity.DEVICE_DIRECTORY,
-    raw_layout=RawLayout(root_slug="N-BaIoT"),
-    split_policy=SplitPolicy(
-        name=SplitPolicyKind.CHRONOLOGICAL_GAPPED,
-        calibration_benign_only=BENIGN_ONLY_CALIBRATION,
-        chronological=CHRONOLOGICAL_SPLIT,
-        contiguous_gaps=True,
-        ratios=SPLIT_RATIOS,
-    ),
-    cap_policy=None,
+    raw_root_slug="N-BaIoT",
+    split_policy=SplitPolicy(ratios=SPLIT_RATIOS),
     family_map=DEVICE_FAMILY_MAP,
     device_ids=DEVICE_DIRS,
     attack_family_dirs=ATTACK_FAMILY_DIRS,

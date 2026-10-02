@@ -1,19 +1,25 @@
-"""NBAIOT main bounded-sweep orchestration: per-cell execution and result assembly."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    ManifestMetricValue,
+    RandomSeed,
+    SignedCount,
+    Threshold,
+)
+
 
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
 
 from joblib import Parallel, delayed
 
-from datp.artifacts.layout import ArtifactLayout
-from datp.artifacts.poison_layout import PoisonLayout
-from datp.artifacts.poison_names import NBAIOT_MAIN_MANIFEST_SOURCE
+from datp.artifacts.layout import ArtifactLayout, nbaiot_main_manifest_path
 from datp.attacks.constants import N_MIN
+from datp.attacks.enums import ManifestProvenanceSource
 from datp.attacks.execution.bounded_sweep_cell import (
     SweepCellConfig,
     SweepCellResult,
@@ -21,6 +27,7 @@ from datp.attacks.execution.bounded_sweep_cell import (
     run_sweep_cell,
 )
 from datp.attacks.manifests.bounded_sweep_manifest import (
+    ArtifactProvenance,
     BoundedSweepManifest,
     BoundedSweepResultRow,
 )
@@ -60,39 +67,67 @@ from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.config.models import ExperimentStage
 from datp.core.enums import ScoringStage
 from datp.core.identity import TrainingCellId
+from datp.core.logging import get_logger
 from datp.core.provenance import REPOSITORY_NAME, hash_jsonable
-from datp.core.seeds import derive_seed_record
+from datp.core.seeds import SeedRecord
 from datp.scoring.loading import load_main_cal_errors, load_parquets_from_dir
+
+logger = get_logger(__name__)
 
 
 def _auroc_invariant(result: SweepCellResult) -> bool:
-    """Check that Auroc is invariant under poisoning for all clients."""
     c, p = result.clean_metrics.auroc_records, result.poisoned_metrics.auroc_records
     return all(
-        c.for_client(r.client_id).auroc == p.for_client(r.client_id).auroc
+        c[r.client_id].auroc == p[r.client_id].auroc
         for r in c.values()
     )
 
 
 def _threshold_pairs(
-    entries: Mapping[str, DeltaTauEntry],
-) -> dict[str, tuple[float, float]]:
-    """Map client IDs to (clean, poisoned) thresholds."""
+    entries: Mapping[ClientId, DeltaTauEntry],
+) -> dict[ClientId, tuple[Threshold, Threshold]]:
     return {cid: (e.tau_clean, e.tau_pois) for cid, e in entries.items()}
 
 
-def _scores_by_client(collection: ScoreCollection) -> dict[str, ClientScores]:
-    """Map eligible client IDs to their score arrays."""
-    return {cid: collection.for_client(cid) for cid in collection.eligible_ids}
+def _scores_by_client(collection: ScoreCollection) -> dict[ClientId, ClientScores]:
+    return {cid: collection.clients[cid] for cid in collection.eligible_ids}
+
+
+@dataclass(frozen=True, slots=True)
+class _FixedAssignmentMetrics:
+    victim_delta_tau: ManifestMetricValue
+    victim_delta_tpr: ManifestMetricValue
+    victim_delta_fpr: ManifestMetricValue
+    delta_cv_fpr: ManifestMetricValue
+    delta_mean_fpr: ManifestMetricValue
+    nonvictim_mean_delta_tpr: ManifestMetricValue
+    nonvictim_mean_delta_fpr: ManifestMetricValue
+
+
+@dataclass(frozen=True, slots=True)
+class _ClusterMetrics:
+    delta_tau_agg: ManifestMetricValue
+    delta_tau_churn: ManifestMetricValue
+    delta_tau_frozen_scaler: ManifestMetricValue
+    delta_tau_normalization_gap: ManifestMetricValue
+    victim_effect: ManifestMetricValue
+    non_victim_effect: ManifestMetricValue
+    sizes_clean: tuple[SignedCount, ...]
+    sizes_poisoned: tuple[SignedCount, ...]
+    victim_size_clean: ManifestMetricValue
+    victim_size_poisoned: ManifestMetricValue
+    n_reassigned: ManifestMetricValue
+    silhouette_clean: ManifestMetricValue
+    silhouette_poisoned: ManifestMetricValue
+    fixed_assignment: _FixedAssignmentMetrics
 
 
 def _fixed_assignment_fields(
     collection: ScoreCollection,
     pair: ClusterThresholdPair,
     clean_fleet: FleetFprMetrics,
-    victim_id: str,
-) -> dict[str, float]:
-    """Compute victim, fleet and non-victim effects when clean cluster assignments stay frozen."""
+    victim_id: ClientId,
+) -> _FixedAssignmentMetrics:
     fixed_pair = ThresholdPairBase(
         policy=pair.policy,
         tau_global_clean=pair.tau_global_clean,
@@ -106,90 +141,81 @@ def _fixed_assignment_fields(
     ds = compute_victim_downstream_metrics(
         clean_threshold=victim.tau_clean,
         poisoned_threshold=victim.tau_pois,
-        client_scores=collection.for_client(victim_id),
+        client_scores=collection.clients[victim_id],
     )
     nv = compute_non_victim_downstream(
         thresholds=_threshold_pairs(entries),
         scores_by_client=_scores_by_client(collection),
         victim_id=victim_id,
     )
-    return {
-        "fixed_cluster_victim_delta_tau": victim.delta_tau,
-        "fixed_cluster_victim_delta_tpr": ds.delta_tpr,
-        "fixed_cluster_victim_delta_fpr": ds.delta_fpr,
-        "fixed_cluster_delta_cv_fpr": fleet.cv_fpr - clean_fleet.cv_fpr,
-        "fixed_cluster_delta_mean_fpr": fleet.mean_fpr - clean_fleet.mean_fpr,
-        "fixed_cluster_nonvictim_mean_delta_tpr": nv.mean_delta_tpr,
-        "fixed_cluster_nonvictim_mean_delta_fpr": nv.mean_delta_fpr,
-    }
+    return _FixedAssignmentMetrics(
+        victim.delta_tau,
+        ds.delta_tpr,
+        ds.delta_fpr,
+        fleet.cv_fpr - clean_fleet.cv_fpr,
+        fleet.mean_fpr - clean_fleet.mean_fpr,
+        nv.mean_delta_tpr,
+        nv.mean_delta_fpr,
+    )
 
 
 def _cluster_fields(
     collection: ScoreCollection,
     pair: ThresholdPairBase,
     clean_fleet: FleetFprMetrics,
-    victim_id: str,
-) -> dict[str, Any]:
-    """Compute cluster-only row fields; NaN or empty for non-cluster policies."""
+    victim_id: ClientId,
+) -> _ClusterMetrics:
     if not isinstance(pair, ClusterThresholdPair):
-        return {
-            "cluster_delta_tau_agg": math.nan,
-            "cluster_delta_tau_churn": math.nan,
-            "cluster_delta_tau_frozen_scaler": math.nan,
-            "cluster_delta_tau_normalization_gap": math.nan,
-            "cluster_victim_effect": math.nan,
-            "cluster_non_victim_effect": math.nan,
-            "cluster_sizes_clean": (),
-            "cluster_sizes_poisoned": (),
-            "cluster_victim_size_clean": math.nan,
-            "cluster_victim_size_poisoned": math.nan,
-            "cluster_n_reassigned": math.nan,
-            "cluster_silhouette_clean": math.nan,
-            "cluster_silhouette_poisoned": math.nan,
-            **dict.fromkeys(_FIXED_CLUSTER_FIELDS, math.nan),
-        }
+        return _ClusterMetrics(
+            math.nan,
+            math.nan,
+            math.nan,
+            math.nan,
+            math.nan,
+            math.nan,
+            (),
+            (),
+            math.nan,
+            math.nan,
+            math.nan,
+            math.nan,
+            math.nan,
+            _FixedAssignmentMetrics(
+                math.nan,
+                math.nan,
+                math.nan,
+                math.nan,
+                math.nan,
+                math.nan,
+                math.nan,
+            ),
+        )
     v = pair.decomposition[victim_id]
     nv = [e.delta_tau_total for k, e in pair.decomposition.items() if k != victim_id]
-    return {
-        "cluster_delta_tau_agg": v.delta_tau_agg,
-        "cluster_delta_tau_churn": v.delta_tau_churn,
-        "cluster_delta_tau_frozen_scaler": v.delta_tau_frozen_scaler,
-        "cluster_delta_tau_normalization_gap": v.delta_tau_normalization_gap,
-        "cluster_victim_effect": v.delta_tau_total,
-        "cluster_non_victim_effect": sum(nv) / len(nv) if nv else math.nan,
-        "cluster_sizes_clean": cluster_sizes(pair.clean_assignments),
-        "cluster_sizes_poisoned": cluster_sizes(pair.poisoned_assignments),
-        "cluster_victim_size_clean": cluster_size_of(pair.clean_assignments, victim_id),
-        "cluster_victim_size_poisoned": cluster_size_of(
-            pair.poisoned_assignments, victim_id
-        ),
-        "cluster_n_reassigned": n_reassigned(
-            pair.clean_assignments, pair.poisoned_assignments
-        ),
-        "cluster_silhouette_clean": pair.silhouette_clean,
-        "cluster_silhouette_poisoned": pair.silhouette_poisoned,
-        **_fixed_assignment_fields(collection, pair, clean_fleet, victim_id),
-    }
-
-
-_FIXED_CLUSTER_FIELDS = (
-    "fixed_cluster_victim_delta_tau",
-    "fixed_cluster_victim_delta_tpr",
-    "fixed_cluster_victim_delta_fpr",
-    "fixed_cluster_delta_cv_fpr",
-    "fixed_cluster_delta_mean_fpr",
-    "fixed_cluster_nonvictim_mean_delta_tpr",
-    "fixed_cluster_nonvictim_mean_delta_fpr",
-)
+    return _ClusterMetrics(
+        v.delta_tau_agg,
+        v.delta_tau_churn,
+        v.delta_tau_frozen_scaler,
+        v.delta_tau_normalization_gap,
+        v.delta_tau_total,
+        sum(nv) / len(nv) if nv else math.nan,
+        cluster_sizes(pair.clean_assignments),
+        cluster_sizes(pair.poisoned_assignments),
+        cluster_size_of(pair.clean_assignments, victim_id),
+        cluster_size_of(pair.poisoned_assignments, victim_id),
+        n_reassigned(pair.clean_assignments, pair.poisoned_assignments),
+        pair.silhouette_clean,
+        pair.silhouette_poisoned,
+        _fixed_assignment_fields(collection, pair, clean_fleet, victim_id),
+    )
 
 
 def _row_for_cell(
     collection: ScoreCollection,
     spec: SweepCellSpec,
-    mu_flag_threshold: float,
+    mu_flag_threshold: Threshold,
     auroc_set: AurocSet,
 ) -> BoundedSweepResultRow:
-    """Execute one sweep cell and assemble its result row."""
     res = run_sweep_cell(
         spec,
         config=SweepCellConfig(
@@ -207,7 +233,7 @@ def _row_for_cell(
         objective=spec.objective,
     )
     cf, pf = res.clean_metrics.fleet_fpr, res.poisoned_metrics.fleet_fpr
-    victim_scores = collection.for_client(spec.victim_id)
+    victim_scores = collection.clients[spec.victim_id]
     ds = compute_victim_downstream_metrics(
         clean_threshold=entry.tau_clean,
         poisoned_threshold=entry.tau_pois,
@@ -219,6 +245,10 @@ def _row_for_cell(
         victim_id=spec.victim_id,
     )
 
+    cluster = _cluster_fields(
+        collection, res.thresholds_under_poisoning, cf, spec.victim_id
+    )
+
     return BoundedSweepResultRow(
         policy=spec.policy,
         source=spec.source,
@@ -228,8 +258,8 @@ def _row_for_cell(
         victim_id=spec.victim_id,
         training_seed=spec.training_seed,
         poisoning_seed=spec.poisoning_seed,
-        seed_record=derive_seed_record(
-            spec.seed_pair,
+        seed_record=SeedRecord(
+            pair=spec.seed_pair,
             client_idx=collection.client_index(spec.victim_id),
             scope_idx=0,
         ),
@@ -268,6 +298,12 @@ def _row_for_cell(
         victim_macro_f1_clean=ds.macro_f1_clean,
         victim_macro_f1_poisoned=ds.macro_f1_poisoned,
         victim_delta_macro_f1=ds.delta_macro_f1,
+        cluster_delta_tau_agg=cluster.delta_tau_agg,
+        cluster_delta_tau_churn=cluster.delta_tau_churn,
+        cluster_delta_tau_frozen_scaler=cluster.delta_tau_frozen_scaler,
+        cluster_delta_tau_normalization_gap=cluster.delta_tau_normalization_gap,
+        cluster_victim_effect=cluster.victim_effect,
+        cluster_non_victim_effect=cluster.non_victim_effect,
         victim_fpr_clean=ds.fpr_clean,
         victim_fpr_poisoned=ds.fpr_poisoned,
         victim_delta_fpr=ds.delta_fpr,
@@ -300,47 +336,94 @@ def _row_for_cell(
         n_replaced=res.n_replaced,
         cal_duplicate_rate_clean=duplicate_rate(victim_scores.cal),
         cal_duplicate_rate_poisoned=duplicate_rate(res.victim_cal_poisoned),
-        **_cluster_fields(
-            collection, res.thresholds_under_poisoning, cf, spec.victim_id
+        cluster_sizes_clean=cluster.sizes_clean,
+        cluster_sizes_poisoned=cluster.sizes_poisoned,
+        cluster_victim_size_clean=cluster.victim_size_clean,
+        cluster_victim_size_poisoned=cluster.victim_size_poisoned,
+        cluster_n_reassigned=cluster.n_reassigned,
+        cluster_silhouette_clean=cluster.silhouette_clean,
+        cluster_silhouette_poisoned=cluster.silhouette_poisoned,
+        fixed_cluster_victim_delta_tau=cluster.fixed_assignment.victim_delta_tau,
+        fixed_cluster_victim_delta_tpr=cluster.fixed_assignment.victim_delta_tpr,
+        fixed_cluster_victim_delta_fpr=cluster.fixed_assignment.victim_delta_fpr,
+        fixed_cluster_delta_cv_fpr=cluster.fixed_assignment.delta_cv_fpr,
+        fixed_cluster_delta_mean_fpr=cluster.fixed_assignment.delta_mean_fpr,
+        fixed_cluster_nonvictim_mean_delta_tpr=(
+            cluster.fixed_assignment.nonvictim_mean_delta_tpr
+        ),
+        fixed_cluster_nonvictim_mean_delta_fpr=(
+            cluster.fixed_assignment.nonvictim_mean_delta_fpr
         ),
     )
 
 
 def load_seed_collections(
     base_dir: Path, config: CalibrationPoisoningConfig
-) -> dict[int, ScoreCollection]:
-    """Load the clean score collection for every training seed."""
-    collections: dict[int, ScoreCollection] = {}
+) -> dict[RandomSeed, ScoreCollection]:
+    logger.info(
+        "poisoning score collection load started",
+        stage=ExperimentStage.NBAIOT_MAIN,
+        seed_count=len(config.seeds.training),
+    )
+    collections: dict[RandomSeed, ScoreCollection] = {}
     for seed in config.seeds.training:
-        cal_errors = load_main_cal_errors(
-            ExperimentStage.NBAIOT_MAIN, seed, base_dir, None
-        )
-        layout = ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
-        score_dir = layout.score_cell(
-            TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed)
-        ).score_dir
-        test_benign = load_parquets_from_dir(
-            score_dir / ScoringStage.TEST_BENIGN.value, allow_empty=False
-        )
-        test_attack = load_parquets_from_dir(
-            score_dir / ScoringStage.TEST_ATTACK.value, allow_empty=False
-        )
-        collections[seed] = build_score_collection(
-            {
-                cid: (cal, test_benign[cid], test_attack[cid])
-                for cid, cal in cal_errors.items()
-            },
-            n_min=N_MIN,
-        )
+        try:
+            cal_errors = load_main_cal_errors(
+                ExperimentStage.NBAIOT_MAIN, seed, base_dir, None
+            )
+            layout = ArtifactLayout(
+                base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN
+            )
+            score_dir = layout.score_cell(
+                TrainingCellId(
+                    stage=ExperimentStage.NBAIOT_MAIN, seed=RandomSeed(seed)
+                )
+            ).score_dir
+            test_benign = load_parquets_from_dir(
+                score_dir / ScoringStage.TEST_BENIGN, allow_empty=False
+            )
+            test_attack = load_parquets_from_dir(
+                score_dir / ScoringStage.TEST_ATTACK, allow_empty=False
+            )
+            collections[seed] = build_score_collection(
+                {
+                    cid: (cal, test_benign[cid], test_attack[cid])
+                    for cid, cal in cal_errors.items()
+                },
+                n_min=N_MIN,
+            )
+        except Exception:
+            logger.exception(
+                "poisoning score collection load failed",
+                stage=ExperimentStage.NBAIOT_MAIN,
+                seed=seed,
+            )
+            raise
+    logger.info(
+        "poisoning score collection load completed",
+        stage=ExperimentStage.NBAIOT_MAIN,
+        seed_count=len(collections),
+        eligible_client_count=sum(
+            len(collection.eligible_ids) for collection in collections.values()
+        ),
+    )
     return collections
 
 
 def run_nbaiot_main(
     base_dir: Path, config: CalibrationPoisoningConfig
 ) -> BoundedSweepManifest:
-    """Execute the full NBAIOT main bounded sweep and return the manifest."""
+    logger.info(
+        "bounded sweep started",
+        stage=ExperimentStage.NBAIOT_MAIN,
+        training_seed_count=len(config.seeds.training),
+        poisoning_seed_count=len(config.seeds.poisoning),
+        analysis_seed_count=len(config.seeds.analysis),
+    )
     collections = load_seed_collections(base_dir, config)
-    mu_flag_by_seed, auroc_by_seed, victims_by_seed = {}, {}, {}
+    mu_flag_by_seed: dict[RandomSeed, Threshold] = {}
+    auroc_by_seed: dict[RandomSeed, AurocSet] = {}
+    victims_by_seed: dict[RandomSeed, tuple[ClientId, ...]] = {}
 
     for seed, col in collections.items():
         mu_flag_by_seed[seed] = lock_mu_flag_threshold(col)
@@ -348,10 +431,15 @@ def run_nbaiot_main(
         victims_by_seed[seed] = col.eligible_ids
 
     cells = enumerate_bounded_sweep_matrix(victims_by_seed, config)
+    logger.info(
+        "bounded sweep matrix planned",
+        cell_count=len(cells),
+        training_seed_count=len(collections),
+        eligible_client_count=sum(len(ids) for ids in victims_by_seed.values()),
+    )
 
-    rows = cast(
-        list[BoundedSweepResultRow],
-        Parallel(n_jobs=-1)(
+    try:
+        rows = Parallel(n_jobs=-1)(
             delayed(_row_for_cell)(
                 collections[spec.training_seed],
                 spec,
@@ -359,18 +447,22 @@ def run_nbaiot_main(
                 auroc_by_seed[spec.training_seed],
             )
             for spec in cells
-        ),
-    )
+        )
+    except Exception:
+        logger.exception("bounded sweep cell execution failed", cell_count=len(cells))
+        raise
 
-    return BoundedSweepManifest(
+    manifest = BoundedSweepManifest(
         generated_at_utc=datetime.now(UTC).isoformat(),
         provenance=ProvenanceRecord(local_epochs=1, repository=REPOSITORY_NAME),
         config_hash=hash_jsonable(config.model_dump(mode="json")),
-        artifact_provenance={"source": NBAIOT_MAIN_MANIFEST_SOURCE},
+        artifact_provenance=ArtifactProvenance(
+            source=ManifestProvenanceSource.NBAIOT_MAIN_SWEEP
+        ),
         policies=config.policies,
         sources=config.sources,
         source_objective_pairs=tuple(
-            sorted({f"{r.source.value}+{r.objective.value}" for r in rows})
+            sorted({f"{r.source}+{r.objective}" for r in rows})
         ),
         fractions=config.fractions,
         training_seeds=config.seeds.training,
@@ -380,15 +472,17 @@ def run_nbaiot_main(
         n_cells=len(rows),
         results=tuple(rows),
     )
+    logger.info("bounded sweep completed", result_count=len(manifest.results))
+    return manifest
 
 
 def write_nbaiot_main_manifest(base_dir: Path) -> Path:
-    """Run the NBAIOT main sweep and write the manifest JSON to disk."""
-    out_path = PoisonLayout(base_dir=base_dir).nbaiot_main_manifest()
+    out_path = nbaiot_main_manifest_path(base_dir)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         run_nbaiot_main(
             base_dir, CalibrationPoisoningConfig.for_bounded_sweep()
         ).model_dump_json(indent=2)
     )
+    logger.info("bounded sweep manifest written", path=out_path)
     return out_path

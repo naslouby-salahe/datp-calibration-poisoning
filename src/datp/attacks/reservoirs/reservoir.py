@@ -1,8 +1,13 @@
-"""Reservoir construction: pool extraction from victim calibration scores by strategy."""
 
 from __future__ import annotations
+from datp.types import (
+    PoisonFraction,
+    SampleCount,
+    ScoreVector,
+)
 
 from dataclasses import dataclass
+from math import floor
 
 import numpy as np
 
@@ -11,26 +16,24 @@ from datp.attacks.enums import PoisoningSourceStrategy, ReservoirStatus
 
 @dataclass(frozen=True, slots=True)
 class ReservoirResult:
-    """Pool of values extracted from a victim's calibration scores for poisoning."""
 
-    pool: np.ndarray
+    pool: ScoreVector
     status: ReservoirStatus
     source: PoisoningSourceStrategy
-    n_pool: int
-    n_distinct: int
+    n_pool: SampleCount
+    n_distinct: SampleCount
 
 
 def build_reservoir(
     *,
-    clean_cal: np.ndarray,
+    clean_cal: ScoreVector,
     source: PoisoningSourceStrategy,
-    tail_mass: float,
+    tail_mass: PoisonFraction,
 ) -> ReservoirResult:
-    """Extract a poisoning-value pool from victim calibration scores by strategy."""
     if source == PoisoningSourceStrategy.RANDOM_BENIGN:
         pool = clean_cal.copy()
     else:
-        n_tail = max(1, int(tail_mass * clean_cal.size))
+        n_tail = max(1, floor(tail_mass * clean_cal.size))
         sorted_cal = np.sort(clean_cal)
 
         if source == PoisoningSourceStrategy.HIGH_SCORE_BENIGN:

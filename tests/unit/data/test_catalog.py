@@ -5,19 +5,26 @@ from __future__ import annotations
 import pytest
 
 from datp.data.catalog import (
-    CapPolicy,
-    CapStrategy,
-    ClientIdentity,
     DatasetID,
     DatasetSpec,
-    RawLayout,
     SplitPolicy,
-    SplitPolicyKind,
     SplitPolicyRole,
     dataset_display_name,
     dataset_processed_slug,
     dataset_spec,
 )
+from datp.core.enums import (
+    ArtifactFile,
+    NBaIoTAttackFamily,
+    NBaIoTDevice,
+    NBaIoTDeviceFamily,
+)
+from datp.data.datasets.nbaiot.spec import (
+    ATTACK_FAMILY_DIRS,
+    DEVICE_DIRS,
+    DEVICE_FAMILY_MAP,
+)
+from datp.reporting.constants import NBAIOT_DEVICE_SHORT_LABELS
 
 
 class TestDatasetID:
@@ -34,26 +41,19 @@ class TestDatasetID:
             assert " " not in member.value
 
 
-class TestClientIdentity:
-    """ClientIdentity construction from dataset and device ID."""
+class TestNBaIoTEnums:
+    def test_device_catalog_and_family_map_cover_the_enum_domain(self) -> None:
+        assert set(DEVICE_DIRS) == set(NBaIoTDevice)
+        assert set(DEVICE_FAMILY_MAP) == set(NBaIoTDevice)
+        assert set(DEVICE_FAMILY_MAP.values()) == set(NBaIoTDeviceFamily)
 
-    def test_expected_members_present(self) -> None:
-        assert ClientIdentity.DEVICE_DIRECTORY in ClientIdentity
-        assert ClientIdentity.MERGED_FILE in ClientIdentity
-
-    def test_values_are_snake_case(self) -> None:
-        for member in ClientIdentity:
-            assert "_" in member.value or member.value.islower()
+    def test_attack_families_and_report_labels_cover_their_enum_domains(self) -> None:
+        assert set(ATTACK_FAMILY_DIRS) == set(NBaIoTAttackFamily)
+        assert set(NBAIOT_DEVICE_SHORT_LABELS) == set(NBaIoTDevice)
+        assert ArtifactFile.BENIGN_TRAFFIC.value == "benign_traffic.csv"
 
 
 class TestDatasetPolicyEnums:
-    """Dataset-scoped policy enum values."""
-
-    def test_split_policy_kind_members(self) -> None:
-        assert set(SplitPolicyKind) == {
-            SplitPolicyKind.CHRONOLOGICAL_GAPPED,
-            SplitPolicyKind.STRATIFIED_RANDOM,
-        }
 
     def test_split_policy_role_members(self) -> None:
         assert set(SplitPolicyRole) == {
@@ -64,60 +64,19 @@ class TestDatasetPolicyEnums:
             SplitPolicyRole.TEST_BENIGN,
         }
 
-    def test_cap_strategy_members(self) -> None:
-        assert set(CapStrategy) == {CapStrategy.ATTACK_PRESERVING}
-
-
 class TestSplitPolicy:
-    """SplitPolicy enumeration and ordering."""
+    """Split-policy ratio configuration."""
 
     def test_construction(self) -> None:
         sp = SplitPolicy(
-            name=SplitPolicyKind.CHRONOLOGICAL_GAPPED,
-            calibration_benign_only=True,
-            chronological=True,
-            contiguous_gaps=False,
             ratios={SplitPolicyRole.TRAIN: 0.6, SplitPolicyRole.CAL: 0.2},
         )
-        assert sp.name == SplitPolicyKind.CHRONOLOGICAL_GAPPED
-        assert sp.calibration_benign_only is True
-        assert sp.chronological is True
-        assert sp.contiguous_gaps is False
         assert sp.ratios == {SplitPolicyRole.TRAIN: 0.6, SplitPolicyRole.CAL: 0.2}
 
     def test_frozen(self) -> None:
-        sp = SplitPolicy(
-            name=SplitPolicyKind.STRATIFIED_RANDOM,
-            calibration_benign_only=False,
-            chronological=False,
-            contiguous_gaps=False,
-            ratios={},
-        )
+        sp = SplitPolicy(ratios={})
         with pytest.raises(Exception):
-            setattr(sp, "name", "other")
-
-
-class TestCapPolicy:
-    """CapPolicy enumeration and defaults."""
-
-    def test_construction(self) -> None:
-        cp = CapPolicy(
-            total=50000,
-            attack_reserve=10000,
-            strategy=CapStrategy.ATTACK_PRESERVING,
-        )
-        assert cp.total == 50000
-        assert cp.attack_reserve == 10000
-        assert cp.strategy == CapStrategy.ATTACK_PRESERVING
-
-    def test_frozen(self) -> None:
-        cp = CapPolicy(
-            total=100,
-            attack_reserve=10,
-            strategy=CapStrategy.ATTACK_PRESERVING,
-        )
-        with pytest.raises(Exception):
-            setattr(cp, "total", 200)
+            setattr(sp, "ratios", {})
 
 
 def _make_spec(feature_count: int = 10) -> DatasetSpec:
@@ -129,16 +88,10 @@ def _make_spec(feature_count: int = 10) -> DatasetSpec:
         feature_columns=None,
         label_column=None,
         benign_label=None,
-        client_identity=ClientIdentity.DEVICE_DIRECTORY,
-        raw_layout=RawLayout(root_slug="test_raw"),
+        raw_root_slug="test_raw",
         split_policy=SplitPolicy(
-            name=SplitPolicyKind.STRATIFIED_RANDOM,
-            calibration_benign_only=True,
-            chronological=False,
-            contiguous_gaps=False,
-            ratios={SplitPolicyRole.TRAIN: 0.7, SplitPolicyRole.CAL: 0.3},
+            ratios={SplitPolicyRole.TRAIN: 0.7, SplitPolicyRole.CAL: 0.3}
         ),
-        cap_policy=None,
         family_map=None,
         device_ids=(),
         attack_family_dirs=(),
@@ -153,7 +106,6 @@ class TestDatasetSpec:
         spec = _make_spec()
         assert spec.id == DatasetID.NBAIOT
         assert spec.feature_count == 10
-        assert spec.cap_policy is None
 
     def test_frozen(self) -> None:
         spec = _make_spec()
@@ -172,8 +124,7 @@ class TestDatasetSpecHelper:
     def test_nbaiot_properties(self) -> None:
         spec = dataset_spec(DatasetID.NBAIOT)
         assert spec.feature_count == 115
-        assert spec.client_identity == ClientIdentity.DEVICE_DIRECTORY
-        assert spec.cap_policy is None
+        assert spec.split_policy.ratios[SplitPolicyRole.CAL] == 0.20
         assert spec.family_map is not None
 
     def test_raises_keyerror_for_invalid_id(self) -> None:

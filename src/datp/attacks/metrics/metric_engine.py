@@ -1,4 +1,3 @@
-"""Metric engine: unified metric computation from collection and threshold pair."""
 
 from __future__ import annotations
 
@@ -14,6 +13,10 @@ from datp.attacks.metrics.fleet_fpr import FleetFprMetrics, compute_fleet_fpr
 from datp.attacks.metrics.mu_flag import compute_mu_flag_threshold
 from datp.attacks.types import AurocSet, MetricEngineInput
 from datp.core.enums import ThresholdPolicy
+from datp.types import (
+    ClientId,
+    Threshold,
+)
 
 __all__ = [
     "DeltaTauEntry",
@@ -31,17 +34,15 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True)
 class MetricResult:
-    """Aggregated metric output for one policy: delta-tau, fleet FPR, and AUROC records."""
 
     policy: ThresholdPolicy
-    delta_tau: dict[str, DeltaTauEntry]
+    delta_tau: dict[ClientId, DeltaTauEntry]
     fleet_fpr: FleetFprMetrics
     auroc_records: AurocSet
-    mu_flag_threshold: float | None
+    mu_flag_threshold: Threshold | None
 
 
 def compute_metrics(inputs: MetricEngineInput) -> MetricResult:
-    """Compute all metrics (delta-tau, fleet FPR, Auroc) from a MetricEngineInput."""
     return MetricResult(
         policy=inputs.pair.policy,
         delta_tau=compute_delta_tau(inputs.collection, inputs.pair),

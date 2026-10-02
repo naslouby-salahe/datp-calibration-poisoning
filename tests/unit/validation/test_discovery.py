@@ -32,7 +32,7 @@ def test_parse_score_cell_dir_no_alpha(tmp_path: Path) -> None:
     location = parse_score_cell_dir(scores_root, cell_dir)
     assert location.cell == TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=42)
     assert location.cell_dir == cell_dir
-    assert location.stage == ExperimentStage.NBAIOT_MAIN
+    assert location.cell.stage == ExperimentStage.NBAIOT_MAIN
     assert location.seed == 42
 
 
@@ -44,7 +44,7 @@ def test_parse_score_cell_dir_with_alpha(tmp_path: Path) -> None:
     assert location.cell == TrainingCellId(
         stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, seed=7
     )
-    assert location.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
+    assert location.cell.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
     assert location.seed == 7
 
 
@@ -53,7 +53,7 @@ def test_parse_score_cell_dir_alpha_iid(tmp_path: Path) -> None:
     scores_root = tmp_path / ArtifactDir.SCORES
     cell_dir = scores_root / ExperimentStage.NBAIOT_FULL_OPTIONAL.value / "seed_0"
     location = parse_score_cell_dir(scores_root, cell_dir)
-    assert location.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
+    assert location.cell.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
     assert location.seed == 0
 
 
@@ -86,7 +86,7 @@ def test_iter_score_cells_no_alpha(tmp_path: Path) -> None:
     _write_dummy_file(scores_root / ArtifactFile.SCORING_MANIFEST)
     cells = iter_score_cells(tmp_path)
     assert len(cells) == 1
-    assert cells[0].stage == ExperimentStage.NBAIOT_MAIN
+    assert cells[0].cell.stage == ExperimentStage.NBAIOT_MAIN
     assert cells[0].seed == 0
 
 
@@ -101,7 +101,7 @@ def test_iter_score_cells_with_alpha(tmp_path: Path) -> None:
     _write_dummy_file(scores_root / ArtifactFile.SCORING_MANIFEST)
     cells = iter_score_cells(tmp_path)
     assert len(cells) == 1
-    assert cells[0].stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
+    assert cells[0].cell.stage == ExperimentStage.NBAIOT_FULL_OPTIONAL
     assert cells[0].seed == 1
 
 

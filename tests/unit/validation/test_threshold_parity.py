@@ -10,9 +10,9 @@ import numpy as np
 import pytest
 
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import MetricName, ScoringStage, ThresholdPolicy
+from datp.core.enums import ScoringStage, ThresholdPolicy
 from datp.data.datasets.nbaiot.spec import DEVICE_FAMILY_MAP
-from datp.thresholding.thresholds import _DeriveInput, derive_threshold
+from datp.thresholding.derivation import ThresholdDerivation, derive_threshold
 from datp.validation import results
 
 _REAL_DEVICES = list(DEVICE_FAMILY_MAP.keys())
@@ -61,17 +61,15 @@ def test_load_score_arrays_thresholds_match_derive_threshold(
         cast(
             results.RunContext,
             SimpleNamespace(
-                score_root=Path("scores"),
-                policy=policy,
-                metrics={MetricName.TAU_GLOBAL: tau_global},
-                seed=0,
-                run_id="run",
+                paths=SimpleNamespace(score_root=Path("scores")),
+                identity=SimpleNamespace(policy=policy, seed=0, run_id="run"),
+                metrics=SimpleNamespace(tau_global=tau_global),
             ),
         ),
         cfg,
     )
     canonical_result = derive_threshold(
-        _DeriveInput(
+        ThresholdDerivation(
             policy=policy,
             client_errors=cal_errors,
             n_min=cfg.threshold.n_min,
@@ -98,4 +96,4 @@ def test_load_score_arrays_thresholds_match_derive_threshold(
     ):
         assert actual.client_id == expected.client_id
         assert actual.threshold == pytest.approx(expected.threshold, abs=1e-12)
-        assert actual.calibration_pending == expected.calibration_pending
+        assert actual.status is expected.status

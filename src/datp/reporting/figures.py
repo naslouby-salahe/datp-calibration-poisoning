@@ -1,26 +1,33 @@
-"""Matplotlib figure generators for paper figures 1–4."""
-
 from __future__ import annotations
 
+from datp.types import (
+    ClientId,
+    FalsePositiveRate,
+    NarrativeText,
+    RandomSeed,
+    RecordKey,
+    ScoreValue,
+    ScoreVector,
+    SignedCount,
+    Threshold,
+)
+
+
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal, Protocol, cast
 
 import matplotlib
 import numpy as np
+from numpy.typing import NDArray
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from datp.config.models import StyleConfig
-from datp.core.enums import ThresholdPolicy
-from datp.reporting.constants import (
-    FIGURE1_STEM,
-    FIGURE2_STEM,
-    FIGURE3_STEM,
-    FIGURE4_STEM,
-    FIGURE5_STEM,
-    FIGURE6_STEM,
-    NBAIOT_DEVICE_SHORT_LABELS,
-)
+from datp.core.enums import NBaIoTDevice, ThresholdPolicy
+from datp.reporting.constants import NBAIOT_DEVICE_SHORT_LABELS
+from datp.reporting.enums import FigureFileStem
 
 plt.rcParams.update(
     {
@@ -40,25 +47,59 @@ plt.rcParams.update(
 _FONT_SIZE_KEY = "font.size"
 
 
-def _save_figs(fig: plt.Figure, base_path: Path, dpi: int) -> Path:
-    fig.savefig(base_path.with_suffix(".png"), dpi=dpi, bbox_inches="tight")
-    fig.savefig(base_path.with_suffix(".pdf"), bbox_inches="tight")
+class _Patch(Protocol):
+    def set_facecolor(self, color: str) -> None: ...
+    def set_alpha(self, alpha: float) -> None: ...
+
+
+class _BoxplotOutput(Protocol):
+    def __getitem__(self, key: Literal["boxes"]) -> list[_Patch]: ...
+
+
+class _Axes(Protocol):
+    def bar(self, x: NDArray[np.generic], height: Sequence[float], width: float, *, label: str, color: str) -> None: ...
+    def set(self, **kwargs: str) -> None: ...
+    def set_xticks(self, ticks: NDArray[np.generic], labels: Sequence[str] | None = None) -> None: ...
+    def set_xticklabels(self, labels: Sequence[str], **kwargs: str | float | int) -> None: ...
+    def legend(self, **kwargs: str | float | int) -> None: ...
+    def plot(self, x: NDArray[np.generic], y: NDArray[np.generic], **kwargs: str | float | int) -> None: ...
+    def axvline(self, x: float, **kwargs: str | float | int) -> None: ...
+    def boxplot(self, data: Sequence[NDArray[np.generic]], **kwargs: bool | Sequence[str]) -> _BoxplotOutput: ...
+    def tick_params(self, *, axis: str, **kwargs: str | float | int) -> None: ...
+    def fill_between(self, x: NDArray[np.generic], y1: NDArray[np.generic], y2: NDArray[np.generic], **kwargs: str | float | int) -> None: ...
+    def errorbar(self, x: Sequence[float], y: Sequence[float], **kwargs: str | float | int | Sequence[Sequence[float]]) -> None: ...
+    def axhline(self, y: float, **kwargs: str | float | int) -> None: ...
+    def scatter(self, x: NDArray[np.generic], y: NDArray[np.generic], **kwargs: str | float | int) -> None: ...
+    def hlines(self, y: float, xmin: float, xmax: float, **kwargs: str | float | int) -> None: ...
+
+
+class _Figure(Protocol):
+    def savefig(
+        self, fname: Path, *, dpi: int | None = None, bbox_inches: str | None = None
+    ) -> None: ...
+    def tight_layout(self) -> None: ...
+
+
+def _save_figs(fig: plt.Figure, base_path: Path, dpi: SignedCount) -> Path:
+    figure = cast(_Figure, fig)
+    figure.savefig(base_path.with_suffix(".png"), dpi=dpi, bbox_inches="tight")
+    figure.savefig(base_path.with_suffix(".pdf"), bbox_inches="tight")
     plt.close(fig)
     return base_path.with_suffix(".png")
 
 
 def generate_figure1(
-    per_device_fpr_global: dict[str, float],
-    per_device_fpr_local: dict[str, float],
+    per_device_fpr_global: dict[ClientId, FalsePositiveRate],
+    per_device_fpr_local: dict[ClientId, FalsePositiveRate],
     output_dir: Path,
-    seed: int,
+    seed: RandomSeed,
     style: StyleConfig,
 ) -> Path:
-    """Generate a grouped bar chart of per-device FPR under GLOBAL vs LOCAL thresholds (Figure 1)."""
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size
     devices = sorted(per_device_fpr_global.keys())
     x, width = np.arange(len(devices)), 0.35
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
+    ax = cast(_Axes, ax)
 
     for offset, data, pol in [
         (-width / 2, per_device_fpr_global, ThresholdPolicy.GLOBAL_THRESHOLD),
@@ -75,7 +116,7 @@ def generate_figure1(
     ax.set(xlabel="Device", ylabel="FPR")
     ax.set_xticks(x)
     ax.set_xticklabels(
-        [NBAIOT_DEVICE_SHORT_LABELS.get(d, d.replace("_", " ")) for d in devices],
+        [NBAIOT_DEVICE_SHORT_LABELS[NBaIoTDevice(d)] for d in devices],
         rotation=45,
         ha="right",
         fontsize=style.font_size - 1,
@@ -83,19 +124,19 @@ def generate_figure1(
     ax.legend()
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / f"{FIGURE1_STEM}{seed}", style.dpi)
+    return _save_figs(fig, output_dir / f"{FigureFileStem.FIGURE_1}{seed}", style.dpi)
 
 
 def generate_figure2(
-    cal_errors: dict[str, np.ndarray],
-    tau_global: float,
-    device_ids: list[str],
+    cal_errors: dict[ClientId, ScoreVector],
+    tau_global: Threshold,
+    device_ids: list[ClientId],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    """Generate per-device eCDF plots of calibration errors with global threshold (Figure 2)."""
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
+    ax = cast(_Axes, ax)
     all_vals = np.concatenate([cal_errors[d] for d in device_ids if d in cal_errors])
     x_clip = float(np.percentile(all_vals, 99))
 
@@ -108,7 +149,7 @@ def generate_figure2(
         ax.plot(
             errors[mask],
             ecdf_y[mask],
-            label=NBAIOT_DEVICE_SHORT_LABELS.get(dev_id, dev_id.replace("_", " ")),
+            label=NBAIOT_DEVICE_SHORT_LABELS[NBaIoTDevice(dev_id)],
             linewidth=1.4,
         )
 
@@ -123,17 +164,17 @@ def generate_figure2(
     ax.legend(fontsize=style.font_size - 1)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FIGURE2_STEM, style.dpi)
+    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_2, style.dpi)
 
 
 def generate_figure3(
-    fpr_by_policy: dict[ThresholdPolicy, list[np.ndarray]],
+    fpr_by_policy: dict[ThresholdPolicy, list[ScoreVector]],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    """Generate a boxplot comparing per-client FPR distributions across policies (Figure 3)."""
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size
     fig, ax = plt.subplots(figsize=style.figsize_single_col)
+    ax = cast(_Axes, ax)
     policies = sorted(fpr_by_policy.keys())
 
     bp = ax.boxplot(
@@ -151,75 +192,30 @@ def generate_figure3(
     ax.tick_params(axis="x", labelrotation=30)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FIGURE3_STEM, style.dpi)
-
-
-def generate_figure4(
-    cv_fpr_by_policy: dict[ThresholdPolicy, dict[str, list[float]]],
-    output_dir: Path,
-    style: StyleConfig,
-) -> Path:
-    """Generate a line plot of CV(FPR) vs Dirichlet alpha across policies (Figure 4)."""
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
-    policies = sorted(cv_fpr_by_policy.keys())
-    all_alpha_keys = sorted({a for b in policies for a in cv_fpr_by_policy[b]})
-    fig, ax = plt.subplots(figsize=style.figsize_double_col)
-
-    for b in policies:
-        alpha_map = cv_fpr_by_policy[b]
-        alpha_order = [a for a in all_alpha_keys if a in alpha_map]
-        x = np.arange(len(alpha_order), dtype=np.float64)
-        means_arr = np.array([float(np.mean(alpha_map[a])) for a in alpha_order])
-        stds_arr = np.array(
-            [
-                float(np.std(alpha_map[a], ddof=1)) if len(alpha_map[a]) > 1 else 0.0
-                for a in alpha_order
-            ]
-        )
-        color = style.policy_colors[b]
-
-        ax.plot(
-            x,
-            means_arr,
-            marker="o",
-            markersize=3,
-            color=color,
-            label=style.policy_labels[b],
-        )
-        ax.fill_between(
-            x, means_arr - stds_arr, means_arr + stds_arr, color=color, alpha=0.2
-        )
-
-    ax.set_xticks(np.arange(len(all_alpha_keys)), all_alpha_keys)
-    ax.set(
-        xlabel=r"Dirichlet $\alpha$ / IID reference",
-        ylabel="CV(FPR)",
-        title="CV(FPR) comparison",
-    )
-    ax.legend(fontsize=style.font_size - 1)
-    fig.tight_layout()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FIGURE4_STEM, style.dpi)
+    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_3, style.dpi)
 
 
 def generate_figure5(
-    client_effects: dict[str, dict[ThresholdPolicy, dict[str, list[float]]]],
+    client_effects: dict[NarrativeText, dict[ThresholdPolicy, dict[ClientId, list[ScoreValue]]]],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    """Generate per-victim effect plots: seed mean with min-max seed range, one panel per objective (Figure 5)."""
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size
     panels = list(client_effects)
     fig, axes = plt.subplots(
         1, len(panels), figsize=style.figsize_double_col, squeeze=False
     )
-    for ax, label in zip(axes[0], panels):
+    for raw_ax, label in zip(axes[0], panels):
+        ax = cast(_Axes, raw_ax)
         by_policy = client_effects[label]
         victims = sorted({v for per in by_policy.values() for v in per})
         policies = sorted(by_policy)
         width = 0.8 / max(len(policies), 1)
         for i, pol in enumerate(policies):
-            xs, means, lows, highs = [], [], [], []
+            xs: list[ScoreValue] = []
+            means: list[ScoreValue] = []
+            lows: list[ScoreValue] = []
+            highs: list[ScoreValue] = []
             for j, v in enumerate(victims):
                 vals = by_policy[pol].get(v)
                 if not vals:
@@ -242,31 +238,31 @@ def generate_figure5(
         ax.axhline(0.0, color="black", linewidth=0.6)
         ax.set_xticks(np.arange(len(victims)))
         ax.set_xticklabels(
-            [NBAIOT_DEVICE_SHORT_LABELS.get(v, v.replace("_", " ")) for v in victims],
+            [NBAIOT_DEVICE_SHORT_LABELS[NBaIoTDevice(v)] for v in victims],
             rotation=60,
             ha="right",
             fontsize=style.font_size - 2,
         )
         ax.set(ylabel=label)
-    axes[0][0].legend(fontsize=style.font_size - 2)
+    cast(_Axes, axes[0][0]).legend(fontsize=style.font_size - 2)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FIGURE5_STEM, style.dpi)
+    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_5, style.dpi)
 
 
 def generate_figure6(
-    seed_effects: dict[str, dict[ThresholdPolicy, list[float]]],
+    seed_effects: dict[RecordKey, dict[ThresholdPolicy, list[ScoreValue]]],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    """Generate seed-level distribution plots of victim-averaged effects, one panel per metric (Figure 6)."""
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size
     panels = list(seed_effects)
     fig, axes = plt.subplots(
         1, len(panels), figsize=style.figsize_double_col, squeeze=False
     )
     rng = np.random.default_rng(0)
-    for ax, label in zip(axes[0], panels):
+    for raw_ax, label in zip(axes[0], panels):
+        ax = cast(_Axes, raw_ax)
         by_policy = seed_effects[label]
         policies = sorted(by_policy)
         for i, pol in enumerate(policies):
@@ -292,4 +288,4 @@ def generate_figure6(
         ax.set(ylabel=label)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FIGURE6_STEM, style.dpi)
+    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_6, style.dpi)

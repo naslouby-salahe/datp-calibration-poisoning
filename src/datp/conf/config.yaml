@@ -15,7 +15,7 @@ dataset:
   n_min: 100
   cap: 50000
   attack_reserve_fraction: 0.2
-  nbaiot_balanced_test: false
+  nbaiot_test_balance: natural_distribution
 
 machine:
   batch_size_train: 256

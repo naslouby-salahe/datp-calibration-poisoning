@@ -25,8 +25,9 @@ from datp.testsupport.checkpoint_protocol import build_fake_checkpoint_metrics
 from datp.thresholding.eligibility import (
     compute_client_thresholds,
     compute_tau_global,
+    identify_eligible,
 )
-from datp.thresholding.thresholds import _DeriveInput, derive_threshold
+from datp.thresholding.derivation import ThresholdDerivation, derive_threshold
 
 
 def _client_data() -> dict[str, ClientData]:
@@ -62,7 +63,7 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
 
     for checkpoint_round in (25, 50):
         ckpt_path = (
-            layout.checkpoint_dir_for_round(cell, checkpoint_round)
+            layout.checkpoint_dir(cell, checkpoint_round)
             / ArtifactFile.MODEL_CHECKPOINT
         )
         ckpt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -70,7 +71,7 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
         score_clients(
             model=model,
             client_data=client_data,
-            score_base=layout.score_cell_for_round(cell, checkpoint_round).score_dir,
+            score_base=layout.score_cell(cell, checkpoint_round).score_dir,
             stage=ExperimentStage.NBAIOT_MAIN,
             seed=0,
             dataset=DatasetID.NBAIOT,
@@ -79,15 +80,16 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
             scoring_batch_size=8,
         )
 
-    provider = ScoreProvider(layout.score_cell_for_round(cell, 25).score_dir)
+    provider = ScoreProvider(layout.score_cell(cell, 25).score_dir)
     client_errors = {
         client_id: provider.load(client_id, stage=ScoringStage.CAL)
         for client_id in ("c1", "c2")
     }
-    client_taus = compute_client_thresholds(client_errors, ["c1", "c2"], q=95)
+    eligibility = identify_eligible(client_errors, n_min=1)
+    client_taus = compute_client_thresholds(client_errors, eligibility, q=95)
     tau_global = compute_tau_global(client_taus)
     global_thresholds = derive_threshold(
-        _DeriveInput(
+        ThresholdDerivation(
             policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             client_errors=client_errors,
             n_min=1,
@@ -98,7 +100,7 @@ def test_checkpoint_scoring_evaluation_summary_and_status(tmp_path: Path) -> Non
         )
     )
     local_thresholds = derive_threshold(
-        _DeriveInput(
+        ThresholdDerivation(
             policy=ThresholdPolicy.LOCAL_THRESHOLD,
             client_errors=client_errors,
             n_min=1,

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
+from datp.core.enums import ProvenanceSentinel
 from datp.core.provenance import (
-    MISSING_MANIFEST_HASH,
     array_hash,
     git_commit,
     hash_file,
@@ -190,5 +190,5 @@ class TestProvenanceConstants:
 
     def test_missing_manifest_hash_is_sentinel_string(self) -> None:
         """Ensure MISSING_MANIFEST_HASH is the correct string sentinel."""
-        assert isinstance(MISSING_MANIFEST_HASH, str)
-        assert "MISSING" in MISSING_MANIFEST_HASH
+        assert isinstance(ProvenanceSentinel.MISSING_MANIFEST_HASH, str)
+        assert "MISSING" in ProvenanceSentinel.MISSING_MANIFEST_HASH

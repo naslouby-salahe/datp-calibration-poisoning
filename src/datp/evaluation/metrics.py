@@ -1,6 +1,23 @@
-"""Binary classification metrics, dispersion stats, and client-level evaluation records."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClassificationScore,
+    ClientCount,
+    ClientId,
+    FalseNegativeRate,
+    FalsePositiveRate,
+    NarrativeText,
+    RandomSeed,
+    Ratio,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    SignedCount,
+    Threshold,
+    TrueNegativeRate,
+    TruePositiveRate,
+)
+
 
 import json
 import math
@@ -16,6 +33,7 @@ from datp.artifacts.names import ArtifactDir
 from datp.config.models import ExperimentStage
 from datp.core.enums import ConfusionKey, PayloadKey, ThresholdPolicy
 from datp.core.identity import PolicyRunId, TrainingCellId
+from datp.core.enums import ClientStatus
 from datp.core.types import ClientThreshold
 from datp.data.catalog import DatasetID, dataset_for_stage
 from datp.scoring.loading import ScoreProvider
@@ -24,181 +42,87 @@ from datp.statistics.aggregates import compute_fpr_fleet_stats, cv, iqr
 
 @dataclass(frozen=True, slots=True)
 class ConfusionCounts:
-    """Confusion matrix counts (tp, fp, tn, fn) for binary classifier evaluation."""
 
-    tp: int
-    fp: int
-    tn: int
-    fn: int
+    tp: SampleCount
+    fp: SampleCount
+    tn: SampleCount
+    fn: SampleCount
 
 
 @dataclass(frozen=True, slots=True)
 class BinaryMetrics:
-    """Aggregated binary classification metrics derived from a confusion matrix."""
 
-    fpr: float
-    tpr: float
-    tnr: float
-    fnr: float
-    balanced_accuracy: float
-    precision: float
-    recall: float
-    macro_f1: float
+    fpr: FalsePositiveRate
+    tpr: TruePositiveRate
+    tnr: TrueNegativeRate
+    fnr: FalseNegativeRate
+    balanced_accuracy: ClassificationScore
+    precision: ClassificationScore
+    recall: ClassificationScore
+    macro_f1: ClassificationScore
 
 
 @dataclass(frozen=True, slots=True)
 class BinaryRankingMetrics:
-    """Ranking-based metrics (AUROC, PR-AUC) for binary classification scores."""
 
-    auroc: float | None
-    pr_auc: float | None
+    auroc: ClassificationScore | None
+    pr_auc: ClassificationScore | None
 
 
 @dataclass(frozen=True, slots=True)
 class ClientEvaluationRecord:
-    """Per-client evaluation record: binary metrics, confusion counts, and threshold info."""
 
-    client_id: str
+    client_id: ClientId
     metrics: BinaryMetrics
     confusion: ConfusionCounts
-    n_benign: int
-    n_attack: int
+    n_benign: SampleCount
+    n_attack: SampleCount
     threshold: ClientThreshold
     evaluation_incomplete: bool
 
 
 @dataclass(frozen=True, slots=True)
 class DispersionMetrics:
-    """Fleet-level dispersion statistics (CV, IQR, min/max gaps) across eligible clients."""
 
-    cv_fpr: float
-    mean_fpr: float
-    std_fpr: float
-    iqr_fpr: float
-    cv_tpr: float
-    iqr_tpr: float
-    max_min_fpr_gap: float
-    worst_client_fpr: float
-    worst_client_id: str | None
-    eligible_count: int
-    client_count: int
-    worst_ba: float
-    p10_macro_f1: float
+    cv_fpr: FalsePositiveRate
+    mean_fpr: FalsePositiveRate
+    std_fpr: FalsePositiveRate
+    iqr_fpr: FalsePositiveRate
+    cv_tpr: TruePositiveRate
+    iqr_tpr: TruePositiveRate
+    max_min_fpr_gap: FalsePositiveRate
+    worst_client_fpr: FalsePositiveRate
+    worst_client_id: ClientId | None
+    eligible_count: ClientCount
+    client_count: ClientCount
+    worst_ba: ScoreValue
+    p10_macro_f1: ClassificationScore
 
 
 @dataclass(frozen=True, slots=True)
 class PerAttackFamilyTPR:
-    """Per-attack-family true positive rate for a single client."""
 
-    client_id: str
-    attack_label: str
-    family: str | None
-    detected_count: int
-    denominator: int
-    tpr: float
+    client_id: ClientId
+    attack_label: NarrativeText
+    family: NarrativeText | None
+    detected_count: SampleCount
+    denominator: SignedCount
+    tpr: TruePositiveRate
 
 
 @dataclass(frozen=True, slots=True)
 class EvaluationResult:
-    """Top-level evaluation result for a policy run: per-client records and fleet dispersion."""
 
     run: PolicyRunId
     dataset: DatasetID
     clients: tuple[ClientEvaluationRecord, ...]
-    eligible_ids: tuple[str, ...]
-    pending_ids: tuple[str, ...]
-    incomplete_ids: tuple[str, ...]
-    coverage_ratio: float
+    eligible_ids: tuple[ClientId, ...]
+    pending_ids: tuple[ClientId, ...]
+    incomplete_ids: tuple[ClientId, ...]
+    coverage_ratio: Ratio
     dispersion: DispersionMetrics
 
-    @property
-    def policy(self) -> ThresholdPolicy:
-        """The threshold policy for this evaluation run."""
-        return self.run.policy
-
-    @property
-    def stage(self) -> ExperimentStage:
-        """The experiment stage for this evaluation run."""
-        return self.run.stage
-
-    @property
-    def seed(self) -> int:
-        """The random seed for this evaluation run."""
-        return self.run.seed
-
-    @property
-    def cv_fpr(self) -> float:
-        """Coefficient of variation of FPR across eligible clients."""
-        return self.dispersion.cv_fpr
-
-    @property
-    def mean_fpr(self) -> float:
-        """Mean FPR across eligible clients."""
-        return self.dispersion.mean_fpr
-
-    @property
-    def std_fpr(self) -> float:
-        """Standard deviation of FPR across eligible clients."""
-        return self.dispersion.std_fpr
-
-    @property
-    def cv_tpr(self) -> float:
-        """Coefficient of variation of TPR across eligible clients."""
-        return self.dispersion.cv_tpr
-
-    @property
-    def iqr_fpr(self) -> float:
-        """Interquartile range of FPR across eligible clients."""
-        return self.dispersion.iqr_fpr
-
-    @property
-    def iqr_tpr(self) -> float:
-        """Interquartile range of TPR across eligible clients."""
-        return self.dispersion.iqr_tpr
-
-    @property
-    def max_min_fpr_gap(self) -> float:
-        """Maximum minus minimum FPR gap across eligible clients."""
-        return self.dispersion.max_min_fpr_gap
-
-    @property
-    def worst_client_fpr(self) -> float:
-        """FPR of the worst-performing eligible client."""
-        return self.dispersion.worst_client_fpr
-
-    @property
-    def worst_client_id(self) -> str | None:
-        """ID of the worst-performing eligible client, or None if none exist."""
-        return self.dispersion.worst_client_id
-
-    @property
-    def eligible_count(self) -> int:
-        """Number of eligible clients included in dispersion statistics."""
-        return self.dispersion.eligible_count
-
-    @property
-    def client_count(self) -> int:
-        """Total number of clients in the evaluation run."""
-        return self.dispersion.client_count
-
-    @property
-    def worst_ba(self) -> float:
-        """Minimum balanced accuracy across complete eligible clients."""
-        return self.dispersion.worst_ba
-
-    @property
-    def p10_macro_f1(self) -> float:
-        """10th percentile of macro F1 across complete eligible clients."""
-        return self.dispersion.p10_macro_f1
-
-    @property
-    def eval_incomplete_ids(self) -> tuple[str, ...]:
-        """IDs of clients with incomplete evaluation (zero attack samples)."""
-        return self.incomplete_ids
-
-
-def recompute_binary_metrics(tp: int, fp: int, tn: int, fn: int) -> BinaryMetrics:
-    """Compute binary classification metrics directly from confusion matrix counts."""
+def recompute_binary_metrics(tp: SampleCount, fp: SampleCount, tn: SampleCount, fn: SampleCount) -> BinaryMetrics:
     n_benign, n_attack = fp + tn, tp + fn
     fpr = fp / n_benign if n_benign else math.nan
     tpr = tp / n_attack if n_attack else math.nan
@@ -219,9 +143,8 @@ def recompute_binary_metrics(tp: int, fp: int, tn: int, fn: int) -> BinaryMetric
 
 
 def compute_binary_ranking_metrics(
-    benign_scores: np.ndarray, attack_scores: np.ndarray
+    benign_scores: ScoreVector | None, attack_scores: ScoreVector | None
 ) -> BinaryRankingMetrics:
-    """Compute AUROC and PR-AUC from benign and attack score arrays."""
     if (
         benign_scores is None
         or attack_scores is None
@@ -238,12 +161,11 @@ def compute_binary_ranking_metrics(
 
 
 def compute_client_record(
-    client_id: str,
-    scores_benign: np.ndarray,
-    scores_attack: np.ndarray,
+    client_id: ClientId,
+    scores_benign: ScoreVector,
+    scores_attack: ScoreVector,
     client_threshold: ClientThreshold,
 ) -> ClientEvaluationRecord:
-    """Build a single client's evaluation record from scores and threshold."""
     benign, attack = (
         np.asarray(scores_benign, dtype=np.float64),
         np.asarray(scores_attack, dtype=np.float64),
@@ -265,10 +187,9 @@ def compute_client_record(
 
 def aggregate_dispersion(
     clients: tuple[ClientEvaluationRecord, ...],
-    eligible_ids: tuple[str, ...],
-    incomplete_ids: tuple[str, ...],
+    eligible_ids: tuple[ClientId, ...],
+    incomplete_ids: tuple[ClientId, ...],
 ) -> DispersionMetrics:
-    """Aggregate fleet-level dispersion metrics across eligible and complete clients."""
     eligible_set = set(eligible_ids)
     incomplete_set = set(incomplete_ids)
 
@@ -333,13 +254,12 @@ def build_evaluation_result(
     *,
     policy: ThresholdPolicy,
     stage: ExperimentStage,
-    seed: int,
+    seed: RandomSeed,
     clients: tuple[ClientEvaluationRecord, ...],
-    eligible_ids: tuple[str, ...],
-    pending_ids: tuple[str, ...],
-    incomplete_ids: tuple[str, ...] | None,
+    eligible_ids: tuple[ClientId, ...],
+    pending_ids: tuple[ClientId, ...],
+    incomplete_ids: tuple[ClientId, ...] | None,
 ) -> EvaluationResult:
-    """Construct and validate an EvaluationResult from per-client records and eligibility sets."""
     if not clients:
         raise ValueError(
             "[evaluation.metrics] clients are empty. Expected: at least one client. Got: empty tuple."
@@ -348,17 +268,17 @@ def build_evaluation_result(
     client_ids = [cr.client_id for cr in clients]
     if len(client_ids) != len(set(client_ids)):
         raise ValueError(
-            f"[evaluation.metrics] Duplicate client metrics. Expected: unique client_id. Got: {str(client_ids)}."
+            f"[evaluation.metrics] Duplicate client metrics. Expected: unique client_id. Got: {client_ids}."
         )
 
     if unknown := (set(eligible_ids) | set(pending_ids)) - set(client_ids):
         raise ValueError(
-            f"[evaluation.metrics] Eligibility references unknown clients. Expected: IDs present in clients. Got: {str(sorted(unknown))}."
+            f"[evaluation.metrics] Eligibility references unknown clients. Expected: IDs present in clients. Got: {sorted(unknown)}."
         )
 
     if overlap := set(eligible_ids) & set(pending_ids):
         raise ValueError(
-            f"[evaluation.metrics] Client has mixed eligibility status. Expected: disjoint IDs. Got: {str(sorted(overlap))}."
+            f"[evaluation.metrics] Client has mixed eligibility status. Expected: disjoint IDs. Got: {sorted(overlap)}."
         )
 
     incomplete = () if incomplete_ids is None else incomplete_ids
@@ -378,11 +298,10 @@ def evaluate_policy_run(
     client_thresholds: Sequence[ClientThreshold],
     score_root: Path,
     stage: ExperimentStage,
-    seed: int,
+    seed: RandomSeed,
     *,
     score_provider: ScoreProvider | None,
 ) -> EvaluationResult:
-    """Evaluate a full policy run by computing per-client records and aggregating results."""
     if not client_thresholds:
         raise ValueError(
             "[evaluation.metrics] client_thresholds is empty. Expected: at least one entry. Got: empty list."
@@ -400,12 +319,15 @@ def evaluate_policy_run(
         )
 
     provider = score_provider or ScoreProvider(score_root)
-    clients, eligible, pending, incomplete = [], [], [], []
+    clients: list[ClientEvaluationRecord] = []
+    eligible: list[ClientId] = []
+    pending: list[ClientId] = []
+    incomplete: list[ClientId] = []
 
     for ct in client_thresholds:
         sb, sa = provider.load_test_scores(ct.client_id)
         clients.append(compute_client_record(ct.client_id, sb, sa, ct))
-        (pending if ct.calibration_pending else eligible).append(ct.client_id)
+        (pending if ct.status is ClientStatus.CALIBRATION_PENDING else eligible).append(ct.client_id)
         if sa.size == 0:
             incomplete.append(ct.client_id)
 
@@ -420,34 +342,31 @@ def evaluate_policy_run(
     )
 
 
-def compute_fpr(benign_errors: np.ndarray, threshold: float) -> float:
-    """Return the false positive rate for benign errors at the given threshold."""
+def compute_fpr(benign_errors: ScoreVector, threshold: Threshold) -> FalsePositiveRate:
     return float(np.mean(benign_errors > threshold)) if benign_errors.size else 0.0
 
 
-def compute_empirical_coverage(test_benign: np.ndarray, threshold: float) -> float:
-    """Return the empirical coverage of benign scores at or below the threshold."""
+def compute_empirical_coverage(test_benign: ScoreVector, threshold: Threshold) -> Ratio:
     return float(np.mean(test_benign <= threshold)) if test_benign.size else 0.0
 
 
 def compute_per_attack_tpr(
-    client_id: str,
-    attack_scores: np.ndarray,
-    attack_labels: np.ndarray,
-    threshold: float,
-    family_fn: Callable[[str], str | None],
+    client_id: ClientId,
+    attack_scores: ScoreVector,
+    attack_labels: ScoreVector,
+    threshold: Threshold,
+    family_fn: Callable[[NarrativeText], NarrativeText | None],
 ) -> list[PerAttackFamilyTPR]:
-    """Compute per-attack-family true positive rates for a single client."""
     scores, labels = (
         np.asarray(attack_scores, dtype=np.float64),
         np.asarray(attack_labels, dtype=object),
     )
     if scores.shape[0] != labels.shape[0]:
         raise ValueError(
-            f"[evaluation.metrics] mismatch. Expected: {str(scores.shape[0])}. Got: {str(labels.shape[0])}."
+            f"[evaluation.metrics] mismatch. Expected: {scores.shape[0]}. Got: {labels.shape[0]}."
         )
 
-    res = []
+    res: list[PerAttackFamilyTPR] = []
     for lbl in np.unique(labels):
         mask = labels == lbl
         detected = int(np.sum(scores[mask] > threshold))
@@ -466,28 +385,27 @@ def compute_per_attack_tpr(
 
 
 def save_confusion_matrices(eval_result: EvaluationResult, base_dir: Path) -> Path:
-    """Save confusion matrices from an evaluation result as a JSON artifact."""
     out_path = (
         Path(base_dir)
         / ArtifactDir.CONFUSION_MATRICES
-        / str(eval_result.stage)
-        / f"{eval_result.policy}_seed{eval_result.seed}.json"
+        / eval_result.run.stage
+        / f"{eval_result.run.policy}_seed{eval_result.run.seed}.json"
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     payload = {
-        PayloadKey.POLICY: eval_result.policy.value,
-        PayloadKey.STAGE: eval_result.stage.value,
-        PayloadKey.SEED: eval_result.seed,
+        PayloadKey.POLICY: eval_result.run.policy,
+        PayloadKey.STAGE: eval_result.run.stage,
+        PayloadKey.SEED: eval_result.run.seed,
         PayloadKey.COVERAGE_RATIO: eval_result.coverage_ratio,
         PayloadKey.PER_CLIENT: [
             {
                 PayloadKey.CLIENT_ID: cr.client_id,
                 PayloadKey.CONFUSION_MATRIX: {
-                    ConfusionKey.TP.value: cr.confusion.tp,
-                    ConfusionKey.FP.value: cr.confusion.fp,
-                    ConfusionKey.TN.value: cr.confusion.tn,
-                    ConfusionKey.FN.value: cr.confusion.fn,
+                    ConfusionKey.TP: cr.confusion.tp,
+                    ConfusionKey.FP: cr.confusion.fp,
+                    ConfusionKey.TN: cr.confusion.tn,
+                    ConfusionKey.FN: cr.confusion.fn,
                 },
                 PayloadKey.N_BENIGN: cr.n_benign,
                 PayloadKey.N_ATTACK: cr.n_attack,

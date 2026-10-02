@@ -1,15 +1,21 @@
-"""Shared experiment models: sweep steps, pipeline requests, and contingency records."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    SampleCount,
+    SignedCount,
+    RoundIndex,
+    ScoreValue,
+    ScoreVector,
+    Threshold,
+)
+
 
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
-
-import numpy as np
-from pydantic import BaseModel, ConfigDict
 
 from datp.config.models import DatpConfig
 from datp.core.enums import ThresholdPolicy
@@ -21,7 +27,6 @@ if TYPE_CHECKING:
 
 
 class SweepStep(enum.StrEnum):
-    """Sweep pipeline steps from matrix building through completion."""
 
     BUILD_MATRIX = "build_matrix"
     VALIDATE_MATRIX = "validate_matrix"
@@ -37,55 +42,41 @@ class SweepStep(enum.StrEnum):
     SWEEP_COMPLETE = "sweep_complete"
 
 
-class ContingencyDecision(enum.StrEnum):
-    """Contingency outcomes: go or fall back to contingency path."""
-
-    GO = "go"
-    CONTINGENCY = "contingency"
-
-
 class PolicyRunStatus(enum.StrEnum):
-    """Policy run status: done, skipped, or failed."""
 
     DONE = "done"
     SKIPPED = "skipped"
     FAILED = "failed"
 
 
+@dataclass(slots=True)
+class SweepResult:
+
+    total: SampleCount = 0
+    completed: SignedCount = 0
+    skipped: SignedCount = 0
+    failed: SignedCount = 0
+
+
 @dataclass(frozen=True, slots=True)
 class PipelineRequest:
-    """Immutable request carrying training cell key, policy, config, and directory paths."""
 
     key: TrainingCellId
     policy: ThresholdPolicy
     cfg: DatpConfig
     base_dir: Path
     prepared_dir: Path
-    checkpoint_round: int | None
+    checkpoint_round: RoundIndex | None
 
 
 @dataclass(slots=True)
 class SharedPipelineContext:
-    """Mutable shared context holding per-cell calibration data, eligibility, and score provider."""
 
     key: TrainingCellId
-    client_errors: dict[str, np.ndarray]
-    eligible: list[str]
-    pending: list[str]
-    client_taus: ClientThresholdsCollection | Mapping[str, float]
-    tau_global: float
+    client_errors: dict[ClientId, ScoreVector]
+    eligible: tuple[ClientId, ...]
+    pending: tuple[ClientId, ...]
+    client_taus: ClientThresholdsCollection | Mapping[ClientId, ScoreValue]
+    tau_global: Threshold
     score_provider: ScoreProvider
-    checkpoint_round: int | None
-
-
-class ContingencyRecord(BaseModel):
-    """Frozen record of a contingency decision with CV-FPR deltas and rationale."""
-
-    model_config = ConfigDict(frozen=True)
-    decision: ContingencyDecision
-    cv_fpr_global: float
-    cv_fpr_local: float
-    delta_cv_fpr: float
-    dispersion_threshold: float
-    rationale: str
-    is_preliminary_diagnostic: bool = True
+    checkpoint_round: RoundIndex | None

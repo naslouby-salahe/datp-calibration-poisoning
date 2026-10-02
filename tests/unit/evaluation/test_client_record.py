@@ -1,7 +1,7 @@
 """Unit tests for per-client evaluation record construction."""
 
 from __future__ import annotations
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 
 import math
 
@@ -16,7 +16,7 @@ def _ct(threshold: float = 0.5) -> ClientThreshold:
     return ClientThreshold(
         client_id="test",
         threshold=threshold,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
 

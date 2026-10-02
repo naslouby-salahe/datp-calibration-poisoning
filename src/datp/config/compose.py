@@ -1,10 +1,16 @@
-"""Hydra configuration composition, validation, and serialization for stage/policy/seed triplets."""
-
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from datp.types import (
+    JsonValue,
+    NarrativeText,
+    RandomSeed,
+)
 
+
+from pathlib import Path
+from enum import StrEnum
+
+import datp.conf as hydra_config_package
 from hydra import compose as hydra_compose
 from hydra import initialize_config_module
 from hydra.core.global_hydra import GlobalHydra
@@ -15,45 +21,51 @@ from datp.artifacts.names import ArtifactFile
 from datp.config.models import DatpConfig, ExperimentStage, StrictModel
 from datp.core.enums import CONTROLLED_POLICIES, ThresholdPolicy
 
-_CONFIG_MODULE = "datp.conf"
+_CONFIG_MODULE = hydra_config_package.__name__
 _CONFIG_NAME = "config"
 
 
+class ComposeRequestField(StrEnum):
+
+    STAGE = "stage"
+    POLICY = "policy"
+    SEED = "seed"
+
+
 class ComposeError(Exception):
-    """Error raised when config composition fails."""
+    pass
 
 
 class ComposeRequest(StrictModel):
-    """Validated request to compose a DatpConfig for a stage/policy/seed triplet."""
 
     stage: ExperimentStage
     policy: ThresholdPolicy
-    seed: int
+    seed: RandomSeed
 
     @model_validator(mode="before")
     @classmethod
-    def preprocess(cls, data: Any) -> Any:
-        """Lowercase stage and policy string values before validation."""
+    def preprocess(cls, data: JsonValue) -> JsonValue:
         if isinstance(data, dict):
             return {
-                k: v.lower() if isinstance(v, str) and k in ("stage", "policy") else v
+                k: v.lower()
+                if isinstance(v, str)
+                and k in (ComposeRequestField.STAGE, ComposeRequestField.POLICY)
+                else v
                 for k, v in data.items()
             }
         return data
 
     @model_validator(mode="after")
     def validate_scientific_constraints(self) -> "ComposeRequest":
-        """Validate that the policy is in the controlled set for the stage."""
         if self.policy not in frozenset(CONTROLLED_POLICIES):
-            allowed = sorted(p.value for p in CONTROLLED_POLICIES)
+            allowed = sorted(p for p in CONTROLLED_POLICIES)
             raise ValueError(
-                f"{self.policy.value} invalid for {self.stage.value}. Expected: {allowed}."
+                f"{self.policy} invalid for {self.stage}. Expected: {allowed}."
             )
         return self
 
 
-def _compose_hydra_config(*, overrides: list[str]) -> DictConfig:
-    """Compose a Hydra DictConfig with the given overrides."""
+def _compose_hydra_config(*, overrides: list[NarrativeText]) -> DictConfig:
     GlobalHydra.instance().clear()
     with initialize_config_module(config_module=_CONFIG_MODULE, version_base=None):
         return hydra_compose(
@@ -62,7 +74,6 @@ def _compose_hydra_config(*, overrides: list[str]) -> DictConfig:
 
 
 def _validate_resolved_config(cfg: DictConfig) -> DatpConfig:
-    """Resolve a Hydra DictConfig and validate against the DatpConfig model."""
     resolved = OmegaConf.to_container(cfg, resolve=True, enum_to_str=True)
     if not isinstance(resolved, dict):
         raise ComposeError(
@@ -75,28 +86,30 @@ def _validate_resolved_config(cfg: DictConfig) -> DatpConfig:
 
 
 def compose_config(
-    *, stage: ExperimentStage | str, policy: ThresholdPolicy | str, seed: int
+    *, stage: ExperimentStage, policy: ThresholdPolicy, seed: RandomSeed
 ) -> DatpConfig:
-    """Compose and validate a full DatpConfig for a stage/policy/seed triplet."""
     try:
         req = ComposeRequest.model_validate(
-            {"stage": stage, "policy": policy, "seed": seed}
+            {
+                ComposeRequestField.STAGE: stage,
+                ComposeRequestField.POLICY: policy,
+                ComposeRequestField.SEED: seed,
+            }
         )
     except ValidationError as exc:
         err_msg = exc.errors()[0].get("msg", str(exc))
         raise ComposeError(f"[config] Validation Error: {err_msg}") from exc
 
     overrides = [
-        f"stage={req.stage.value}",
-        f"policy={req.policy.value}",
+        f"stage={req.stage}",
+        f"policy={req.policy}",
         f"seed={req.seed}",
     ]
     cfg = _compose_hydra_config(overrides=overrides)
     return _validate_resolved_config(cfg)
 
 
-def resolved_config_yaml(cfg: DatpConfig | DictConfig) -> str:
-    """Serialize a resolved config to a YAML string."""
+def resolved_config_yaml(cfg: DatpConfig | DictConfig) -> NarrativeText:
     payload = (
         OmegaConf.create(cfg.model_dump(mode="json"))
         if isinstance(cfg, DatpConfig)
@@ -106,7 +119,6 @@ def resolved_config_yaml(cfg: DatpConfig | DictConfig) -> str:
 
 
 def write_resolved_config(cfg: DatpConfig | DictConfig, output_dir: Path) -> Path:
-    """Write the resolved config as YAML to the output directory."""
     output_dir.mkdir(parents=True, exist_ok=True)
     dest = output_dir / ArtifactFile.RESOLVED_CONFIG
     dest.write_text(resolved_config_yaml(cfg))
@@ -117,5 +129,4 @@ BASE_CONFIG: DatpConfig = _validate_resolved_config(_compose_hydra_config(overri
 
 
 def compose_analysis_config() -> DatpConfig:
-    """Return the base config for analysis purposes."""
     return BASE_CONFIG

@@ -1,6 +1,10 @@
-"""Stacked autoencoder with configurable activation, batch norm, and bottleneck."""
-
 from __future__ import annotations
+
+from datp.types import (
+    FeatureCount,
+    SignedCount,
+)
+
 
 import torch
 import torch.nn as nn
@@ -18,16 +22,14 @@ _ACTIVATION_CLASSES: dict[Activation, type[nn.Module]] = {
 
 
 class Autoencoder(nn.Module):
-    """Symmetric stacked autoencoder with a configurable bottleneck dimension."""
 
     def __init__(
         self,
-        input_dim: int,
-        hidden_dims: list[int],
+        input_dim: FeatureCount,
+        hidden_dims: list[SignedCount],
         activation: Activation,
         use_bn: bool,
     ) -> None:
-        """Initialize encoder and decoder stacks with the given architecture hyperparameters."""
         super().__init__()
         if not hidden_dims:
             raise ValueError("hidden_dims must be non-empty")
@@ -35,9 +37,9 @@ class Autoencoder(nn.Module):
             raise ValueError(f"Unknown activation: {activation!r}")
 
         act_cls = _ACTIVATION_CLASSES[activation]
-        dims = [input_dim, *hidden_dims]
+        dims: list[int] = [input_dim, *hidden_dims]
 
-        enc = []
+        enc: list[nn.Module] = []
         for i in range(len(dims) - 1):
             enc.extend(
                 [nn.Linear(dims[i], dims[i + 1])]
@@ -46,7 +48,7 @@ class Autoencoder(nn.Module):
             )
         self.encoder = nn.Sequential(*enc)
 
-        dec = []
+        dec: list[nn.Module] = []
         dec_dims = dims[::-1]
         for i in range(len(dec_dims) - 1):
             dec.append(nn.Linear(dec_dims[i], dec_dims[i + 1]))
@@ -56,39 +58,17 @@ class Autoencoder(nn.Module):
                 dec.append(act_cls())
         self.decoder = nn.Sequential(*dec)
 
-        self._bottleneck_dim = hidden_dims[-1]
-
-    @property
-    def bottleneck_dim(self) -> int:
-        """Dimensionality of the latent bottleneck."""
-        return self._bottleneck_dim
-
-    def encode(self, x: torch.Tensor) -> torch.Tensor:
-        """Project input through the encoder to the bottleneck representation."""
-        return self.encoder(x)
-
-    def decode(self, z: torch.Tensor) -> torch.Tensor:
-        """Reconstruct input from a bottleneck representation."""
-        return self.decoder(z)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Full encode-decode pass returning the reconstruction."""
-        return self.decode(self.encode(x))
+        return self.decoder(self.encoder(x))
 
     def reconstruction_error(self, x: torch.Tensor) -> torch.Tensor:
-        """Per-sample MSE between input and reconstruction.
-
-        Returns a 1-D tensor of shape ``(batch_size,)``.
-        """
         return ((x - self.forward(x)) ** 2).mean(dim=1)
 
     def reconstruction_loss(self, x: torch.Tensor) -> torch.Tensor:
-        """Scalar MSE loss between input and its reconstruction."""
         return F.mse_loss(self.forward(x), x)
 
 
 def validate_model_on_cuda(model: nn.Module) -> None:
-    """Raise if any model parameter is not on a CUDA device."""
     for name, param in model.named_parameters():
         if not param.is_cuda:
             raise RuntimeError(

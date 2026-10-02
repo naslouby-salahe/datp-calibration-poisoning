@@ -9,6 +9,7 @@ from datp.attacks.constants import THRESHOLD_QUANTILE
 from datp.attacks.injection.injector import inject_fixed_budget
 from datp.attacks.reservoirs.reservoir import build_reservoir
 from datp.attacks.score_containers import build_score_collection
+from datp.attacks.types import PoisonedCalibrationSet
 from datp.attacks.threshold_recomputation.threshold_recompute import (
     compute_global_pair,
     compute_local_pair,
@@ -17,7 +18,7 @@ from datp.attacks.enums import PoisoningSourceStrategy
 from datp.core.enums import ThresholdPolicy
 from datp.core.seeds import SeedRecord, make_seed_rng
 from datp.core.seeds import SeedPair
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     make_standard_score_set,
 )
@@ -29,7 +30,7 @@ def _make_collection_and_pois_cal(victim_idx: int = 0, fraction: float = 0.40) -
     raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
     col = build_score_collection(raw)
 
-    eligible_ids = list(col.eligible_ids)
+    eligible_ids = list(col.eligibility.eligible_ids)
     victim_id = eligible_ids[victim_idx]
     victim_cal = col.clients[victim_id].cal
 
@@ -56,7 +57,7 @@ def _make_collection_and_pois_cal(victim_idx: int = 0, fraction: float = 0.40) -
         else:
             poisoned_cal[cid] = col.clients[cid].cal
 
-    return col, poisoned_cal, victim_id
+    return col, PoisonedCalibrationSet.from_mapping(poisoned_cal), victim_id
 
 
 class TestGlobalThresholdPair:
@@ -84,8 +85,8 @@ class TestGlobalThresholdPair:
     def test_eligible_ids_in_result(self) -> None:
         col, pois_cal, _ = _make_collection_and_pois_cal()
         pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        assert set(pair.thresholds_clean.keys()) == set(col.eligible_ids)
-        assert set(pair.thresholds_pois.keys()) == set(col.eligible_ids)
+        assert set(pair.thresholds_clean.keys()) == set(col.eligibility.eligible_ids)
+        assert set(pair.thresholds_pois.keys()) == set(col.eligibility.eligible_ids)
 
     def test_clean_reproducible(self) -> None:
         col, pois_cal, _ = _make_collection_and_pois_cal()
@@ -99,7 +100,9 @@ class TestGlobalThresholdPair:
         raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
         col = build_score_collection(raw)
 
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = PoisonedCalibrationSet.from_mapping(
+            {cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids}
+        )
         pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
         assert pair.tau_global_pois == pytest.approx(pair.tau_global_clean)
 
@@ -117,7 +120,7 @@ class TestLocalThresholdPair:
         col, pois_cal, victim_id = _make_collection_and_pois_cal(victim_idx=0)
         tau_g = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean
         pair = compute_local_pair(col, pois_cal, THRESHOLD_QUANTILE, tau_g)
-        for cid in col.eligible_ids:
+        for cid in col.eligibility.eligible_ids:
             if cid != victim_id:
                 assert pair.thresholds_clean[cid] == pytest.approx(
                     pair.thresholds_pois[cid]
@@ -134,17 +137,19 @@ class TestLocalThresholdPair:
         col, pois_cal, _ = _make_collection_and_pois_cal()
         tau_g = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean
         pair = compute_local_pair(col, pois_cal, THRESHOLD_QUANTILE, tau_g)
-        assert set(pair.thresholds_clean.keys()) == set(col.eligible_ids)
-        assert set(pair.thresholds_pois.keys()) == set(col.eligible_ids)
+        assert set(pair.thresholds_clean.keys()) == set(col.eligibility.eligible_ids)
+        assert set(pair.thresholds_pois.keys()) == set(col.eligibility.eligible_ids)
 
     def test_f0_pair_equals_clean(self) -> None:
         ss = make_standard_score_set(StandardScoreSetRequest(n_eligible=3, n_pending=1))
         raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
         col = build_score_collection(raw)
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligible_ids}
+        pois_cal = PoisonedCalibrationSet.from_mapping(
+            {cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids}
+        )
         tau_g = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE).tau_global_clean
         pair = compute_local_pair(col, pois_cal, THRESHOLD_QUANTILE, tau_g)
-        for cid in col.eligible_ids:
+        for cid in col.eligibility.eligible_ids:
             assert pair.thresholds_clean[cid] == pytest.approx(
                 pair.thresholds_pois[cid]
             )
@@ -156,6 +161,6 @@ class TestNoPendingMutation:
     def test_pending_not_in_threshold_dicts(self) -> None:
         col, pois_cal, _ = _make_collection_and_pois_cal()
         pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
-        for pid in col.pending_ids:
+        for pid in col.eligibility.pending_ids:
             assert pid not in pair.thresholds_clean
             assert pid not in pair.thresholds_pois

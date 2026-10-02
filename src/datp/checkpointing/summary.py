@@ -1,6 +1,22 @@
-"""Checkpoint metric aggregation summaries and primary-round selection."""
-
 from __future__ import annotations
+
+from datp.types import (
+    BootstrapCount,
+    ClassificationScore,
+    FalsePositiveRate,
+    PoisonFraction,
+    RandomSeed,
+    Ratio,
+    SeedCount,
+    RoundIndex,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    SignedCount,
+    SignedDelta,
+    TruePositiveRate,
+)
+
 
 import math
 from collections.abc import Iterable
@@ -16,7 +32,6 @@ from datp.checkpointing.constants import (
     FPR_DELTA_ADVANTAGE_MIN,
 )
 from datp.checkpointing.enums import (
-    CheckpointSelectionVerdict,
     PrimaryCheckpointSelectionRule,
 )
 from datp.config.models import ExperimentStage
@@ -32,69 +47,67 @@ _MODULE = "checkpointing.summary"
 
 @dataclass(frozen=True, slots=True)
 class CheckpointPolicySummary:
-    """Aggregated metrics summary for one policy at one checkpoint round."""
 
     stage: ExperimentStage
     policy: ThresholdPolicy
-    checkpoint_round: int
-    seed_count: int
-    mean_fpr: float
-    cv_fpr: float
-    worst_client_fpr: float
-    mean_tpr: float
-    cv_tpr: float
-    worst_client_tpr: float
-    macro_f1: float
-    p10_macro_f1: float
-    worst_client_balanced_accuracy: float
-    coverage_ratio: float
-    collapse_cell_count: int
+    checkpoint_round: RoundIndex
+    seed_count: SeedCount
+    mean_fpr: FalsePositiveRate
+    cv_fpr: FalsePositiveRate
+    worst_client_fpr: FalsePositiveRate
+    mean_tpr: TruePositiveRate
+    cv_tpr: TruePositiveRate
+    worst_client_tpr: TruePositiveRate
+    macro_f1: ClassificationScore
+    p10_macro_f1: ClassificationScore
+    worst_client_balanced_accuracy: ClassificationScore
+    coverage_ratio: Ratio
+    collapse_cell_count: SampleCount
 
 
 @dataclass(frozen=True, slots=True)
 class CheckpointPrimaryTrainingComparison:
-    """Statistical comparison of GLOBAL vs LOCAL threshold at one round."""
 
-    checkpoint_round: int
-    cv_fpr_deltas: tuple[float, ...]
-    worst_client_fpr_deltas: tuple[float, ...]
+    checkpoint_round: RoundIndex
+    cv_fpr_deltas: tuple[SignedDelta, ...]
+    worst_client_fpr_deltas: tuple[SignedDelta, ...]
     cv_fpr_bca95: BootstrapResult
-    cv_fpr_sign_consistency: float
-    worst_fpr_sign_consistency: float
+    cv_fpr_sign_consistency: FalsePositiveRate
+    worst_fpr_sign_consistency: FalsePositiveRate
     wilcoxon: WilcoxonResult
     cliffs_delta: CliffsDeltaResult
 
 
 @dataclass(frozen=True, slots=True)
 class GlobalCheckpointSelection:
-    """Result of global primary checkpoint selection with all supporting evidence."""
 
-    selected_round: int
-    verdict: CheckpointSelectionVerdict
+    selected_round: RoundIndex
     stage: ExperimentStage
     rule: PrimaryCheckpointSelectionRule
     comparisons: tuple[CheckpointPrimaryTrainingComparison, ...]
     summaries: tuple[CheckpointPolicySummary, ...]
 
 
-def _aggregate_fpr_stats(items: list[SweepMetrics]) -> tuple[float, float, float]:
-    """Aggregate mean FPR, CV FPR, and worst-client FPR across seeds."""
-    mean_fpr = _mean(m.mean_fpr for m in items)
+def _aggregate_fpr_stats(items: list[SweepMetrics]) -> tuple[FalsePositiveRate, FalsePositiveRate, FalsePositiveRate]:
+    mean_fprs: list[FalsePositiveRate] = []
+    for metric in items:
+        if metric.mean_fpr is None:
+            raise ValueError(f"Missing mean_fpr in {metric.run_id}")
+        mean_fprs.append(metric.mean_fpr)
+    mean_fpr = _mean(mean_fprs)
     cv_fpr = _mean(m.cv_fpr for m in items)
     worst_client_fpr = _max(m.worst_client_fpr for m in items)
     return mean_fpr, cv_fpr, worst_client_fpr
 
 
-def _aggregate_tpr_stats(items: list[SweepMetrics]) -> tuple[float, float, float]:
-    """Aggregate mean TPR, CV TPR, and worst-client TPR across seeds."""
+def _aggregate_tpr_stats(items: list[SweepMetrics]) -> tuple[TruePositiveRate, TruePositiveRate, TruePositiveRate]:
     mean_tpr = _mean(_mean_client_tpr(m) for m in items)
     cv_tpr = _mean(m.cv_tpr for m in items)
     worst_client_tpr = _min(_worst_client_tpr(m) for m in items)
     return mean_tpr, cv_tpr, worst_client_tpr
 
 
-def _require_round(item: SweepMetrics) -> int:
-    """Extract checkpoint_round from metrics, raising if None."""
+def _require_round(item: SweepMetrics) -> RoundIndex:
     if item.checkpoint_round is None:
         raise ValueError(
             f"[{_MODULE}] Metric lacks checkpoint_round. Expected: int. Got: {item.run_id}."
@@ -105,10 +118,9 @@ def _require_round(item: SweepMetrics) -> int:
 def _build_policy_summary(
     stage: ExperimentStage,
     policy: ThresholdPolicy,
-    checkpoint_round: int,
+    checkpoint_round: RoundIndex,
     items: list[SweepMetrics],
 ) -> CheckpointPolicySummary:
-    """Aggregate all metrics for a policy-round combination into a summary."""
     mean_fpr, cv_fpr, worst_client_fpr = _aggregate_fpr_stats(items)
     mean_tpr, cv_tpr, worst_client_tpr = _aggregate_tpr_stats(items)
     return CheckpointPolicySummary(
@@ -133,8 +145,7 @@ def _build_policy_summary(
 def summarize_checkpoint_metrics(
     metrics: tuple[SweepMetrics, ...],
 ) -> tuple[CheckpointPolicySummary, ...]:
-    """Group and summarize metrics by stage, policy, and checkpoint round."""
-    grouped: dict[tuple[ExperimentStage, ThresholdPolicy, int], list[SweepMetrics]] = {}
+    grouped: dict[tuple[ExperimentStage, ThresholdPolicy, SignedCount], list[SweepMetrics]] = {}
     for item in metrics:
         grouped.setdefault((item.stage, item.policy, _require_round(item)), []).append(
             item
@@ -148,10 +159,9 @@ def summarize_checkpoint_metrics(
 
 def _eligible_rounds(
     comparisons: tuple[CheckpointPrimaryTrainingComparison, ...],
-    local_by_round: dict[int, CheckpointPolicySummary],
-) -> list[int]:
-    """Filter comparison rounds to those with positive FPR advantage and sufficient coverage."""
-    rounds: list[int] = []
+    local_by_round: dict[RoundIndex, CheckpointPolicySummary],
+) -> list[RoundIndex]:
+    rounds: list[RoundIndex] = []
     for comparison in comparisons:
         local_summary = local_by_round.get(comparison.checkpoint_round)
         if local_summary is None:
@@ -167,7 +177,6 @@ def _eligible_rounds(
 
 
 def _validate_primary_training_metrics(metrics: tuple[SweepMetrics, ...]) -> None:
-    """Ensure all supplied metrics are from the NBAIOT_MAIN stage."""
     if not metrics:
         raise ValueError(
             f"[{_MODULE}] No checkpoint metrics supplied. Expected: primary training metrics. Got: empty."
@@ -181,10 +190,9 @@ def _validate_primary_training_metrics(metrics: tuple[SweepMetrics, ...]) -> Non
 def select_global_primary_checkpoint(
     *,
     metrics: tuple[SweepMetrics, ...],
-    n_bootstrap: int,
-    bootstrap_seed: int,
+    n_bootstrap: BootstrapCount,
+    bootstrap_seed: RandomSeed,
 ) -> GlobalCheckpointSelection:
-    """Select the primary global checkpoint by lower-tail tradeoff from NBAIOT_MAIN comparisons."""
     _validate_primary_training_metrics(metrics)
     summaries = summarize_checkpoint_metrics(metrics)
     local_by_round = {
@@ -208,7 +216,6 @@ def select_global_primary_checkpoint(
     )
     return GlobalCheckpointSelection(
         selected_round=selected,
-        verdict=CheckpointSelectionVerdict.SELECTED,
         stage=ExperimentStage.NBAIOT_MAIN,
         rule=PrimaryCheckpointSelectionRule.GLOBAL_LOWER_TAIL_TRADEOFF_FROM_NBAIOT_MAIN,
         comparisons=comparisons,
@@ -216,30 +223,17 @@ def select_global_primary_checkpoint(
     )
 
 
-def summaries_for_global_primary_checkpoint(
-    summaries: tuple[CheckpointPolicySummary, ...],
-    selection: GlobalCheckpointSelection,
-) -> tuple[CheckpointPolicySummary, ...]:
-    """Filter summaries to only the selected checkpoint round."""
-    return tuple(
-        summary
-        for summary in summaries
-        if summary.checkpoint_round == selection.selected_round
-    )
-
-
 def _build_round_comparison(
-    checkpoint_round: int,
-    global_seeds: dict[int, SweepMetrics],
-    local_seeds: dict[int, SweepMetrics],
-    n_bootstrap: int,
-    bootstrap_seed: int,
+    checkpoint_round: RoundIndex,
+    global_seeds: dict[RandomSeed, SweepMetrics],
+    local_seeds: dict[RandomSeed, SweepMetrics],
+    n_bootstrap: BootstrapCount,
+    bootstrap_seed: RandomSeed,
 ) -> CheckpointPrimaryTrainingComparison:
-    """Build a statistical comparison between GLOBAL and LOCAL FPR at one round."""
     seeds = tuple(sorted(set(global_seeds) & set(local_seeds)))
     if len(seeds) < BCA_MIN_PAIRED_SEEDS:
         raise ValueError(
-            f"[{_MODULE}] BCa checkpoint selection needs at least {BCA_MIN_PAIRED_SEEDS} paired seeds. Expected: >={BCA_MIN_PAIRED_SEEDS}. Got: {str(len(seeds))}."
+            f"[{_MODULE}] BCa checkpoint selection needs at least {BCA_MIN_PAIRED_SEEDS} paired seeds. Expected: >={BCA_MIN_PAIRED_SEEDS}. Got: {len(seeds)}."
         )
     cv_deltas = tuple(
         global_seeds[seed].cv_fpr - local_seeds[seed].cv_fpr for seed in seeds
@@ -272,11 +266,12 @@ def _build_round_comparison(
 def _primary_training_comparisons(
     *,
     metrics: tuple[SweepMetrics, ...],
-    n_bootstrap: int,
-    bootstrap_seed: int,
+    n_bootstrap: BootstrapCount,
+    bootstrap_seed: RandomSeed,
 ) -> tuple[CheckpointPrimaryTrainingComparison, ...]:
-    """Build paired comparisons across all rounds where both policies are present."""
-    grouped: dict[int, dict[ThresholdPolicy, dict[int, SweepMetrics]]] = {}
+    grouped: dict[
+        RoundIndex, dict[ThresholdPolicy, dict[RandomSeed, SweepMetrics]]
+    ] = {}
     for metric in metrics:
         policy_map = grouped.setdefault(_require_round(metric), {})
         seed_map = policy_map.setdefault(metric.policy, {})
@@ -297,13 +292,11 @@ def _primary_training_comparisons(
     return tuple(comparisons)
 
 
-def _lower_tail_tradeoff(summary: CheckpointPolicySummary) -> float:
-    """Return the minimum of p10 macro F1 and worst-client balanced accuracy."""
+def _lower_tail_tradeoff(summary: CheckpointPolicySummary) -> ScoreValue:
     return min(summary.p10_macro_f1, summary.worst_client_balanced_accuracy)
 
 
-def _collapse_cell_count(metric: SweepMetrics) -> int:
-    """Count clients below BA or TPR collapse thresholds, excluding calibration-pending."""
+def _collapse_cell_count(metric: SweepMetrics) -> SampleCount:
     count = 0
     for detail in metric.per_client:
         if detail.calibration_pending:
@@ -316,22 +309,19 @@ def _collapse_cell_count(metric: SweepMetrics) -> int:
     return count
 
 
-def _mean_client_tpr(metric: SweepMetrics) -> float:
-    """Mean TPR across non-calibration-pending clients."""
+def _mean_client_tpr(metric: SweepMetrics) -> TruePositiveRate:
     return _mean(
         detail.tpr for detail in metric.per_client if not detail.calibration_pending
     )
 
 
-def _worst_client_tpr(metric: SweepMetrics) -> float:
-    """Minimum TPR across non-calibration-pending clients."""
+def _worst_client_tpr(metric: SweepMetrics) -> TruePositiveRate:
     return _min(
         detail.tpr for detail in metric.per_client if not detail.calibration_pending
     )
 
 
-def _mean_client_macro_f1(metric: SweepMetrics) -> float:
-    """Mean macro F1 across non-calibration-pending clients."""
+def _mean_client_macro_f1(metric: SweepMetrics) -> ClassificationScore:
     return _mean(
         detail.macro_f1
         for detail in metric.per_client
@@ -339,32 +329,27 @@ def _mean_client_macro_f1(metric: SweepMetrics) -> float:
     )
 
 
-def _positive_fraction(values: tuple[float, ...]) -> float:
-    """Fraction of values strictly above FPR_DELTA_ADVANTAGE_MIN."""
+def _positive_fraction(values: tuple[ScoreValue, ...]) -> PoisonFraction:
     if not values:
         return math.nan
     return sum(value > FPR_DELTA_ADVANTAGE_MIN for value in values) / len(values)
 
 
-def _mean(values: Iterable[float]) -> float:
-    """Mean of finite float values, NaN if empty."""
+def _mean(values: Iterable[ScoreValue]) -> ScoreValue:
     arr = _finite_array(values)
     return float(np.mean(arr)) if arr.size else math.nan
 
 
-def _min(values: Iterable[float]) -> float:
-    """Minimum of finite float values, NaN if empty."""
+def _min(values: Iterable[ScoreValue]) -> ScoreValue:
     arr = _finite_array(values)
     return float(np.min(arr)) if arr.size else math.nan
 
 
-def _max(values: Iterable[float]) -> float:
-    """Maximum of finite float values, NaN if empty."""
+def _max(values: Iterable[ScoreValue]) -> ScoreValue:
     arr = _finite_array(values)
     return float(np.max(arr)) if arr.size else math.nan
 
 
-def _finite_array(values: Iterable[float]) -> np.ndarray:
-    """Convert an iterable of floats to a numpy array, dropping non-finite values."""
+def _finite_array(values: Iterable[ScoreValue]) -> ScoreVector:
     arr = np.array(tuple(values), dtype=np.float64)
     return arr[np.isfinite(arr)]

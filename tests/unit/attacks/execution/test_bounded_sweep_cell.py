@@ -14,7 +14,7 @@ from datp.attacks.planning.bounded_sweep_matrix import SweepCellSpec
 from datp.attacks.score_containers import build_score_collection
 from datp.core.enums import ThresholdPolicy
 from datp.core.seeds import SeedPair
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     make_standard_score_set,
 )
@@ -61,7 +61,7 @@ def test_run_sweep_cell_zero_fraction_gives_zero_delta():
     """Verify that running a sweep cell with fraction=0.0 produces a delta_tau of exactly 0.0."""
     col = _make_collection()
     mu_flag = lock_mu_flag_threshold(col)
-    victim_id = col.eligible_ids[0]
+    victim_id = col.eligibility.eligible_ids[0]
     spec = _make_spec(
         victim_id=victim_id,
         policy=ThresholdPolicy.GLOBAL_THRESHOLD,
@@ -81,7 +81,7 @@ def test_run_sweep_cell_high_source_raises_threshold():
     """Verify that high-score poisoning raises the local threshold (positive delta_tau)."""
     col = _make_collection()
     mu_flag = lock_mu_flag_threshold(col)
-    victim_id = col.eligible_ids[0]
+    victim_id = col.eligibility.eligible_ids[0]
     spec = _make_spec(
         victim_id=victim_id,
         policy=ThresholdPolicy.LOCAL_THRESHOLD,
@@ -100,7 +100,7 @@ def test_run_sweep_cell_high_source_raises_threshold():
 def test_run_sweep_cell_uses_passed_mu_flag_not_recomputed():
     """Verify that the sweep cell execution uses the provided mu_flag_threshold configuration directly."""
     col = _make_collection()
-    victim_id = col.eligible_ids[0]
+    victim_id = col.eligibility.eligible_ids[0]
     real_mu = lock_mu_flag_threshold(col)
     sentinel_mu = real_mu + 999.0
     spec = _make_spec(

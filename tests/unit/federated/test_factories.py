@@ -23,6 +23,7 @@ def _make_cfg() -> MagicMock:
     cfg.model.lr = 0.01
     cfg.federation.local_epochs = 1
     cfg.machine.batch_size_train = 8
+    cfg.machine.require_cuda = False
     return cfg
 
 
@@ -161,6 +162,22 @@ class TestMakeClientFn:
 
         fn(_make_context(0))
         fn(_make_context(1))
+
+    def test_required_cuda_validates_client_model(self) -> None:
+        cfg = _make_cfg()
+        cfg.machine.require_cuda = True
+        client_data = _make_client_data()
+        with patch("datp.federated.factories.validate_model_on_cuda") as validate:
+            make_client_fn(
+                client_data,
+                ClientFactoryConfig(
+                    client_ids=sorted(client_data),
+                    cfg=cfg,
+                    device=torch.device(DeviceType.CPU),
+                ),
+            )(_make_context(0))
+
+        validate.assert_called_once()
 
 
 class TestMakeClientFnPreparedDir:

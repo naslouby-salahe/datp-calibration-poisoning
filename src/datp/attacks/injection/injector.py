@@ -1,8 +1,15 @@
-"""Fixed-budget calibration-value injection into victim calibration arrays."""
-
 from __future__ import annotations
 
+from datp.types import (
+    PoisonFraction,
+    SampleCount,
+    ScoreVector,
+    SignedCount,
+)
+
+
 from dataclasses import dataclass
+from math import floor
 
 import numpy as np
 
@@ -12,24 +19,22 @@ from datp.attacks.reservoirs.reservoir import ReservoirResult, build_reservoir
 
 @dataclass(frozen=True, slots=True)
 class InjectionResult:
-    """Result of a fixed-budget calibration injection: poisoned array and replacement metadata."""
 
-    poisoned_cal: np.ndarray
-    n_replaced: int
-    n_total: int
-    fraction: float
-    positions_replaced: np.ndarray
+    poisoned_cal: ScoreVector
+    n_replaced: SampleCount
+    n_total: SampleCount
+    fraction: PoisonFraction
+    positions_replaced: ScoreVector
 
 
 def inject_fixed_budget(
     *,
-    clean_cal: np.ndarray,
+    clean_cal: ScoreVector,
     reservoir: ReservoirResult,
-    fraction: float,
+    fraction: PoisonFraction,
     rng: np.random.Generator,
     draw: ReservoirDraw = ReservoirDraw.WITH_REPLACEMENT,
 ) -> InjectionResult:
-    """Replace a random fraction of calibration values with reservoir draws."""
     if not 0.0 <= fraction <= 1.0:
         raise ValueError(f"fraction must be in [0, 1]; got {fraction}")
 
@@ -56,9 +61,8 @@ def inject_fixed_budget(
 
 
 def _draw_values(
-    pool: np.ndarray, m: int, rng: np.random.Generator, draw: ReservoirDraw
-) -> np.ndarray:
-    """Draw m injected values from a pool under the given draw mode."""
+    pool: ScoreVector, m: SignedCount, rng: np.random.Generator, draw: ReservoirDraw
+) -> ScoreVector:
     match draw:
         case ReservoirDraw.WITH_REPLACEMENT:
             return rng.choice(pool, size=m, replace=True)
@@ -79,14 +83,13 @@ def _draw_values(
             raise ValueError(f"Unsupported draw mode: {draw}")
 
 
-def disjoint_budget(n: int, requested: int, tail_mass: float, source: PoisoningSourceStrategy) -> int:
-    """Return the largest budget not above the request whose disjoint source pool can supply it."""
+def disjoint_budget(n: SampleCount, requested: SignedCount, tail_mass: PoisonFraction, source: PoisoningSourceStrategy) -> SignedCount:
     for m in range(requested, 0, -1):
         source_size = n - m
         pool = (
             source_size
             if source == PoisoningSourceStrategy.RANDOM_BENIGN
-            else max(1, int(tail_mass * source_size))
+            else max(1, floor(tail_mass * source_size))
         )
         if pool >= m:
             return m
@@ -95,13 +98,12 @@ def disjoint_budget(n: int, requested: int, tail_mass: float, source: PoisoningS
 
 def inject_disjoint_reservoir(
     *,
-    clean_cal: np.ndarray,
+    clean_cal: ScoreVector,
     source: PoisoningSourceStrategy,
-    tail_mass: float,
-    fraction: float,
+    tail_mass: PoisonFraction,
+    fraction: PoisonFraction,
     rng: np.random.Generator,
 ) -> tuple[InjectionResult, ReservoirResult]:
-    """Replace entries using a reservoir built only from entries that are not replaced."""
     n = len(clean_cal)
     if fraction <= 0.0:
         return InjectionResult(

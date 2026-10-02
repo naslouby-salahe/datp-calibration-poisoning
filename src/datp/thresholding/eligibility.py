@@ -1,18 +1,25 @@
-"""Eligibility partitioning and threshold-result assembly."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    Quantile,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    Threshold,
+)
+
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
 
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 from datp.core.identity import PolicyRunId
 from datp.core.types import (
     ClientThreshold,
     ClusterMetadata,
-    ThresholdMetadata,
     ThresholdResult,
 )
 from datp.thresholding.thresholds import (
@@ -23,148 +30,101 @@ from datp.thresholding.thresholds import (
 
 @dataclass(frozen=True, slots=True)
 class EligibilityResult:
-    """Partition result: clients that meet the calibration minimum vs those that do not."""
 
-    eligible_ids: tuple[str, ...]
-    pending_ids: tuple[str, ...]
-
-    def __iter__(self):
-        """Yield (eligible_ids, pending_ids) as lists."""
-        yield list(self.eligible_ids)
-        yield list(self.pending_ids)
+    eligible_ids: tuple[ClientId, ...]
+    pending_ids: tuple[ClientId, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ClientCalibrationErrors:
-    """A single client's calibration error array, identified by client ID."""
 
-    client_id: str
-    errors: np.ndarray
+    client_id: ClientId
+    errors: ScoreVector
 
     def __post_init__(self) -> None:
-        """Ensure errors is stored as a numpy array."""
         object.__setattr__(self, "errors", np.array(self.errors, copy=False))
 
 
 @dataclass(frozen=True, slots=True)
 class CalibrationErrorSet:
-    """Immutable collection of per-client calibration error arrays with lookup helpers."""
 
     clients: tuple[ClientCalibrationErrors, ...]
 
     @classmethod
     def from_mapping(
         cls,
-        client_errors: Mapping[str, np.ndarray],
+        client_errors: Mapping[ClientId, ScoreVector],
     ) -> "CalibrationErrorSet":
-        """Construct a CalibrationErrorSet from a mapping of client IDs to error arrays."""
         return cls(
             clients=tuple(
-                ClientCalibrationErrors(client_id=cid, errors=errors)
+                ClientCalibrationErrors(client_id=ClientId(cid), errors=errors)
                 for cid, errors in client_errors.items()
             )
         )
 
-    def for_client(self, client_id: str) -> ClientCalibrationErrors:
-        """Return the ClientCalibrationErrors for the given client ID, or raise KeyError."""
+    def for_client(self, client_id: ClientId) -> ClientCalibrationErrors:
         for client in self.clients:
             if client.client_id == client_id:
                 return client
         raise KeyError(client_id)
 
-    @property
-    def client_ids(self) -> tuple[str, ...]:
-        """All client IDs in this error set."""
-        return tuple(client.client_id for client in self.clients)
-
-
 @dataclass(frozen=True, slots=True)
-class ClientThresholdsCollection:
-    """Immutable collection of per-client thresholds with dict-like access and iteration."""
+class ClientThresholdsCollection(Mapping[ClientId, float]):
 
     entries: tuple[ClientThreshold, ...]
 
     @classmethod
     def from_mapping(
         cls,
-        thresholds: Mapping[str, float],
+        thresholds: Mapping[ClientId, Threshold],
         strategy: ThresholdPolicy,
     ) -> "ClientThresholdsCollection":
-        """Construct a ClientThresholdsCollection from a mapping of client IDs to threshold values."""
         return cls(
             entries=tuple(
                 ClientThreshold(
-                    client_id=cid,
+                    client_id=ClientId(cid),
                     threshold=tau,
-                    calibration_pending=False,
+                    status=ClientStatus.ELIGIBLE,
                     strategy=strategy,
                 )
                 for cid, tau in thresholds.items()
             )
         )
 
-    def for_client(self, client_id: str) -> ClientThreshold:
-        """Return the ClientThreshold for the given client ID, or raise KeyError."""
-        for entry in self.entries:
-            if entry.client_id == client_id:
-                return entry
-        raise KeyError(client_id)
-
     @property
-    def tau_values(self) -> tuple[float, ...]:
-        """All threshold values in this collection."""
+    def tau_values(self) -> tuple[Threshold, ...]:
         return tuple(entry.threshold for entry in self.entries)
 
     @property
-    def client_ids(self) -> tuple[str, ...]:
-        """All client IDs in this threshold collection."""
+    def client_ids(self) -> tuple[ClientId, ...]:
         return tuple(entry.client_id for entry in self.entries)
 
-    def __bool__(self) -> bool:
-        """Return True if the collection is non-empty."""
-        return bool(self.entries)
-
     def __len__(self) -> int:
-        """Return the number of threshold entries."""
         return len(self.entries)
 
     def __eq__(self, other: object) -> bool:
-        """Compare by (client_id, threshold) pairs."""
         if isinstance(other, Mapping):
-            return dict(self.items()) == dict(other.items())
+            return dict(self.items()) == other
         return super().__eq__(other)
 
-    def __getitem__(self, client_id: str) -> float:
-        """Return the threshold value for a client, or raise KeyError."""
-        return self.for_client(client_id).threshold
+    def __getitem__(self, client_id: ClientId) -> ScoreValue:
+        for entry in self.entries:
+            if entry.client_id == client_id:
+                return entry.threshold
+        raise KeyError(client_id)
 
     def __iter__(self):
-        """Yield all client IDs."""
         return iter(self.client_ids)
-
-    def items(self):
-        """Yield (client_id, threshold) pairs."""
-        for entry in self.entries:
-            yield entry.client_id, entry.threshold
-
-    def keys(self):
-        """Yield all client IDs."""
-        return iter(self.client_ids)
-
-    def values(self):
-        """Yield all threshold values."""
-        return iter(self.tau_values)
 
 
 def identify_eligible(
-    error_set: CalibrationErrorSet | Mapping[str, np.ndarray],
-    n_min: int,
+    error_set: CalibrationErrorSet | Mapping[ClientId, ScoreVector],
+    n_min: SampleCount,
 ) -> EligibilityResult:
-    """Partition clients into eligible and pending based on minimum calibration sample count."""
     if not isinstance(error_set, CalibrationErrorSet):
         error_set = CalibrationErrorSet.from_mapping(error_set)
-    eligible: list[str] = []
-    pending: list[str] = []
+    eligible: list[ClientId] = []
+    pending: list[ClientId] = []
     for client in error_set.clients:
         if client.errors.size >= n_min:
             eligible.append(client.client_id)
@@ -174,21 +134,18 @@ def identify_eligible(
 
 
 def compute_client_thresholds(
-    error_set: CalibrationErrorSet | Mapping[str, np.ndarray],
-    eligibility: EligibilityResult | Sequence[str],
-    q: float,
+    error_set: CalibrationErrorSet | Mapping[ClientId, ScoreVector],
+    eligibility: EligibilityResult,
+    q: Quantile,
 ) -> ClientThresholdsCollection:
-    """Compute per-client percentile thresholds for eligible clients."""
     if not isinstance(error_set, CalibrationErrorSet):
         error_set = CalibrationErrorSet.from_mapping(error_set)
-    if not isinstance(eligibility, EligibilityResult):
-        eligibility = EligibilityResult(eligible_ids=tuple(eligibility), pending_ids=())
     return ClientThresholdsCollection(
         entries=tuple(
-            ClientThreshold(
+                ClientThreshold(
                 client_id=cid,
                 threshold=percentile_threshold(error_set.for_client(cid).errors, q=q),
-                calibration_pending=False,
+                status=ClientStatus.ELIGIBLE,
                 strategy=ThresholdPolicy.LOCAL_THRESHOLD,
             )
             for cid in eligibility.eligible_ids
@@ -197,9 +154,8 @@ def compute_client_thresholds(
 
 
 def compute_tau_global(
-    thresholds: ClientThresholdsCollection | Mapping[str, float],
-) -> float:
-    """Compute the global threshold as the arithmetic mean of eligible-client thresholds."""
+    thresholds: ClientThresholdsCollection | Mapping[ClientId, Threshold],
+) -> ScoreValue:
     if not isinstance(thresholds, ClientThresholdsCollection):
         thresholds = ClientThresholdsCollection.from_mapping(
             thresholds,
@@ -214,21 +170,20 @@ def compute_tau_global(
 
 def build_threshold_result(
     run: PolicyRunId,
-    tau_global: float,
-    eligible_thresholds: ClientThresholdsCollection | Mapping[str, float],
-    pending_clients: tuple[str, ...] | Sequence[str],
+    tau_global: Threshold,
+    eligible_thresholds: ClientThresholdsCollection | Mapping[ClientId, Threshold],
+    pending_clients: Sequence[ClientId],
     cluster_metadata: ClusterMetadata | None,
 ) -> ThresholdResult:
-    """Assemble a ThresholdResult from eligible thresholds, pending clients, and cluster metadata."""
     thresholds: list[ClientThreshold] = []
 
     if not isinstance(eligible_thresholds, ClientThresholdsCollection):
         eligible_thresholds = ClientThresholdsCollection(
             entries=tuple(
                 ClientThreshold(
-                    client_id=cid,
+                    client_id=ClientId(cid),
                     threshold=tau,
-                    calibration_pending=False,
+                    status=ClientStatus.ELIGIBLE,
                     strategy=run.policy,
                 )
                 for cid, tau in eligible_thresholds.items()
@@ -240,7 +195,7 @@ def build_threshold_result(
             ClientThreshold(
                 client_id=entry.client_id,
                 threshold=entry.threshold,
-                calibration_pending=False,
+                status=ClientStatus.ELIGIBLE,
                 strategy=run.policy,
             )
         )
@@ -248,9 +203,9 @@ def build_threshold_result(
     for cid in pending_clients:
         thresholds.append(
             ClientThreshold(
-                client_id=cid,
+                client_id=ClientId(cid),
                 threshold=tau_global,
-                calibration_pending=True,
+                status=ClientStatus.CALIBRATION_PENDING,
                 strategy=run.policy,
             )
         )
@@ -259,5 +214,5 @@ def build_threshold_result(
         run=run,
         tau_global=tau_global,
         client_thresholds=tuple(thresholds),
-        metadata=ThresholdMetadata(cluster=cluster_metadata),
+        cluster=cluster_metadata,
     )

@@ -43,10 +43,8 @@ def _ray_teardown_after_each_test():
     except Exception:
         pass
 
-    try:
-        import datp.core.tracking as _tracking
+    import datp.core.tracking as _tracking
 
-        _tracking._TRACKING_ENABLED = False
-    except Exception:
-        pass
+    _tracking._TRACKING_ENABLED.set(False)
+    _tracking._import_mlflow.cache_clear()
     _release_heap()

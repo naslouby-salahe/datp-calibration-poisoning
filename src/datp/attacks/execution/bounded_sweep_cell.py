@@ -1,17 +1,14 @@
-"""Bounded-sweep cell execution: injection, threshold recomputation, and metrics."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
 
 from datp.attacks.constants import THRESHOLD_QUANTILE
 from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy
 from datp.attacks.execution.cell_runner import (
     InjectionOutcome,
     InjectionSpec,
-    PolicyPair,
     inject_single_victim,
     recompute_pair,
 )
@@ -27,14 +24,28 @@ from datp.attacks.planning.guardrails import (
     assert_valid_source_objective_pair,
 )
 from datp.attacks.score_containers import ScoreCollection
-from datp.attacks.types import AurocSet, MetricEngineInput, PoisonedCalibrationSet
+from datp.attacks.types import (
+    AurocSet,
+    MetricEngineInput,
+    PoisonedCalibrationSet,
+    ThresholdPairBase,
+)
 from datp.config.models import ExperimentStage
 from datp.core.enums import ThresholdPolicy
 from datp.core.seeds import SeedPair
+from datp.types import (
+    ClientId,
+    Index,
+    PoisonFraction,
+    Quantile,
+    RandomSeed,
+    SampleCount,
+    ScoreVector,
+    Threshold,
+)
 
 
-def lock_mu_flag_threshold(collection: ScoreCollection) -> float:
-    """Compute the mu-flag threshold from the minimum clean mean FPR across all policies."""
+def lock_mu_flag_threshold(collection: ScoreCollection) -> Threshold:
     clean_cal_set = PoisonedCalibrationSet.from_mapping(
         {cid: collection.clients[cid].cal.copy() for cid in collection.eligible_ids}
     )
@@ -58,52 +69,38 @@ def lock_mu_flag_threshold(collection: ScoreCollection) -> float:
 
 @dataclass(frozen=True, slots=True)
 class SweepCellConfig:
-    """Per-cell configuration for a bounded-sweep execution."""
 
     collection: ScoreCollection
-    mu_flag_threshold: float
+    mu_flag_threshold: Threshold
     auroc_set: AurocSet | None = None
-    scope_idx: int = 0
-    q: float = THRESHOLD_QUANTILE
-    cluster_seed: int = 0
+    scope_idx: Index = 0
+    q: Quantile = THRESHOLD_QUANTILE
+    cluster_seed: RandomSeed = RandomSeed(0)
 
 
 @dataclass(frozen=True, slots=True)
 class SweepCellResult:
-    """Immutable result of one bounded-sweep cell."""
 
     policy: ThresholdPolicy
-    victim_id: str
+    victim_id: ClientId
     objective: AttackerObjective
     source: PoisoningSourceStrategy
-    fraction: float
+    fraction: PoisonFraction
     seed_pair: SeedPair
-    thresholds_under_clean: PolicyPair
-    thresholds_under_poisoning: PolicyPair
+    thresholds_under_clean: ThresholdPairBase
+    thresholds_under_poisoning: ThresholdPairBase
     clean_metrics: MetricResult
     poisoned_metrics: MetricResult
-    victim_cal_poisoned: np.ndarray
-    n_replaced: int
-
-    @property
-    def training_seed(self) -> int:
-        """Training seed from the cell's seed pair."""
-        return self.seed_pair.training_seed
-
-    @property
-    def poisoning_seed(self) -> int:
-        """Poisoning seed from the cell's seed pair."""
-        return self.seed_pair.poisoning_seed
-
+    victim_cal_poisoned: ScoreVector
+    n_replaced: SampleCount
 
 def _cell_injection_and_metrics(
     spec: SweepCellSpec,
     config: SweepCellConfig,
     *,
-    fraction: float,
-    mu_flag_threshold: float | None,
-) -> tuple[PolicyPair, MetricResult, InjectionOutcome]:
-    """Inject at the given fraction and compute the threshold pair, metrics, and injection outcome."""
+    fraction: PoisonFraction,
+    mu_flag_threshold: Threshold | None,
+) -> tuple[ThresholdPairBase, MetricResult, InjectionOutcome]:
     outcome = inject_single_victim(
         config.collection,
         victim_id=spec.victim_id,
@@ -128,7 +125,6 @@ def _cell_injection_and_metrics(
 
 
 def run_sweep_cell(spec: SweepCellSpec, *, config: SweepCellConfig) -> SweepCellResult:
-    """Run one sweep cell: guardrails, clean baseline, then poisoned metrics."""
     assert_fractions_in_locked_grid([spec.fraction], ExperimentStage.NBAIOT_MAIN)
     assert_bounded_scale_requires_single_client(
         ExperimentStage.NBAIOT_MAIN, spec.target_scope
@@ -153,6 +149,6 @@ def run_sweep_cell(spec: SweepCellSpec, *, config: SweepCellConfig) -> SweepCell
         thresholds_under_poisoning=poisoned_pair,
         clean_metrics=clean_metrics,
         poisoned_metrics=poisoned_metrics,
-        victim_cal_poisoned=outcome.poisoned_cal_set.for_client(spec.victim_id).cal,
+        victim_cal_poisoned=outcome.poisoned_cal_set[spec.victim_id].cal,
         n_replaced=outcome.injection.n_replaced,
     )

@@ -48,7 +48,7 @@ class TestCompleteDetected:
         )
 
         report = get_status(base_dir=tmp_path)
-        rr = report.stage_reports[ExperimentStage.NBAIOT_MAIN.value]
+        rr = report.stage_reports[ExperimentStage.NBAIOT_MAIN]
 
         assert len(rr.complete) == 1
         assert len(rr.missing) == _NBAIOT_MAIN_CELLS - 1
@@ -70,7 +70,7 @@ class TestAbortedDetected:
         (rp / ArtifactFile.RUN_ABORTED).write_text("OOM error")
 
         report = get_status(base_dir=tmp_path)
-        rr = report.stage_reports[ExperimentStage.NBAIOT_MAIN.value]
+        rr = report.stage_reports[ExperimentStage.NBAIOT_MAIN]
 
         assert len(rr.aborted) == 1
         assert len(rr.missing) == _NBAIOT_MAIN_CELLS - 1
@@ -87,5 +87,5 @@ class TestSummaryRows:
 
         assert len(rows) == 2
 
-        assert rows[0][4] == _NBAIOT_MAIN_CELLS
-        assert rows[1][4] == _TOTAL_CELLS
+        assert rows[0].total == _NBAIOT_MAIN_CELLS
+        assert rows[1].total == _TOTAL_CELLS

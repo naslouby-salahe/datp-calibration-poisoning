@@ -8,19 +8,6 @@ from pathlib import Path
 
 from datp.core.enums import ThresholdPolicy
 
-
-def test_threshold_result_types_importable() -> None:
-    """Verify that core result types can be successfully imported and inspected."""
-    from datp.core.types import (
-        ClientEvalResult,
-        ClientEvalResultWithAuroc,
-        ThresholdResult,
-    )
-
-    for cls in (ThresholdResult, ClientEvalResult, ClientEvalResultWithAuroc):
-        assert len(typing.get_type_hints(cls)) > 0, f"{cls.__name__} has no type hints"
-
-
 def test_client_metrics_is_frozen_dataclass() -> None:
     """Verify that ClientEvaluationRecord is a frozen python dataclass."""
     from datp.evaluation.metrics import ClientEvaluationRecord
@@ -46,24 +33,7 @@ def test_threshold_result_required_keys() -> None:
         "run",
         "tau_global",
         "client_thresholds",
-        "metadata",
-    }
-    assert expected.issubset(hints.keys()), f"Missing keys: {expected - hints.keys()}"
-
-
-def test_client_eval_result_with_auroc_keys() -> None:
-    """Verify that ClientEvalResultWithAuroc has all expected metric fields."""
-    from datp.core.types import ClientEvalResultWithAuroc
-
-    hints = typing.get_type_hints(ClientEvalResultWithAuroc)
-    expected = {
-        "fpr",
-        "tpr",
-        "balanced_accuracy",
-        "macro_f1",
-        "n_benign",
-        "n_attack",
-        "auroc",
+        "cluster",
     }
     assert expected.issubset(hints.keys()), f"Missing keys: {expected - hints.keys()}"
 
@@ -128,18 +98,6 @@ def test_identity_classes_are_frozen_dataclasses() -> None:
         assert dataclasses.is_dataclass(cls), f"{cls.__name__} must be a dataclass"
         assert getattr(cls, "__dataclass_params__").frozen, (
             f"{cls.__name__} must be frozen"
-        )
-
-
-def test_serialization_boundary_classes_are_pydantic() -> None:
-    """Verify that API serialization boundary models derive from Pydantic BaseModel."""
-    from pydantic import BaseModel
-
-    from datp.core.types import ClientEvalResult, PolicyResult
-
-    for cls in (PolicyResult, ClientEvalResult):
-        assert issubclass(cls, BaseModel), (
-            f"{cls.__name__} must remain Pydantic (serialization boundary)"
         )
 
 

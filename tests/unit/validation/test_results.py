@@ -12,6 +12,7 @@ from datp.artifacts.names import ArtifactFile
 from datp.checkpointing.enums import ConvergenceStatus
 from datp.config.models import ExperimentStage
 from datp.core.enums import (
+    ClientStatus,
     NormalizationScope,
     ThresholdAggregationMethod,
     ThresholdPolicy,
@@ -77,7 +78,7 @@ def test_fpr_and_tpr_denominators() -> None:
     ct = ClientThreshold(
         client_id="c",
         threshold=0.5,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     rec = compute_client_record("c", np.array([0.1, 0.9]), np.array([0.8, 0.2]), ct)
@@ -92,7 +93,7 @@ def test_binary_macro_f1_ignores_multiclass_attack_names() -> None:
     ct = ClientThreshold(
         client_id="c",
         threshold=0.5,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     rec = compute_client_record("c", benign, attack, ct)
@@ -118,7 +119,7 @@ def test_evaluation_incomplete_exclusion() -> None:
     ct = ClientThreshold(
         client_id="c",
         threshold=0.5,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     rec = compute_client_record("c", np.array([0.1, 0.9]), np.array([]), ct)

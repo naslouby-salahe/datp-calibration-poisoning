@@ -1,33 +1,48 @@
-"""Structured logging setup with Rich console and optional structlog integration."""
-
 from __future__ import annotations
+from datp.types import (
+    ByteCount,
+    SampleCount,
+    SignedCount,
+)
 
+import enum
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from threading import Event, Lock
+from typing import TYPE_CHECKING
 
+import structlog
 from rich.console import Console
 from rich.logging import RichHandler
+from structlog.stdlib import get_logger
 
-from datp.core.enums import ArtifactFile
+from datp.core.enums import (
+    ArtifactFile,
+    LogLevel,
+)
 
 if TYPE_CHECKING:
     from datp.config.models import LoggingConfig
 
-try:
-    import structlog
-except ImportError:
-    structlog = None  # type: ignore[assignment]
+__all__ = ["configure_logging", "get_logger", "reset_logging"]
+
+
+class ExternalLibraryLogger(enum.StrEnum):
+
+    FLOWER = "flwr"
+    RAY = "ray"
+    URLLIB3 = "urllib3"
+    MLFLOW = "mlflow"
+    PYTORCH_LIGHTNING = "pytorch_lightning"
+    LIGHTNING = "lightning"
 
 console = Console(stderr=True)
-_SETUP_DONE = False
+_SETUP_DONE = Event()
+_SETUP_LOCK = Lock()
 
 
-def _structlog_shared_processors() -> list[Any]:
-    """Return the shared structlog processor chain, or an empty list if structlog is unavailable."""
-    if structlog is None:
-        return []
+def _structlog_shared_processors() -> list[structlog.types.Processor]:
     return [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
@@ -37,61 +52,23 @@ def _structlog_shared_processors() -> list[Any]:
     ]
 
 
-@runtime_checkable
-class _LoggerProtocol(Protocol):
-    def bind(self, **kwargs: Any) -> "_LoggerProtocol": ...
-    def debug(self, event: str, **kwargs: Any) -> None: ...
-    def info(self, event: str, **kwargs: Any) -> None: ...
-    def warning(self, event: str, **kwargs: Any) -> None: ...
-    def error(self, event: str, **kwargs: Any) -> None: ...
-    def exception(self, event: str, **kwargs: Any) -> None: ...
-
-
-class _StdlibBoundLogger:
-    def __init__(self, logger: logging.Logger, context: dict[str, Any] | None) -> None:
-        self._logger = logger
-        self._context = {} if context is None else dict(context)
-
-    def bind(self, **kwargs: Any) -> "_StdlibBoundLogger":
-        """Return a copy with additional context merged in."""
-        return _StdlibBoundLogger(self._logger, {**self._context, **kwargs})
-
-    def _render(self, event: str, **kwargs: Any) -> str:
-        """Render a log message with context key=value pairs appended."""
-        merged = {**self._context, **kwargs}
-        if not merged:
-            return event
-        fields = " ".join(f"{k}={v!r}" for k, v in sorted(merged.items()))
-        return f"{event} {fields}"
-
-    def debug(self, event: str, **kwargs: Any) -> None:
-        self._logger.debug(self._render(event, **kwargs))
-
-    def info(self, event: str, **kwargs: Any) -> None:
-        self._logger.info(self._render(event, **kwargs))
-
-    def warning(self, event: str, **kwargs: Any) -> None:
-        self._logger.warning(self._render(event, **kwargs))
-
-    def error(self, event: str, **kwargs: Any) -> None:
-        self._logger.error(self._render(event, **kwargs))
-
-    def exception(self, event: str, **kwargs: Any) -> None:
-        self._logger.exception(self._render(event, **kwargs))
-
-
-def _parse_level(level: str) -> int:
-    """Convert a string level name to its integer constant."""
-    parsed = logging.getLevelName(level.upper())
-    if isinstance(parsed, int):
-        return parsed
-    raise ValueError(f"Invalid logging level: {level!r}")
+def _parse_level(level: LogLevel) -> SignedCount:
+    match level:
+        case LogLevel.DEBUG:
+            return logging.DEBUG
+        case LogLevel.INFO:
+            return logging.INFO
+        case LogLevel.WARNING:
+            return logging.WARNING
+        case LogLevel.ERROR:
+            return logging.ERROR
+        case LogLevel.CRITICAL:
+            return logging.CRITICAL
 
 
 def _make_handlers(
-    *, level: str, json: bool, log_dir: Path, max_bytes: int, backup_count: int
+    *, level: LogLevel, json: bool, log_dir: Path, max_bytes: ByteCount, backup_count: SampleCount
 ) -> list[logging.Handler]:
-    """Create and configure console and rotating-file logging handlers."""
     log_dir.mkdir(parents=True, exist_ok=True)
     lvl = _parse_level(level)
 
@@ -111,49 +88,40 @@ def _make_handlers(
     )
     file_handler.setLevel(lvl)
 
-    if structlog is not None:
-        shared = _structlog_shared_processors()
-        console_handler.setFormatter(
-            structlog.stdlib.ProcessorFormatter(
-                foreign_pre_chain=shared,
-                processors=[
-                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                    structlog.dev.ConsoleRenderer(colors=True),
-                ],
-            )
+    shared = _structlog_shared_processors()
+    console_handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=shared,
+            processors=[
+                structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                structlog.dev.ConsoleRenderer(colors=True),
+            ],
         )
-
-        file_renderer = (
-            structlog.processors.JSONRenderer()
-            if json
-            else structlog.processors.KeyValueRenderer(
-                sort_keys=True, key_order=["timestamp", "level", "logger", "event"]
-            )
+    )
+    file_renderer = (
+        structlog.processors.JSONRenderer()
+        if json
+        else structlog.processors.KeyValueRenderer(
+            sort_keys=True, key_order=["timestamp", "level", "logger", "event"]
         )
-        file_handler.setFormatter(
-            structlog.stdlib.ProcessorFormatter(
-                foreign_pre_chain=[*shared, structlog.processors.ExceptionRenderer()],
-                processors=[
-                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                    file_renderer,
-                ],
-            )
+    )
+    file_handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=[*shared, structlog.processors.ExceptionRenderer()],
+            processors=[
+                structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                file_renderer,
+            ],
         )
-    else:
-        fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-        console_handler.setFormatter(fmt)
-        file_handler.setFormatter(fmt)
-
+    )
     return [console_handler, file_handler]
 
 
 def configure_logging(cfg: LoggingConfig, log_dir: Path) -> None:
-    """Set up the root logger with console and file handlers; idempotent after first call."""
-    global _SETUP_DONE  # noqa: PLW0603
-    if _SETUP_DONE:
-        return
+    with _SETUP_LOCK:
+        if _SETUP_DONE.is_set():
+            return
 
-    if structlog is not None:
         structlog.configure(
             processors=[
                 *_structlog_shared_processors(),
@@ -164,43 +132,32 @@ def configure_logging(cfg: LoggingConfig, log_dir: Path) -> None:
             cache_logger_on_first_use=True,
         )
 
-    root = logging.getLogger()
-    for handler in root.handlers[:]:
-        root.removeHandler(handler)
-        handler.close()
+        root = logging.getLogger()
+        for handler in root.handlers[:]:
+            root.removeHandler(handler)
+            handler.close()
 
-    root.setLevel(_parse_level(cfg.level))
-    for handler in _make_handlers(
-        level=cfg.level,
-        json=cfg.json_format,
-        log_dir=log_dir,
-        max_bytes=cfg.max_bytes,
-        backup_count=cfg.backup_count,
-    ):
-        root.addHandler(handler)
+        root.setLevel(_parse_level(cfg.level))
+        for handler in _make_handlers(
+            level=cfg.level,
+            json=cfg.json_format,
+            log_dir=log_dir,
+            max_bytes=cfg.max_bytes,
+            backup_count=cfg.backup_count,
+        ):
+            root.addHandler(handler)
 
-    for name in ("flwr", "ray", "urllib3", "mlflow", "pytorch_lightning", "lightning"):
-        logging.getLogger(name).setLevel(logging.WARNING)
+        for name in ExternalLibraryLogger:
+            logging.getLogger(name).setLevel(logging.WARNING)
 
-    _SETUP_DONE = True
-
-
-def get_logger(name: str | None = None) -> _LoggerProtocol:
-    """Return a structured logger, falling back to a stdlib wrapper if structlog is unavailable."""
-    if structlog is not None:
-        return structlog.get_logger(name)
-    return _StdlibBoundLogger(
-        logging.getLogger("datp" if name is None else name), context=None
-    )
+        _SETUP_DONE.set()
 
 
 def reset_logging() -> None:
-    """Remove all handlers and reset structlog defaults."""
-    global _SETUP_DONE  # noqa: PLW0603
-    root = logging.getLogger()
-    for handler in root.handlers[:]:
-        root.removeHandler(handler)
-        handler.close()
-    _SETUP_DONE = False
-    if structlog is not None:
+    with _SETUP_LOCK:
+        root = logging.getLogger()
+        for handler in root.handlers[:]:
+            root.removeHandler(handler)
+            handler.close()
+        _SETUP_DONE.clear()
         structlog.reset_defaults()

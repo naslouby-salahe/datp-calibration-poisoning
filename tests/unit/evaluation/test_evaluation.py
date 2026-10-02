@@ -1,7 +1,7 @@
 """Unit tests for the main evaluation pipeline."""
 
 from __future__ import annotations
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 
 import dataclasses
 import math
@@ -13,7 +13,7 @@ import pytest
 
 from datp.config.models import ExperimentStage
 from datp.core.identity import PolicyRunId, TrainingCellId
-from datp.core.types import ClientThreshold, ThresholdMetadata, ThresholdResult
+from datp.core.types import ClientThreshold, ThresholdResult
 from datp.evaluation.metrics import (
     BinaryMetrics,
     ClientEvaluationRecord,
@@ -51,7 +51,7 @@ def test_eval_incomplete_excluded_from_attack_metrics() -> None:
         threshold=ClientThreshold(
             client_id="c3",
             threshold=0.5,
-            calibration_pending=False,
+            status=ClientStatus.ELIGIBLE,
             strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         ),
         evaluation_incomplete=True,
@@ -115,7 +115,7 @@ def test_metrics_serialization_contains_eligibility_threshold_and_provenance_fie
     ct_eligible = ClientThreshold(
         client_id="c1",
         threshold=0.5,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     c1_rec = _ccr(
@@ -124,7 +124,7 @@ def test_metrics_serialization_contains_eligibility_threshold_and_provenance_fie
     ct_pending = ClientThreshold(
         client_id="c2",
         threshold=0.5,
-        calibration_pending=True,
+        status=ClientStatus.CALIBRATION_PENDING,
         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     c2_rec = ClientEvaluationRecord(
@@ -157,17 +157,17 @@ def test_metrics_serialization_contains_eligibility_threshold_and_provenance_fie
                     ClientThreshold(
                         client_id="c1",
                         threshold=0.5,
-                        calibration_pending=False,
+                        status=ClientStatus.ELIGIBLE,
                         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
                     ),
                     ClientThreshold(
                         client_id="c2",
                         threshold=0.5,
-                        calibration_pending=True,
+                        status=ClientStatus.CALIBRATION_PENDING,
                         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
                     ),
                 ),
-                metadata=ThresholdMetadata(cluster=None),
+                cluster=None,
             ),
             config_identity="test",
             split_manifest_identity="test",
@@ -211,7 +211,7 @@ def test_build_evaluation_result_rejects_undefined_eligible_fpr() -> None:
         threshold=ClientThreshold(
             client_id="attack_only",
             threshold=0.5,
-            calibration_pending=False,
+            status=ClientStatus.ELIGIBLE,
             strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         ),
         evaluation_incomplete=False,

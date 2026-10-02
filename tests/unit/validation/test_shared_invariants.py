@@ -8,6 +8,7 @@ from datp.validation.enums import AuditStatus
 from datp.validation.invariants import (
     InvariantHashes,
     InvariantKey,
+    ScoreArtifactHash,
     build_invariant_results,
 )
 
@@ -15,16 +16,20 @@ _CELL_A = InvariantKey(stage=ExperimentStage.NBAIOT_MAIN, seed=0)
 _CELL_B = InvariantKey(stage=ExperimentStage.SYNTHETIC_SMOKE, seed=0)
 _CELL_C = InvariantKey(stage=ExperimentStage.NBAIOT_FULL_OPTIONAL, seed=0)
 
-_HASH_MAP_REF: dict[tuple[ScoringStage, str], str] = {
-    (ScoringStage.CAL, "client_1"): "aaa",
-    (ScoringStage.TEST_BENIGN, "client_1"): "bbb",
-    (ScoringStage.TEST_ATTACK, "client_1"): "ccc",
-}
-_HASH_MAP_ALT: dict[tuple[ScoringStage, str], str] = {
-    (ScoringStage.CAL, "client_1"): "aaa",
-    (ScoringStage.TEST_BENIGN, "client_1"): "bbb",
-    (ScoringStage.TEST_ATTACK, "client_1"): "XXX",
-}
+_HASH_MAP_REF = frozenset(
+    {
+        ScoreArtifactHash(ScoringStage.CAL, "client_1", "aaa"),
+        ScoreArtifactHash(ScoringStage.TEST_BENIGN, "client_1", "bbb"),
+        ScoreArtifactHash(ScoringStage.TEST_ATTACK, "client_1", "ccc"),
+    }
+)
+_HASH_MAP_ALT = frozenset(
+    {
+        ScoreArtifactHash(ScoringStage.CAL, "client_1", "aaa"),
+        ScoreArtifactHash(ScoringStage.TEST_BENIGN, "client_1", "bbb"),
+        ScoreArtifactHash(ScoringStage.TEST_ATTACK, "client_1", "XXX"),
+    }
+)
 
 
 def _inputs(
@@ -53,12 +58,12 @@ def _inputs(
 def _score_hashes(
     cell: InvariantKey,
     baselines: list[ThresholdPolicy],
-    hash_map: dict[tuple[ScoringStage, str], str] | None = None,
-) -> dict[InvariantKey, dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]]:
+    hash_map: frozenset[ScoreArtifactHash] | None = None,
+) -> dict[InvariantKey, dict[ThresholdPolicy, frozenset[ScoreArtifactHash]]]:
     """Helper to mock score arrays hash structures for various threshold policies."""
     if hash_map is None:
         hash_map = _HASH_MAP_REF
-    return {cell: {b: dict(hash_map) for b in baselines}}
+    return {cell: {b: hash_map for b in baselines}}
 
 
 class TestInvariantPass:
@@ -162,12 +167,12 @@ class TestInvariantFail:
             ThresholdPolicy.CLUSTER_THRESHOLD,
         ]
         score_hashes: dict[
-            InvariantKey, dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]
+            InvariantKey, dict[ThresholdPolicy, frozenset[ScoreArtifactHash]]
         ] = {
             _CELL_B: {
-                ThresholdPolicy.GLOBAL_THRESHOLD: dict(_HASH_MAP_REF),
-                ThresholdPolicy.LOCAL_THRESHOLD: dict(_HASH_MAP_ALT),
-                ThresholdPolicy.CLUSTER_THRESHOLD: dict(_HASH_MAP_REF),
+                ThresholdPolicy.GLOBAL_THRESHOLD: _HASH_MAP_REF,
+                ThresholdPolicy.LOCAL_THRESHOLD: _HASH_MAP_ALT,
+                ThresholdPolicy.CLUSTER_THRESHOLD: _HASH_MAP_REF,
             }
         }
         results = build_invariant_results(

@@ -1,4 +1,3 @@
-"""Statistical utilities: bootstrap, effect size, divergence, aggregation, and hypothesis tests."""
 
 from datp.statistics.aggregates import FprFleetStats, compute_fpr_fleet_stats, cv, iqr
 from datp.statistics.bootstrap import BootstrapResult, bca_ci, bootstrap_ci

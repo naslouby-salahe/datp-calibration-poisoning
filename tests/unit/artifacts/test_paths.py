@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import time
 from pathlib import Path
 
 from datp.artifacts.layout import ArtifactLayout
@@ -13,7 +12,6 @@ from datp.core.enums import ScoringStage, ThresholdPolicy
 from datp.core.identity import (
     PolicyRunId,
     TrainingCellId,
-    make_run_id,
 )
 
 _OUTPUTS = Path(ArtifactDir.OUTPUTS)
@@ -31,25 +29,6 @@ def _run(stage: ExperimentStage, policy: ThresholdPolicy, seed: int) -> PolicyRu
 def _cell(stage: ExperimentStage, seed: int) -> TrainingCellId:
     """Helper to build TrainingCellId instances."""
     return TrainingCellId(stage=stage, seed=seed)
-
-
-class TestMakeRunId:
-    """Tests verifying make_run_id collision guarantees and formats."""
-
-    def test_collision_proof_different_timestamps(self) -> None:
-        """Verify that calling make_run_id with a delay produces different IDs."""
-        id1 = make_run_id(_STAGE, seed=0)
-        time.sleep(0.002)
-        id2 = make_run_id(_STAGE, seed=0)
-        assert id1 != id2
-
-    def test_collision_proof_format(self) -> None:
-        """Verify that generated run IDs start with stage/seed and end in a timestamp."""
-        rid = make_run_id(_STAGE, seed=42)
-        assert rid.startswith("nbaiot_main_seed42_")
-        ts_part = rid.rsplit("_", 1)[-1]
-        assert ts_part.isdigit()
-        assert len(ts_part) >= 13
 
 
 class TestCanonicalResultPath:

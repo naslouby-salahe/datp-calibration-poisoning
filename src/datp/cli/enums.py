@@ -1,5 +1,5 @@
-"""CLI enumerations: exit codes, command names, column headers, and output keys."""
 
+from collections.abc import Sequence
 from enum import IntEnum, StrEnum
 
 from datp.config.models import ExperimentStage
@@ -7,27 +7,59 @@ from datp.core.enums import ThresholdPolicy
 
 
 class CliExitCode(IntEnum):
-    """CLI process exit codes."""
 
     SUCCESS = 0
     ERROR = 1
 
 
+class CliCommand(StrEnum):
+
+    AUDIT_RESULTS = "audit results"
+    AUDIT_REUSE = "audit reuse"
+    CHECKPOINT_PREVIEW = "checkpoint-protocol preview"
+    CHECKPOINT_SMOKE = "checkpoint-protocol smoke"
+    CHECKPOINT_EVALUATE_FROM_SCORES = "checkpoint-protocol evaluate-from-scores"
+    CHECKPOINT_STATUS = "checkpoint-protocol status"
+    CHECKPOINT_SUMMARY = "checkpoint-protocol summary"
+    CONFIG_PREVIEW = "config preview"
+    POISON_PREVIEW = "poison preview"
+    POISON_DRY_RUN = "poison dry-run"
+    POISON_SMOKE = "poison smoke"
+    POISON_RUN_BOUNDED_SWEEP = "poison run-bounded-sweep"
+    POISON_RUN_SENSITIVITY = "poison run-sensitivity"
+    POISON_STAGES = "poison stages"
+    REPORT_STATS = "report stats"
+    REPORT_VALIDATE = "report validate"
+    REPORT_FIGURES = "report figures"
+    REPORT_TABLES = "report tables"
+    REPORT_POISONING = "report poisoning"
+    REPORT_SENSITIVITY = "report sensitivity"
+    REPORT_ALL = "report all"
+    STATUS = "status"
+    SWEEP = "sweep"
+
+    @classmethod
+    def resolve(cls, arguments: Sequence[str]) -> "CliCommand | None":
+        for command in cls:
+            command_path = command.split()
+            if list(arguments[: len(command_path)]) == command_path:
+                return command
+        return None
+
+
 class AuditCommand(StrEnum):
-    """Subcommands for the audit CLI group."""
 
     RESULTS = "results"
+    REUSE = "reuse"
 
 
 class AuditColumn(StrEnum):
-    """Column headers for the audit results table."""
 
     ARTIFACT = "Artifact"
     PATH = "Path"
 
 
 class CheckpointCommand(StrEnum):
-    """Subcommands for the checkpoint-protocol CLI group."""
 
     PREVIEW = "preview"
     SMOKE = "smoke"
@@ -36,23 +68,20 @@ class CheckpointCommand(StrEnum):
     SUMMARY = "summary"
 
 
-class _CheckpointSmokeField(StrEnum):
-    """JSON keys for the checkpoint smoke test output."""
+class CheckpointSmokeField(StrEnum):
 
     ARTIFACT_ROOT = "artifact_root"
     ROUNDS = "rounds"
     SELECTED_ROUND = "selected_round"
 
 
-class _CheckpointEvalField(StrEnum):
-    """JSON keys for the checkpoint evaluate-from-scores output."""
+class CheckpointEvalField(StrEnum):
 
     CHECKPOINT_ROUND = "checkpoint_round"
     POLICIES = "policies"
 
 
-class _CheckpointStatusField(StrEnum):
-    """JSON keys for the checkpoint status output."""
+class CheckpointStatusField(StrEnum):
 
     COMPLETE = "complete"
     CHECKPOINT = "checkpoint"
@@ -60,30 +89,26 @@ class _CheckpointStatusField(StrEnum):
     RESULTS = "results"
 
 
-class _CheckpointSummaryField(StrEnum):
-    """JSON keys for the checkpoint summary output."""
+class CheckpointSummaryField(StrEnum):
 
     SELECTED_ROUND = "selected_round"
 
 
-_SMOKE_TEMP_DIR_PREFIX = "datp_checkpoint_protocol_smoke_"
-_ERROR_NOT_CONFIGURED = "checkpoint_protocol is not configured."
-_ERROR_MUST_NOT_WRITE_OUTPUTS = "checkpoint protocol smoke must not write to outputs/"
-_CHECKPOINT_DEFAULT_STAGE = ExperimentStage.NBAIOT_MAIN
-_CHECKPOINT_SUMMARY_POLICIES = (
+ERROR_NOT_CONFIGURED = "checkpoint_protocol is not configured."
+ERROR_MUST_NOT_WRITE_OUTPUTS = "checkpoint protocol smoke must not write to outputs/"
+CHECKPOINT_DEFAULT_STAGE = ExperimentStage.NBAIOT_MAIN
+CHECKPOINT_SUMMARY_POLICIES = (
     ThresholdPolicy.GLOBAL_THRESHOLD,
     ThresholdPolicy.LOCAL_THRESHOLD,
 )
 
 
 class ConfigCommand(StrEnum):
-    """Subcommands for the config CLI group."""
 
     PREVIEW = "preview"
 
 
 class PoisonCommand(StrEnum):
-    """Subcommands for the poison CLI group."""
 
     PREVIEW = "preview"
     DRY_RUN = "dry-run"
@@ -94,7 +119,6 @@ class PoisonCommand(StrEnum):
 
 
 class PoisonOutputKey(StrEnum):
-    """JSON keys for poison command output."""
 
     STAGE = "stage"
     DATASET = "dataset"
@@ -103,14 +127,13 @@ class PoisonOutputKey(StrEnum):
     DESCRIPTION = "description"
 
 
-_EXECUTION_GATE_NOTICE = (
+EXECUTION_GATE_NOTICE = (
     "NOTE: Experiment execution is blocked until this stage's own gate "
     "(see below) is authorized. This command is preview/dry-run only."
 )
 
 
 class ReportCommand(StrEnum):
-    """Subcommands for the report CLI group."""
 
     STATS = "stats"
     VALIDATE = "validate"
@@ -122,10 +145,14 @@ class ReportCommand(StrEnum):
 
 
 class StatusColumn(StrEnum):
-    """Column headers for the status table."""
 
     SCOPE = "Scope"
     COMPLETE = "Complete"
     MISSING = "Missing"
     ABORTED = "Aborted"
     TOTAL = "Total"
+
+
+class StatusScope(StrEnum):
+
+    OVERALL = "Overall"

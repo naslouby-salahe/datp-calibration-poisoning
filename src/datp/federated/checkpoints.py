@@ -1,6 +1,10 @@
-"""Checkpoint persistence and convergence artifact I/O for FL training runs."""
-
 from __future__ import annotations
+
+from datp.types import (
+    RoundIndex,
+    ScoreValue,
+)
+
 
 import json
 from dataclasses import dataclass
@@ -19,15 +23,13 @@ from datp.config.models import ConvergenceConfig
 
 @dataclass(frozen=True, slots=True)
 class ConvergenceSnapshot:
-    """Snapshot of loss history, convergence round, and criterion value from a training run."""
 
-    loss_history: list[float]
-    converged_round: int | None
-    criterion_value: float | None
+    loss_history: list[ScoreValue]
+    converged_round: RoundIndex | None
+    criterion_value: ScoreValue | None
 
 
 def save_checkpoint(model: nn.Module, ckpt_dir: Path) -> Path:
-    """Atomically save model state_dict to the checkpoint directory."""
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     ckpt_file = ckpt_dir / ArtifactFile.MODEL_CHECKPOINT
     tmp_file = ckpt_file.with_suffix(".pt.tmp")
@@ -37,28 +39,25 @@ def save_checkpoint(model: nn.Module, ckpt_dir: Path) -> Path:
 
 
 def save_params_snapshot(params: NDArrays, ckpt_dir: Path) -> Path:
-    """Atomically write aggregated FL parameters as a .npz file."""
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     snap_file = ckpt_dir / ArtifactFile.PARAMS_SNAPSHOT
     tmp_file = ckpt_dir / "params_writing.npz"
-    np.savez(str(tmp_file), *params)
+    np.savez(tmp_file, *params)
     tmp_file.rename(snap_file)
     return snap_file
 
 
 def load_params_snapshot(ckpt_dir: Path) -> NDArrays | None:
-    """Load a previously saved parameter snapshot, or None if not found."""
     snap_file = ckpt_dir / ArtifactFile.PARAMS_SNAPSHOT
     if not snap_file.exists():
         return None
-    archive = np.load(str(snap_file))
+    archive = np.load(snap_file)
     return [archive[k] for k in sorted(archive.files)]
 
 
 def save_convergence_artifacts(
     ckpt_dir: Path, snapshot: ConvergenceSnapshot, conv_cfg: ConvergenceConfig
 ) -> None:
-    """Write convergence curve CSV and summary JSON atomically."""
     curve_path = ckpt_dir / ArtifactFile.CONVERGENCE_CURVE
     summary_path = ckpt_dir / ArtifactFile.CONVERGENCE_SUMMARY
     df = pd.DataFrame(

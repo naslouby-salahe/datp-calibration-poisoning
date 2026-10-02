@@ -1,4 +1,3 @@
-"""Per-client Auroc record computation."""
 
 from __future__ import annotations
 
@@ -8,10 +7,9 @@ from datp.evaluation.metrics import compute_binary_ranking_metrics
 
 
 def compute_auroc_records(collection: ScoreCollection) -> AurocSet:
-    """Compute per-client Auroc records from test-benign and test-attack scores."""
     records: list[AurocRecord] = []
     for cid in collection.eligible_ids:
-        c = collection.for_client(cid)
+        c = collection.clients[cid]
         records.append(
             AurocRecord(
                 client_id=cid,

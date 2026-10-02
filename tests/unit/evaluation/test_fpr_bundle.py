@@ -24,8 +24,8 @@ def test_cv_fpr_eligible_only() -> None:
     )
 
     expected_cv = cv(np.array([0.10, 0.15, 0.20]), ddof=0)
-    assert abs(ev.cv_fpr - expected_cv) < 1e-12
-    assert abs(ev.cv_fpr - cv(np.array([0.10, 0.15, 0.20, 0.50]), ddof=0)) > 0.01
+    assert abs(ev.dispersion.cv_fpr - expected_cv) < 1e-12
+    assert abs(ev.dispersion.cv_fpr - cv(np.array([0.10, 0.15, 0.20, 0.50]), ddof=0)) > 0.01
 
 
 def test_coverage_ratio() -> None:
@@ -44,12 +44,12 @@ def test_fpr_bundle_includes_mean_std_worst() -> None:
     c3 = _make_client_record("c3", fpr=0.30, tpr=0.70)
     ev = _make_eval_result([c1, c2, c3], ["c1", "c2", "c3"], [])
 
-    assert ev.mean_fpr == pytest.approx(0.20, abs=1e-10)
-    assert ev.std_fpr == pytest.approx(np.std([0.10, 0.20, 0.30], ddof=1), abs=1e-10)
-    assert ev.worst_client_fpr == pytest.approx(0.30, abs=1e-10)
-    assert ev.worst_client_id == "c3"
-    assert ev.eligible_count == 3
-    assert ev.client_count == 3
+    assert ev.dispersion.mean_fpr == pytest.approx(0.20, abs=1e-10)
+    assert ev.dispersion.std_fpr == pytest.approx(np.std([0.10, 0.20, 0.30], ddof=1), abs=1e-10)
+    assert ev.dispersion.worst_client_fpr == pytest.approx(0.30, abs=1e-10)
+    assert ev.dispersion.worst_client_id == "c3"
+    assert ev.dispersion.eligible_count == 3
+    assert ev.dispersion.client_count == 3
 
 
 def test_bundle_excludes_pending_from_fpr_stats() -> None:
@@ -58,27 +58,27 @@ def test_bundle_excludes_pending_from_fpr_stats() -> None:
     c_pending = _make_client_record("cp", fpr=0.99, tpr=0.50)
     ev = _make_eval_result([c1, c2, c_pending], ["c1", "c2"], ["cp"])
 
-    assert ev.mean_fpr == pytest.approx(0.15, abs=1e-10)
-    assert ev.worst_client_fpr == pytest.approx(0.20, abs=1e-10)
-    assert ev.worst_client_id == "c2"
-    assert ev.eligible_count == 2
-    assert ev.client_count == 3
+    assert ev.dispersion.mean_fpr == pytest.approx(0.15, abs=1e-10)
+    assert ev.dispersion.worst_client_fpr == pytest.approx(0.20, abs=1e-10)
+    assert ev.dispersion.worst_client_id == "c2"
+    assert ev.dispersion.eligible_count == 2
+    assert ev.dispersion.client_count == 3
 
 
 def test_bundle_single_eligible_std_is_nan() -> None:
     c1 = _make_client_record("c1", fpr=0.10, tpr=0.90)
     ev = _make_eval_result([c1], ["c1"], [])
-    assert math.isnan(ev.std_fpr)
-    assert ev.mean_fpr == pytest.approx(0.10, abs=1e-10)
+    assert math.isnan(ev.dispersion.std_fpr)
+    assert ev.dispersion.mean_fpr == pytest.approx(0.10, abs=1e-10)
 
 
 def test_bundle_no_eligible_all_nan() -> None:
     c_pending = _make_client_record("cp", fpr=0.5, tpr=0.5)
     ev = _make_eval_result([c_pending], [], ["cp"])
-    assert math.isnan(ev.cv_fpr)
-    assert math.isnan(ev.mean_fpr)
-    assert math.isnan(ev.std_fpr)
-    assert math.isnan(ev.worst_client_fpr)
-    assert ev.worst_client_id is None
-    assert ev.eligible_count == 0
-    assert ev.client_count == 1
+    assert math.isnan(ev.dispersion.cv_fpr)
+    assert math.isnan(ev.dispersion.mean_fpr)
+    assert math.isnan(ev.dispersion.std_fpr)
+    assert math.isnan(ev.dispersion.worst_client_fpr)
+    assert ev.dispersion.worst_client_id is None
+    assert ev.dispersion.eligible_count == 0
+    assert ev.dispersion.client_count == 1

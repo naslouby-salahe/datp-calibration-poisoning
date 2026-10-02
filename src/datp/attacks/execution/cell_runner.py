@@ -1,14 +1,8 @@
-"""Single-victim and multi-victim injection plus threshold recomputation."""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
-from functools import cached_property
-from typing import cast
 
-import numpy as np
-from joblib import Parallel, delayed
 
 from datp.attacks.constants import TAIL_MASS, THRESHOLD_QUANTILE
 from datp.attacks.enums import (
@@ -38,19 +32,22 @@ from datp.attacks.threshold_recomputation.threshold_recompute import (
 from datp.attacks.types import PoisonedCalibrationSet, ThresholdPairBase
 from datp.core.enums import ScoringStage, ThresholdPolicy
 from datp.core.seeds import SeedPair, SeedRecord, make_seed_rng
+from datp.types import (
+    ClientId,
+    Index,
+    PoisonFraction,
+    ScoreVector,
+)
 
-PolicyPair = ThresholdPairBase
-
-_SOURCES_SORTED = tuple(sorted(PoisoningSourceStrategy, key=lambda s: s.value))
-_OBJECTIVES_SORTED = tuple(sorted(AttackerObjective, key=lambda o: o.value))
+_SOURCES_SORTED = tuple(sorted(PoisoningSourceStrategy, key=lambda s: s))
+_OBJECTIVES_SORTED = tuple(sorted(AttackerObjective, key=lambda o: o))
 
 
 def cell_child_index(
     source: PoisoningSourceStrategy,
     objective: AttackerObjective | None,
-    fraction: float,
-) -> int:
-    """Derive a deterministic child index for RNG seeding from source, objective, and fraction."""
+    fraction: PoisonFraction,
+) -> Index:
     if objective is None:
         return 0
     return (
@@ -62,44 +59,40 @@ def cell_child_index(
 
 @dataclass(frozen=True, slots=True)
 class InjectionSpec:
-    """Immutable specification for a single poisoning injection."""
 
     source: PoisoningSourceStrategy
-    fraction: float
+    fraction: PoisonFraction
     seed_pair: SeedPair
     objective: AttackerObjective | None
-    scope_idx: int = 0
-    tail_mass: float = TAIL_MASS
+    scope_idx: Index = 0
+    tail_mass: PoisonFraction = TAIL_MASS
     draw: ReservoirDraw = ReservoirDraw.WITH_REPLACEMENT
 
 
 @dataclass(frozen=True)
 class InjectionOutcome:
-    """Result of injecting one victim: poisoned calibration set, reservoir, and injection details."""
 
-    victim_id: str
+    victim_id: ClientId
     poisoned_cal_set: PoisonedCalibrationSet
     reservoir: ReservoirResult
     injection: InjectionResult
 
 
 def _build_poisoned_clients(
-    collection: ScoreCollection, victim_cal_map: dict[str, np.ndarray]
-) -> dict[str, np.ndarray]:
-    """Merge victim poisoned calibrations with clean copies for non-victim clients."""
+    collection: ScoreCollection, victim_cal_map: dict[ClientId, ScoreVector]
+) -> dict[ClientId, ScoreVector]:
     return {
         cid: victim_cal_map[cid]
         if cid in victim_cal_map
-        else collection.for_client(cid).cal.copy()
+        else collection.clients[cid].cal.copy()
         for cid in collection.eligible_ids
     }
 
 
 def inject_single_victim(
-    collection: ScoreCollection, *, victim_id: str, spec: InjectionSpec
+    collection: ScoreCollection, *, victim_id: ClientId, spec: InjectionSpec
 ) -> InjectionOutcome:
-    """Build a reservoir, inject poisoned values, and return the outcome for one victim."""
-    v_clean = collection.for_client(victim_id).cal
+    v_clean = collection.clients[victim_id].cal
     _clean_snapshot = v_clean.copy()
 
     assert_reservoir_not_test_or_training(ScoringStage.CAL)
@@ -147,68 +140,11 @@ def inject_single_victim(
     )
 
 
-@dataclass(frozen=True)
-class MultiInjectionOutcome:
-    """Aggregated result of injecting multiple victims."""
-
-    outcomes: tuple[InjectionOutcome, ...]
-    poisoned_cal_set: PoisonedCalibrationSet
-
-    @cached_property
-    def _victim_map(self) -> dict[str, InjectionOutcome]:
-        """Victim ID to InjectionOutcome lookup."""
-        return {o.victim_id: o for o in self.outcomes}
-
-    @cached_property
-    def victim_ids(self) -> tuple[str, ...]:
-        """Sorted victim IDs."""
-        return tuple(self._victim_map.keys())
-
-    def for_victim(self, victim_id: str) -> InjectionOutcome:
-        """Return the InjectionOutcome for a given victim ID."""
-        return self._victim_map[victim_id]
-
-
-def _validate_and_order_victim_ids(victim_ids: Sequence[str]) -> tuple[str, ...]:
-    """Validate victim IDs are unique and contain at least 2 elements."""
-    ordered = tuple(sorted(set(victim_ids)))
-    if len(ordered) != len(victim_ids) or len(ordered) < 2:
-        raise ValueError("victim_ids must be unique and contain at least 2 elements")
-    return ordered
-
-
-def inject_multi_victim(
-    collection: ScoreCollection, *, victim_ids: Sequence[str], spec: InjectionSpec
-) -> MultiInjectionOutcome:
-    """Inject multiple victims in parallel and merge their poisoned calibrations."""
-    ordered = _validate_and_order_victim_ids(victim_ids)
-
-    outcomes = cast(
-        tuple[InjectionOutcome, ...],
-        tuple(
-            Parallel(n_jobs=-1, prefer="threads")(
-                delayed(inject_single_victim)(collection, victim_id=vid, spec=spec)
-                for vid in ordered
-            )
-        ),
-    )
-
-    return MultiInjectionOutcome(
-        outcomes=outcomes,
-        poisoned_cal_set=PoisonedCalibrationSet.from_mapping(
-            _build_poisoned_clients(
-                collection, {o.victim_id: o.injection.poisoned_cal for o in outcomes}
-            )
-        ),
-    )
-
-
 def recompute_pair(
     collection: ScoreCollection,
     poisoned_cal_set: PoisonedCalibrationSet,
     policy: ThresholdPolicy,
-) -> PolicyPair:
-    """Recompute clean/poisoned threshold pair for the given policy."""
+) -> ThresholdPairBase:
     match policy:
         case ThresholdPolicy.GLOBAL_THRESHOLD:
             return compute_global_pair(collection, poisoned_cal_set, THRESHOLD_QUANTILE)

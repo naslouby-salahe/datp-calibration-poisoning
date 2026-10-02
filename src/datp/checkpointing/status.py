@@ -1,6 +1,10 @@
-"""Filesystem inspection of checkpoint artifact presence and completeness."""
-
 from __future__ import annotations
+
+from datp.types import (
+    RandomSeed,
+    RoundIndex,
+)
+
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,18 +19,16 @@ from datp.core.identity import PolicyRunId, TrainingCellId
 
 @dataclass(frozen=True, slots=True)
 class CheckpointArtifactCellStatus:
-    """Status of all artifacts for a single checkpoint round cell."""
 
     stage: ExperimentStage
-    seed: int
-    checkpoint_round: int
+    seed: RandomSeed
+    checkpoint_round: RoundIndex
     checkpoint: CheckpointArtifactStatus
     scores: CheckpointArtifactStatus
     results: tuple[tuple[ThresholdPolicy, CheckpointArtifactStatus], ...]
 
     @property
     def complete(self) -> bool:
-        """True when checkpoint, scores, and all policy results are present."""
         return (
             self.checkpoint == CheckpointArtifactStatus.PRESENT
             and self.scores == CheckpointArtifactStatus.PRESENT
@@ -40,12 +42,11 @@ def checkpoint_artifact_status(
     *,
     artifact_root: Path,
     stage: ExperimentStage,
-    seed: int,
-    checkpoint_round: int,
+    seed: RandomSeed,
+    checkpoint_round: RoundIndex,
     policies: tuple[ThresholdPolicy, ...] | None = None,
 ) -> CheckpointArtifactCellStatus:
-    """Inspect and return the artifact status for a checkpoint round cell."""
-    cell = TrainingCellId(stage=stage, seed=seed)
+    cell = TrainingCellId(stage=stage, seed=RandomSeed(seed))
     layout = ArtifactLayout(base_dir=artifact_root, stage=stage)
     expected_policies = policies or CONTROLLED_POLICIES
 
@@ -54,17 +55,17 @@ def checkpoint_artifact_status(
         seed=seed,
         checkpoint_round=checkpoint_round,
         checkpoint=_file_status(
-            layout.checkpoint_dir_for_round(cell, checkpoint_round)
+            layout.checkpoint_dir(cell, checkpoint_round)
             / ArtifactFile.MODEL_CHECKPOINT
         ),
         scores=_file_status(
-            layout.score_cell_for_round(cell, checkpoint_round).manifest_path
+            layout.score_cell(cell, checkpoint_round).manifest_path
         ),
         results=tuple(
             (
                 policy,
                 _file_status(
-                    layout.policy_run_for_round(
+                    layout.policy_run(
                         PolicyRunId(cell=cell, policy=policy), checkpoint_round
                     ).metrics_path
                 ),
@@ -75,7 +76,6 @@ def checkpoint_artifact_status(
 
 
 def _file_status(path: Path) -> CheckpointArtifactStatus:
-    """Return PRESENT, INVALID, or MISSING based on path existence."""
     if path.is_file():
         return CheckpointArtifactStatus.PRESENT
     if path.exists():

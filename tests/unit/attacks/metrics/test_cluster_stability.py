@@ -7,8 +7,15 @@ from datp.attacks.metrics.cluster_stability import (
     cluster_sizes,
     n_reassigned,
 )
+from datp.types import ClientId, ClusterId
 
-_CLEAN = {"a": "0", "b": "0", "c": "1", "d": "1", "e": "2"}
+_CLEAN = {
+    ClientId("a"): ClusterId("0"),
+    ClientId("b"): ClusterId("0"),
+    ClientId("c"): ClusterId("1"),
+    ClientId("d"): ClusterId("1"),
+    ClientId("e"): ClusterId("2"),
+}
 
 
 def test_sizes_sorted_descending() -> None:
@@ -18,17 +25,29 @@ def test_sizes_sorted_descending() -> None:
 
 def test_size_of_client() -> None:
     """The size of a client's own cluster is returned."""
-    assert cluster_size_of(_CLEAN, "e") == 1
-    assert cluster_size_of(_CLEAN, "a") == 2
+    assert cluster_size_of(_CLEAN, ClientId("e")) == 1
+    assert cluster_size_of(_CLEAN, ClientId("a")) == 2
 
 
 def test_relabeling_is_not_reassignment() -> None:
     """A pure label permutation reassigns nobody."""
-    relabeled = {"a": "9", "b": "9", "c": "7", "d": "7", "e": "5"}
+    relabeled = {
+        ClientId("a"): ClusterId("9"),
+        ClientId("b"): ClusterId("9"),
+        ClientId("c"): ClusterId("7"),
+        ClientId("d"): ClusterId("7"),
+        ClientId("e"): ClusterId("5"),
+    }
     assert n_reassigned(_CLEAN, relabeled) == 0
 
 
 def test_moved_client_counts_all_affected_clients() -> None:
     """Moving one client changes the mate sets of every client in the touched clusters."""
-    moved = {"a": "0", "b": "0", "c": "1", "d": "2", "e": "2"}
+    moved = {
+        ClientId("a"): ClusterId("0"),
+        ClientId("b"): ClusterId("0"),
+        ClientId("c"): ClusterId("1"),
+        ClientId("d"): ClusterId("2"),
+        ClientId("e"): ClusterId("2"),
+    }
     assert n_reassigned(_CLEAN, moved) == 3

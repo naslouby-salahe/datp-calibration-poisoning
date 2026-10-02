@@ -1,6 +1,15 @@
-"""LaTeX and CSV table generators with main-body-policy validation."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClassificationScore,
+    FalsePositiveRate,
+    NarrativeText,
+    Ratio,
+    SampleCount,
+    ScoreValue,
+    TruePositiveRate,
+)
+
 
 import csv
 from dataclasses import dataclass, field
@@ -20,16 +29,14 @@ MANDATORY_FOOTNOTE = (
 
 
 def validate_main_body_role(policies: list[ThresholdPolicy]) -> None:
-    """Raise ValueError if any policy is not in the allowed main-body policy set."""
     for p in policies:
         if p not in MAIN_BODY_POLICIES:
             raise ValueError(
-                f"Policy '{p}' not permitted. Allowed: {[p.value for p in MAIN_BODY_POLICIES]}"
+                f"Policy '{p}' not permitted. Allowed: {[p for p in MAIN_BODY_POLICIES]}"
             )
 
 
-def format_mean_std(mean: float, std: float, bold: bool = False) -> str:
-    """Format a mean-plus-minus-std pair as a LaTeX string, with NaN fallback."""
+def format_mean_std(mean: ScoreValue, std: ScoreValue, bold: bool = False) -> NarrativeText:
     if np.isnan(mean):
         return "---"
     text = f"{mean:.3f} ± {std:.3f}"
@@ -38,33 +45,30 @@ def format_mean_std(mean: float, std: float, bold: bool = False) -> str:
 
 @dataclass(frozen=True, slots=True)
 class TableRow:
-    """A single row in a results table aggregating evaluation metrics for one threshold policy."""
 
     policy: ThresholdPolicy
-    cv_fpr_mean: float
-    cv_fpr_std: float
-    cv_tpr_mean: float
-    cv_tpr_std: float
-    worst_ba_mean: float
-    worst_ba_std: float
-    macro_f1_mean: float
-    macro_f1_std: float
-    eligible_count: int
-    pending_count: int
-    coverage_ratio: float
+    cv_fpr_mean: FalsePositiveRate
+    cv_fpr_std: FalsePositiveRate
+    cv_tpr_mean: TruePositiveRate
+    cv_tpr_std: TruePositiveRate
+    worst_ba_mean: ScoreValue
+    worst_ba_std: ScoreValue
+    macro_f1_mean: ClassificationScore
+    macro_f1_std: ClassificationScore
+    eligible_count: SampleCount
+    pending_count: SampleCount
+    coverage_ratio: Ratio
 
 
 @dataclass(slots=True)
 class ResultTable:
-    """LaTeX/CSV results table with styled rows and main-body-policy validation."""
 
-    title: str
+    title: NarrativeText
     style: StyleConfig
-    rows: list[TableRow] = field(default_factory=list)
-    footnote: str = MANDATORY_FOOTNOTE
+    rows: list[TableRow] = field(default_factory=lambda: list[TableRow]())
+    footnote: NarrativeText = MANDATORY_FOOTNOTE
 
-    def to_latex(self) -> str:
-        """Render the table as a LaTeX tabular with bold-best highlighting."""
+    def to_latex(self) -> NarrativeText:
         best_cv_fpr = (
             min(self.rows, key=lambda r: r.cv_fpr_mean).policy if self.rows else None
         )
@@ -73,7 +77,7 @@ class ResultTable:
         )
         labels = self.style.policy_labels
 
-        rows_tex = []
+        rows_tex: list[NarrativeText] = []
         for r in self.rows:
             lbl = labels[r.policy]
             cov = f"{r.coverage_ratio:.2f} ({r.eligible_count}/{r.eligible_count + r.pending_count})"
@@ -105,7 +109,6 @@ ThresholdPolicy & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ & Worst BA & P10 client 
 \\end{{table}}"""
 
     def to_csv(self, path: Path) -> Path:
-        """Write the table to a CSV file and return the path."""
         labels = self.style.policy_labels
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="", encoding="utf-8") as f:
@@ -147,7 +150,7 @@ ThresholdPolicy & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ & Worst BA & P10 client 
         return path
 
 
-def _mean_std(values: list[float]) -> tuple[float, float]:
+def _mean_std(values: list[ScoreValue]) -> tuple[ScoreValue, ScoreValue]:
     return float(np.mean(values)), float(np.std(values, ddof=1)) if len(
         values
     ) > 1 else 0.0
@@ -167,10 +170,14 @@ def _build_table_row(
     ):
         raise ValueError(f"Coverage count mismatch for {policy}.")
 
-    cv_fpr_mean, cv_fpr_std = _mean_std([r.cv_fpr for r in results])
-    cv_tpr_mean, cv_tpr_std = _mean_std([r.cv_tpr for r in results])
-    worst_ba_mean, worst_ba_std = _mean_std([r.worst_ba for r in results])
-    macro_f1_mean, macro_f1_std = _mean_std([r.p10_macro_f1 for r in results])
+    cv_fpr_mean, cv_fpr_std = _mean_std([r.dispersion.cv_fpr for r in results])
+    cv_tpr_mean, cv_tpr_std = _mean_std([r.dispersion.cv_tpr for r in results])
+    worst_ba_mean, worst_ba_std = _mean_std(
+        [r.dispersion.worst_ba for r in results]
+    )
+    macro_f1_mean, macro_f1_std = _mean_std(
+        [r.dispersion.p10_macro_f1 for r in results]
+    )
     return TableRow(
         policy=policy,
         cv_fpr_mean=cv_fpr_mean,
@@ -192,7 +199,6 @@ def generate_table3(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    """Generate Table 3 (N-BaIoT main results) as LaTeX and CSV."""
     validate_main_body_role(list(results_by_policy.keys()))
     table = ResultTable(title="Table 3: N-BaIoT Main Results", style=style)
 

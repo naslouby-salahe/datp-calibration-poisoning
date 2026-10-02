@@ -1,6 +1,13 @@
-"""N-BaIoT preprocessing: CSV loading, splitting, scaling, and artifact writing."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    NarrativeText,
+    RandomSeed,
+    SampleCount,
+    SignedCount,
+)
+
 
 import math
 from pathlib import Path
@@ -8,18 +15,22 @@ from pathlib import Path
 import polars as pl
 from sklearn.preprocessing import StandardScaler
 
-from datp.artifacts.names import ArtifactFile
+from datp.core.enums import (
+    ArtifactFile,
+    ClientStatus,
+    NBaIoTBalancePolicy,
+    NBaIoTDevice,
+    PathToken,
+)
 from datp.core.logging import get_logger
 from datp.data.artifacts import create_empty_feature_frame, write_client_splits
 from datp.data.catalog import SplitPolicyRole
 from datp.data.contracts import PartitionResult
 from datp.data.datasets.nbaiot.spec import (
     ATTACK_FAMILY_DIRS,
-    BENIGN_TRAFFIC_FILE,
     DEVICE_DIRS,
     FEATURE_COUNT,
     NBAIOT_SPEC,
-    SPLIT_RATIOS,
 )
 from datp.data.manifests import create_manifest
 from datp.data.scaling import apply_scaler, fit_scaler
@@ -30,19 +41,19 @@ _NBAIOT_MODULE = "data.nbaiot"
 
 
 def _raw_nbaiot_files(raw_dir: Path) -> list[Path]:
-    """Collect all existing raw CSV files across devices and attack families."""
-    files = []
+    files: list[Path] = []
     for device_id in DEVICE_DIRS:
         device_dir = raw_dir / device_id
-        files.append(device_dir / BENIGN_TRAFFIC_FILE)
+        files.append(device_dir / ArtifactFile.BENIGN_TRAFFIC)
         for attack_family_dir in ATTACK_FAMILY_DIRS:
-            files.extend(sorted((device_dir / attack_family_dir).glob("*.csv")))
+            files.extend(sorted((device_dir / attack_family_dir).glob(PathToken.CSV_GLOB)))
     return [path for path in files if path.exists()]
 
 
-def _compute_split_indices(n: int) -> dict[str, tuple[int, int]]:
-    """Compute chronological split boundaries from the configured ratios."""
-    indices = {}
+def _compute_split_indices(
+    n: SampleCount,
+) -> dict[SplitPolicyRole, tuple[SignedCount, SignedCount]]:
+    indices: dict[SplitPolicyRole, tuple[SignedCount, SignedCount]] = {}
     start = 0
     for role in (
         SplitPolicyRole.TRAIN,
@@ -50,21 +61,21 @@ def _compute_split_indices(n: int) -> dict[str, tuple[int, int]]:
         SplitPolicyRole.CAL,
         SplitPolicyRole.GAP2,
     ):
-        end = start + math.floor(n * SPLIT_RATIOS[role])
-        indices[role.value] = (start, end)
+        end = start + math.floor(n * NBAIOT_SPEC.split_policy.ratios[role])
+        indices[role] = (start, end)
         start = end
-    indices[SplitPolicyRole.TEST_BENIGN.value] = (start, n)
+    indices[SplitPolicyRole.TEST_BENIGN] = (start, n)
     return indices
 
 
-def _load_attack_csvs(device_dir: Path) -> tuple[pl.DataFrame, list[str]]:
-    """Load all attack CSV files for a device and return a concatenated frame with class labels."""
-    attack_frames, attack_classes = [], []
+def _load_attack_csvs(device_dir: Path) -> tuple[pl.DataFrame, list[NarrativeText]]:
+    attack_frames: list[pl.DataFrame] = []
+    attack_classes: list[NarrativeText] = []
     for family in ATTACK_FAMILY_DIRS:
         family_path = device_dir / family
         if not family_path.is_dir():
             continue
-        for csv_file in sorted(family_path.glob("*.csv")):
+        for csv_file in sorted(family_path.glob(PathToken.CSV_GLOB)):
             attack_frames.append(pl.read_csv(csv_file))
             attack_classes.append(f"{family.replace('_attacks', '')}_{csv_file.stem}")
 
@@ -78,9 +89,8 @@ def _scale_device_splits(
     cal_df: pl.DataFrame,
     test_benign_df: pl.DataFrame,
     attack_df_raw: pl.DataFrame,
-    feature_cols: list[str],
+    feature_cols: list[NarrativeText],
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame, StandardScaler]:
-    """Fit a scaler on the training split and transform all splits."""
     scaler = fit_scaler(train_df)
     test_attack_scaled = (
         apply_scaler(attack_df_raw, scaler)
@@ -97,19 +107,18 @@ def _scale_device_splits(
 
 
 def _prepare_device(
-    device_id: str,
+    device_id: NBaIoTDevice,
     raw_dir: Path,
     output_dir: Path,
-    n_min: int,
-    seed: int,
+    n_min: SampleCount,
+    seed: RandomSeed,
     *,
-    balanced_test: bool,
+    test_balance_policy: NBaIoTBalancePolicy,
 ) -> PartitionResult:
-    """Load, split, scale, and write artifacts for a single N-BaIoT device."""
     device_raw = raw_dir / device_id
-    benign_csv = device_raw / BENIGN_TRAFFIC_FILE
+    benign_csv = device_raw / ArtifactFile.BENIGN_TRAFFIC
     if not benign_csv.exists():
-        raise FileNotFoundError(f"[{_NBAIOT_MODULE}] {str(benign_csv)} not found.")
+        raise FileNotFoundError(f"[{_NBAIOT_MODULE}] {benign_csv} not found.")
 
     benign_df = pl.read_csv(benign_csv)
     n_benign = len(benign_df)
@@ -124,11 +133,16 @@ def _prepare_device(
     splits = _compute_split_indices(n_benign)
 
     train_df = benign_df.slice(
-        splits["train"][0], splits["train"][1] - splits["train"][0]
+        splits[SplitPolicyRole.TRAIN][0],
+        splits[SplitPolicyRole.TRAIN][1] - splits[SplitPolicyRole.TRAIN][0],
     )
-    cal_df = benign_df.slice(splits["cal"][0], splits["cal"][1] - splits["cal"][0])
+    cal_df = benign_df.slice(
+        splits[SplitPolicyRole.CAL][0],
+        splits[SplitPolicyRole.CAL][1] - splits[SplitPolicyRole.CAL][0],
+    )
     test_benign_df = benign_df.slice(
-        splits["test_benign"][0], splits["test_benign"][1] - splits["test_benign"][0]
+        splits[SplitPolicyRole.TEST_BENIGN][0],
+        splits[SplitPolicyRole.TEST_BENIGN][1] - splits[SplitPolicyRole.TEST_BENIGN][0],
     )
 
     calibration_pending = len(cal_df) < n_min
@@ -151,15 +165,18 @@ def _prepare_device(
         )
     )
 
-    if balanced_test and 0 < len(test_attack_scaled) < len(test_benign_scaled):
-        logger.info(
-            "balanced-test sensitivity: subsampled benign test",
-            device=device_id,
-            n=len(test_attack_scaled),
-        )
-        test_benign_scaled = test_benign_scaled.sample(
-            n=len(test_attack_scaled), seed=seed, with_replacement=False
-        )
+    if test_balance_policy is NBaIoTBalancePolicy.BALANCED:
+        if 0 < len(test_attack_scaled) < len(test_benign_scaled):
+            logger.info(
+                "balanced-test sensitivity: subsampled benign test",
+                device=device_id,
+                n=len(test_attack_scaled),
+            )
+            test_benign_scaled = test_benign_scaled.sample(
+                n=len(test_attack_scaled), seed=seed, with_replacement=False
+            )
+    elif test_balance_policy is not NBaIoTBalancePolicy.NATURAL_DISTRIBUTION:
+        raise ValueError(f"Unsupported test balance policy: {test_balance_policy!r}")
 
     write_client_splits(
         client_dir=output_dir / device_id,
@@ -188,15 +205,23 @@ def _prepare_device(
         test_benign_count=len(test_benign_scaled),
         test_attack_count=len(test_attack_scaled),
         attack_classes=attack_classes,
-        calibration_pending=calibration_pending,
+        status=(
+            ClientStatus.CALIBRATION_PENDING
+            if calibration_pending
+            else ClientStatus.ELIGIBLE
+        ),
         split_indices=splits,
     )
 
 
 def prepare_nbaiot(
-    raw_dir: Path, output_dir: Path, n_min: int, seed: int, *, balanced_test: bool
-) -> dict[str, PartitionResult]:
-    """Preprocess all N-BaIoT devices, write manifests, and return partition results."""
+    raw_dir: Path,
+    output_dir: Path,
+    n_min: SampleCount,
+    seed: RandomSeed,
+    *,
+    test_balance_policy: NBaIoTBalancePolicy,
+) -> dict[ClientId, PartitionResult]:
     raw_dir, output_dir = Path(raw_dir), Path(output_dir)
     if not raw_dir.is_dir():
         raise FileNotFoundError(
@@ -204,21 +229,28 @@ def prepare_nbaiot(
         )
 
     results = {
-        dev: _prepare_device(
-            dev, raw_dir, output_dir, n_min, seed, balanced_test=balanced_test
+        ClientId(dev): _prepare_device(
+            dev,
+            raw_dir,
+            output_dir,
+            n_min,
+            seed,
+            test_balance_policy=test_balance_policy,
         )
         for dev in DEVICE_DIRS
     }
 
     logger.info(
         "N-BaIoT preparation complete",
-        eligible=sum(not v.calibration_pending for v in results.values()),
-        pending=sum(v.calibration_pending for v in results.values()),
+        eligible=sum(v.status is ClientStatus.ELIGIBLE for v in results.values()),
+        pending=sum(
+            v.status is ClientStatus.CALIBRATION_PENDING for v in results.values()
+        ),
         total=len(results),
     )
 
     create_manifest(
-        dataset=NBAIOT_SPEC.id.value,
+        dataset=NBAIOT_SPEC.id,
         raw_files=_raw_nbaiot_files(raw_dir),
         raw_base_dir=raw_dir,
         metadata={

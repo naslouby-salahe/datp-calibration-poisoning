@@ -1,5 +1,6 @@
 {
   "include": ["src"],
+  "extraPaths": ["src", "typings"],
   "exclude": [
     "**/node_modules",
     "**/.*",
@@ -19,7 +20,7 @@
   ],
   "venvPath": ".",
   "venv": ".venv",
-  "typeCheckingMode": "standard",
+  "typeCheckingMode": "strict",
   "reportPrivateImportUsage": "none",
   "reportUnsupportedDunderAll": "none"
 }

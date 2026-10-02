@@ -19,7 +19,7 @@ from datp.core.seeds import set_seeds
 from datp.data.catalog import DatasetID
 from datp.data.splits import Split
 from datp.scoring.generation import validate_scoring_manifest
-from datp.scoring.manifest import SCORE_COLUMN, ScoringManifestStatus
+from datp.scoring.manifest import ScoringColumn, ScoringManifestStatus
 
 _SEED = 0
 
@@ -243,26 +243,6 @@ class TestBatchedScoring:
             )
 
 
-class TestErrorsToDataFrame:
-    """Error arrays to DataFrame conversion."""
-
-    def test_empty_errors(self) -> None:
-        from datp.scoring.generation import _errors_to_dataframe
-
-        df = _errors_to_dataframe(np.array([], dtype=np.float32))
-        assert df.shape == (0, 1)
-        assert df.columns == [SCORE_COLUMN]
-
-    def test_non_empty_errors(self) -> None:
-        from datp.scoring.generation import _errors_to_dataframe
-
-        errors = np.array([0.1, 0.2, 0.3], dtype=np.float32)
-        df = _errors_to_dataframe(errors)
-        assert df.shape == (3, 1)
-        assert df.columns == [SCORE_COLUMN]
-        assert df[SCORE_COLUMN].to_list() == pytest.approx([0.1, 0.2, 0.3])
-
-
 class TestScoreRecord:
     """ScoreRecord dataclass fields."""
 
@@ -277,8 +257,8 @@ class TestScoreRecord:
         assert record.client_id == "c0"
         assert record.split == ScoringStage.CAL
         assert record.row_count == 3
-        assert record.columns == (SCORE_COLUMN,)
-        assert record.dtypes[0].column == SCORE_COLUMN
+        assert record.columns == (ScoringColumn.RECONSTRUCTION_ERROR,)
+        assert record.dtypes[0].column == ScoringColumn.RECONSTRUCTION_ERROR
         assert record.dtypes[0].dtype == "Float32"
         assert record.score_min == pytest.approx(0.1)
         assert record.score_max == pytest.approx(0.2)

@@ -7,19 +7,17 @@ import pytest
 
 from datp.attacks.constants import N_MIN, THRESHOLD_QUANTILE
 from datp.config.models import ExperimentStage
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import (
     ClientFingerprint,
-    ClientFingerprintTuple,
-    ClientSilhouetteScore,
-    ClientSilhouetteScoreTuple,
+    ClusterCountSilhouetteScore,
     ClusterInfo,
-    ClusterInfoTuple,
     ClusterMetadata,
     ThresholdResult,
 )
 from datp.thresholding.eligibility import (
+    EligibilityResult,
     build_threshold_result,
     compute_client_thresholds,
     compute_tau_global,
@@ -55,40 +53,40 @@ class TestIdentifyEligible:
 
     def test_partitions_correctly(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify that clients are correctly partitioned according to the N_MIN limit."""
-        eligible, pending = identify_eligible(client_errors, n_min=N_MIN)
-        assert set(eligible) == {"client_a", "client_b", "client_c"}
-        assert set(pending) == {"client_d"}
+        result = identify_eligible(client_errors, n_min=N_MIN)
+        assert set(result.eligible_ids) == {"client_a", "client_b", "client_c"}
+        assert set(result.pending_ids) == {"client_d"}
 
     def test_n_min_from_param(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify N_MIN threshold limits are correctly respected when customized."""
-        eligible, _ = identify_eligible(client_errors, n_min=500)
-        assert "client_a" not in eligible
-        assert "client_b" not in eligible
+        eligible_ids = identify_eligible(client_errors, n_min=500).eligible_ids
+        assert "client_a" not in eligible_ids
+        assert "client_b" not in eligible_ids
 
     def test_all_eligible(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify all clients are eligible when N_MIN is set to 1."""
-        eligible, pending = identify_eligible(client_errors, n_min=1)
-        assert len(eligible) == 4
-        assert len(pending) == 0
+        result = identify_eligible(client_errors, n_min=1)
+        assert len(result.eligible_ids) == 4
+        assert len(result.pending_ids) == 0
 
     def test_all_pending(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify all clients are pending when N_MIN is larger than any client sample count."""
-        eligible, pending = identify_eligible(client_errors, n_min=1000)
-        assert len(eligible) == 0
-        assert len(pending) == 4
+        result = identify_eligible(client_errors, n_min=1000)
+        assert len(result.eligible_ids) == 0
+        assert len(result.pending_ids) == 4
 
     def test_empty_input(self) -> None:
         """Verify empty input dictionary returns empty lists for both partitions."""
-        eligible, pending = identify_eligible({}, n_min=100)
-        assert eligible == []
-        assert pending == []
+        result = identify_eligible({}, n_min=100)
+        assert result.eligible_ids == ()
+        assert result.pending_ids == ()
 
     def test_exact_boundary(self) -> None:
         """Verify client is marked eligible when sample count is exactly N_MIN."""
         errors = {"a": _make_errors(100, seed=0)}
-        eligible, pending = identify_eligible(errors, n_min=100)
-        assert eligible == ["a"]
-        assert pending == []
+        result = identify_eligible(errors, n_min=100)
+        assert result.eligible_ids == ("a",)
+        assert result.pending_ids == ()
 
 
 class TestComputeClientThresholds:
@@ -96,21 +94,23 @@ class TestComputeClientThresholds:
 
     def test_eligible_only(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify that thresholds are computed only for the eligible subset."""
-        eligible, _ = identify_eligible(client_errors, n_min=N_MIN)
-        taus = compute_client_thresholds(client_errors, eligible, q=THRESHOLD_QUANTILE)
+        eligibility = identify_eligible(client_errors, n_min=N_MIN)
+        taus = compute_client_thresholds(client_errors, eligibility, q=THRESHOLD_QUANTILE)
         assert "client_d" not in taus
 
     def test_matches_percentile(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify calculated thresholds match the exact percentile values from numpy."""
-        eligible, _ = identify_eligible(client_errors, n_min=N_MIN)
-        taus = compute_client_thresholds(client_errors, eligible, q=THRESHOLD_QUANTILE)
-        for cid in eligible:
+        eligibility = identify_eligible(client_errors, n_min=N_MIN)
+        taus = compute_client_thresholds(client_errors, eligibility, q=THRESHOLD_QUANTILE)
+        for cid in eligibility.eligible_ids:
             expected = float(np.percentile(client_errors[cid], THRESHOLD_QUANTILE))
             assert taus[cid] == pytest.approx(expected)
 
     def test_empty_eligible_returns_empty(self) -> None:
-        """Verify empty eligible list returns an empty threshold dict."""
-        taus = compute_client_thresholds({}, [], q=THRESHOLD_QUANTILE)
+        """Verify an empty eligibility result returns no client thresholds."""
+        taus = compute_client_thresholds(
+            {}, EligibilityResult(eligible_ids=(), pending_ids=()), q=THRESHOLD_QUANTILE
+        )
         assert taus == {}
 
 
@@ -156,7 +156,7 @@ class TestBuildThresholdResult:
         assert result.tau_global == pytest.approx(0.5)
         assert result.eligible_count == 2
         assert result.pending_count == 1
-        assert result.metadata.cluster is None
+        assert result.cluster is None
 
     def test_eligible_clients_not_pending(self) -> None:
         """Verify that eligible clients have calibration_pending set to False."""
@@ -169,7 +169,7 @@ class TestBuildThresholdResult:
         )
         ct = next(ct for ct in result.client_thresholds if ct.client_id == "a")
         assert ct.threshold == pytest.approx(0.3)
-        assert ct.calibration_pending is False
+        assert ct.status is ClientStatus.ELIGIBLE
         assert ct.strategy == ThresholdPolicy.LOCAL_THRESHOLD
 
     def test_pending_clients_get_tau_global(self) -> None:
@@ -183,7 +183,7 @@ class TestBuildThresholdResult:
         )
         ct = next(ct for ct in result.client_thresholds if ct.client_id == "p")
         assert ct.threshold == pytest.approx(0.42)
-        assert ct.calibration_pending is True
+        assert ct.status is ClientStatus.CALIBRATION_PENDING
         assert ct.strategy == ThresholdPolicy.GLOBAL_THRESHOLD
 
     def test_all_eligible_no_pending(self) -> None:
@@ -210,49 +210,35 @@ class TestBuildThresholdResult:
         assert result.eligible_count == 0
         assert result.pending_count == 3
         for ct in result.client_thresholds:
-            assert ct.calibration_pending is True
+            assert ct.status is ClientStatus.CALIBRATION_PENDING
             assert ct.threshold == pytest.approx(0.99)
 
     def test_with_cluster_metadata(self) -> None:
         """Verify that cluster metadata is correctly linked in the built result."""
         cluster_meta = ClusterMetadata(
             k=2,
-            cluster_info=ClusterInfoTuple(
-                (
-                    ClusterInfo(
-                        cluster_id="cluster_0", tau_cluster=0.3, members=("a",)
-                    ),
-                    ClusterInfo(
-                        cluster_id="cluster_1", tau_cluster=0.7, members=("b",)
-                    ),
-                )
+            cluster_info=(
+                ClusterInfo(cluster_id="cluster_0", tau_cluster=0.3, members=("a",)),
+                ClusterInfo(cluster_id="cluster_1", tau_cluster=0.7, members=("b",)),
             ),
             silhouette=0.85,
-            silhouette_scores=ClientSilhouetteScoreTuple(
-                (
-                    ClientSilhouetteScore(client_id="2", score=0.85),
-                    ClientSilhouetteScore(client_id="3", score=0.72),
-                )
+            silhouette_scores=(
+                ClusterCountSilhouetteScore(cluster_count=2, score=0.85),
+                ClusterCountSilhouetteScore(cluster_count=3, score=0.72),
             ),
-            fingerprints=ClientFingerprintTuple(
-                (
-                    ClientFingerprint(
-                        client_id="a",
-                        mean=1.0,
-                        std=0.5,
-                        skewness=0.1,
-                        p95=2.0,
-                    ),
-                    ClientFingerprint(
-                        client_id="b",
-                        mean=3.0,
-                        std=0.2,
-                        skewness=-0.1,
-                        p95=4.0,
-                    ),
-                )
+            fingerprints=(
+                ClientFingerprint(
+                    client_id="a", mean=1.0, std=0.5, skewness=0.1, p95=2.0
+                ),
+                ClientFingerprint(
+                    client_id="b", mean=3.0, std=0.2, skewness=-0.1, p95=4.0
+                ),
             ),
         )
+        assert cluster_meta.fingerprint_for("a").mean == 1.0
+        with pytest.raises(KeyError, match="missing"):
+            cluster_meta.fingerprint_for("missing")
+
         result = build_threshold_result(
             run=_run(ThresholdPolicy.CLUSTER_THRESHOLD),
             tau_global=0.5,
@@ -260,7 +246,7 @@ class TestBuildThresholdResult:
             pending_clients=[],
             cluster_metadata=cluster_meta,
         )
-        assert result.metadata.cluster is cluster_meta
+        assert result.cluster is cluster_meta
 
     def test_strategy_matches_run_policy(self) -> None:
         """Ensure client thresholds strategy matches the policy run ID configuration."""

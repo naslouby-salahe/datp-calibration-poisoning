@@ -20,7 +20,7 @@ from datp.attacks.reservoirs.reservoir import (
     build_reservoir,
 )
 from datp.core.seeds import SeedPair, SeedRecord, make_seed_rng
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     make_degenerate_tail_client,
     make_eligible_client,
 )
@@ -88,7 +88,7 @@ class TestCardinalityPreserved:
             rng=_rng(),
         )
         assert res.poisoned_cal.shape == c.cal.shape
-        assert res.n_total == c.n_cal
+        assert res.n_total == c.cal.size
 
 
 class TestBudgetFormula:
@@ -118,7 +118,7 @@ class TestBudgetFormula:
             fraction=fraction,
             rng=_rng(),
         )
-        expected = max(1, round(fraction * c.n_cal))
+        expected = max(1, round(fraction * c.cal.size))
         assert res.n_replaced == expected
 
 

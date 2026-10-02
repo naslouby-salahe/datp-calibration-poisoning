@@ -11,11 +11,11 @@ import pandas as pd
 import polars as pl
 from datp.artifacts.names import ArtifactFile
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, POLICY_THRESHOLD_SOURCE, ThresholdPolicy
 from datp.core.types import ClientThreshold
 from datp.data.common.storage import write_artifact
 from datp.evaluation.metrics import compute_client_record
-from datp.scoring.manifest import SCORE_COLUMN
+from datp.scoring.manifest import ScoringColumn
 from datp.validation.enums import AuditArtifact, WarningCode
 from datp.validation.results import run_results_audit
 
@@ -52,7 +52,7 @@ def _write_scores(root: Path) -> None:
             "test_attack": attack,
         }.items():
             write_artifact(
-                pl.DataFrame({SCORE_COLUMN: values}),
+                pl.DataFrame({ScoringColumn.RECONSTRUCTION_ERROR: values}),
                 _safe_score_path(root, stage, client_id),
             )
 
@@ -62,7 +62,7 @@ def _make_client_metric_entry(client_id: str, policy: ThresholdPolicy) -> dict:
     ct = ClientThreshold(
         client_id=client_id,
         threshold=0.06,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=policy,
     )
     rec = compute_client_record(
@@ -72,10 +72,12 @@ def _make_client_metric_entry(client_id: str, policy: ThresholdPolicy) -> dict:
         "client_id": client_id,
         "fpr": rec.metrics.fpr,
         "tpr": rec.metrics.tpr,
+        "tnr": rec.metrics.tnr,
+        "fnr": rec.metrics.fnr,
+        "precision": rec.metrics.precision,
+        "recall": rec.metrics.recall,
         "balanced_accuracy": rec.metrics.balanced_accuracy,
         "macro_f1": rec.metrics.macro_f1,
-        "auroc": None,
-        "pr_auc": None,
         "confusion_matrix": {
             "tp": rec.confusion.tp,
             "fp": rec.confusion.fp,
@@ -84,12 +86,10 @@ def _make_client_metric_entry(client_id: str, policy: ThresholdPolicy) -> dict:
         },
         "n_benign": rec.n_benign,
         "n_attack": rec.n_attack,
-        "benign_count": rec.n_benign,
-        "attack_count": rec.n_attack,
         "calibration_pending": False,
         "evaluation_incomplete": False,
         "threshold_value": 0.06,
-        "threshold_source": policy.value,
+        "threshold_source": POLICY_THRESHOLD_SOURCE[policy].value,
     }
 
 
@@ -102,6 +102,7 @@ def _metrics_payload(policy: ThresholdPolicy) -> dict:
         "threshold_schema_version": "1",
         "run_id": f"nbaiot_main_{policy.value}_seed0",
         "run_kind": "core_ladder",
+        "checkpoint_round": None,
         "dataset": "nbaiot",
         "policy": policy.value,
         "threshold_scope": "eligible_client_arithmetic_mean",
@@ -114,6 +115,8 @@ def _metrics_payload(policy: ThresholdPolicy) -> dict:
         "iqr_fpr": 0.0,
         "iqr_tpr": 0.0,
         "worst_client_fpr": 0.0,
+        "worst_ba": 1.0,
+        "p10_macro_f1": 1.0,
         "worst_client_id": _CLIENTS[0],
         "eligible_count": len(_CLIENTS),
         "client_count": len(_CLIENTS),
@@ -139,7 +142,6 @@ def _metrics_payload(policy: ThresholdPolicy) -> dict:
         "stage": "nbaiot_main",
         "seed": 0,
         "tau_global": 0.06,
-        "normalization_scope": "per_client_zscore",
     }
 
 
@@ -182,7 +184,7 @@ def test_results_audit_generates_core_artifacts(tmp_path: Path) -> None:
 
     from datp.validation.results import AuditOutputName
 
-    assert paths.path_for(AuditOutputName.RUN_MANIFEST).is_file()
+    assert dict(paths.items())[AuditOutputName.RUN_MANIFEST].is_file()
     assert (audit_dir / AuditArtifact.POLICY_INVARIANTS).is_file()
     assert (audit_dir / AuditArtifact.RUN_MANIFEST).is_file()
     assert (audit_dir / AuditArtifact.RECONSTRUCTION_ERROR_SUMMARY).is_file()

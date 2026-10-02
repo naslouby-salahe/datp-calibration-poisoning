@@ -1,4 +1,3 @@
-"""Checkpoint protocol CLI: preview, smoke, evaluate, status, and summary."""
 
 from __future__ import annotations
 
@@ -16,34 +15,46 @@ from datp.checkpointing.invariants import (
     CheckpointValidationConfig,
     validate_checkpoint_evaluation_invariants,
 )
-from datp.checkpointing.status import checkpoint_artifact_status
+from datp.checkpointing.status import (
+    CheckpointArtifactCellStatus,
+    checkpoint_artifact_status,
+)
 from datp.checkpointing.summary import select_global_primary_checkpoint
 from datp.cli.enums import (
-    _CHECKPOINT_DEFAULT_STAGE,
-    _CHECKPOINT_SUMMARY_POLICIES,
-    _ERROR_MUST_NOT_WRITE_OUTPUTS,
-    _ERROR_NOT_CONFIGURED,
-    _SMOKE_TEMP_DIR_PREFIX,
+    CHECKPOINT_DEFAULT_STAGE,
+    CHECKPOINT_SUMMARY_POLICIES,
+    ERROR_MUST_NOT_WRITE_OUTPUTS,
+    ERROR_NOT_CONFIGURED,
     CheckpointCommand,
-    _CheckpointEvalField,
-    _CheckpointSmokeField,
-    _CheckpointStatusField,
-    _CheckpointSummaryField,
+    CheckpointEvalField,
+    CheckpointSmokeField,
+    CheckpointStatusField,
+    CheckpointSummaryField,
 )
 from datp.config.compose import BASE_CONFIG
-from datp.core.enums import CONTROLLED_POLICIES
+from datp.core.enums import CONTROLLED_POLICIES, PathToken
 from datp.core.identity import PolicyRunId, TrainingCellId
+from datp.types import (
+    RandomSeed,
+    RoundIndex,
+)
 from datp.thresholding.metrics_serialization import SweepMetrics
 
 app = typer.Typer()
 _stdout = Console()
 
 
-@app.command(CheckpointCommand.PREVIEW.value)
+def _round_index_from_cli(value: int) -> RoundIndex:
+    if value < 0:
+        raise typer.BadParameter("round must be non-negative")
+    return value
+
+
+@app.command(CheckpointCommand.PREVIEW)
 def preview() -> None:
     """Print the resolved checkpoint protocol configuration as JSON."""
     if not BASE_CONFIG.checkpoint_protocol:
-        _stdout.print(_ERROR_NOT_CONFIGURED)
+        _stdout.print(ERROR_NOT_CONFIGURED)
         return
     _stdout.print(
         json.dumps(
@@ -55,18 +66,17 @@ def preview() -> None:
     )
 
 
-@app.command(CheckpointCommand.SMOKE.value)
+@app.command(CheckpointCommand.SMOKE)
 def smoke(artifact_root: Path | None = typer.Option(None)) -> None:
     """Run a smoke test of the primary checkpoint selection logic."""
     if artifact_root:
         _run_smoke(artifact_root)
     else:
-        with tempfile.TemporaryDirectory(prefix=_SMOKE_TEMP_DIR_PREFIX) as tmp:
+        with tempfile.TemporaryDirectory(prefix=PathToken.CHECKPOINT_PROTOCOL_SMOKE_TEMP_PREFIX) as tmp:
             _run_smoke(Path(tmp))
 
 
 def _run_smoke(artifact_root: Path) -> None:
-    """Build a smoke fixture and run primary checkpoint selection."""
     from datp.testsupport.checkpoint_protocol import (
         SMOKE_N_BOOTSTRAP,
         SMOKE_ROUNDS,
@@ -86,9 +96,9 @@ def _run_smoke(artifact_root: Path) -> None:
     _stdout.print(
         json.dumps(
             {
-                _CheckpointSmokeField.ARTIFACT_ROOT.value: str(artifact_root),
-                _CheckpointSmokeField.ROUNDS.value: list(SMOKE_ROUNDS),
-                _CheckpointSmokeField.SELECTED_ROUND.value: selection.selected_round,
+                CheckpointSmokeField.ARTIFACT_ROOT: str(artifact_root),
+                CheckpointSmokeField.ROUNDS: list(SMOKE_ROUNDS),
+                CheckpointSmokeField.SELECTED_ROUND: selection.selected_round,
             },
             indent=2,
             sort_keys=True,
@@ -97,21 +107,23 @@ def _run_smoke(artifact_root: Path) -> None:
     )
 
 
-@app.command(CheckpointCommand.EVALUATE_FROM_SCORES.value)
+@app.command(CheckpointCommand.EVALUATE_FROM_SCORES)
 def evaluate_from_scores(
     artifact_root: Path = typer.Option(...),
     seed: int = typer.Option(...),
     checkpoint_round: int = typer.Option(...),
 ) -> None:
     """Validate checkpoint evaluation invariants from existing score artifacts."""
-    layout = ArtifactLayout(base_dir=artifact_root, stage=_CHECKPOINT_DEFAULT_STAGE)
-    cell = TrainingCellId(stage=_CHECKPOINT_DEFAULT_STAGE, seed=seed)
+    seed_value = RandomSeed(seed)
+    round_index = _round_index_from_cli(checkpoint_round)
+    layout = ArtifactLayout(base_dir=artifact_root, stage=CHECKPOINT_DEFAULT_STAGE)
+    cell = TrainingCellId(stage=CHECKPOINT_DEFAULT_STAGE, seed=seed_value)
 
     metrics_paths = tuple(
         p
         for p in (
-            layout.policy_run_for_round(
-                PolicyRunId(cell=cell, policy=pol), checkpoint_round
+            layout.policy_run(
+                PolicyRunId(cell=cell, policy=pol), round_index
             ).metrics_path
             for pol in CONTROLLED_POLICIES
         )
@@ -120,11 +132,11 @@ def evaluate_from_scores(
 
     invariant = validate_checkpoint_evaluation_invariants(
         CheckpointValidationConfig(
-            stage=_CHECKPOINT_DEFAULT_STAGE,
-            seed=seed,
-            checkpoint_round=checkpoint_round,
-            score_manifest_path=layout.score_cell_for_round(
-                cell, checkpoint_round
+            stage=CHECKPOINT_DEFAULT_STAGE,
+            seed=seed_value,
+            checkpoint_round=round_index,
+            score_manifest_path=layout.score_cell(
+                cell, round_index
             ).manifest_path,
             config_identity=None,
             split_manifest_identity=None,
@@ -136,9 +148,9 @@ def evaluate_from_scores(
     _stdout.print(
         json.dumps(
             {
-                _CheckpointEvalField.CHECKPOINT_ROUND.value: invariant.checkpoint_round,
-                _CheckpointEvalField.POLICIES.value: [
-                    p.value for p in invariant.policies
+                CheckpointEvalField.CHECKPOINT_ROUND: invariant.checkpoint_round,
+                CheckpointEvalField.POLICIES: [
+                    p for p in invariant.policies
                 ],
             },
             sort_keys=True,
@@ -146,28 +158,30 @@ def evaluate_from_scores(
     )
 
 
-@app.command(CheckpointCommand.STATUS.value)
+@app.command(CheckpointCommand.STATUS)
 def status(
     artifact_root: Path = typer.Option(...),
     seed: int = typer.Option(...),
     checkpoint_round: int = typer.Option(...),
 ) -> None:
     """Print the artifact status for a checkpoint round cell as JSON."""
-    cell_status = checkpoint_artifact_status(
+    seed_value = RandomSeed(seed)
+    round_index = _round_index_from_cli(checkpoint_round)
+    cell_status: CheckpointArtifactCellStatus = checkpoint_artifact_status(
         artifact_root=artifact_root,
-        stage=_CHECKPOINT_DEFAULT_STAGE,
-        seed=seed,
-        checkpoint_round=checkpoint_round,
+        stage=CHECKPOINT_DEFAULT_STAGE,
+        seed=seed_value,
+        checkpoint_round=round_index,
     )
 
     _stdout.print(
         json.dumps(
             {
-                _CheckpointStatusField.COMPLETE.value: cell_status.complete,
-                _CheckpointStatusField.CHECKPOINT.value: cell_status.checkpoint.value,
-                _CheckpointStatusField.SCORES.value: cell_status.scores.value,
-                _CheckpointStatusField.RESULTS.value: {
-                    policy.value: res.value for policy, res in cell_status.results
+                CheckpointStatusField.COMPLETE: cell_status.complete,
+                CheckpointStatusField.CHECKPOINT: cell_status.checkpoint,
+                CheckpointStatusField.SCORES: cell_status.scores,
+                CheckpointStatusField.RESULTS: {
+                    policy: res for policy, res in cell_status.results
                 },
             },
             indent=2,
@@ -177,27 +191,31 @@ def status(
     )
 
 
-@app.command(CheckpointCommand.SUMMARY.value)
+@app.command(CheckpointCommand.SUMMARY)
 def summary(
     artifact_root: Path = typer.Option(...),
     seeds: list[int] = typer.Option(...),
     rounds: list[int] = typer.Option(...),
 ) -> None:
     """Print the selected primary checkpoint round as JSON."""
-    layout = ArtifactLayout(base_dir=artifact_root, stage=_CHECKPOINT_DEFAULT_STAGE)
+    training_seeds = tuple(RandomSeed(seed) for seed in seeds)
+    checkpoint_rounds = tuple(_round_index_from_cli(value) for value in rounds)
+    layout = ArtifactLayout(base_dir=artifact_root, stage=CHECKPOINT_DEFAULT_STAGE)
     metrics = tuple(
         SweepMetrics.model_validate_json(
-            layout.policy_run_for_round(
+            layout.policy_run(
                 PolicyRunId(
-                    cell=TrainingCellId(stage=_CHECKPOINT_DEFAULT_STAGE, seed=s),
+                    cell=TrainingCellId(
+                        stage=CHECKPOINT_DEFAULT_STAGE, seed=RandomSeed(s)
+                    ),
                     policy=p,
                 ),
                 r,
             ).metrics_path.read_text()
         )
-        for s in seeds
-        for r in rounds
-        for p in _CHECKPOINT_SUMMARY_POLICIES
+        for s in training_seeds
+        for r in checkpoint_rounds
+        for p in CHECKPOINT_SUMMARY_POLICIES
     )
     selection = select_global_primary_checkpoint(
         metrics=metrics,
@@ -206,13 +224,12 @@ def summary(
     )
     _stdout.print(
         json.dumps(
-            {_CheckpointSummaryField.SELECTED_ROUND.value: selection.selected_round},
+            {CheckpointSummaryField.SELECTED_ROUND: selection.selected_round},
             sort_keys=True,
         )
     )
 
 
 def _reject_outputs_path(path: Path) -> None:
-    """Raise if path resolves inside the outputs directory."""
     if path.resolve().is_relative_to((Path.cwd() / ArtifactDir.OUTPUTS).resolve()):
-        raise typer.BadParameter(_ERROR_MUST_NOT_WRITE_OUTPUTS)
+        raise typer.BadParameter(ERROR_MUST_NOT_WRITE_OUTPUTS)

@@ -42,12 +42,10 @@ def _base_client(client_id: str = "c1", calibration_pending: bool = False) -> di
         },
         PayloadKey.N_BENIGN: 10,
         PayloadKey.N_ATTACK: 10,
-        "benign_count": 10,
-        "attack_count": 10,
         PayloadKey.CALIBRATION_PENDING: calibration_pending,
         PayloadKey.EVALUATION_INCOMPLETE: False,
         PayloadKey.THRESHOLD_VALUE: 0.5,
-        PayloadKey.THRESHOLD_SOURCE: "global_threshold",
+        PayloadKey.THRESHOLD_SOURCE: "global",
     }
 
 
@@ -62,6 +60,7 @@ def _valid_payload(**overrides) -> dict:
         PayloadKey.POLICY: "global_threshold",
         PayloadKey.STAGE: "nbaiot_main",
         PayloadKey.SEED: 0,
+        "checkpoint_round": None,
         PayloadKey.THRESHOLD_SCOPE: "eligible_client_arithmetic_mean",
         PayloadKey.THRESHOLD_STRATEGY_NAME: "global_threshold",
         "tau_global": 0.5,

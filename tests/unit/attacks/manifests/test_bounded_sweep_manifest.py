@@ -10,24 +10,26 @@ from pydantic import ValidationError
 
 from datp.attacks.enums import (
     AttackerObjective,
+    ManifestProvenanceSource,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
 )
 from datp.attacks.manifests.bounded_sweep_manifest import (
+    ArtifactProvenance,
     BoundedSweepManifest,
     BoundedSweepResultRow,
 )
 from datp.attacks.manifests.run_manifest import ProvenanceRecord
 from datp.core.enums import ThresholdPolicy
 from datp.core.provenance import REPOSITORY_NAME
-from datp.core.seeds import SeedPair, derive_seed_record
+from datp.core.seeds import SeedPair, SeedRecord
 from tests.fixtures.sweep_rows import extended_row_fields
 
 
 def _row(training_seed: int = 0, poisoning_seed: int = 100) -> BoundedSweepResultRow:
     """Helper to build a complete BoundedSweepResultRow mock instance."""
-    seed_record = derive_seed_record(
-        SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
+    seed_record = SeedRecord(
+        pair=SeedPair(training_seed=training_seed, poisoning_seed=poisoning_seed),
         client_idx=0,
         scope_idx=0,
     )
@@ -99,7 +101,9 @@ def _manifest(**overrides: Any) -> BoundedSweepManifest:
         "poisoning_seeds": tuple(range(100, 110)),
         "analysis_seeds": tuple(range(300, 310)),
         "config_hash": "config-hash",
-        "artifact_provenance": {"source": "test"},
+        "artifact_provenance": ArtifactProvenance(
+            source=ManifestProvenanceSource.NBAIOT_MAIN_SWEEP
+        ),
         "mu_flag_threshold_by_training_seed": dict.fromkeys(range(10), 0.005),
         "n_cells": 1,
         "results": (_row(),),
@@ -111,8 +115,9 @@ def _manifest(**overrides: Any) -> BoundedSweepManifest:
 def test_manifest_round_trips_through_json() -> None:
     """Verify that BoundedSweepManifest parses successfully from serialized JSON output."""
     manifest = _manifest()
-    restored = BoundedSweepManifest.model_validate_json(manifest.model_dump_json())
-    assert restored == manifest
+    serialized = manifest.model_dump_json()
+    restored = BoundedSweepManifest.model_validate_json(serialized)
+    assert restored.model_dump_json() == serialized
 
 
 def test_undefined_cv_serializes_as_null_and_round_trips_to_nan() -> None:

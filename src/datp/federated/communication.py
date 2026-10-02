@@ -1,6 +1,13 @@
-"""Communication-overhead modeling for FL training and threshold calibration."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ByteCount,
+    RoundCount,
+    RoundIndex,
+    SampleCount,
+    SignedCount,
+)
+
 
 from dataclasses import dataclass
 
@@ -12,50 +19,44 @@ _CLUSTER_DOWNLINK_FLOATS_PER_CLIENT = 2
 
 @dataclass(frozen=True, slots=True)
 class RoundComm:
-    """Per-round communication payload sizes for model transfer in a single FL round."""
 
-    round_num: int
-    server_uplink_payload_bytes: int
-    server_downlink_payload_bytes: int
+    round_num: RoundIndex
+    server_uplink_payload_bytes: ByteCount
+    server_downlink_payload_bytes: ByteCount
 
 
 @dataclass(frozen=True, slots=True)
 class ThresholdComm:
-    """Communication payload sizes for a single threshold-calibration policy."""
 
     policy: ThresholdPolicy
-    server_uplink_payload_bytes: int
-    server_downlink_payload_bytes: int
+    server_uplink_payload_bytes: ByteCount
+    server_downlink_payload_bytes: ByteCount
 
 
 @dataclass(frozen=True, slots=True)
 class TrainingCommSummary:
-    """Aggregate communication summary for FL training: per-round and total bytes."""
 
-    model_bytes: int
-    total_rounds: int
-    num_clients: int
-    uplink_bytes_per_round: int
-    downlink_bytes_per_round: int
-    total_uplink_bytes: int
-    total_downlink_bytes: int
+    model_bytes: ByteCount
+    total_rounds: RoundCount
+    num_clients: SampleCount
+    uplink_bytes_per_round: RoundIndex
+    downlink_bytes_per_round: RoundIndex
+    total_uplink_bytes: ByteCount
+    total_downlink_bytes: ByteCount
 
 
 @dataclass(frozen=True, slots=True)
 class CommSummary:
-    """Top-level communication summary: training overhead plus per-policy threshold overhead."""
 
     training: TrainingCommSummary
     threshold_calibration: dict[ThresholdPolicy, ThresholdComm]
 
 
-def compute_model_bytes(param_count: int) -> int:
-    """Return byte size of a model given its scalar parameter count."""
+def compute_model_bytes(param_count: ByteCount) -> ByteCount:
     return param_count * _BYTES_PER_SCALAR
 
 
-def compute_round_comm(round_num: int, model_bytes: int, num_clients: int) -> RoundComm:
-    """Compute per-round uplink and downlink bytes for model transfer."""
+def compute_round_comm(round_num: RoundIndex, model_bytes: ByteCount, num_clients: SampleCount) -> RoundComm:
     return RoundComm(
         round_num=round_num,
         server_uplink_payload_bytes=model_bytes * num_clients,
@@ -63,8 +64,7 @@ def compute_round_comm(round_num: int, model_bytes: int, num_clients: int) -> Ro
     )
 
 
-def compute_threshold_comm(policy: ThresholdPolicy, k_eligible: int) -> ThresholdComm:
-    """Estimate communication bytes for a threshold-calibration policy."""
+def compute_threshold_comm(policy: ThresholdPolicy, k_eligible: SignedCount) -> ThresholdComm:
     if policy == ThresholdPolicy.GLOBAL_THRESHOLD:
         return ThresholdComm(
             policy, _BYTES_PER_SCALAR * k_eligible, _BYTES_PER_SCALAR * k_eligible
@@ -82,17 +82,17 @@ def compute_threshold_comm(policy: ThresholdPolicy, k_eligible: int) -> Threshol
 
 
 def build_comm_summary(
-    total_rounds: int, model_bytes: int, num_clients: int, k_eligible: int
+    total_rounds: RoundCount, model_bytes: ByteCount, num_clients: SampleCount, k_eligible: SignedCount
 ) -> CommSummary:
-    """Build a complete communication summary for all threshold policies."""
+    round_comm = compute_round_comm(1, model_bytes, num_clients)
     training = TrainingCommSummary(
         model_bytes=model_bytes,
         total_rounds=total_rounds,
         num_clients=num_clients,
-        uplink_bytes_per_round=model_bytes * num_clients,
-        downlink_bytes_per_round=model_bytes * num_clients,
-        total_uplink_bytes=model_bytes * num_clients * total_rounds,
-        total_downlink_bytes=model_bytes * num_clients * total_rounds,
+        uplink_bytes_per_round=round_comm.server_uplink_payload_bytes,
+        downlink_bytes_per_round=round_comm.server_downlink_payload_bytes,
+        total_uplink_bytes=round_comm.server_uplink_payload_bytes * total_rounds,
+        total_downlink_bytes=round_comm.server_downlink_payload_bytes * total_rounds,
     )
     threshold_calibration = {
         bl: compute_threshold_comm(bl, k_eligible) for bl in ThresholdPolicy

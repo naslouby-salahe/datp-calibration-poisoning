@@ -133,18 +133,18 @@ class TestLoadScoringData:
     def test_returns_client_data_when_no_prepared_dir(self) -> None:
         """Verify in-memory client data is returned if prepared_dir is None."""
         data = {"c0": _client_data()}
-        result = load_scoring_data(data, None)
+        result = load_scoring_data(data, None, expected_dim=2)
         assert result is data
 
     def test_raises_when_both_absent(self) -> None:
         """Verify ValueError is raised if both scoring inputs are absent."""
         with pytest.raises(ValueError, match="No scoring data source"):
-            load_scoring_data(None, None)
+            load_scoring_data(None, None, expected_dim=2)
 
     def test_raises_when_client_data_empty_and_no_prepared_dir(self) -> None:
         """Verify ValueError is raised if in-memory client data is empty and prepared_dir is None."""
         with pytest.raises(ValueError, match="No scoring data source"):
-            load_scoring_data({}, None)
+            load_scoring_data({}, None, expected_dim=2)
 
     def test_loads_from_prepared_dir_ignoring_client_data(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -155,7 +155,7 @@ class TestLoadScoringData:
         fake = {"c0": _client_data()}
         monkeypatch.setattr(sim_mod, "load_client_data", lambda *_a, **_kw: fake)
 
-        result = load_scoring_data(None, tmp_path)
+        result = load_scoring_data(None, tmp_path, expected_dim=2)
         assert result is fake
 
     def test_prepared_dir_wins_over_client_data(
@@ -168,7 +168,7 @@ class TestLoadScoringData:
         monkeypatch.setattr(sim_mod, "load_client_data", lambda *_, **__: from_disk)
 
         in_memory = {"in_memory": _client_data()}
-        result = load_scoring_data(in_memory, tmp_path)
+        result = load_scoring_data(in_memory, tmp_path, expected_dim=2)
         assert result is from_disk
 
 

@@ -1,7 +1,17 @@
-"""Blast-radius and spillover diagnostics for poisoning impact assessment."""
-
 from __future__ import annotations
 
+from datp.types import (
+    ClientId,
+    FalsePositiveRate,
+    PoisonFraction,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    Threshold,
+)
+
+
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -15,30 +25,27 @@ from datp.core.enums import ThresholdPolicy
 
 @dataclass(frozen=True, slots=True)
 class BlastRadiusRecord:
-    """Proportion of non-victim eligible clients with significant delta-tau."""
 
     policy: ThresholdPolicy
-    victim_id: str | None
-    n_significant: int
-    n_eligible: int
-    blast_fraction: float
+    victim_id: ClientId | None
+    n_significant: SampleCount
+    n_eligible: SampleCount
+    blast_fraction: PoisonFraction
 
 
 @dataclass(frozen=True, slots=True)
 class SpilloverRecord:
-    """Non-victim clients whose thresholds shift due to calibration poisoning."""
 
     policy: ThresholdPolicy
-    victim_id: str
-    spillover_client_ids: tuple[str, ...]
-    n_spillover: int
-    n_non_victims: int
+    victim_id: ClientId
+    spillover_client_ids: tuple[ClientId, ...]
+    n_spillover: SampleCount
+    n_non_victims: SampleCount
 
 
 def compute_blast_radius(
-    result: MetricResult, *, victim_id: str | None = None
+    result: MetricResult, *, victim_id: ClientId | None = None
 ) -> BlastRadiusRecord:
-    """Count how many non-victim clients show significant delta-tau."""
     entries = result.delta_tau
     n_sig = sum(e.is_significant for cid, e in entries.items() if cid != victim_id)
     n_elig = len(entries) - (1 if victim_id in entries else 0)
@@ -56,10 +63,9 @@ def compute_spillover(
     result: MetricResult,
     *,
     collection: ScoreCollection,
-    victim_id: str,
+    victim_id: ClientId,
     objective: AttackerObjective,
 ) -> SpilloverRecord:
-    """Identify non-victim clients whose downstream metrics degraded under poisoning."""
     entries = result.delta_tau
     non_victim_ids = tuple(cid for cid in entries if cid != victim_id)
     spill = tuple(
@@ -88,12 +94,11 @@ def _has_downstream_degradation(
     *,
     collection: ScoreCollection,
     result: MetricResult,
-    client_id: str,
+    client_id: ClientId,
     objective: AttackerObjective,
 ) -> bool:
-    """Check if a non-victim client's TPR, BA, or macro-F1 degraded."""
     entry = result.delta_tau[client_id]
-    client_scores = collection.for_client(client_id)
+    client_scores = collection.clients[client_id]
 
     if objective == AttackerObjective.THRESHOLD_RAISE:
         metrics = compute_victim_downstream_metrics(
@@ -112,30 +117,27 @@ def _has_downstream_degradation(
     return poisoned_fpr > clean_fpr
 
 
-def _fpr(test_benign: np.ndarray, threshold: float) -> float:
-    """Compute false-positive rate at a given threshold."""
+def _fpr(test_benign: ScoreVector, threshold: Threshold) -> FalsePositiveRate:
     if test_benign.size == 0:
-        return float("nan")
+        return math.nan
     return float(np.mean(test_benign > threshold))
 
 
-def duplicate_rate(values: np.ndarray) -> float:
-    """Return the fraction of entries that repeat an earlier value in the array."""
-    return 1.0 - len(np.unique(values)) / values.size if values.size else float("nan")
+def duplicate_rate(values: ScoreVector) -> ScoreValue:
+    return 1.0 - len(np.unique(values)) / values.size if values.size else math.nan
 
 
 def tau_bound_utilization(
     *,
-    clean_cal: np.ndarray,
-    tau_clean: float,
-    tau_pois: float,
+    clean_cal: ScoreVector,
+    tau_clean: Threshold,
+    tau_pois: Threshold,
     objective: AttackerObjective,
-) -> float:
-    """Return the share of the buffer-reachable threshold range consumed by the shift."""
+) -> Threshold:
     if objective == AttackerObjective.THRESHOLD_RAISE:
         reachable = float(clean_cal.max()) - tau_clean
         shift = tau_pois - tau_clean
     else:
         reachable = tau_clean - float(clean_cal.min())
         shift = tau_clean - tau_pois
-    return shift / reachable if reachable > 0.0 else float("nan")
+    return shift / reachable if reachable > 0.0 else math.nan

@@ -34,3 +34,13 @@ def test_removed_diagnostic_cli_targets_do_not_return() -> None:
     makefile = _makefile_text()
     assert "$(DATP_CLI) diagnostic" not in makefile
     assert "diagnostic-regime-" not in makefile
+
+
+def test_normal_unit_target_runs_architecture_tests() -> None:
+    makefile = _makefile_text()
+    target = re.search(
+        r"^datp-cp-unit-tests:.*\n((?:\t.*\n)+)", makefile, re.MULTILINE
+    )
+
+    assert target is not None
+    assert "tests/architecture/" in target.group(1)

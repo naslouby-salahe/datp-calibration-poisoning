@@ -16,9 +16,9 @@ from datp.attacks.threshold_recomputation.threshold_recompute import (
     compute_global_pair,
     compute_local_pair,
 )
-from datp.attacks.types import MetricEngineInput
+from datp.attacks.types import MetricEngineInput, PoisonedCalibrationSet
 from datp.core.seeds import SeedPair, SeedRecord, make_seed_rng
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     make_standard_score_set,
 )
@@ -30,7 +30,7 @@ def _make_setup(fraction: float = 0.40):
     raw = {c.client_id: (c.cal, c.test_benign, c.test_attack) for c in ss.clients}
     col = build_score_collection(raw)
 
-    eligible_ids = list(col.eligible_ids)
+    eligible_ids = list(col.eligibility.eligible_ids)
     victim_id = eligible_ids[0]
     cal = col.clients[victim_id].cal
     reservoir = build_reservoir(
@@ -46,10 +46,10 @@ def _make_setup(fraction: float = 0.40):
     inj = inject_fixed_budget(
         clean_cal=cal, reservoir=reservoir, fraction=fraction, rng=rng
     )
-    pois_cal = {
+    pois_cal = PoisonedCalibrationSet.from_mapping({
         cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
         for cid in eligible_ids
-    }
+    })
 
     global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
     local_pair = compute_local_pair(

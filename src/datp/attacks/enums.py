@@ -1,4 +1,3 @@
-"""Attack protocol enums and small enum-derived predicates."""
 
 from __future__ import annotations
 
@@ -6,34 +5,46 @@ import enum
 
 __all__ = [
     "AttackerObjective",
+    "ClaimClassification",
     "CalibrationInjectionRule",
-    "DIAGNOSTIC_ONLY_KNOWLEDGE",
-    "DIAGNOSTIC_ONLY_SCOPES",
     "DIAGNOSTIC_ONLY_SOURCES",
     "PoisoningDefense",
     "PoisoningKnowledge",
     "PoisoningSourceStrategy",
     "PoisoningTargetScope",
+    "ReservoirMode",
     "ReservoirDraw",
     "ReservoirStatus",
+    "SplitSemantics",
     "SYNTHESIZED_DRAWS",
-    "SensitivityAnalysis",
-    "is_diagnostic_knowledge",
-    "is_diagnostic_scope",
     "is_diagnostic_source",
     "objective_for_source",
 ]
 
 
 class AttackerObjective(enum.StrEnum):
-    """What the attacker aims to achieve by poisoning the calibration set."""
 
     THRESHOLD_RAISE = "threshold_raise"
     THRESHOLD_LOWER = "threshold_lower"
 
 
+class ClaimClassification(enum.StrEnum):
+
+    CALIBRATION_INSTABILITY = "calibration_instability"
+    FULL_VULNERABILITY = "full_vulnerability"
+    MECHANISM_ONLY = "mechanism_only"
+    NULL_OR_CONDITIONAL = "null_or_conditional"
+
+
+class ThresholdScaleScenario(enum.StrEnum):
+
+    RAW_CLEAN = "raw_clean"
+    RAW_POISONED = "raw_pois"
+    NORMALIZED_CLEAN = "norm_clean"
+    NORMALIZED_POISONED = "norm_pois"
+
+
 class PoisoningSourceStrategy(enum.StrEnum):
-    """Reservoir sampling strategy for poisoned-value selection."""
 
     RANDOM_BENIGN = "random_benign"
     HIGH_SCORE_BENIGN = "high_score_benign"
@@ -44,13 +55,29 @@ class PoisoningSourceStrategy(enum.StrEnum):
 
 
 class CalibrationInjectionRule(enum.StrEnum):
-    """How poisoned values replace calibration entries."""
 
     REPLACE_FIXED_BUDGET = "replace_fixed_budget"
 
 
+class SplitSemantics(enum.StrEnum):
+
+    CHRONOLOGICAL_BENIGN_ONLY_60_1_20_1_18 = (
+        "chronological_benign_only_60_1_20_1_18"
+    )
+
+
+class ReservoirMode(enum.StrEnum):
+
+    VICTIM_LOCAL_BENIGN_CAL_SOURCE_PRECEDENCE_RULE_2 = (
+        "victim_local_benign_cal_source_precedence_rule_2"
+    )
+
+
+class ManifestProvenanceSource(enum.StrEnum):
+    NBAIOT_MAIN_SWEEP = "nbaiot_main_manifest"
+
+
 class ReservoirDraw(enum.StrEnum):
-    """How reservoir values are drawn at injection; only WITH_REPLACEMENT is used by the bounded sweep."""
 
     WITH_REPLACEMENT = "with_replacement"
     WITHOUT_REPLACEMENT = "without_replacement"
@@ -58,44 +85,35 @@ class ReservoirDraw(enum.StrEnum):
     INTERPOLATED_TAIL = "interpolated_tail"
 
 
+class SeedAggregationMethod(enum.StrEnum):
+
+    MEAN = "mean"
+    MAXIMUM = "max"
+
+
 SYNTHESIZED_DRAWS: frozenset[ReservoirDraw] = frozenset(
     {ReservoirDraw.INTERPOLATED_TAIL}
 )
 
 
-class SensitivityAnalysis(enum.StrEnum):
-    """Sensitivity analyses that sit beside the bounded sweep."""
-
-    CLUSTER_STABILITY = "cluster_stability"
-    SCALE_NORMALIZATION = "scale_normalization"
-    DRAW_VARIANT = "draw_variant"
-    TRUST_BOUNDARY = "trust_boundary"
-
-
 class PoisoningKnowledge(enum.StrEnum):
-    """Attacker knowledge model."""
 
     GRAY_BOX_SCORE_ACCESS = "gray_box_score_access"
-    WHITE_BOX_DIAGNOSTIC_ONLY = "white_box_diagnostic_only"
 
 
 class PoisoningTargetScope(enum.StrEnum):
-    """Which clients the attacker targets in one poisoning pass."""
 
     SINGLE_CLIENT = "single_client"
     MULTI_CLIENT = "multi_client"
-    ALL_CLIENTS_DIAGNOSTIC_ONLY = "all_clients_diagnostic_only"
 
 
 class PoisoningDefense(enum.StrEnum):
-    """Defense applied to the calibration set before threshold derivation, if any."""
 
     NONE = "none"
     TRIMMED_CALIBRATION = "trimmed_calibration"
 
 
 class ReservoirStatus(enum.StrEnum):
-    """Outcome of reservoir construction for a victim client."""
 
     FEASIBLE = "feasible"
     INFEASIBLE_DEGENERATE_TAIL = "infeasible_degenerate_tail"
@@ -107,23 +125,10 @@ DIAGNOSTIC_ONLY_SOURCES: frozenset[PoisoningSourceStrategy] = frozenset(
     }
 )
 
-DIAGNOSTIC_ONLY_SCOPES: frozenset[PoisoningTargetScope] = frozenset(
-    {
-        PoisoningTargetScope.ALL_CLIENTS_DIAGNOSTIC_ONLY,
-    }
-)
-
-DIAGNOSTIC_ONLY_KNOWLEDGE: frozenset[PoisoningKnowledge] = frozenset(
-    {
-        PoisoningKnowledge.WHITE_BOX_DIAGNOSTIC_ONLY,
-    }
-)
-
 
 def objective_for_source(
     source: PoisoningSourceStrategy,
 ) -> AttackerObjective | None:
-    """Return the implied attacker objective for a source strategy, or None if unconstrained."""
     match source:
         case PoisoningSourceStrategy.HIGH_SCORE_BENIGN:
             return AttackerObjective.THRESHOLD_RAISE
@@ -137,15 +142,4 @@ def objective_for_source(
 
 
 def is_diagnostic_source(source: PoisoningSourceStrategy) -> bool:
-    """Return True if *source* is a diagnostic-only variant."""
     return source in DIAGNOSTIC_ONLY_SOURCES
-
-
-def is_diagnostic_scope(scope: PoisoningTargetScope) -> bool:
-    """Return True if *scope* is a diagnostic-only variant."""
-    return scope in DIAGNOSTIC_ONLY_SCOPES
-
-
-def is_diagnostic_knowledge(knowledge: PoisoningKnowledge) -> bool:
-    """Return True if *knowledge* is a diagnostic-only variant."""
-    return knowledge in DIAGNOSTIC_ONLY_KNOWLEDGE

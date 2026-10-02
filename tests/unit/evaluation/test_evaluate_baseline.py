@@ -1,7 +1,7 @@
 """Unit tests for baseline evaluation metric computation."""
 
 from __future__ import annotations
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 
 import tempfile
 from pathlib import Path
@@ -26,7 +26,7 @@ def _ct(
     return ClientThreshold(
         client_id=client_id,
         threshold=threshold,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=strategy,
     )
 
@@ -77,9 +77,9 @@ def test_evaluate_policy_run_accepts_score_provider_and_marks_eval_incomplete(
         score_provider=ScoreProvider(tmp_path),
     )
 
-    assert result.eval_incomplete_ids == ("c1",)
-    assert result.stage == _STAGE
-    assert result.policy == ThresholdPolicy.GLOBAL_THRESHOLD
+    assert result.incomplete_ids == ("c1",)
+    assert result.run.stage == _STAGE
+    assert result.run.policy == ThresholdPolicy.GLOBAL_THRESHOLD
 
 
 def test_attack_empty_valid_artifact_is_eval_incomplete() -> None:
@@ -94,7 +94,7 @@ def test_attack_empty_valid_artifact_is_eval_incomplete() -> None:
     ct = ClientThreshold(
         client_id="test",
         threshold=0.8,
-        calibration_pending=False,
+        status=ClientStatus.ELIGIBLE,
         strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
     )
     result = compute_client_record("test", benign, attack, ct)

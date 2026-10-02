@@ -1,0 +1,28 @@
+rules:
+  - id: datp.no-low-level-domain-aliases
+    languages: [python]
+    severity: ERROR
+    message: Use a semantic domain type imported from datp.types.
+    paths:
+      include:
+        - /src/datp/**/*.py
+      exclude:
+        - /src/datp/types.py
+    pattern-either:
+      - pattern: NonNegativeInt
+      - pattern: PositiveInt
+      - pattern: NonNegativeFloat
+      - pattern: PositiveFloat
+      - pattern: UnitInterval
+      - pattern: OpenUnitInterval
+      - pattern: FiniteFloat
+      - pattern: SignedInt
+
+  - id: datp.no-builtin-print
+    languages: [python]
+    severity: ERROR
+    message: Use structured logging or the explicit CLI console adapter.
+    paths:
+      include:
+        - /src/datp/**/*.py
+    pattern: print(...)

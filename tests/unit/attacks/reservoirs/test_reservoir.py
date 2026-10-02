@@ -9,7 +9,7 @@ from datp.attacks.reservoirs.reservoir import (
     build_reservoir,
 )
 from datp.attacks.enums import PoisoningSourceStrategy
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     make_degenerate_tail_client,
     make_eligible_client,
 )
@@ -27,7 +27,7 @@ class TestBuildReservoirRandom:
         )
         np.testing.assert_array_equal(res.pool, c.cal)
         assert res.status == ReservoirStatus.FEASIBLE
-        assert res.n_pool == c.n_cal
+        assert res.n_pool == c.cal.size
 
     def test_does_not_mutate_clean(self) -> None:
         c = make_eligible_client()
@@ -50,7 +50,7 @@ class TestBuildReservoirHigh:
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             tail_mass=0.10,
         )
-        n_tail = max(1, int(0.10 * c.n_cal))
+        n_tail = max(1, int(0.10 * c.cal.size))
         assert res.n_pool == n_tail
         sorted_cal = np.sort(c.cal)
         expected = sorted_cal[-n_tail:]
@@ -78,7 +78,7 @@ class TestBuildReservoirLow:
             source=PoisoningSourceStrategy.LOW_SCORE_BENIGN,
             tail_mass=0.10,
         )
-        n_tail = max(1, int(0.10 * c.n_cal))
+        n_tail = max(1, int(0.10 * c.cal.size))
         assert res.n_pool == n_tail
         sorted_cal = np.sort(c.cal)
         expected = sorted_cal[:n_tail]

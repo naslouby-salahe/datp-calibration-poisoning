@@ -23,13 +23,16 @@ help: ## Show available targets.
 # ---------------------------------------------------------------------------
 
 .PHONY: check
-check: ## Run ruff and pyright (no tests).
+check: ## Run ruff, pyright, and Semgrep (no tests).
 	$(PYTHON) -m ruff check src/ tests/
+	$(PYTHON) -m ruff check --select C901 src/datp/
 	$(PYTHON) -m pyright src/
+	mkdir -p $${TMPDIR:-/tmp}/datp-semgrep/config $${TMPDIR:-/tmp}/datp-semgrep/cache
+	XDG_CONFIG_HOME=$${TMPDIR:-/tmp}/datp-semgrep/config XDG_CACHE_HOME=$${TMPDIR:-/tmp}/datp-semgrep/cache SEMGREP_SETTINGS_FILE=$${TMPDIR:-/tmp}/datp-semgrep/settings.yaml SEMGREP_LOG_FILE=$${TMPDIR:-/tmp}/datp-semgrep/semgrep.log semgrep --disable-version-check --no-git-ignore --config semgrep.yml src/datp/
 
 .PHONY: datp-cp-unit-tests
 datp-cp-unit-tests: ## Run unit tests only (faster iteration during development).
-	$(PYTEST) tests/unit/ --tb=short -q
+	$(PYTEST) tests/architecture/ tests/unit/ --tb=short -q
 
 # ---------------------------------------------------------------------------
 # datp-cp workflow — run targets in order

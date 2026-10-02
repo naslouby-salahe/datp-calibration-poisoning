@@ -24,6 +24,7 @@ from datp.config.models import (
     ThresholdConfig,
     TrackingConfig,
 )
+from datp.core.enums import NBaIoTBalancePolicy
 from datp.core.enums import Activation
 
 
@@ -120,7 +121,7 @@ class TestDatasetConfig:
             n_min=100,
             cap=50000,
             attack_reserve_fraction=0.2,
-            nbaiot_balanced_test=False,
+            nbaiot_test_balance=NBaIoTBalancePolicy.NATURAL_DISTRIBUTION,
         )
         assert d.feature_count == 115
         assert d.n_min == 100
@@ -133,7 +134,7 @@ class TestDatasetConfig:
                     "n_min": 100,
                     "cap": 50000,
                     "attack_reserve_fraction": 0.2,
-                    "nbaiot_balanced_test": False,
+                    "nbaiot_test_balance": NBaIoTBalancePolicy.NATURAL_DISTRIBUTION,
                     "bogus": 1,
                 }
             )

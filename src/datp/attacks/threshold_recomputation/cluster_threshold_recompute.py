@@ -1,11 +1,25 @@
-"""Cluster-threshold recomputation with decomposition into agg, churn, and frozen-scaler effects."""
-
 from __future__ import annotations
 
-from collections import UserDict
+from datp.types import (
+    ClassificationScore,
+    ClientId,
+    ClusterCount,
+    ClusterId,
+    ClusterIndex,
+    FeatureMatrix,
+    IterationCount,
+    Quantile,
+    RandomSeed,
+    SampleCount,
+    SignedDelta,
+    Threshold,
+)
+
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import TypeVar
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -21,8 +35,12 @@ from datp.attacks.constants import (
 from datp.attacks.score_containers import ScoreCollection
 from datp.attacks.types import PoisonedCalibrationSet, ThresholdPairBase
 from datp.config.models import ExperimentStage
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 from datp.core.identity import PolicyRunId, TrainingCellId
+from datp.core.types import (
+    ClusterMetadata,
+    ThresholdResult,
+)
 from datp.thresholding.eligibility import (
     CalibrationErrorSet,
     ClientThresholdsCollection,
@@ -35,68 +53,53 @@ from datp.thresholding.policies import compute_cluster, compute_fingerprints
 
 @dataclass(frozen=True, slots=True)
 class ClusterHyperparams:
-    """KMeans hyperparameters for cluster-threshold computation."""
 
-    k: int = CLUSTER_K_NBAIOT
-    n_init: int = CLUSTER_N_INIT
-    max_iter: int = CLUSTER_MAX_ITER
-    random_state: int = CLUSTER_RANDOM_STATE
-    n_min: int = N_MIN
-    seed: int = 0
+    k: ClusterCount = CLUSTER_K_NBAIOT
+    n_init: IterationCount = CLUSTER_N_INIT
+    max_iter: IterationCount = CLUSTER_MAX_ITER
+    random_state: RandomSeed = CLUSTER_RANDOM_STATE
+    n_min: SampleCount = N_MIN
+    seed: RandomSeed = RandomSeed(0)
 
 
 @dataclass(frozen=True, slots=True)
 class ClusterDecompEntry:
-    """Per-client decomposition of total delta-tau into agg, churn, frozen-scaler, and gap components."""
 
-    client_id: str
-    tau_clean: float
-    tau_agg: float
-    tau_pois: float
-    tau_frozen_scaler: float
-    delta_tau_agg: float
-    delta_tau_churn: float
-    delta_tau_total: float
-    delta_tau_frozen_scaler: float
-    delta_tau_normalization_gap: float
-
-
-class ClusterDecomposition(UserDict):
-    """Client-ID-keyed collection of ClusterDecompEntry records."""
-
-    def __init__(self, entries: tuple[ClusterDecompEntry, ...]):
-        """Initialize from a tuple of ClusterDecompEntry records."""
-        super().__init__({e.client_id: e for e in entries})
+    client_id: ClientId
+    tau_clean: Threshold
+    tau_agg: Threshold
+    tau_pois: Threshold
+    tau_frozen_scaler: Threshold
+    delta_tau_agg: SignedDelta
+    delta_tau_churn: SignedDelta
+    delta_tau_total: SignedDelta
+    delta_tau_frozen_scaler: SignedDelta
+    delta_tau_normalization_gap: SignedDelta
 
 
 @dataclass(frozen=True, slots=True)
 class ClusterThresholdPair(ThresholdPairBase):
-    """Threshold pair with cluster-decomposition metadata."""
 
-    decomposition: ClusterDecomposition
+    decomposition: Mapping[ClientId, ClusterDecompEntry]
     fixed_assignment_thresholds: ClientThresholdsCollection
-    clean_assignments: Mapping[str, str]
-    poisoned_assignments: Mapping[str, str]
-    silhouette_clean: float
-    silhouette_poisoned: float
+    clean_assignments: Mapping[ClientId, ClusterId]
+    poisoned_assignments: Mapping[ClientId, ClusterId]
+    silhouette_clean: ClassificationScore
+    silhouette_poisoned: ClassificationScore
 
 
 def compute_cluster_pair(
     collection: ScoreCollection,
-    poisoned_cal_set: PoisonedCalibrationSet | dict[str, np.ndarray],
-    q: float,
+    poisoned_cal_set: PoisonedCalibrationSet,
+    q: Quantile,
     params: ClusterHyperparams = ClusterHyperparams(),
 ) -> ClusterThresholdPair:
-    """Recompute cluster thresholds and decompose effects into agg, churn, and frozen-scaler components."""
-    if not isinstance(poisoned_cal_set, PoisonedCalibrationSet):
-        poisoned_cal_set = PoisonedCalibrationSet.from_mapping(poisoned_cal_set)
-
     eligible_ids = list(collection.eligible_ids)
     eligibility = EligibilityResult(eligible_ids=tuple(eligible_ids), pending_ids=())
 
-    clean_cal = {cid: collection.for_client(cid).cal for cid in collection.all_ids}
+    clean_cal = {cid: collection.clients[cid].cal for cid in collection.all_ids}
     pois_cal = {
-        cid: poisoned_cal_set.for_client(cid).cal
+        cid: poisoned_cal_set[cid].cal
         if cid in collection.eligible_ids
         else clean_cal[cid]
         for cid in collection.all_ids
@@ -117,10 +120,11 @@ def compute_cluster_pair(
     tau_global_pois = compute_tau_global(tau_pois_col)
 
     run_id = PolicyRunId(
-        cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=params.seed),
+        cell=TrainingCellId(
+            stage=ExperimentStage.NBAIOT_MAIN, seed=RandomSeed(params.seed)
+        ),
         policy=ThresholdPolicy.CLUSTER_THRESHOLD,
     )
-
     clean_res = compute_cluster(
         clean_cal,
         n_min=params.n_min,
@@ -132,12 +136,6 @@ def compute_cluster_pair(
         max_iter=params.max_iter,
         run=run_id,
     )
-    eff_clean = {
-        ct.client_id: ct.threshold
-        for ct in clean_res.client_thresholds
-        if not ct.calibration_pending
-    }
-
     pois_res = compute_cluster(
         pois_cal,
         n_min=params.n_min,
@@ -149,93 +147,35 @@ def compute_cluster_pair(
         max_iter=params.max_iter,
         run=run_id,
     )
-    eff_pois = {
-        ct.client_id: ct.threshold
-        for ct in pois_res.client_thresholds
-        if not ct.calibration_pending
-    }
+    eff_clean = _resolved_thresholds(clean_res)
+    eff_pois = _resolved_thresholds(pois_res)
 
-    assert clean_res.metadata.cluster is not None, (
+    assert clean_res.cluster is not None, (
         "CLUSTER_THRESHOLD metadata must be set after compute_cluster run"
     )
 
-    tau_pois_map = dict(tau_pois_col.items())
-    client_to_clean_cluster = {
-        member: info.cluster_id
-        for info in clean_res.metadata.cluster.cluster_info
-        for member in info.members
-    }
-    assert pois_res.metadata.cluster is not None
-    client_to_pois_cluster = {
-        member: info.cluster_id
-        for info in pois_res.metadata.cluster.cluster_info
-        for member in info.members
-    }
+    assert pois_res.cluster is not None
+    client_to_clean_cluster = _cluster_assignments(clean_res.cluster)
+    client_to_pois_cluster = _cluster_assignments(pois_res.cluster)
 
     clean_fp = compute_fingerprints(clean_cal, eligible_ids, q=q)
     pois_fp = compute_fingerprints(pois_cal, eligible_ids, q=q)
     clean_fp_mat = np.array([clean_fp[cid] for cid in eligible_ids], dtype=np.float64)
     pois_fp_mat = np.array([pois_fp[cid] for cid in eligible_ids], dtype=np.float64)
 
-    fs_labels: list[int] = (
-        KMeans(
-            n_clusters=params.k,
-            n_init=params.n_init,  # type: ignore[arg-type]
-            max_iter=params.max_iter,
-            random_state=params.random_state,
-        )
-        .fit_predict(StandardScaler().fit(clean_fp_mat).transform(pois_fp_mat))
-        .tolist()
+    frozen_scaler_assignments = _frozen_scaler_assignments(
+        eligible_ids, clean_fp_mat, pois_fp_mat, params
     )
-
-    # tau_agg: frozen clean-cluster assignments re-averaged over poisoned per-client quantile taus.
-    cluster_groups: dict[str, list[str]] = {}
-    for cid in eligible_ids:
-        cluster_groups.setdefault(client_to_clean_cluster[cid], []).append(cid)
-    tau_agg_per_cluster = {
-        ck: float(np.mean([tau_pois_map[c] for c in cids]))
-        for ck, cids in cluster_groups.items()
-    }
-    tau_agg_map = {
-        cid: tau_agg_per_cluster[client_to_clean_cluster[cid]] for cid in eligible_ids
-    }
-
-    # tau_fs: frozen-scaler diagnostic — clean scaler on poisoned fingerprints, re-averaged.
-    fs_groups: dict[int, list[str]] = {}
-    for cid, lbl in zip(eligible_ids, fs_labels):
-        fs_groups.setdefault(lbl, []).append(cid)
-    tau_fs_per_label = {
-        lbl: float(np.mean([tau_pois_map[c] for c in cids]))
-        for lbl, cids in fs_groups.items()
-    }
-    tau_fs_map = {
-        cid: tau_fs_per_label[lbl] for cid, lbl in zip(eligible_ids, fs_labels)
-    }
-
-    entries = []
-    for cid in eligible_ids:
-        tc = eff_clean[cid]
-        ta = tau_agg_map[cid]
-        tp = eff_pois[cid]
-        tfs = tau_fs_map[cid]
-        dta = ta - tc
-        dtt = tp - tc
-        dtfs = tfs - tc
-        entries.append(
-            ClusterDecompEntry(
-                client_id=cid,
-                tau_clean=tc,
-                tau_agg=ta,
-                tau_pois=tp,
-                tau_frozen_scaler=tfs,
-                delta_tau_agg=dta,
-                delta_tau_churn=dtt - dta,
-                delta_tau_total=dtt,
-                delta_tau_frozen_scaler=dtfs,
-                delta_tau_normalization_gap=dtt - dtfs,
-            )
-        )
-    decomposition = ClusterDecomposition(tuple(entries))
+    tau_pois_map = dict(tau_pois_col.items())
+    tau_agg_map = _aggregate_thresholds_by_assignment(
+        client_to_clean_cluster, tau_pois_map
+    )
+    tau_fs_map = _aggregate_thresholds_by_assignment(
+        frozen_scaler_assignments, tau_pois_map
+    )
+    decomposition = _build_decomposition(
+        eligible_ids, eff_clean, tau_agg_map, eff_pois, tau_fs_map
+    )
 
     return ClusterThresholdPair(
         policy=ThresholdPolicy.CLUSTER_THRESHOLD,
@@ -251,12 +191,94 @@ def compute_cluster_pair(
         fixed_assignment_thresholds=ClientThresholdsCollection.from_mapping(
             tau_agg_map, ThresholdPolicy.CLUSTER_THRESHOLD
         ),
-        clean_assignments=MappingProxyType(
-            {cid: client_to_clean_cluster[cid] for cid in eligible_ids}
-        ),
-        poisoned_assignments=MappingProxyType(
-            {cid: client_to_pois_cluster[cid] for cid in eligible_ids}
-        ),
-        silhouette_clean=clean_res.metadata.cluster.silhouette,
-        silhouette_poisoned=pois_res.metadata.cluster.silhouette,
+        clean_assignments=MappingProxyType(client_to_clean_cluster),
+        poisoned_assignments=MappingProxyType(client_to_pois_cluster),
+        silhouette_clean=clean_res.cluster.silhouette,
+        silhouette_poisoned=pois_res.cluster.silhouette,
     )
+
+
+
+
+def _resolved_thresholds(result: ThresholdResult) -> dict[ClientId, Threshold]:
+    return {
+        item.client_id: item.threshold
+        for item in result.client_thresholds
+        if item.status is ClientStatus.ELIGIBLE
+    }
+
+
+def _cluster_assignments(metadata: ClusterMetadata) -> dict[ClientId, ClusterId]:
+    return {
+        client_id: cluster.cluster_id
+        for cluster in metadata.cluster_info
+        for client_id in cluster.members
+    }
+
+
+def _frozen_scaler_assignments(
+    eligible_ids: list[ClientId],
+    clean_fingerprints: FeatureMatrix,
+    poisoned_fingerprints: FeatureMatrix,
+    params: ClusterHyperparams,
+) -> dict[ClientId, ClusterIndex]:
+    labels = KMeans(
+        n_clusters=params.k,
+        n_init=params.n_init,
+        max_iter=params.max_iter,
+        random_state=params.random_state,
+    ).fit_predict(
+        StandardScaler().fit(clean_fingerprints).transform(poisoned_fingerprints)
+    )
+    return {
+        client_id: int(label)
+        for client_id, label in zip(eligible_ids, labels)
+    }
+
+
+_ClusterAssignment = TypeVar("_ClusterAssignment", ClusterId, ClusterIndex)
+
+
+def _aggregate_thresholds_by_assignment(
+    assignments: Mapping[ClientId, _ClusterAssignment],
+    thresholds: Mapping[ClientId, Threshold],
+) -> dict[ClientId, Threshold]:
+    groups: dict[_ClusterAssignment, list[ClientId]] = {}
+    for client_id, label in assignments.items():
+        groups.setdefault(label, []).append(client_id)
+    averages = {
+        label: float(np.mean([thresholds[client_id] for client_id in members]))
+        for label, members in groups.items()
+    }
+    return {client_id: averages[label] for client_id, label in assignments.items()}
+
+
+def _build_decomposition(
+    eligible_ids: list[ClientId],
+    clean_thresholds: Mapping[ClientId, Threshold],
+    aggregate_thresholds: Mapping[ClientId, Threshold],
+    poisoned_thresholds: Mapping[ClientId, Threshold],
+    frozen_scaler_thresholds: Mapping[ClientId, Threshold],
+) -> dict[ClientId, ClusterDecompEntry]:
+    entries: dict[ClientId, ClusterDecompEntry] = {}
+    for client_id in eligible_ids:
+        tau_clean = clean_thresholds[client_id]
+        tau_agg = aggregate_thresholds[client_id]
+        tau_pois = poisoned_thresholds[client_id]
+        tau_frozen = frozen_scaler_thresholds[client_id]
+        delta_agg = tau_agg - tau_clean
+        delta_total = tau_pois - tau_clean
+        delta_frozen = tau_frozen - tau_clean
+        entries[client_id] = ClusterDecompEntry(
+            client_id=client_id,
+            tau_clean=tau_clean,
+            tau_agg=tau_agg,
+            tau_pois=tau_pois,
+            tau_frozen_scaler=tau_frozen,
+            delta_tau_agg=delta_agg,
+            delta_tau_churn=delta_total - delta_agg,
+            delta_tau_total=delta_total,
+            delta_tau_frozen_scaler=delta_frozen,
+            delta_tau_normalization_gap=delta_total - delta_frozen,
+        )
+    return entries

@@ -1,6 +1,19 @@
-"""Bootstrap confidence intervals (percentile and BCa) over paired seed-level deltas."""
-
 from __future__ import annotations
+
+from datp.types import (
+    BootstrapCount,
+    ConfidenceLevel,
+    IntervalBound,
+    JsonValue,
+    Quantile,
+    RandomSeed,
+    RecordKey,
+    SeedCount,
+    ScoreValue,
+    ScoreVector,
+    SignedDelta,
+)
+
 
 from dataclasses import dataclass
 
@@ -8,35 +21,54 @@ import numpy as np
 from scipy import stats as sp_stats
 
 from datp.statistics.constants import BCA_MIN_PAIRED_SEEDS, BootstrapMethod
+from datp.statistics.constants import BootstrapField
 
 
 @dataclass(frozen=True, slots=True)
 class BootstrapResult:
-    """Bootstrap confidence interval with delta mean and zero-exclusion flag."""
 
-    ci_lower: float
-    ci_upper: float
-    mean_delta: float
+    ci_lower: IntervalBound
+    ci_upper: IntervalBound
+    mean_delta: SignedDelta
     excludes_zero: bool
-    n_seeds: int
-    n_bootstrap: int
+    n_seeds: SeedCount
+    n_bootstrap: BootstrapCount
     method: BootstrapMethod
 
 
-def _validate_deltas(deltas: np.ndarray, method: BootstrapMethod) -> np.ndarray:
+@dataclass(frozen=True, slots=True)
+class BootstrapReport:
+    result: BootstrapResult
+    confidence_level: ConfidenceLevel
+    per_seed_deltas: tuple[SignedDelta, ...]
+
+    def to_payload(self) -> dict[RecordKey, JsonValue]:
+        return {
+            BootstrapField.PER_SEED_DELTAS: list(self.per_seed_deltas),
+            BootstrapField.MEAN_DELTA: self.result.mean_delta,
+            BootstrapField.CI_LOWER: self.result.ci_lower,
+            BootstrapField.CI_UPPER: self.result.ci_upper,
+            BootstrapField.CI: self.confidence_level,
+            BootstrapField.EXCLUDES_ZERO: self.result.excludes_zero,
+            BootstrapField.N_BOOTSTRAP: self.result.n_bootstrap,
+            BootstrapField.N_SEEDS: self.result.n_seeds,
+        }
+
+
+def _validate_deltas(deltas: ScoreVector, method: BootstrapMethod) -> ScoreVector:
     values = np.asarray(deltas, dtype=np.float64)
     if values.size == 0:
-        raise ValueError(f"{method.value}: deltas array is empty")
+        raise ValueError(f"{method}: deltas array is empty")
     if not np.isfinite(values).all():
         bad_count = int(np.sum(~np.isfinite(values)))
         raise ValueError(
-            f"{method.value}: deltas contains {bad_count} non-finite value(s); "
+            f"{method}: deltas contains {bad_count} non-finite value(s); "
             "resolve undefined CV(FPR) values before computing bootstrap CI"
         )
     return values
 
 
-def _bootstrap_means(deltas: np.ndarray, n_bootstrap: int, seed: int) -> np.ndarray:
+def _bootstrap_means(deltas: ScoreVector, n_bootstrap: BootstrapCount, seed: RandomSeed) -> ScoreVector:
     n = len(deltas)
     rng = np.random.default_rng(seed)
     boot_means = np.empty(n_bootstrap, dtype=np.float64)
@@ -47,12 +79,11 @@ def _bootstrap_means(deltas: np.ndarray, n_bootstrap: int, seed: int) -> np.ndar
 
 
 def bootstrap_ci(
-    deltas: np.ndarray,
-    n_bootstrap: int,
-    ci: float,
-    seed: int,
+    deltas: ScoreVector,
+    n_bootstrap: BootstrapCount,
+    ci: IntervalBound,
+    seed: RandomSeed,
 ) -> BootstrapResult:
-    """Percentile bootstrap CI over paired seed-level aggregate deltas."""
     values = _validate_deltas(deltas, BootstrapMethod.PERCENTILE)
     boot_means = _bootstrap_means(values, n_bootstrap, seed)
 
@@ -74,17 +105,16 @@ def bootstrap_ci(
 
 
 def bca_ci(
-    deltas: np.ndarray,
-    n_bootstrap: int,
-    ci: float,
-    seed: int,
+    deltas: ScoreVector,
+    n_bootstrap: BootstrapCount,
+    ci: IntervalBound,
+    seed: RandomSeed,
 ) -> BootstrapResult:
-    """BCa bootstrap CI over paired seed-level aggregate deltas."""
     values = _validate_deltas(deltas, BootstrapMethod.BCA)
     n = values.size
     if n < BCA_MIN_PAIRED_SEEDS:
         raise ValueError(
-            f"{BootstrapMethod.BCA.value}: need at least {BCA_MIN_PAIRED_SEEDS} "
+            f"{BootstrapMethod.BCA}: need at least {BCA_MIN_PAIRED_SEEDS} "
             f"seeds for jackknife acceleration, got {n}"
         )
 
@@ -111,7 +141,7 @@ def bca_ci(
     z_alpha_2 = float(sp_stats.norm.ppf(alpha / 2.0))
     z_1_alpha_2 = float(sp_stats.norm.ppf(1.0 - alpha / 2.0))
 
-    def _adjusted_percentile(z_quantile: float) -> float:
+    def _adjusted_percentile(z_quantile: Quantile) -> ScoreValue:
         numerator = z0 + z_quantile
         denominator = 1.0 - acceleration * numerator
         if denominator <= 0.0:

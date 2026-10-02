@@ -30,15 +30,8 @@ class TestAutoencoderShape:
             NBAIOT_INPUT_DIM, NBAIOT_HIDDEN, activation=Activation.RELU, use_bn=False
         )
         x = torch.randn(16, NBAIOT_INPUT_DIM)
-        z = model.encode(x)
+        z = model.encoder(x)
         assert z.shape == (16, NBAIOT_HIDDEN[-1])
-
-    def test_bottleneck_property(self) -> None:
-        model = Autoencoder(
-            NBAIOT_INPUT_DIM, NBAIOT_HIDDEN, activation=Activation.RELU, use_bn=False
-        )
-        assert model.bottleneck_dim == 20
-
 
 class TestReconstructionError:
     """Reconstruction error computation and shape."""

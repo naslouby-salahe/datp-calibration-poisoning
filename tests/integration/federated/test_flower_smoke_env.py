@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from tests.fixtures.flower_smoke import SMOKE_NUM_ROUNDS, run_flower_smoke
+from tests_support.flower_smoke import SMOKE_NUM_ROUNDS, run_flower_smoke
 
 _SMOKE_SEED = 42
 

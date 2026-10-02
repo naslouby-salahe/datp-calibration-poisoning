@@ -1,7 +1,7 @@
 """Unit tests for LaTeX table generation from result data."""
 
 from __future__ import annotations
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 
 import csv
 import math
@@ -62,7 +62,11 @@ def _make_client_record(
         threshold=ClientThreshold(
             client_id=client_id,
             threshold=0.1,
-            calibration_pending=client_id in _PENDING_IDS,
+            status=(
+                ClientStatus.CALIBRATION_PENDING
+                if client_id in _PENDING_IDS
+                else ClientStatus.ELIGIBLE
+            ),
             strategy=policy,
         ),
         evaluation_incomplete=False,

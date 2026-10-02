@@ -1,4 +1,3 @@
-"""Hydra/Pydantic configuration composition and validation."""
 
 from datp.config.compose import (
     ComposeError,

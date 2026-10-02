@@ -13,7 +13,7 @@ from datp.scoring.loading import (
     load_parquets_from_dir,
     read_score_column,
 )
-from datp.scoring.manifest import SCORE_COLUMN
+from datp.scoring.manifest import ScoringColumn
 from tests.fixtures.scoring_loading import assert_loads_client_score_parquets
 from tests.unit.conftest import _write_score_artifact
 
@@ -47,7 +47,7 @@ class TestReadScoreColumn:
 
         path = tmp_path / "bad.parquet"
         pq.write_table(
-            pa.table({SCORE_COLUMN: pa.array([1, 2, 3], type=pa.int64())}), path
+            pa.table({ScoringColumn.RECONSTRUCTION_ERROR: pa.array([1, 2, 3], type=pa.int64())}), path
         )
         with pytest.raises(TypeError, match="non-floating"):
             read_score_column(path)

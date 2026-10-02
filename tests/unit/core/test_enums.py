@@ -6,6 +6,7 @@ from datp.core.enums import ThresholdPolicy
 from datp.checkpointing.enums import EvidenceRole
 from datp.core.enums import (
     CLUSTER_FINGERPRINT_FEATURES,
+    ClusterFingerprintFeature,
     CONTROLLED_POLICIES,
     ClientStatus,
     NormalizationScope,
@@ -154,7 +155,12 @@ class TestClusterThresholdFingerprintFeatures:
 
     def test_feature_names(self) -> None:
         """Verify statistical fingerprint feature tuple entries."""
-        assert CLUSTER_FINGERPRINT_FEATURES == ("mean", "std", "skew", "p95")
+        assert CLUSTER_FINGERPRINT_FEATURES == (
+            ClusterFingerprintFeature.MEAN,
+            ClusterFingerprintFeature.STANDARD_DEVIATION,
+            ClusterFingerprintFeature.SKEWNESS,
+            ClusterFingerprintFeature.NINETY_FIFTH_PERCENTILE,
+        )
 
     def test_is_tuple(self) -> None:
         """Ensure cluster fingerprint features is represented as a tuple."""
@@ -167,10 +173,6 @@ class TestEvidenceRole:
     def test_descriptive_value(self) -> None:
         """Verify descriptive evidence role string value."""
         assert EvidenceRole.DESCRIPTIVE == "descriptive"
-
-    def test_secondary_value(self) -> None:
-        """Verify secondary evidence role string value."""
-        assert EvidenceRole.SECONDARY == "secondary"
 
     def test_descriptive_with_sidecar_delta_value(self) -> None:
         """Verify descriptive confirmatory sidecar delta role string."""
@@ -207,14 +209,13 @@ class TestFigureName:
 
     def test_six_figures_defined(self) -> None:
         """Verify exactly six figures are defined in the enum."""
-        assert len(FigureName) == 6
+        assert len(FigureName) == 5
 
     def test_figure_values(self) -> None:
         """Verify FigureName mapping values match standard identifiers."""
         assert FigureName.FIGURE_1 == "figure_1"
         assert FigureName.FIGURE_2 == "figure_2"
         assert FigureName.FIGURE_3 == "figure_3"
-        assert FigureName.FIGURE_4 == "figure_4"
         assert FigureName.FIGURE_5 == "figure_5"
         assert FigureName.FIGURE_6 == "figure_6"
 

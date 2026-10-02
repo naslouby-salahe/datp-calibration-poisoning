@@ -1,6 +1,11 @@
-"""Controlled-policy invariant: hash-sharing checks across policies within each cell."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    ContentHash,
+    RandomSeed,
+)
+
 
 from dataclasses import dataclass
 
@@ -12,24 +17,26 @@ from datp.validation.schemas import PolicyInvariantResult
 
 @dataclass(frozen=True, slots=True)
 class InvariantKey:
-    """Compound key of stage and seed identifying one invariant-check unit."""
 
     stage: ExperimentStage
-    seed: int
+    seed: RandomSeed
 
 
 @dataclass(frozen=True, slots=True)
 class InvariantHashes:
-    """Content hashes for split, model, encoder, scoring code, and metrics code."""
 
-    split_hash: str
-    model_hash: str
-    encoder_hash: str
-    scoring_code_hash: str
-    metrics_code_hash: str
+    split_hash: ContentHash
+    model_hash: ContentHash
+    encoder_hash: ContentHash
+    scoring_code_hash: ContentHash
+    metrics_code_hash: ContentHash
 
 
-_ScoreHashMap = dict[ThresholdPolicy, dict[tuple[ScoringStage, str], str]]
+@dataclass(frozen=True, slots=True)
+class ScoreArtifactHash:
+    stage: ScoringStage
+    client_id: ClientId
+    array_digest: ContentHash
 
 
 def _check_hash_flags(hashes: list[InvariantHashes]) -> tuple[bool, bool, bool, bool]:
@@ -69,13 +76,14 @@ def _resolve_invariant_status(
 
 def build_invariant_results(
     invariant_inputs: dict[InvariantKey, dict[ThresholdPolicy, InvariantHashes]],
-    score_hashes_by_cell: dict[InvariantKey, _ScoreHashMap],
+    score_hashes_by_cell: dict[
+        InvariantKey, dict[ThresholdPolicy, frozenset[ScoreArtifactHash]]
+    ],
 ) -> list[PolicyInvariantResult]:
-    """Build policy-invariant results by comparing hashes across policies per cell."""
     results: list[PolicyInvariantResult] = []
 
     for key, by_policy in sorted(
-        invariant_inputs.items(), key=lambda i: (i[0].stage.value, i[0].seed)
+        invariant_inputs.items(), key=lambda i: (i[0].stage, i[0].seed)
     ):
         required = list(CONTROLLED_POLICIES)
         checked = [b for b in required if b in by_policy]
@@ -105,7 +113,7 @@ def build_invariant_results(
                 reconstruction_error_hashes_shared=rec_sh,
                 scoring_code_hash_shared=sc_sh,
                 metrics_code_hash_shared=me_sh,
-                disallowed_differences=[v.value for v in disallowed],
+                disallowed_differences=[v for v in disallowed],
             )
         )
 

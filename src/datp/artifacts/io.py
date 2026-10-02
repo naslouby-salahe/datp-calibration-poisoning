@@ -1,26 +1,22 @@
-"""Atomic JSON/CSV writers and metrics persistence."""
 
 from __future__ import annotations
+from datp.types import JsonValue
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 import orjson
 import pandas as pd
 from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 
-from datp.artifacts.names import ArtifactFile
-
-
-def serialize_json_payload(data: Any) -> Any:
-    """Convert a Pydantic model to a JSON-serializable Python object."""
-    return to_jsonable_python(data)
-
-
-def write_json_atomic(path: Path, data: Any) -> Path:
-    """Write JSON atomically via tmp + rename with sorted, indented output."""
+def write_json_atomic(
+    path: Path,
+    data: JsonValue
+    | BaseModel
+    | Sequence[BaseModel]
+    | Mapping[str, JsonValue | BaseModel | Sequence[BaseModel]],
+) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(f"{path.suffix}.tmp")
     tmp.write_bytes(
@@ -38,13 +34,7 @@ def write_json_atomic(path: Path, data: Any) -> Path:
 
 
 def write_csv(path: Path, records: Sequence[BaseModel]) -> None:
-    """Write a sequence of Pydantic models as CSV atomically via tmp + rename."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(f"{path.suffix}.tmp")
     pd.DataFrame([to_jsonable_python(r) for r in records]).to_csv(tmp, index=False)
     tmp.replace(path)
-
-
-def write_metrics_atomic(run_dir: Path, metrics: Any) -> Path:
-    """Write metrics JSON atomically into a run directory."""
-    return write_json_atomic(run_dir / ArtifactFile.METRICS, metrics)

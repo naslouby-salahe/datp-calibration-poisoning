@@ -1,7 +1,7 @@
 """Shared test builders for evaluation metric fixtures."""
 
 from __future__ import annotations
-from datp.core.enums import ThresholdPolicy
+from datp.core.enums import ClientStatus, ThresholdPolicy
 
 import math
 from dataclasses import dataclass
@@ -87,7 +87,7 @@ def _make_client_record(
         threshold=ClientThreshold(
             client_id=client_id,
             threshold=0.5,
-            calibration_pending=False,
+            status=ClientStatus.ELIGIBLE,
             strategy=ThresholdPolicy.GLOBAL_THRESHOLD,
         ),
         evaluation_incomplete=(n_attack == 0),

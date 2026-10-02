@@ -69,9 +69,9 @@ def test_round_aware_paths_include_round(tmp_path: Path) -> None:
     cell = TrainingCellId(stage=_STAGE, seed=7)
     run = PolicyRunId(cell=cell, policy=ThresholdPolicy.LOCAL_THRESHOLD)
 
-    checkpoint_dir = layout.checkpoint_dir_for_round(cell, 50)
-    score_dir = layout.score_cell_for_round(cell, 50).score_dir
-    result_dir = layout.policy_run_for_round(run, 50).result_dir
+    checkpoint_dir = layout.checkpoint_dir(cell, 50)
+    score_dir = layout.score_cell(cell, 50).score_dir
+    result_dir = layout.policy_run(run, 50).result_dir
 
     assert (
         checkpoint_dir

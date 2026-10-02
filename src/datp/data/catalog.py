@@ -1,30 +1,18 @@
-"""Dataset catalog: spec lookup and stage-to-dataset mapping."""
-
 from __future__ import annotations
+
+from datp.types import NarrativeText
+
 
 from functools import cache
 
 from datp.config.models import ExperimentStage
-from datp.core.enums import ClientIdentity, DatasetID
-from datp.data.specs import (
-    CapPolicy,
-    CapStrategy,
-    DatasetSpec,
-    RawLayout,
-    SplitPolicy,
-    SplitPolicyKind,
-    SplitPolicyRole,
-)
+from datp.core.enums import DatasetID
+from datp.data.specs import DatasetSpec, SplitPolicy, SplitPolicyRole
 
 __all__ = [
-    "CapPolicy",
-    "CapStrategy",
-    "ClientIdentity",
     "DatasetID",
     "DatasetSpec",
-    "RawLayout",
     "SplitPolicy",
-    "SplitPolicyKind",
     "SplitPolicyRole",
     "dataset_display_name",
     "dataset_for_stage",
@@ -36,19 +24,16 @@ __all__ = [
 
 @cache
 def dataset_spec(dataset_id: DatasetID) -> DatasetSpec:
-    """Return the cached DatasetSpec for a known dataset."""
     from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 
     return {DatasetID.NBAIOT: NBAIOT_SPEC}[dataset_id]
 
 
-def dataset_display_name(dataset_id: DatasetID) -> str:
-    """Return the human-readable display name for a dataset."""
+def dataset_display_name(dataset_id: DatasetID) -> NarrativeText:
     return dataset_spec(dataset_id).display_name
 
 
-def dataset_processed_slug(dataset_id: DatasetID) -> str:
-    """Return the filesystem slug for a processed dataset."""
+def dataset_processed_slug(dataset_id: DatasetID) -> NarrativeText:
     return dataset_spec(dataset_id).processed_slug
 
 
@@ -61,10 +46,8 @@ _STAGE_DATASET = {
 
 
 def dataset_for_stage(stage: ExperimentStage) -> DatasetID:
-    """Map an experiment stage to its canonical dataset."""
     return _STAGE_DATASET[stage]
 
 
 def spec_for_stage(stage: ExperimentStage) -> DatasetSpec:
-    """Return the full DatasetSpec for an experiment stage."""
     return dataset_spec(dataset_for_stage(stage))

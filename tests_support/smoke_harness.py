@@ -18,7 +18,6 @@ from datp.attacks.enums import PoisoningSourceStrategy
 from datp.attacks.execution.cell_runner import (
     InjectionOutcome,
     InjectionSpec,
-    PolicyPair,
     inject_single_victim,
     recompute_pair,
 )
@@ -28,24 +27,30 @@ from datp.attacks.metrics.metric_engine import (
     compute_metrics,
     compute_mu_flag_threshold,
 )
+from datp.attacks.types import ThresholdPairBase
 from datp.attacks.score_containers import (
     ScoreCollection,
-    VictimSet,
     build_score_collection,
-    build_victim_set,
 )
 from datp.config.models import ExperimentStage
 from datp.core.enums import ThresholdPolicy
 from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.seeds import SeedPair
-from datp.testsupport.synthetic_scores import SyntheticScoreSet
+from datp.types import ClientId
+from tests_support.synthetic_scores import SyntheticScoreSet
 from datp.thresholding.eligibility import (
+    EligibilityResult,
     compute_client_thresholds,
     compute_tau_global,
 )
 from datp.thresholding.policies import compute_cluster
 
-__all__ = ["InjectionOutcome", "PolicyPair", "inject_single_victim", "recompute_pair"]
+__all__ = [
+    "InjectionOutcome",
+    "ThresholdPairBase",
+    "inject_single_victim",
+    "recompute_pair",
+]
 
 
 def collection_from_score_set(score_set: SyntheticScoreSet) -> ScoreCollection:
@@ -62,12 +67,12 @@ class SmokeCellResult:
     """Full clean-vs-poisoned result for one smoke matrix cell."""
 
     policy: ThresholdPolicy
-    victim_id: str
+    victim_id: ClientId
     fraction: float
     source: PoisoningSourceStrategy
     outcome: InjectionOutcome
-    clean_pair: PolicyPair
-    poisoned_pair: PolicyPair
+    clean_pair: ThresholdPairBase
+    poisoned_pair: ThresholdPairBase
     clean_metrics: MetricResult
     poisoned_metrics: MetricResult
     mu_flag_threshold: float
@@ -75,11 +80,11 @@ class SmokeCellResult:
 
 def _evaluate_state(
     collection: ScoreCollection,
-    victim_id: str,
+    victim_id: ClientId,
     spec: InjectionSpec,
     policy: ThresholdPolicy,
     mu_flag_threshold: float | None,
-) -> tuple[InjectionOutcome, PolicyPair, MetricResult]:
+) -> tuple[InjectionOutcome, ThresholdPairBase, MetricResult]:
     outcome = inject_single_victim(collection, victim_id=victim_id, spec=spec)
     pair = recompute_pair(collection, outcome.poisoned_cal_set, policy)
     metrics = compute_metrics(
@@ -95,7 +100,7 @@ def _evaluate_state(
 def run_smoke_cell(
     collection: ScoreCollection,
     *,
-    victim_id: str,
+    victim_id: ClientId,
     policy: ThresholdPolicy,
     source: PoisoningSourceStrategy,
     fraction: float,
@@ -160,7 +165,7 @@ def run_smoke_cell(
 def victim_seed_deltas(
     collection: ScoreCollection,
     *,
-    victim_id: str,
+    victim_id: ClientId,
     policy: ThresholdPolicy,
     source: PoisoningSourceStrategy,
     fraction: float,
@@ -185,7 +190,7 @@ def victim_seed_deltas(
 
 
 def cluster_count(
-    cal_dict: dict[str, np.ndarray],
+    cal_dict: dict[str, np.ndarray] | dict[ClientId, np.ndarray],
     *,
     q: float = THRESHOLD_QUANTILE,
     n_min: int = N_MIN,
@@ -196,10 +201,14 @@ def cluster_count(
     random_state: int = CLUSTER_RANDOM_STATE,
 ) -> int:
     """Run CLUSTER_THRESHOLD and return the realized fixed cluster count."""
-    eligible_ids = [cid for cid, arr in cal_dict.items() if arr.size >= n_min]
+    typed_cal_dict = {ClientId(cid): arr for cid, arr in cal_dict.items()}
+    eligibility = EligibilityResult(
+        eligible_ids=tuple(cid for cid, arr in typed_cal_dict.items() if arr.size >= n_min),
+        pending_ids=tuple(cid for cid, arr in typed_cal_dict.items() if arr.size < n_min),
+    )
     taus = compute_client_thresholds(
-        {cid: cal_dict[cid] for cid in eligible_ids},
-        eligible_ids,
+        typed_cal_dict,
+        eligibility,
         q=q,
     )
     run = PolicyRunId(
@@ -207,7 +216,7 @@ def cluster_count(
         policy=ThresholdPolicy.CLUSTER_THRESHOLD,
     )
     result = compute_cluster(
-        cal_dict,
+        typed_cal_dict,
         n_min=n_min,
         tau_global=compute_tau_global(taus),
         q=q,
@@ -217,11 +226,6 @@ def cluster_count(
         max_iter=max_iter,
         run=run,
     )
-    if result.metadata.cluster is None:
+    if result.cluster is None:
         raise RuntimeError("cluster metadata must be set after CLUSTER_THRESHOLD run")
-    return result.metadata.cluster.k
-
-
-def build_smoke_victim_set(score_set: SyntheticScoreSet) -> VictimSet:
-    """Build eligible-victim metadata from a synthetic score set."""
-    return build_victim_set(collection_from_score_set(score_set))
+    return result.cluster.k

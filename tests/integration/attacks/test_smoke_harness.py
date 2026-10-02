@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
 
 from datp.attacks.constants import CLUSTER_K_NBAIOT
-from datp.artifacts.poison_names import CALIBRATION_POISONING_OUTPUT_ROOT
 from datp.attacks.constants import POISONING_SEEDS
-from datp.core.provenance import REPOSITORY_NAME
 from datp.attacks.threshold_recomputation.cluster_threshold_recompute import (
     ClusterThresholdPair,
 )
@@ -20,7 +17,7 @@ from datp.attacks.execution.cell_runner import (
     inject_single_victim,
 )
 from datp.attacks.planning.guardrails import assert_no_inplace_mutation
-from datp.attacks.metrics.inference import (
+from tests_support.inference import (
     InferenceInput,
     PairedDeltas,
     SeedDelta,
@@ -28,32 +25,22 @@ from datp.attacks.metrics.inference import (
     compute_inference,
 )
 from datp.attacks.metrics.metric_engine import compute_fleet_fpr
-from datp.attacks.manifests.run_logger import (
-    ManifestBuildRequest,
-    ManifestEmissionError,
-    build_manifest,
-    emit_manifest,
-    load_manifest,
-)
-from datp.attacks.manifests.run_manifest import RESERVOIR_MODE
 from datp.attacks.score_containers import build_score_collection
-from datp.attacks.threshold_recomputation.threshold_recompute import ThresholdPair
+from datp.attacks.types import ThresholdPairBase
 from datp.attacks.enums import (
     AttackerObjective,
-    CalibrationInjectionRule,
     PoisoningSourceStrategy,
-    PoisoningTargetScope,
 )
 from datp.core.enums import ThresholdPolicy
 from datp.core.seeds import SeedPair
-from datp.config.models import ExperimentStage
-from datp.testsupport.smoke_harness import (
+from datp.types import ClientId
+from tests_support.smoke_harness import (
     cluster_count,
     collection_from_score_set,
     run_smoke_cell,
     victim_seed_deltas,
 )
-from datp.testsupport.synthetic_scores import (
+from tests_support.synthetic_scores import (
     StandardScoreSetRequest,
     make_standard_score_set,
 )
@@ -61,7 +48,7 @@ from datp.thresholding.eligibility import ClientThresholdsCollection
 
 pytestmark = pytest.mark.integration
 
-_VICTIM = "eligible_0"
+_VICTIM = ClientId("eligible_0")
 _HIGH_FRACTION = 0.40
 _ALL_POLICIES = (
     ThresholdPolicy.GLOBAL_THRESHOLD,
@@ -90,7 +77,7 @@ def test_invariant_1_f0_reproduces_clean_zero_delta(collection, policy):
     )
 
     np.testing.assert_array_equal(
-        cell.outcome.poisoned_cal_set.for_client(_VICTIM).cal,
+        cell.outcome.poisoned_cal_set[_VICTIM].cal,
         collection.clients[_VICTIM].cal,
     )
 
@@ -101,7 +88,7 @@ def test_invariant_1_f0_reproduces_clean_zero_delta(collection, policy):
 
 def test_invariant_2_cardinality_preserved(collection):
     """Fixed-budget replacement keeps victim calibration size unchanged."""
-    n_before = collection.clients[_VICTIM].n_cal
+    n_before = collection.clients[_VICTIM].cal.size
     outcome = inject_single_victim(
         collection,
         victim_id=_VICTIM,
@@ -113,19 +100,19 @@ def test_invariant_2_cardinality_preserved(collection):
         ),
     )
     assert outcome.injection.n_total == n_before
-    assert outcome.poisoned_cal_set.for_client(_VICTIM).cal.shape[0] == n_before
+    assert outcome.poisoned_cal_set[_VICTIM].cal.shape[0] == n_before
     assert outcome.injection.n_replaced == max(1, round(_HIGH_FRACTION * n_before))
 
     rebuilt: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
     for cid, c in collection.clients.items():
         cal = (
-            outcome.poisoned_cal_set.for_client(cid).cal
-            if cid in outcome.poisoned_cal_set.client_ids
+            outcome.poisoned_cal_set[cid].cal
+            if cid in outcome.poisoned_cal_set
             else c.cal
         )
         rebuilt[cid] = (cal, c.test_benign, c.test_attack)
     poisoned_collection = build_score_collection(rebuilt)
-    assert poisoned_collection.eligible_ids == collection.eligible_ids
+    assert poisoned_collection.eligibility.eligible_ids == collection.eligibility.eligible_ids
 
 
 def test_invariant_3_no_inplace_mutation(collection):
@@ -142,9 +129,9 @@ def test_invariant_3_no_inplace_mutation(collection):
 
     assert_no_inplace_mutation(snapshot, collection.clients[_VICTIM].cal)
 
-    assert cell.outcome.poisoned_cal_set.for_client(_VICTIM).cal is not victim_clean
+    assert cell.outcome.poisoned_cal_set[_VICTIM].cal is not victim_clean
     assert not np.array_equal(
-        cell.outcome.poisoned_cal_set.for_client(_VICTIM).cal, snapshot
+        cell.outcome.poisoned_cal_set[_VICTIM].cal, snapshot
     )
 
 
@@ -170,7 +157,7 @@ def test_invariant_4_high_raises_low_lowers_local_threshold(collection):
 
 def test_invariant_5_pending_excluded_and_gets_tau_global(collection):
     """Calibration-pending clients are excluded from poisoning and threshold recomputation."""
-    pending_ids = collection.pending_ids
+    pending_ids = collection.eligibility.pending_ids
     assert pending_ids, "fixture must include a Calibration-Pending client"
     pending = pending_ids[0]
 
@@ -184,13 +171,13 @@ def test_invariant_5_pending_excluded_and_gets_tau_global(collection):
         )
         pair = cell.poisoned_pair
 
-        assert pending not in collection.eligible_ids
+        assert pending not in collection.eligibility.eligible_ids
         assert pending not in pair.thresholds_pois
         assert pending not in pair.thresholds_clean
 
         assert pending not in cell.poisoned_metrics.delta_tau
         fleet = cell.poisoned_metrics.fleet_fpr
-        assert fleet.n_eligible == len(collection.eligible_ids)
+        assert fleet.n_eligible == len(collection.eligibility.eligible_ids)
         assert fleet.n_total == len(collection.clients)
 
 
@@ -217,8 +204,8 @@ def test_invariant_6_determinism(collection):
         ),
     )
     np.testing.assert_array_equal(
-        out_a.poisoned_cal_set.for_client(_VICTIM).cal,
-        out_b.poisoned_cal_set.for_client(_VICTIM).cal,
+        out_a.poisoned_cal_set[_VICTIM].cal,
+        out_b.poisoned_cal_set[_VICTIM].cal,
     )
     np.testing.assert_array_equal(
         out_a.injection.positions_replaced, out_b.injection.positions_replaced
@@ -271,7 +258,7 @@ def test_invariant_7_cluster_threshold_decomposition_identity(collection):
 
 def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
     """Bootstrap inference across poisoning seeds produces valid seed aggregates and confidence intervals."""
-    eligible = collection.eligible_ids
+    eligible = collection.eligibility.eligible_ids
     deltas: dict[str, dict[int, SeedDelta]] = {}
     for victim in eligible:
         seed_deltas = victim_seed_deltas(
@@ -285,11 +272,9 @@ def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
         deltas[victim] = collect_paired_deltas(
             victim_id=victim, seed_deltas=seed_deltas
         )
-    paired = PairedDeltas(deltas=deltas)
-
     result = compute_inference(
         InferenceInput(
-            paired=paired,
+            paired=PairedDeltas(deltas=deltas),
             poisoning_seeds=POISONING_SEEDS,
             direction=AttackerObjective.THRESHOLD_RAISE,
         )
@@ -300,71 +285,6 @@ def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
     assert result.n_feasible_victims == len(eligible)
 
     assert result.sign_test.n_total == 10
-
-
-def test_invariant_9_manifest_round_trip(collection, tmp_path):
-    """Built manifest survives emit-then-load round-trip with all fields intact."""
-    cell = run_smoke_cell(
-        collection,
-        victim_id=_VICTIM,
-        policy=ThresholdPolicy.LOCAL_THRESHOLD,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-    )
-    manifest = build_manifest(
-        ManifestBuildRequest(
-            dataset="synthetic",
-            stage=ExperimentStage.SYNTHETIC_SMOKE,
-            policy=ThresholdPolicy.LOCAL_THRESHOLD,
-            objective=AttackerObjective.THRESHOLD_RAISE,
-            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-            fraction=_HIGH_FRACTION,
-            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-            training_seed=0,
-            poisoning_seed=100,
-            client_idx=0,
-            scope_idx=0,
-            mu_flag_threshold=cell.mu_flag_threshold,
-            repository=REPOSITORY_NAME,
-        )
-    )
-    run_dir = tmp_path / "cell"
-    emit_manifest(manifest, run_dir)
-    loaded = load_manifest(run_dir)
-
-    assert loaded.reservoir_mode == RESERVOIR_MODE
-    assert loaded.mu_flag_threshold == pytest.approx(cell.mu_flag_threshold)
-    assert loaded.injection_rule == CalibrationInjectionRule.REPLACE_FIXED_BUDGET
-    assert loaded.provenance.local_epochs == 1
-
-    assert loaded.seed_record.entropy == (0, 100, 0, 0)
-    assert loaded.seed_record.training_seed == 0
-    assert loaded.seed_record.poisoning_seed == 100
-    assert loaded.seed_record.client_idx == 0
-    assert loaded.seed_record.scope_idx == 0
-
-
-def test_invariant_9_manifest_requires_locked_mu_flag(tmp_path):
-    """Emitting a manifest without a locked mu-flag threshold raises an error."""
-    manifest = build_manifest(
-        ManifestBuildRequest(
-            dataset="synthetic",
-            stage=ExperimentStage.SYNTHETIC_SMOKE,
-            policy=ThresholdPolicy.LOCAL_THRESHOLD,
-            objective=AttackerObjective.THRESHOLD_RAISE,
-            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-            fraction=_HIGH_FRACTION,
-            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-            training_seed=0,
-            poisoning_seed=100,
-            client_idx=0,
-            scope_idx=0,
-            mu_flag_threshold=None,
-            repository=REPOSITORY_NAME,
-        )
-    )
-    with pytest.raises(ManifestEmissionError):
-        emit_manifest(manifest, tmp_path / "cell")
 
 
 def test_invariant_10_auroc_invariant(collection):
@@ -396,7 +316,7 @@ def test_invariant_11_cv_fpr_reported_with_coverage(collection):
     )
     fleet = cell.poisoned_metrics.fleet_fpr
 
-    expected_coverage = len(collection.eligible_ids) / len(collection.clients)
+    expected_coverage = len(collection.eligibility.eligible_ids) / len(collection.clients)
     assert fleet.coverage_ratio == pytest.approx(expected_coverage)
     assert 0.0 < fleet.coverage_ratio <= 1.0
 
@@ -412,16 +332,16 @@ def test_invariant_11_cv_fpr_no_epsilon_returns_nan_when_mean_zero():
         clients[f"eligible_{i}"] = (cal, test_benign, test_attack)
     coll = build_score_collection(clients)
 
-    pair = ThresholdPair(
+    pair = ThresholdPairBase(
         policy=ThresholdPolicy.LOCAL_THRESHOLD,
         tau_global_clean=0.5,
         tau_global_pois=0.5,
         thresholds_clean=ClientThresholdsCollection.from_mapping(
-            dict.fromkeys(coll.eligible_ids, 0.5),
+            dict.fromkeys(coll.eligibility.eligible_ids, 0.5),
             ThresholdPolicy.LOCAL_THRESHOLD,
         ),
         thresholds_pois=ClientThresholdsCollection.from_mapping(
-            dict.fromkeys(coll.eligible_ids, 0.5),
+            dict.fromkeys(coll.eligibility.eligible_ids, 0.5),
             ThresholdPolicy.LOCAL_THRESHOLD,
         ),
     )
@@ -454,7 +374,10 @@ def test_global_shift_less_than_local_shift(collection):
 
 def test_cluster_threshold_k_fixed_at_three(collection):
     """Cluster count is fixed at 3 both before and after poisoning."""
-    clean_cal = collection.cal_dict()
+    clean_cal = {
+        client.client_id: client.errors
+        for client in collection.calibration_errors.clients
+    }
     assert cluster_count(clean_cal) == CLUSTER_K_NBAIOT == 3
 
     outcome = inject_single_victim(
@@ -468,44 +391,8 @@ def test_cluster_threshold_k_fixed_at_three(collection):
         ),
     )
     poisoned_cal = dict(clean_cal)
-    poisoned_cal[_VICTIM] = outcome.poisoned_cal_set.for_client(_VICTIM).cal
+    poisoned_cal[_VICTIM] = outcome.poisoned_cal_set[_VICTIM].cal
     assert cluster_count(poisoned_cal) == CLUSTER_K_NBAIOT == 3
-
-
-def test_outputs_in_temp_only(collection, tmp_path, monkeypatch):
-    """Manifest emission writes only under the run directory, never to the global output root."""
-    monkeypatch.chdir(tmp_path)
-    cell = run_smoke_cell(
-        collection,
-        victim_id=_VICTIM,
-        policy=ThresholdPolicy.LOCAL_THRESHOLD,
-        source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-        fraction=_HIGH_FRACTION,
-    )
-    manifest = build_manifest(
-        ManifestBuildRequest(
-            dataset="synthetic",
-            stage=ExperimentStage.SYNTHETIC_SMOKE,
-            policy=ThresholdPolicy.LOCAL_THRESHOLD,
-            objective=AttackerObjective.THRESHOLD_RAISE,
-            source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
-            fraction=_HIGH_FRACTION,
-            target_scope=PoisoningTargetScope.SINGLE_CLIENT,
-            training_seed=0,
-            poisoning_seed=100,
-            client_idx=0,
-            scope_idx=0,
-            mu_flag_threshold=cell.mu_flag_threshold,
-            repository=REPOSITORY_NAME,
-        )
-    )
-    run_dir = tmp_path / "run"
-    emit_manifest(manifest, run_dir)
-
-    assert (run_dir / "run_manifest.json").exists()
-
-    assert not (tmp_path / CALIBRATION_POISONING_OUTPUT_ROOT).exists()
-    assert not Path(CALIBRATION_POISONING_OUTPUT_ROOT).exists()
 
 
 def test_lowering_increases_fpr_dispersion(collection):

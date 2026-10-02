@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from datp.artifacts.io import write_metrics_atomic
-from tests.fixtures.flower_smoke import run_flower_smoke
+from datp.artifacts.io import write_json_atomic
+from datp.artifacts.names import ArtifactFile
+from tests_support.flower_smoke import run_flower_smoke
 
 
 def _run_experiment(seed: int | None, run_dir: Path) -> Path:
@@ -17,7 +18,7 @@ def _run_experiment(seed: int | None, run_dir: Path) -> Path:
             {"round": rnd, "loss": loss} for rnd, loss in run_flower_smoke(seed=seed)
         ],
     }
-    return write_metrics_atomic(run_dir, metrics)
+    return write_json_atomic(run_dir / ArtifactFile.METRICS, metrics)
 
 
 @pytest.mark.integration

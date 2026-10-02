@@ -8,7 +8,7 @@ import numpy as np
 
 from datp.attacks.constants import N_MIN
 from datp.core.seeds import SeedPair, SeedRecord, make_seed_rng
-from datp.scoring.manifest import SCORE_COLUMN
+from datp.scoring.manifest import ScoringColumn
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +33,7 @@ class SyntheticClientScores:
     @property
     def score_column(self) -> str:
         """Canonical name of the score column in the scoring manifest."""
-        return SCORE_COLUMN
+        return ScoringColumn.RECONSTRUCTION_ERROR
 
 
 @dataclass(frozen=True, slots=True)

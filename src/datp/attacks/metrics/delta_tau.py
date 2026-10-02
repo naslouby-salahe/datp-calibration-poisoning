@@ -1,6 +1,13 @@
-"""Per-client delta-tau computation with materiality-scaled significance."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    ScoreValue,
+    ScoreVector,
+    SignedDelta,
+    Threshold,
+)
+
 
 import math
 from dataclasses import dataclass
@@ -16,22 +23,20 @@ from datp.statistics.aggregates import iqr
 
 @dataclass(frozen=True, slots=True)
 class DeltaTauEntry:
-    """Per-client operating-point delta with materiality-scaled significance flag."""
 
-    client_id: str
+    client_id: ClientId
     policy: ThresholdPolicy
-    tau_clean: float
-    tau_pois: float
-    delta_tau: float
-    delta_tau_rel: float
-    delta_tau_scale: float
-    scale_base: float
-    iqr_median: float
+    tau_clean: Threshold
+    tau_pois: Threshold
+    delta_tau: SignedDelta
+    delta_tau_rel: SignedDelta
+    delta_tau_scale: SignedDelta
+    scale_base: ScoreValue
+    iqr_median: ScoreValue
     is_significant: bool
 
 
-def per_client_scale_base(clean_cal: np.ndarray, iqr: float) -> float:
-    """Return the unscaled materiality base for a client: IQR, then MAD, then min-spacing fallback."""
+def per_client_scale_base(clean_cal: ScoreVector, iqr: ScoreValue) -> ScoreValue:
     if iqr > 0.0:
         return iqr
 
@@ -48,9 +53,8 @@ def per_client_scale_base(clean_cal: np.ndarray, iqr: float) -> float:
 
 
 def materiality_scale(
-    scale_base: float, iqr_median: float, factor: float, floor_factor: float
-) -> float:
-    """Return the materiality scale for a base value, or NaN when the base is undefined."""
+    scale_base: ScoreValue, iqr_median: ScoreValue, factor: ScoreValue, floor_factor: ScoreValue
+) -> ScoreValue:
     if math.isnan(scale_base):
         return math.nan
     return max(factor * scale_base, floor_factor * iqr_median)
@@ -59,19 +63,18 @@ def materiality_scale(
 def compute_delta_tau(
     collection: ScoreCollection,
     pair: ThresholdPairBase,
-) -> dict[str, DeltaTauEntry]:
-    """Compute per-client delta-tau entries with materiality-scaled significance flags."""
-    bases: dict[str, float] = {}
-    iqrs: list[float] = []
+) -> dict[ClientId, DeltaTauEntry]:
+    bases: dict[ClientId, ScoreValue] = {}
+    iqrs: list[ScoreValue] = []
 
     for cid in collection.eligible_ids:
-        clean_cal = collection.for_client(cid).cal
+        clean_cal = collection.clients[cid].cal
         iqr_val = iqr(clean_cal)
         iqrs.append(iqr_val)
         bases[cid] = per_client_scale_base(clean_cal, iqr_val)
 
     iqr_median = float(np.median(iqrs)) if iqrs else 0.0
-    result: dict[str, DeltaTauEntry] = {}
+    result: dict[ClientId, DeltaTauEntry] = {}
 
     for cid in collection.eligible_ids:
         tc = pair.thresholds_clean[cid]

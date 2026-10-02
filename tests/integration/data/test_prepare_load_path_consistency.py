@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from datp.core.enums import DeviceType
+from datp.core.enums import DeviceType, NBaIoTBalancePolicy
 from datp.data.datasets.nbaiot import prepare_nbaiot
 from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 from datp.federated.data_loading import (
@@ -36,7 +36,13 @@ class TestPrepareLoadPathConsistency:
             dataclasses.replace(NBAIOT_SPEC, feature_count=N_FEATURES),
         )
 
-        prepare_nbaiot(raw_dir, output_dir, n_min=100, seed=42, balanced_test=False)
+        prepare_nbaiot(
+            raw_dir,
+            output_dir,
+            n_min=100,
+            seed=42,
+            test_balance_policy=NBaIoTBalancePolicy.NATURAL_DISTRIBUTION,
+        )
         return output_dir
 
     def test_discover_client_dirs_finds_devices(self, prepared_dir: Path) -> None:

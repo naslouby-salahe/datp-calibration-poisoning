@@ -1,20 +1,23 @@
-"""Rich console pretty-printing for sweep progress banners and result summaries."""
-
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING
+from datp.types import (
+    ArtifactName,
+    DurationSeconds,
+    NarrativeText,
+    RandomSeed,
+    SampleCount,
+    SignedCount,
+)
 
+
+from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 from datp.config.models import ExperimentStage
 from datp.core.enums import ThresholdPolicy
-from datp.experiments.models import PolicyRunStatus, SweepStep
-
-if TYPE_CHECKING:
-    from datp.experiments.sweep import SweepResult
+from datp.experiments.models import PolicyRunStatus, SweepResult, SweepStep
 
 console = Console()
 
@@ -40,8 +43,7 @@ _STATUS_SYMBOLS = {
 }
 
 
-def print_sweep_banner(cell_count: int, base_dir: str) -> None:
-    """Print a Rich panel banner announcing the sweep stage and cell count."""
+def print_sweep_banner(cell_count: SampleCount, base_dir: ArtifactName) -> None:
     lines = [
         f"Stage: [cyan]NBAIOT_MAIN[/cyan] Cells: [cyan]{cell_count}[/cyan]",
         f"Output: [dim]{base_dir}[/dim]",
@@ -51,8 +53,7 @@ def print_sweep_banner(cell_count: int, base_dir: str) -> None:
     )
 
 
-def print_dry_run_summary(total_cells: int) -> None:
-    """Print a table summarizing the sweep matrix for dry-run mode."""
+def print_dry_run_summary(total_cells: SignedCount) -> None:
     table = Table(title="Sweep Matrix", border_style="cyan")
     table.add_column("Cells", justify="right")
     table.add_row(str(total_cells), style="bold")
@@ -60,28 +61,25 @@ def print_dry_run_summary(total_cells: int) -> None:
     console.print("[dim]Dry run only. No training launched.[/dim]")
 
 
-def print_step(step: SweepStep, detail: str) -> None:
-    """Print a labelled sweep step with optional detail text."""
+def print_step(step: SweepStep, detail: NarrativeText) -> None:
     detail_str = f" [dim]{detail}[/dim]" if detail else ""
     console.print(
-        f" [dim][{step.value}][/dim] [bold]{_SWEEP_STEP_LABELS[step]}[/bold]{detail_str}"
+        f" [dim][{step}][/dim] [bold]{_SWEEP_STEP_LABELS[step]}[/bold]{detail_str}"
     )
 
 
 def print_group_header(
-    stage: ExperimentStage, seed: int, group_size: int, current: int, total: int
+    stage: ExperimentStage, seed: RandomSeed, group_size: SignedCount, current: SignedCount, total: SampleCount
 ) -> None:
-    """Print a formatted group header with stage, seed, and progress indicator."""
     progress = f"[{current}/{total}]"
     console.print(
-        f"\n[bold yellow]{'─' * 56}[/bold yellow]\n[bold yellow] Group {progress}[/bold yellow] stage={stage.value} seed={seed} [dim]({group_size} cells)[/dim]"
+        f"\n[bold yellow]{'─' * 56}[/bold yellow]\n[bold yellow] Group {progress}[/bold yellow] stage={stage} seed={seed} [dim]({group_size} cells)[/dim]"
     )
 
 
 def print_policy_result(
-    policy: ThresholdPolicy, status: PolicyRunStatus, elapsed_s: float
+    policy: ThresholdPolicy, status: PolicyRunStatus, elapsed_s: DurationSeconds
 ) -> None:
-    """Print a single policy's result with status symbol and elapsed time."""
     elapsed_str = f"[dim]({elapsed_s:.1f}s)[/dim]" if elapsed_s > 0 else ""
     console.print(
         f" {_STATUS_SYMBOLS[status]} [bold]{policy.upper()}[/bold] {elapsed_str}"
@@ -89,7 +87,6 @@ def print_policy_result(
 
 
 def print_checkpoint_status(found: bool, ckpt_path: Path) -> None:
-    """Print whether a FL checkpoint was found or needs training."""
     if found:
         console.print(f" [green]✓ checkpoint found[/green] [dim]{ckpt_path}[/dim]")
     else:
@@ -98,8 +95,7 @@ def print_checkpoint_status(found: bool, ckpt_path: Path) -> None:
         )
 
 
-def print_sweep_summary(result: SweepResult, elapsed_s: float) -> None:
-    """Print a summary table of sweep totals, completed, skipped, and failed cells."""
+def print_sweep_summary(result: SweepResult, elapsed_s: DurationSeconds) -> None:
     table = Table(title="Sweep Summary", border_style="green")
     table.add_column("Metric", style="bold")
     table.add_column("Value")

@@ -1,6 +1,11 @@
-"""FL checkpoint gating: train, recover, or skip based on artifact presence and protocol config."""
-
 from __future__ import annotations
+
+from datp.types import (
+    DurationSeconds,
+    NarrativeText,
+    SignedCount,
+)
+
 
 from collections.abc import Callable
 from pathlib import Path
@@ -21,17 +26,16 @@ _MODULE = "experiments.stages.train_encoder"
 def ensure_fl_checkpoint(
     request: PipelineRequest,
     *,
-    step_fn: Callable[[SweepStep, str], None] | None,
+    step_fn: Callable[[SweepStep, NarrativeText], None] | None,
     checkpoint_status_fn: Callable[[bool, Path], None] | None,
-    lock_timeout: float,
+    lock_timeout: DurationSeconds,
 ) -> None:
-    """Ensure an FL checkpoint exists for a training cell, running training if needed."""
     key = request.key
     layout = ArtifactLayout(base_dir=request.base_dir, stage=key.stage)
     ckpt_dir = layout.checkpoint_dir(key)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     ckpt_file = ckpt_dir / ArtifactFile.MODEL_CHECKPOINT
-    label = f"stage={key.stage} seed={key.seed}"
+    label = key.label()
 
     if step_fn is not None:
         step_fn(SweepStep.CHECK_CHECKPOINT, label)
@@ -41,7 +45,7 @@ def ensure_fl_checkpoint(
         lock = FileLock(str(lock_path), timeout=lock_timeout)
     except OSError as exc:
         raise RuntimeError(
-            f"[{_MODULE}] Cannot create file lock. Expected: {str(lock_path)}. Got: {str(exc)}."
+            f"[{_MODULE}] Cannot create file lock. Expected: {lock_path}. Got: {exc}."
         ) from exc
 
     try:
@@ -57,7 +61,7 @@ def ensure_fl_checkpoint(
             )
     except Timeout:
         raise RuntimeError(
-            f"[{_MODULE}] Timed out waiting for checkpoint lock after {lock_timeout:.0f}s. Expected: lock acquired. Got: {str(lock_path)}."
+            f"[{_MODULE}] Timed out waiting for checkpoint lock after {lock_timeout:.0f}s. Expected: lock acquired. Got: {lock_path}."
         )
 
 
@@ -133,8 +137,8 @@ def _handle_non_protocol_checkpoint(
 
 def _run_fl_training(
     request: PipelineRequest,
-    label: str,
-    step_fn: Callable[[SweepStep, str], None] | None,
+    label: NarrativeText,
+    step_fn: Callable[[SweepStep, NarrativeText], None] | None,
 ) -> None:
     import torch
 
@@ -165,8 +169,8 @@ def _ensure_fl_checkpoint_locked(
     layout: ArtifactLayout,
     ckpt_dir: Path,
     ckpt_file: Path,
-    label: str,
-    step_fn: Callable[[SweepStep, str], None] | None,
+    label: NarrativeText,
+    step_fn: Callable[[SweepStep, NarrativeText], None] | None,
     checkpoint_status_fn: Callable[[bool, Path], None] | None,
 ) -> None:
     key = request.key
@@ -194,7 +198,7 @@ def _ensure_fl_checkpoint_locked(
     _run_fl_training(request, label, step_fn)
 
 
-def _require_milestones(request: PipelineRequest) -> tuple[int, ...]:
+def _require_milestones(request: PipelineRequest) -> tuple[SignedCount, ...]:
     protocol = request.cfg.checkpoint_protocol
     if protocol is None:
         raise ValueError(f"[{_MODULE}] configured checkpoint protocol not found.")
@@ -207,7 +211,7 @@ def _checkpoint_protocol_checkpoints_exist(
     key = request.key
     return all(
         (
-            layout.checkpoint_dir_for_round(key, r) / ArtifactFile.MODEL_CHECKPOINT
+            layout.checkpoint_dir(key, r) / ArtifactFile.MODEL_CHECKPOINT
         ).exists()
         for r in _require_milestones(request)
     )
@@ -218,9 +222,9 @@ def _checkpoint_protocol_complete(
 ) -> bool:
     key = request.key
     return all(
-        layout.score_cell_for_round(key, r).manifest_path.exists()
+        layout.score_cell(key, r).manifest_path.exists()
         and (
-            layout.checkpoint_dir_for_round(key, r) / ArtifactFile.MODEL_CHECKPOINT
+            layout.checkpoint_dir(key, r) / ArtifactFile.MODEL_CHECKPOINT
         ).exists()
         for r in _require_milestones(request)
     )
@@ -245,14 +249,14 @@ def _recover_checkpoint_protocol_scores(
     )
 
     for r in _require_milestones(request):
-        score_base = layout.score_cell_for_round(key, r).score_dir
+        score_base = layout.score_cell(key, r).score_dir
         try:
             validate_scoring_manifest(score_base)
             continue
         except (FileNotFoundError, ValueError):
             pass
 
-        round_ckpt_dir = layout.checkpoint_dir_for_round(key, r)
+        round_ckpt_dir = layout.checkpoint_dir(key, r)
         model = load_model_from_checkpoint(
             request.cfg,
             ckpt_dir=round_ckpt_dir,

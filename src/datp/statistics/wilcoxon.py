@@ -1,34 +1,36 @@
-"""Wilcoxon signed-rank test and Bonferroni correction for paired comparisons."""
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import cast
+from datp.types import (
+    Probability,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    SignificanceLevel,
+)
 
+
+from dataclasses import dataclass
 import numpy as np
 from scipy.stats import wilcoxon as _scipy_wilcoxon
 
 
 @dataclass(frozen=True, slots=True)
 class WilcoxonResult:
-    """Result of a Wilcoxon signed-rank test: statistic, p-value, and sample size."""
 
-    statistic: float
-    p_value: float
-    n: int
+    statistic: ScoreValue
+    p_value: Probability
+    n: SampleCount
 
 
 @dataclass(frozen=True, slots=True)
 class BonferroniResult:
-    """Bonferroni correction result: corrected alpha, per-comparison significance, and original p-values."""
 
-    corrected_alpha: float
+    corrected_alpha: SignificanceLevel
     significant: tuple[bool, ...]
-    original_p_values: tuple[float, ...]
+    original_p_values: tuple[Probability, ...]
 
 
-def wilcoxon_test(x: np.ndarray, y: np.ndarray) -> WilcoxonResult:
-    """Run a two-sided Wilcoxon signed-rank test on paired arrays x and y."""
+def wilcoxon_test(x: ScoreVector, y: ScoreVector) -> WilcoxonResult:
     x_arr = np.asarray(x, dtype=np.float64)
     y_arr = np.asarray(y, dtype=np.float64)
     if x_arr.size == 0 or y_arr.size == 0:
@@ -41,7 +43,7 @@ def wilcoxon_test(x: np.ndarray, y: np.ndarray) -> WilcoxonResult:
     if np.all(x_arr - y_arr == 0):
         return WilcoxonResult(statistic=0.0, p_value=1.0, n=len(x_arr))
 
-    statistic, p_value = cast(tuple[float, float], _scipy_wilcoxon(x_arr, y_arr))
+    statistic, p_value = _scipy_wilcoxon(x_arr, y_arr)
     return WilcoxonResult(
         statistic=float(statistic),
         p_value=float(p_value),
@@ -49,8 +51,9 @@ def wilcoxon_test(x: np.ndarray, y: np.ndarray) -> WilcoxonResult:
     )
 
 
-def bonferroni_correct(p_values: list[float], alpha: float) -> BonferroniResult:
-    """Apply Bonferroni correction to a list of p-values given a family-wise alpha."""
+def bonferroni_correct(
+    p_values: list[Probability], alpha: SignificanceLevel
+) -> BonferroniResult:
     if not p_values:
         raise ValueError("bonferroni_correct: p_values must be non-empty")
     corrected_alpha = alpha / len(p_values)

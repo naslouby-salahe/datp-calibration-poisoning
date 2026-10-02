@@ -1,14 +1,28 @@
-"""FedAvg strategy with convergence monitoring and checkpoint snapshotting."""
-
 from __future__ import annotations
 
-import time
+from datp.types import (
+    ClientId,
+    DurationSeconds,
+    Index,
+    NarrativeText,
+    PoisonFraction,
+    RecordKey,
+    RoundCount,
+    RoundIndex,
+    SampleCount,
+    ScoreValue,
+    SignedCount,
+)
+
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from flwr.common import (
+    EvaluateRes,
     EvaluateIns,
+    FitRes,
     FitIns,
     NDArrays,
     Parameters,
@@ -16,46 +30,47 @@ from flwr.common import (
     parameters_to_ndarrays,
 )
 from flwr.server.client_proxy import ClientProxy
+from flwr.server.client_manager import ClientManager
 from flwr.server.strategy import FedAvg
 
 from datp.checkpointing.enums import CheckpointConvergenceMode
-from datp.config.models import CheckpointProtocolConfig, DatpConfig
+from datp.config.models import (
+    CheckpointProtocolConfig,
+    DatpConfig,
+)
 from datp.federated.checkpoints import save_params_snapshot
 from datp.federated.convergence import ConvergenceMonitor
+from datp.federated.enums import FederatedRoundStage
 
 
 @dataclass(frozen=True, slots=True)
 class FedAvgBuildRequest:
-    """Input bundle to construct a DatpFedAvg strategy from configuration."""
 
     initial_parameters: Parameters
-    num_clients: int
-    effective_rounds_max: int
-    checkpoint_disk_dirs: dict[int, Path] | None
+    num_clients: SampleCount
+    effective_rounds_max: RoundCount
+    checkpoint_disk_dirs: dict[RoundIndex, Path] | None
 
 
 @dataclass(frozen=True, slots=True)
 class FedAvgConfig:
-    """Immutable configuration for DatpFedAvg hyperparameters and callbacks."""
 
     convergence_monitor: ConvergenceMonitor
-    round_timeout_s: float
-    fraction_fit: float
-    fraction_evaluate: float
-    min_fit_clients: int
-    min_evaluate_clients: int
-    min_available_clients: int
+    round_timeout_s: DurationSeconds
+    fraction_fit: PoisonFraction
+    fraction_evaluate: PoisonFraction
+    min_fit_clients: SignedCount
+    min_evaluate_clients: SignedCount
+    min_available_clients: SignedCount
     initial_parameters: Parameters | None = None
-    checkpoint_milestones: tuple[int, ...] = ()
+    checkpoint_milestones: tuple[SignedCount, ...] = ()
     convergence_mode: CheckpointConvergenceMode = CheckpointConvergenceMode.EARLY_STOP
-    checkpoint_disk_dirs: dict[int, Path] | None = None
+    checkpoint_disk_dirs: dict[RoundIndex, Path] | None = None
 
 
 class DatpFedAvg(FedAvg):
-    """FedAvg variant that snapshots parameters at milestones and stops on convergence."""
 
     def __init__(self, config: FedAvgConfig) -> None:
-        """Initialize with convergence monitoring and checkpoint snapshots."""
         super().__init__(
             fraction_fit=config.fraction_fit,
             fraction_evaluate=config.fraction_evaluate,
@@ -66,8 +81,6 @@ class DatpFedAvg(FedAvg):
             fit_metrics_aggregation_fn=lambda _: {},
         )
         self._monitor = config.convergence_monitor
-        self._round_timeout_s = config.round_timeout_s
-        self._round_start_time: float | None = None
         self._stopped = False
         self._latest_parameters: NDArrays | None = None
         self._checkpoint_milestones = frozenset(config.checkpoint_milestones)
@@ -77,51 +90,47 @@ class DatpFedAvg(FedAvg):
 
     @property
     def convergence_monitor(self) -> ConvergenceMonitor:
-        """The convergence monitor driving early stopping."""
         return self._monitor
 
     @property
     def stopped(self) -> bool:
-        """Whether training has been stopped by convergence or max rounds."""
         return self._stopped
 
     @property
     def latest_parameters(self) -> NDArrays | None:
-        """The most recently aggregated model parameters."""
         return self._latest_parameters
 
     @property
-    def parameter_snapshots(self) -> dict[int, NDArrays]:
-        """Shallow copy of milestone parameter snapshots keyed by round."""
+    def parameter_snapshots(self) -> dict[Index, NDArrays]:
         return self._parameter_snapshots.copy()
 
     def _raise_if_failures(
         self,
-        stage: str,
-        server_round: int,
-        failures: list[tuple[ClientProxy, Any] | BaseException],
+        stage: FederatedRoundStage,
+        server_round: RoundIndex,
+        failures: Sequence[
+            tuple[ClientProxy, FitRes | EvaluateRes] | BaseException
+        ],
     ) -> None:
-        """Raise a RuntimeError listing all failed clients for the round."""
         if not failures:
             return
-        failed_ids = []
+        failed_ids: list[ClientId | NarrativeText] = []
         for item in failures:
             if isinstance(item, BaseException):
                 failed_ids.append("<unidentified>")
             else:
-                failed_ids.append(item[0].cid)
+                failed_ids.append(ClientId(item[0].cid))
         raise RuntimeError(
             f"FL round {server_round}: {len(failures)} failures during {stage}. Failed clients: {failed_ids}"
         )
 
     def aggregate_fit(
         self,
-        server_round: int,
-        results: list[tuple[ClientProxy, Any]],
-        failures: list[tuple[ClientProxy, Any] | BaseException],
-    ) -> tuple[Parameters | None, dict[str, Scalar]]:
-        """Aggregate fit results and snapshot parameters at checkpoint milestones."""
-        self._raise_if_failures("fit", server_round, failures)
+        server_round: RoundIndex,
+        results: list[tuple[ClientProxy, FitRes]],
+        failures: list[tuple[ClientProxy, FitRes] | BaseException],
+    ) -> tuple[Parameters | None, dict[RecordKey, Scalar]]:
+        self._raise_if_failures(FederatedRoundStage.FIT, server_round, failures)
         aggregated = super().aggregate_fit(server_round, results, failures)
         if not aggregated or not aggregated[0]:
             return None, aggregated[1] if aggregated else {}
@@ -143,30 +152,26 @@ class DatpFedAvg(FedAvg):
         return params, fit_metrics
 
     def configure_fit(
-        self, server_round: int, parameters: Parameters, client_manager: Any
+        self, server_round: RoundIndex, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
-        """Skip fit configuration when training has stopped."""
         if self._stopped:
             return []
-        self._round_start_time = time.monotonic()
         return super().configure_fit(server_round, parameters, client_manager)
 
     def configure_evaluate(
-        self, server_round: int, parameters: Parameters, client_manager: Any
+        self, server_round: RoundIndex, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
-        """Skip evaluation configuration when training has stopped."""
         if self._stopped:
             return []
         return super().configure_evaluate(server_round, parameters, client_manager)
 
     def aggregate_evaluate(
         self,
-        server_round: int,
-        results: list[tuple[ClientProxy, Any]],
-        failures: list[tuple[ClientProxy, Any] | BaseException],
-    ) -> tuple[float | None, dict[str, Scalar]]:
-        """Aggregate evaluation losses and feed weighted loss to the convergence monitor."""
-        self._raise_if_failures("evaluate", server_round, failures)
+        server_round: RoundIndex,
+        results: list[tuple[ClientProxy, EvaluateRes]],
+        failures: list[tuple[ClientProxy, EvaluateRes] | BaseException],
+    ) -> tuple[ScoreValue | None, dict[RecordKey, Scalar]]:
+        self._raise_if_failures(FederatedRoundStage.EVALUATE, server_round, failures)
         if not results:
             return None, {}
 
@@ -190,17 +195,12 @@ class DatpFedAvg(FedAvg):
 
     @classmethod
     def from_config(cls, cfg: DatpConfig, req: FedAvgBuildRequest) -> DatpFedAvg:
-        """Build a DatpFedAvg strategy from configuration and a build request."""
-        conv = cfg.federation.convergence
-        monitor = ConvergenceMonitor(
-            conv.rounds_initial,
-            req.effective_rounds_max,
-            conv.relative_threshold,
-            conv.window,
+        monitor = ConvergenceMonitor.from_config(
+            cfg, rounds_max=req.effective_rounds_max
         )
 
         ckpt_cfg = cfg.checkpoint_protocol
-        ckpt_milestones: tuple[int, ...] = ()
+        ckpt_milestones: tuple[SignedCount, ...] = ()
         ckpt_conv_mode = CheckpointConvergenceMode.EARLY_STOP
         if isinstance(ckpt_cfg, CheckpointProtocolConfig) and ckpt_cfg.enabled:
             ckpt_milestones = ckpt_cfg.milestones
@@ -209,7 +209,7 @@ class DatpFedAvg(FedAvg):
         return cls(
             FedAvgConfig(
                 convergence_monitor=monitor,
-                round_timeout_s=conv.round_timeout_s,
+                round_timeout_s=cfg.federation.convergence.round_timeout_s,
                 fraction_fit=1.0,
                 fraction_evaluate=1.0,
                 min_fit_clients=req.num_clients,

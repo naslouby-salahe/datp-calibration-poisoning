@@ -1,6 +1,18 @@
-"""Downstream classification-metric deltas for victim and non-victim clients."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClassificationScore,
+    ClientId,
+    FalsePositiveRate,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    SignedCount,
+    SignedDelta,
+    Threshold,
+    TruePositiveRate,
+)
+
 
 import math
 from collections.abc import Iterable, Mapping
@@ -14,63 +26,60 @@ from datp.evaluation.metrics import BinaryMetrics, recompute_binary_metrics
 
 @dataclass(frozen=True, slots=True)
 class VictimDownstreamMetrics:
-    """Clean vs poisoned TPR, FPR, balanced-accuracy, macro-F1 and absolute error counts for one client."""
 
-    tpr_clean: float
-    tpr_poisoned: float
-    delta_tpr: float
-    fpr_clean: float
-    fpr_poisoned: float
-    delta_fpr: float
-    ba_clean: float
-    ba_poisoned: float
-    delta_ba: float
-    macro_f1_clean: float
-    macro_f1_poisoned: float
-    delta_macro_f1: float
-    fp_clean: int
-    fp_poisoned: int
-    fn_clean: int
-    fn_poisoned: int
-    n_test_benign: int
-    n_test_attack: int
+    tpr_clean: TruePositiveRate
+    tpr_poisoned: TruePositiveRate
+    delta_tpr: SignedDelta
+    fpr_clean: FalsePositiveRate
+    fpr_poisoned: FalsePositiveRate
+    delta_fpr: SignedDelta
+    ba_clean: ScoreValue
+    ba_poisoned: ScoreValue
+    delta_ba: SignedDelta
+    macro_f1_clean: ClassificationScore
+    macro_f1_poisoned: ClassificationScore
+    delta_macro_f1: SignedDelta
+    fp_clean: SignedCount
+    fp_poisoned: SignedCount
+    fn_clean: SignedCount
+    fn_poisoned: SignedCount
+    n_test_benign: SampleCount
+    n_test_attack: SampleCount
 
 
 @dataclass(frozen=True, slots=True)
 class NonVictimDownstreamMetrics:
-    """Fleet-aggregated downstream deltas over non-victim clients."""
 
-    n_clients: int
-    mean_tpr_clean: float
-    mean_tpr_poisoned: float
-    mean_delta_tpr: float
-    worst_delta_tpr: float
-    mean_fpr_clean: float
-    mean_fpr_poisoned: float
-    mean_delta_fpr: float
-    worst_delta_fpr: float
-    mean_delta_ba: float
-    mean_delta_macro_f1: float
-    delta_fp_total: int
-    delta_fn_total: int
+    n_clients: SampleCount
+    mean_tpr_clean: TruePositiveRate
+    mean_tpr_poisoned: TruePositiveRate
+    mean_delta_tpr: SignedDelta
+    worst_delta_tpr: SignedDelta
+    mean_fpr_clean: FalsePositiveRate
+    mean_fpr_poisoned: FalsePositiveRate
+    mean_delta_fpr: SignedDelta
+    worst_delta_fpr: SignedDelta
+    mean_delta_ba: SignedDelta
+    mean_delta_macro_f1: SignedDelta
+    delta_fp_total: SignedCount
+    delta_fn_total: SignedCount
 
 
-def _counts(scores: np.ndarray, threshold: float) -> int:
+def _counts(scores: ScoreVector, threshold: Threshold) -> SignedCount:
     return int(np.sum(scores > threshold))
 
 
 def compute_victim_downstream_metrics(
     *,
-    clean_threshold: float,
-    poisoned_threshold: float,
+    clean_threshold: Threshold,
+    poisoned_threshold: Threshold,
     client_scores: ClientScores,
 ) -> VictimDownstreamMetrics:
-    """Compute TPR, FPR, balanced-accuracy, macro-F1 and error-count deltas between clean and poisoned thresholds."""
     benign = client_scores.test_benign
     attack = client_scores.test_attack
     n_benign, n_attack = len(benign), len(attack)
 
-    def _metrics_at(thresh: float) -> tuple[BinaryMetrics, int, int]:
+    def _metrics_at(thresh: ScoreValue) -> tuple[BinaryMetrics, SignedCount, SignedCount]:
         tp = _counts(attack, thresh)
         fp = _counts(benign, thresh)
         return (
@@ -104,15 +113,14 @@ def compute_victim_downstream_metrics(
     )
 
 
-def _finite_mean(values: Iterable[float]) -> float:
+def _finite_mean(values: Iterable[ScoreValue]) -> ScoreValue:
     finite = [v for v in values if math.isfinite(v)]
     return float(np.mean(finite)) if finite else math.nan
 
 
 def aggregate_non_victim_metrics(
-    per_client: Mapping[str, VictimDownstreamMetrics],
+    per_client: Mapping[ClientId, VictimDownstreamMetrics],
 ) -> NonVictimDownstreamMetrics:
-    """Aggregate per-client downstream metrics over a set of non-victim clients."""
     items = list(per_client.values())
     d_tpr = [m.delta_tpr for m in items if math.isfinite(m.delta_tpr)]
     d_fpr = [m.delta_fpr for m in items if math.isfinite(m.delta_fpr)]
@@ -135,11 +143,10 @@ def aggregate_non_victim_metrics(
 
 def compute_non_victim_downstream(
     *,
-    thresholds: Mapping[str, tuple[float, float]],
-    scores_by_client: Mapping[str, ClientScores],
-    victim_id: str,
+    thresholds: Mapping[ClientId, tuple[Threshold, Threshold]],
+    scores_by_client: Mapping[ClientId, ClientScores],
+    victim_id: ClientId,
 ) -> NonVictimDownstreamMetrics:
-    """Compute downstream metrics for every non-victim client given (clean, poisoned) thresholds."""
     return aggregate_non_victim_metrics(
         {
             cid: compute_victim_downstream_metrics(

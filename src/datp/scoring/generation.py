@@ -1,4 +1,10 @@
-"""Score generation: model loading, reconstruction-errors, and per-client Parquet output."""
+from datp.types import (
+    BatchSize,
+    ClientId,
+    RandomSeed,
+    RoundIndex,
+    ScoreVector,
+)
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -13,7 +19,7 @@ from datp.artifacts.names import ArtifactFile, PathToken
 from datp.config.models import DatpConfig
 from datp.config.models import ExperimentStage
 from datp.core.device import resolve_device
-from datp.core.enums import SCORING_STAGES, ScoringStage
+from datp.core.enums import ClientDataAttribute, SCORING_STAGES, ScoringStage
 from datp.core.logging import get_logger
 from datp.core.provenance import git_commit, hash_file, utc_timestamp
 from datp.data.catalog import DatasetID
@@ -21,11 +27,11 @@ from datp.data.common.storage import write_artifact
 from datp.federated.types import ClientData
 from datp.modeling.autoencoder import Autoencoder
 from datp.scoring.manifest import (
-    SCORE_COLUMN,
-    SCORING_MANIFEST_NOT_PROVIDED,
     ScoringColumnDtype,
+    ScoringColumn,
     ScoringManifest,
     ScoringManifestContext,
+    ScoringManifestSentinel,
     ScoringManifestStatus,
     ScoringRecord,
     resolve_within_score_base,
@@ -39,11 +45,10 @@ _MODULE = "scoring.generation"
 def load_model_from_checkpoint(
     cfg: DatpConfig, *, ckpt_dir: Path, require_cuda: bool
 ) -> Autoencoder:
-    """Load an Autoencoder from a checkpoint file on the resolved device."""
     ckpt_file = ckpt_dir / ArtifactFile.MODEL_CHECKPOINT
     if not ckpt_file.exists():
         raise FileNotFoundError(
-            f"[{_MODULE}] Checkpoint missing. Expected: {str(ckpt_file)}. Got: missing file."
+            f"[{_MODULE}] Checkpoint missing. Expected: {ckpt_file}. Got: missing file."
         )
 
     device = resolve_device(require_cuda)
@@ -63,15 +68,14 @@ def load_model_from_checkpoint(
 def compute_reconstruction_errors(
     model: Autoencoder,
     data: torch.Tensor,
-    batch_size: int | None = None,
-) -> np.ndarray:
-    """Compute reconstruction errors for a tensor in batches, returning a float32 array."""
+    batch_size: BatchSize | None = None,
+) -> ScoreVector:
     if data.shape[0] == 0:
         return np.array([], dtype=np.float32)
 
     effective_batch = batch_size or data.shape[0]
     model.eval()
-    all_errors: list[np.ndarray] = []
+    all_errors: list[ScoreVector] = []
     with torch.inference_mode():
         for start in range(0, data.shape[0], effective_batch):
             batch_errors = model.reconstruction_error(
@@ -81,26 +85,24 @@ def compute_reconstruction_errors(
     return np.concatenate(all_errors)
 
 
-def _errors_to_dataframe(errors: np.ndarray) -> pl.DataFrame:
-    return pl.DataFrame({SCORE_COLUMN: errors.astype(np.float32, copy=False)})
-
-
-def _score_output_path(score_base: Path, stage: ScoringStage, client_id: str) -> Path:
+def _score_output_path(
+    score_base: Path, stage: ScoringStage, client_id: ClientId
+) -> Path:
     filename = f"{client_id}{PathToken.PARQUET_EXT}"
     if Path(filename).name != filename:
         raise ValueError(
             f"[{_MODULE}] Invalid client id for score artifact path. Expected: client id without path separators. Got: {client_id}."
         )
-    out_path = score_base / stage.value / filename
+    out_path = score_base / stage / filename
     resolve_within_score_base(score_base, out_path)
     return out_path
 
 
 def _score_record(
     path: Path,
-    client_id: str,
+    client_id: ClientId,
     stage: ScoringStage,
-    errors: np.ndarray,
+    errors: ScoreVector,
     *,
     score_base: Path | None = None,
 ) -> ScoringRecord:
@@ -112,9 +114,9 @@ def _score_record(
         client_id=client_id,
         split=stage,
         path=record_path,
-        row_count=int(errors.size),
-        columns=(SCORE_COLUMN,),
-        dtypes=(ScoringColumnDtype(column=SCORE_COLUMN, dtype="Float32"),),
+        row_count=errors.size,
+        columns=(ScoringColumn.RECONSTRUCTION_ERROR,),
+        dtypes=(ScoringColumnDtype(column=ScoringColumn.RECONSTRUCTION_ERROR, dtype="Float32"),),
         score_min=float(finite.min()) if finite.size else None,
         score_max=float(finite.max()) if finite.size else None,
         score_nan_count=int(np.isnan(errors).sum()),
@@ -127,10 +129,10 @@ class _SplitScoringParams:
     model: Autoencoder
     model_device: torch.device
     data: torch.Tensor
-    client_id: str
+    client_id: ClientId
     stage: ScoringStage
     score_base: Path
-    batch_size: int
+    batch_size: BatchSize
 
 
 def _score_one_split(params: _SplitScoringParams) -> ScoringRecord:
@@ -146,7 +148,9 @@ def _score_one_split(params: _SplitScoringParams) -> ScoringRecord:
     )
     out_path = _score_output_path(params.score_base, params.stage, params.client_id)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    write_artifact(_errors_to_dataframe(errors), out_path)
+    write_artifact(
+        pl.DataFrame({ScoringColumn.RECONSTRUCTION_ERROR: errors.astype(np.float32, copy=False)}), out_path
+    )
     logger.debug(
         "wrote scores",
         n_scores=len(errors),
@@ -164,25 +168,33 @@ def _score_one_split(params: _SplitScoringParams) -> ScoringRecord:
 
 
 def score_clients_impl(
-    client_data: Mapping[str, ClientData],
+    client_data: Mapping[ClientId, ClientData],
     *,
     score_base: Path,
-    scoring_batch_size: int,
-    get_model: Callable[[str], Autoencoder],
+    scoring_batch_size: BatchSize,
+    get_model: Callable[[ClientId], Autoencoder],
 ) -> list[ScoringRecord]:
-    """Compute and persist per-client reconstruction errors across all scoring stages."""
     records: list[ScoringRecord] = []
-    for client_id, splits in client_data.items():
+    scoring_stages: tuple[ScoringStage, ...] = SCORING_STAGES
+    for client_key, splits in client_data.items():
+        client_id = ClientId(client_key)
         model = get_model(client_id)
         model.eval()
         model_device = next(model.parameters()).device
-        for scoring_stage in SCORING_STAGES:
+        for scoring_stage in scoring_stages:
+            data = (
+                splits.val
+                if scoring_stage.client_data_attr is ClientDataAttribute.VAL
+                else splits.test_benign
+                if scoring_stage.client_data_attr is ClientDataAttribute.TEST_BENIGN
+                else splits.test_attack
+            )
             records.append(
                 _score_one_split(
                     _SplitScoringParams(
                         model=model,
                         model_device=model_device,
-                        data=getattr(splits, scoring_stage.client_data_attr),
+                        data=data,
                         client_id=client_id,
                         stage=scoring_stage,
                         score_base=score_base,
@@ -195,30 +207,27 @@ def score_clients_impl(
 
 def write_scoring_manifest_and_sentinel(
     records: list[ScoringRecord],
-    client_ids: list[str],
+    client_ids: list[ClientId],
     score_base: Path,
     ctx: ScoringManifestContext,
 ) -> None:
-    """Write the scoring manifest JSON and DONE sentinel file."""
     manifest = ScoringManifest(
-        dataset=str(ctx.dataset),
-        stage=str(ctx.stage)
-        if ctx.stage is not None
-        else SCORING_MANIFEST_NOT_PROVIDED,
+        dataset=ctx.dataset,
+        stage=ctx.stage,
         seed=ctx.seed,
         model_checkpoint_path=str(ctx.checkpoint_path)
         if ctx.checkpoint_path is not None
-        else SCORING_MANIFEST_NOT_PROVIDED,
+        else ScoringManifestSentinel.NOT_PROVIDED,
         model_checkpoint_hash=hash_file(ctx.checkpoint_path)
         if ctx.checkpoint_path is not None
-        else SCORING_MANIFEST_NOT_PROVIDED,
+        else ScoringManifestSentinel.NOT_PROVIDED,
         checkpoint_round=ctx.checkpoint_round,
         scoring_code_version=git_commit(),
-        score_column_name=SCORE_COLUMN,
+        score_column_name=ScoringColumn.RECONSTRUCTION_ERROR,
         expected_client_ids=tuple(sorted(client_ids)),
-        expected_splits=tuple(s.value for s in SCORING_STAGES),
+        expected_splits=SCORING_STAGES,
         actual_client_ids=tuple(sorted({record.client_id for record in records})),
-        actual_splits=tuple(sorted({record.split.value for record in records})),
+        actual_splits=tuple(sorted({record.split for record in records})),
         records=tuple(records),
         completion_status=ScoringManifestStatus.COMPLETE,
         generated_at_utc=utc_timestamp(),
@@ -236,17 +245,16 @@ def write_scoring_manifest_and_sentinel(
 
 def score_clients(
     model: Autoencoder,
-    client_data: Mapping[str, ClientData],
+    client_data: Mapping[ClientId, ClientData],
     *,
     score_base: Path,
     stage: ExperimentStage | None,
-    seed: int | None,
+    seed: RandomSeed | None,
     dataset: DatasetID,
     checkpoint_path: Path | None,
-    checkpoint_round: int | None,
-    scoring_batch_size: int,
+    checkpoint_round: RoundIndex | None,
+    scoring_batch_size: BatchSize,
 ) -> None:
-    """Score all client splits, persist Parquet files, and write the manifest."""
     model.eval()
     logger.info(
         "scoring clients", n_clients=len(client_data), score_base=str(score_base)
@@ -259,7 +267,7 @@ def score_clients(
     )
     write_scoring_manifest_and_sentinel(
         records,
-        sorted(client_data.keys()),
+        [ClientId(client_id) for client_id in sorted(client_data)],
         score_base,
         ScoringManifestContext(
             dataset=dataset,

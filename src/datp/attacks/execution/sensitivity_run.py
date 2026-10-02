@@ -1,19 +1,30 @@
-"""Sensitivity analyses beside the bounded sweep: cluster stability, scale normalization, distinct draws."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    FalsePositiveRate,
+    PoisonFraction,
+    RandomSeed,
+    ScoreValue,
+    ScoreVector,
+    SignedCount,
+    Threshold,
+)
+
 
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from itertools import product
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import cast
 
 import numpy as np
 from joblib import Parallel, delayed
 from threadpoolctl import threadpool_limits
 
-from datp.artifacts.poison_layout import PoisonLayout
+from datp.artifacts.layout import sensitivity_manifest_path
 from datp.attacks.constants import (
     CLUSTER_SENSITIVITY_FRACTIONS,
     CLUSTER_SENSITIVITY_K_GRID,
@@ -26,19 +37,21 @@ from datp.attacks.constants import (
     TRIM_FRACTION_APPENDIX,
     TRIM_FRACTION_PRIMARY,
 )
-from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy, ReservoirDraw
+from datp.attacks.enums import (
+    AttackerObjective,
+    PoisoningDefense,
+    PoisoningSourceStrategy,
+    ReservoirDraw,
+    ThresholdScaleScenario,
+)
 from datp.attacks.execution.bounded_sweep_run import load_seed_collections
 from datp.attacks.execution.cell_runner import (
     InjectionOutcome,
     InjectionSpec,
-    PolicyPair,
     inject_single_victim,
     recompute_pair,
 )
-from datp.attacks.injection.defenses import (
-    build_defended_collection,
-    defend_poisoned_cal,
-)
+from datp.attacks.injection.defenses import apply_defense
 from datp.attacks.manifests.run_manifest import ProvenanceRecord
 from datp.attacks.manifests.sensitivity_manifest import (
     ClusterStabilityRow,
@@ -58,9 +71,10 @@ from datp.attacks.threshold_recomputation.cluster_threshold_recompute import (
     ClusterHyperparams,
     compute_cluster_pair,
 )
-from datp.attacks.types import PoisonedCalibrationSet
+from datp.attacks.types import PoisonedCalibrationSet, ThresholdPairBase
 from datp.config.attack_config import CalibrationPoisoningConfig
 from datp.core.enums import ThresholdPolicy
+from datp.core.logging import get_logger
 from datp.core.provenance import REPOSITORY_NAME, hash_jsonable
 from datp.core.seeds import SeedPair
 from datp.statistics.aggregates import cv
@@ -70,43 +84,38 @@ from datp.thresholding.eligibility import (
     compute_client_thresholds,
 )
 
-class _CellBase(TypedDict):
-    training_seed: int
-    victim_id: str
+logger = get_logger(__name__)
+
+@dataclass(frozen=True, slots=True)
+class _CellBase:
+
+    training_seed: RandomSeed
+    victim_id: ClientId
     source: PoisoningSourceStrategy
     objective: AttackerObjective
-    fraction: float
+    fraction: PoisonFraction
 
 
-_ClusterGrid = tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]
-
-_TaskRows = tuple[
-    list[ClusterStabilityRow],
-    ScaleNormalizationRow,
-    list[DrawVariantRow],
-    list[TrustBoundaryRow],
-]
 
 
-def _spec(
-    seed_pair: SeedPair,
-    source: PoisoningSourceStrategy,
-    objective: AttackerObjective,
-    fraction: float,
-    draw: ReservoirDraw,
-) -> InjectionSpec:
-    return InjectionSpec(
-        source=source,
-        fraction=fraction,
-        seed_pair=seed_pair,
-        objective=objective,
-        draw=draw,
-    )
+@dataclass(frozen=True, slots=True)
+class _ClusterGrid:
+    cluster_counts: tuple[SignedCount, ...]
+    initializations: tuple[SignedCount, ...]
+    random_states: tuple[RandomSeed, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _SensitivityTaskResult:
+    cluster_stability: tuple[ClusterStabilityRow, ...]
+    scale_normalization: ScaleNormalizationRow
+    draw_variants: tuple[DrawVariantRow, ...]
+    trust_boundary: tuple[TrustBoundaryRow, ...]
 
 
 def _local_taus(
-    collection: ScoreCollection, cal: dict[str, np.ndarray]
-) -> dict[str, float]:
+    collection: ScoreCollection, cal: dict[ClientId, ScoreVector]
+) -> dict[ClientId, ScoreValue]:
     ids = collection.eligible_ids
     taus = compute_client_thresholds(
         CalibrationErrorSet.from_mapping({cid: cal[cid] for cid in ids}),
@@ -117,10 +126,10 @@ def _local_taus(
 
 
 def _fprs(
-    collection: ScoreCollection, thresholds: dict[str, float]
-) -> dict[str, float]:
+    collection: ScoreCollection, thresholds: dict[ClientId, Threshold]
+) -> dict[ClientId, FalsePositiveRate]:
     return {
-        cid: float(np.mean(collection.for_client(cid).test_benign > thr))
+        cid: float(np.mean(collection.clients[cid].test_benign > thr))
         for cid, thr in thresholds.items()
     }
 
@@ -128,11 +137,11 @@ def _fprs(
 def _scale_row(
     collection: ScoreCollection,
     base: _CellBase,
-    victim_id: str,
-    poisoned_cal: np.ndarray,
+    victim_id: ClientId,
+    poisoned_cal: ScoreVector,
 ) -> ScaleNormalizationRow:
     ids = collection.eligible_ids
-    clean = {cid: collection.for_client(cid).cal for cid in ids}
+    clean = {cid: collection.clients[cid].cal for cid in ids}
     pois = {**clean, victim_id: poisoned_cal}
     t_clean, t_pois = _local_taus(collection, clean), _local_taus(collection, pois)
     scales = {
@@ -151,18 +160,19 @@ def _scale_row(
     fpr = {
         name: _fprs(collection, thr)
         for name, thr in {
-            "raw_clean": raw_clean,
-            "raw_pois": raw_pois,
-            "norm_clean": norm_clean,
-            "norm_pois": norm_pois,
+            ThresholdScaleScenario.RAW_CLEAN: raw_clean,
+            ThresholdScaleScenario.RAW_POISONED: raw_pois,
+            ThresholdScaleScenario.NORMALIZED_CLEAN: norm_clean,
+            ThresholdScaleScenario.NORMALIZED_POISONED: norm_pois,
         }.items()
     }
 
-    def fleet_cv(name: str) -> float:
-        return cv(np.array(list(fpr[name].values())))
-
     return ScaleNormalizationRow(
-        **base,
+        training_seed=base.training_seed,
+        victim_id=base.victim_id,
+        source=base.source,
+        objective=base.objective,
+        fraction=base.fraction,
         tau_local_cv_clean=cv(t_arr),
         tau_local_max_min_ratio_clean=float(t_arr.max() / t_arr.min())
         if t_arr.min() > 0.0
@@ -170,26 +180,38 @@ def _scale_row(
         score_scale_cv_clean=cv(np.array(list(scales.values()))),
         raw_global_victim_delta_tau=raw_pois[victim_id] - raw_clean[victim_id],
         normalized_global_victim_delta_tau=norm_pois[victim_id] - norm_clean[victim_id],
-        raw_global_victim_delta_fpr=fpr["raw_pois"][victim_id]
-        - fpr["raw_clean"][victim_id],
-        normalized_global_victim_delta_fpr=fpr["norm_pois"][victim_id]
-        - fpr["norm_clean"][victim_id],
-        raw_global_cv_fpr_clean=fleet_cv("raw_clean"),
-        normalized_global_cv_fpr_clean=fleet_cv("norm_clean"),
-        raw_global_cv_fpr_poisoned=fleet_cv("raw_pois"),
-        normalized_global_cv_fpr_poisoned=fleet_cv("norm_pois"),
+        raw_global_victim_delta_fpr=fpr[ThresholdScaleScenario.RAW_POISONED][victim_id]
+        - fpr[ThresholdScaleScenario.RAW_CLEAN][victim_id],
+        normalized_global_victim_delta_fpr=fpr[
+            ThresholdScaleScenario.NORMALIZED_POISONED
+        ][victim_id]
+        - fpr[ThresholdScaleScenario.NORMALIZED_CLEAN][victim_id],
+        raw_global_cv_fpr_clean=cv(
+            np.array(list(fpr[ThresholdScaleScenario.RAW_CLEAN].values()))
+        ),
+        normalized_global_cv_fpr_clean=cv(
+            np.array(list(fpr[ThresholdScaleScenario.NORMALIZED_CLEAN].values()))
+        ),
+        raw_global_cv_fpr_poisoned=cv(
+            np.array(list(fpr[ThresholdScaleScenario.RAW_POISONED].values()))
+        ),
+        normalized_global_cv_fpr_poisoned=cv(
+            np.array(list(fpr[ThresholdScaleScenario.NORMALIZED_POISONED].values()))
+        ),
     )
 
 
 def _cluster_rows(
     collection: ScoreCollection,
     base: _CellBase,
-    victim_id: str,
+    victim_id: ClientId,
     poisoned_cal_set: PoisonedCalibrationSet,
     grid: _ClusterGrid,
 ) -> list[ClusterStabilityRow]:
-    rows = []
-    for k, n_init, random_state in product(*grid):
+    rows: list[ClusterStabilityRow] = []
+    for k, n_init, random_state in product(
+        grid.cluster_counts, grid.initializations, grid.random_states
+    ):
         pair = compute_cluster_pair(
             collection,
             poisoned_cal_set,
@@ -199,7 +221,11 @@ def _cluster_rows(
         clean_tau = pair.thresholds_clean[victim_id]
         rows.append(
             ClusterStabilityRow(
-                **base,
+                training_seed=base.training_seed,
+                victim_id=base.victim_id,
+                source=base.source,
+                objective=base.objective,
+                fraction=base.fraction,
                 k=k,
                 n_init=n_init,
                 random_state=random_state,
@@ -235,7 +261,7 @@ _DRAW_VARIANTS = (
 )
 
 
-def _victim_shift(pair: PolicyPair, victim_id: str) -> float:
+def _victim_shift(pair: ThresholdPairBase, victim_id: ClientId) -> ScoreValue:
     return pair.thresholds_pois[victim_id] - pair.thresholds_clean[victim_id]
 
 
@@ -243,17 +269,17 @@ def _draw_variant_rows(
     collection: ScoreCollection,
     base: _CellBase,
     seed_pair: SeedPair,
-    victim_id: str,
+    victim_id: ClientId,
     with_outcome: InjectionOutcome,
 ) -> list[DrawVariantRow]:
-    n = collection.for_client(victim_id).cal.size
+    n = collection.clients[victim_id].cal.size
     requested = with_outcome.injection.n_replaced
     dup_with = duplicate_rate(with_outcome.injection.poisoned_cal)
     pairs_with = {
         policy: recompute_pair(collection, with_outcome.poisoned_cal_set, policy)
         for policy in _POLICIES
     }
-    rows = []
+    rows: list[DrawVariantRow] = []
     for draw in _DRAW_VARIANTS:
         budget = (
             min(requested, with_outcome.reservoir.pool.size)
@@ -263,19 +289,23 @@ def _draw_variant_rows(
         variant = inject_single_victim(
             collection,
             victim_id=victim_id,
-            spec=_spec(
-                seed_pair,
-                base["source"],
-                base["objective"],
-                budget / n,
-                draw,
+            spec=InjectionSpec(
+                source=base.source,
+                fraction=budget / n,
+                seed_pair=seed_pair,
+                objective=base.objective,
+                draw=draw,
             ),
         )
         dup_variant = duplicate_rate(variant.injection.poisoned_cal)
         for policy in _POLICIES:
             rows.append(
                 DrawVariantRow(
-                    **base,
+                    training_seed=base.training_seed,
+                    victim_id=base.victim_id,
+                    source=base.source,
+                    objective=base.objective,
+                    fraction=base.fraction,
                     policy=policy,
                     draw=draw,
                     requested_n_replaced=requested,
@@ -299,15 +329,17 @@ def _defended_pair(
     collection: ScoreCollection,
     with_outcome: InjectionOutcome,
     policy: ThresholdPolicy,
-    trim_fraction: float,
-) -> PolicyPair:
+    trim_fraction: PoisonFraction,
+) -> ThresholdPairBase:
     ids = collection.eligible_ids
-    poisoned = defend_poisoned_cal(
-        {cid: with_outcome.poisoned_cal_set.for_client(cid).cal for cid in ids},
-        trim_fraction,
+    defended_collection, poisoned = apply_defense(
+        collection,
+        {cid: with_outcome.poisoned_cal_set[cid].cal for cid in ids},
+        defense=PoisoningDefense.TRIMMED_CALIBRATION,
+        trim_fraction=trim_fraction,
     )
     return recompute_pair(
-        build_defended_collection(collection, trim_fraction),
+        defended_collection,
         PoisonedCalibrationSet.from_mapping(poisoned),
         policy,
     )
@@ -316,16 +348,16 @@ def _defended_pair(
 def _trust_boundary_rows(
     collection: ScoreCollection,
     base: _CellBase,
-    victim_id: str,
+    victim_id: ClientId,
     with_outcome: InjectionOutcome,
 ) -> list[TrustBoundaryRow]:
-    victim_cal = collection.for_client(victim_id).cal
+    victim_cal = collection.clients[victim_id].cal
     extreme = (
         float(victim_cal.max())
-        if base["objective"] == AttackerObjective.THRESHOLD_RAISE
+        if base.objective == AttackerObjective.THRESHOLD_RAISE
         else float(victim_cal.min())
     )
-    rows = []
+    rows: list[TrustBoundaryRow] = []
     for policy in _POLICIES:
         undefended = recompute_pair(collection, with_outcome.poisoned_cal_set, policy)
         tau_clean = undefended.thresholds_clean[victim_id]
@@ -339,7 +371,11 @@ def _trust_boundary_rows(
         )
         rows.append(
             TrustBoundaryRow(
-                **base,
+                training_seed=base.training_seed,
+                victim_id=base.victim_id,
+                source=base.source,
+                objective=base.objective,
+                fraction=base.fraction,
                 policy=policy,
                 delta_tau_undefended=shift,
                 delta_tau_trim_primary=_victim_shift(primary, victim_id),
@@ -360,51 +396,65 @@ def _trust_boundary_rows(
 def _task(
     collection: ScoreCollection,
     seed_pair: SeedPair,
-    victim_id: str,
+    victim_id: ClientId,
     source: PoisoningSourceStrategy,
     objective: AttackerObjective,
-    fraction: float,
+    fraction: PoisonFraction,
     grid: _ClusterGrid,
-) -> _TaskRows:
-    base: _CellBase = {
-        "training_seed": seed_pair.training_seed,
-        "victim_id": victim_id,
-        "source": source,
-        "objective": objective,
-        "fraction": fraction,
-    }
+) -> _SensitivityTaskResult:
+    base = _CellBase(
+        training_seed=seed_pair.training_seed,
+        victim_id=victim_id,
+        source=source,
+        objective=objective,
+        fraction=fraction,
+    )
     with threadpool_limits(limits=1):
         with_outcome = inject_single_victim(
             collection,
             victim_id=victim_id,
-            spec=_spec(
-                seed_pair, source, objective, fraction, ReservoirDraw.WITH_REPLACEMENT
+            spec=InjectionSpec(
+                source=source,
+                fraction=fraction,
+                seed_pair=seed_pair,
+                objective=objective,
+                draw=ReservoirDraw.WITH_REPLACEMENT,
             ),
         )
-        return (
-            _cluster_rows(
-                collection, base, victim_id, with_outcome.poisoned_cal_set, grid
+        return _SensitivityTaskResult(
+            cluster_stability=tuple(
+                _cluster_rows(
+                    collection, base, victim_id, with_outcome.poisoned_cal_set, grid
+                )
             ),
-            _scale_row(
+            scale_normalization=_scale_row(
                 collection, base, victim_id, with_outcome.injection.poisoned_cal
             ),
-            _draw_variant_rows(collection, base, seed_pair, victim_id, with_outcome),
-            _trust_boundary_rows(collection, base, victim_id, with_outcome),
+            draw_variants=tuple(
+                _draw_variant_rows(collection, base, seed_pair, victim_id, with_outcome)
+            ),
+            trust_boundary=tuple(
+                _trust_boundary_rows(collection, base, victim_id, with_outcome)
+            ),
         )
 
 
 def run_sensitivity(
     base_dir: Path, config: CalibrationPoisoningConfig
 ) -> SensitivityManifest:
-    """Run all sensitivity analyses and return the manifest."""
+    logger.info(
+        "sensitivity analysis started",
+        training_seed_count=len(config.seeds.training),
+        poisoning_seed_count=len(config.seeds.poisoning),
+    )
     collections = load_seed_collections(base_dir, config)
     fractions = tuple(
         sorted(set(CLUSTER_SENSITIVITY_FRACTIONS) & set(DRAW_VARIANT_FRACTIONS))
     )
-    grid: _ClusterGrid = (
-        CLUSTER_SENSITIVITY_K_GRID,
-        CLUSTER_SENSITIVITY_N_INIT_GRID,
-        CLUSTER_SENSITIVITY_RANDOM_STATES,
+    grid = _ClusterGrid(
+        cluster_counts=CLUSTER_SENSITIVITY_K_GRID,
+        initializations=CLUSTER_SENSITIVITY_N_INIT_GRID,
+        random_states=CLUSTER_SENSITIVITY_RANDOM_STATES,
     )
     tasks = [
         (
@@ -425,29 +475,52 @@ def run_sensitivity(
             fractions,
         )
     ]
-    results = cast(
-        Sequence[_TaskRows],
-        Parallel(n_jobs=-1)(delayed(_task)(*args) for args in tasks),
+    logger.info(
+        "sensitivity analysis plan prepared",
+        task_count=len(tasks),
+        cluster_count=len(grid.cluster_counts),
+        initialization_count=len(grid.initializations),
+        random_state_count=len(grid.random_states),
     )
+    try:
+        results = cast(
+            Sequence[_SensitivityTaskResult],
+            Parallel(n_jobs=-1)(delayed(_task)(*args) for args in tasks),
+        )
+    except Exception:
+        logger.exception(
+            "sensitivity analysis task execution failed", task_count=len(tasks)
+        )
+        raise
 
-    return SensitivityManifest(
+    manifest = SensitivityManifest(
         generated_at_utc=datetime.now(UTC).isoformat(),
         provenance=ProvenanceRecord(local_epochs=1, repository=REPOSITORY_NAME),
         config_hash=hash_jsonable(config.model_dump(mode="json")),
-        cluster_stability=tuple(r for c, _, _, _ in results for r in c),
-        scale_normalization=tuple(s for _, s, _, _ in results),
-        draw_variants=tuple(r for _, _, d, _ in results for r in d),
-        trust_boundary=tuple(r for _, _, _, t in results for r in t),
+        cluster_stability=tuple(
+            row for result in results for row in result.cluster_stability
+        ),
+        scale_normalization=tuple(result.scale_normalization for result in results),
+        draw_variants=tuple(row for result in results for row in result.draw_variants),
+        trust_boundary=tuple(row for result in results for row in result.trust_boundary),
     )
+    logger.info(
+        "sensitivity analysis completed",
+        cluster_stability_count=len(manifest.cluster_stability),
+        scale_normalization_count=len(manifest.scale_normalization),
+        draw_variant_count=len(manifest.draw_variants),
+        trust_boundary_count=len(manifest.trust_boundary),
+    )
+    return manifest
 
 
 def write_sensitivity_manifest(base_dir: Path) -> Path:
-    """Run the sensitivity analyses and write the manifest JSON to disk."""
-    out_path = PoisonLayout(base_dir=base_dir).sensitivity_manifest()
+    out_path = sensitivity_manifest_path(base_dir)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         run_sensitivity(
             base_dir, CalibrationPoisoningConfig.for_bounded_sweep()
         ).model_dump_json(indent=2)
     )
+    logger.info("sensitivity manifest written", path=out_path)
     return out_path

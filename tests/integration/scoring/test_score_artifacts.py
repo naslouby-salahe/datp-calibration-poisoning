@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from datp.artifacts.layout import ArtifactLayout
-from datp.artifacts.names import ArtifactFile
+from datp.artifacts.names import ArtifactFile, PathToken
 from datp.config.models import ExperimentStage
 from datp.core.enums import ScoringStage
 from datp.core.identity import TrainingCellId
@@ -40,7 +40,11 @@ def test_artifacts_written(tmp_path) -> None:
     cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=SEED)
     for cid in client_ids:
         for stage in _STAGES:
-            expected = layout.score_file(cell, stage, cid)
+            expected = (
+                layout.score_cell(cell).score_dir
+                / stage
+                / f"{cid}{PathToken.PARQUET_EXT}"
+            )
             assert expected.exists(), (
                 f"Missing score artifact: {expected} (client={cid}, stage={stage})"
             )
@@ -68,7 +72,7 @@ def test_artifact_schema(tmp_path) -> None:
     cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=SEED)
     parquet_file = ArtifactLayout(
         base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN
-    ).score_file(cell, ScoringStage.CAL, first_cid)
+    ).score_cell(cell).score_dir / ScoringStage.CAL / f"{first_cid}{PathToken.PARQUET_EXT}"
     df = pd.read_parquet(parquet_file)
 
     assert list(df.columns) == ["reconstruction_error"], (

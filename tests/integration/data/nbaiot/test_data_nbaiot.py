@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from datp.core.enums import ClientStatus, NBaIoTBalancePolicy
 from datp.data.datasets.nbaiot import (
     DEVICE_DIRS,
     SPLIT_RATIOS,
@@ -37,7 +38,11 @@ def prepared(tmp_path_factory: pytest.TempPathFactory, monkeypatch_module):
     nbaiot_mod.DEVICE_DIRS = list(_REPRESENTATIVE_DEVICES)
     try:
         result = prepare_nbaiot(
-            RAW_DIR, output_dir, n_min=100, seed=42, balanced_test=False
+            RAW_DIR,
+            output_dir,
+            n_min=100,
+            seed=42,
+            test_balance_policy=NBaIoTBalancePolicy.NATURAL_DISTRIBUTION,
         )
     finally:
         nbaiot_mod.DEVICE_DIRS = original_dirs
@@ -223,7 +228,7 @@ class TestCalibrationCounts:
             assert info.benign_cal_count >= 100, (
                 f"{device_id}: benign_cal_count = {info.benign_cal_count} < 100"
             )
-            assert info.calibration_pending is False, (
+            assert info.status is ClientStatus.ELIGIBLE, (
                 f"{device_id}: unexpectedly flagged as Calibration-Pending"
             )
 

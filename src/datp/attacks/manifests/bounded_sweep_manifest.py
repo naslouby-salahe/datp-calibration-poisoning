@@ -1,177 +1,191 @@
-"""Bounded-sweep manifest: result rows and sweep-level provenance model."""
-
 from __future__ import annotations
 
-import math
-from typing import Annotated, Any
+from datp.types import (
+    ClassificationScore,
+    ClientId,
+    ContentHash,
+    FalsePositiveRate,
+    ManifestMetricValue,
+    NarrativeText,
+    PoisonFraction,
+    RandomSeed,
+    Ratio,
+    SampleCount,
+    SchemaVersion,
+    ScoreValue,
+    SignedCount,
+    SignedDelta,
+    Threshold,
+    TruePositiveRate,
+)
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, model_validator
+
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from datp.attacks.constants import ANALYSIS_SEEDS, POISONING_SEEDS, TRAINING_SEEDS
 from datp.attacks.enums import (
     AttackerObjective,
     CalibrationInjectionRule,
+    ManifestProvenanceSource,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
+    ReservoirMode,
 )
-from datp.attacks.manifests.run_manifest import RESERVOIR_MODE, ProvenanceRecord
+from datp.attacks.manifests.run_manifest import ProvenanceRecord
 from datp.config.models import ExperimentStage
 from datp.core.enums import ThresholdPolicy
 from datp.core.seeds import SeedRecord
 from datp.data.catalog import DatasetID
 
 
-def _undefined_null_to_nan(value: Any) -> Any:
-    """Convert None to NaN for Pydantic field validation."""
-    return math.nan if value is None else value
-
-
-NanFloat = Annotated[float, BeforeValidator(_undefined_null_to_nan)]
-
-
 class BoundedSweepResultRow(BaseModel):
-    """Single row in a bounded-sweep result manifest."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     policy: ThresholdPolicy
     source: PoisoningSourceStrategy
     objective: AttackerObjective
-    fraction: float
+    fraction: PoisonFraction
     target_scope: PoisoningTargetScope
-    victim_id: str
-    training_seed: int
-    poisoning_seed: int
+    victim_id: ClientId
+    training_seed: RandomSeed
+    poisoning_seed: RandomSeed
     seed_record: SeedRecord
 
-    delta_tau: float
-    delta_tau_rel: float
+    delta_tau: SignedDelta
+    delta_tau_rel: SignedDelta
     is_victim_significant: bool
 
-    cv_fpr_clean: NanFloat
-    cv_fpr_poisoned: NanFloat
-    delta_cv_fpr: NanFloat
-    mean_fpr_clean: NanFloat
-    mean_fpr_poisoned: NanFloat
-    delta_mean_fpr: NanFloat
-    iqr_fpr_clean: NanFloat
-    iqr_fpr_poisoned: NanFloat
-    delta_iqr_fpr: NanFloat
-    max_min_fpr_clean: NanFloat
-    max_min_fpr_poisoned: NanFloat
-    delta_max_min_fpr: NanFloat
-    worst_client_fpr_clean: NanFloat
-    worst_client_fpr_poisoned: NanFloat
-    delta_worst_client_fpr: NanFloat
+    cv_fpr_clean: ManifestMetricValue
+    cv_fpr_poisoned: ManifestMetricValue
+    delta_cv_fpr: ManifestMetricValue
+    mean_fpr_clean: ManifestMetricValue
+    mean_fpr_poisoned: ManifestMetricValue
+    delta_mean_fpr: ManifestMetricValue
+    iqr_fpr_clean: ManifestMetricValue
+    iqr_fpr_poisoned: ManifestMetricValue
+    delta_iqr_fpr: ManifestMetricValue
+    max_min_fpr_clean: ManifestMetricValue
+    max_min_fpr_poisoned: ManifestMetricValue
+    delta_max_min_fpr: ManifestMetricValue
+    worst_client_fpr_clean: ManifestMetricValue
+    worst_client_fpr_poisoned: ManifestMetricValue
+    delta_worst_client_fpr: ManifestMetricValue
 
-    coverage_ratio: float
-    n_eligible: int
+    coverage_ratio: Ratio
+    n_eligible: SampleCount
     mu_flag_triggered: bool
     auroc_invariant: bool
-    blast_fraction: float
-    n_blast_significant: int
-    n_spillover: int
-    n_non_victims: int
+    blast_fraction: PoisonFraction
+    n_blast_significant: SampleCount
+    n_spillover: SampleCount
+    n_non_victims: SampleCount
 
-    victim_tpr_clean: float
-    victim_tpr_poisoned: float
-    victim_delta_tpr: float
-    victim_ba_clean: float
-    victim_ba_poisoned: float
-    victim_delta_ba: float
-    victim_macro_f1_clean: float
-    victim_macro_f1_poisoned: float
-    victim_delta_macro_f1: float
+    victim_tpr_clean: TruePositiveRate
+    victim_tpr_poisoned: TruePositiveRate
+    victim_delta_tpr: SignedDelta
+    victim_ba_clean: ScoreValue
+    victim_ba_poisoned: ScoreValue
+    victim_delta_ba: SignedDelta
+    victim_macro_f1_clean: ClassificationScore
+    victim_macro_f1_poisoned: ClassificationScore
+    victim_delta_macro_f1: SignedDelta
 
-    cluster_delta_tau_agg: NanFloat
-    cluster_delta_tau_churn: NanFloat
-    cluster_delta_tau_frozen_scaler: NanFloat
-    cluster_delta_tau_normalization_gap: NanFloat
-    cluster_victim_effect: NanFloat
-    cluster_non_victim_effect: NanFloat
+    cluster_delta_tau_agg: ManifestMetricValue
+    cluster_delta_tau_churn: ManifestMetricValue
+    cluster_delta_tau_frozen_scaler: ManifestMetricValue
+    cluster_delta_tau_normalization_gap: ManifestMetricValue
+    cluster_victim_effect: ManifestMetricValue
+    cluster_non_victim_effect: ManifestMetricValue
 
-    victim_fpr_clean: float
-    victim_fpr_poisoned: float
-    victim_delta_fpr: float
-    victim_fp_clean: int
-    victim_fp_poisoned: int
-    victim_fn_clean: int
-    victim_fn_poisoned: int
-    victim_n_test_benign: int
-    victim_n_test_attack: int
+    victim_fpr_clean: FalsePositiveRate
+    victim_fpr_poisoned: FalsePositiveRate
+    victim_delta_fpr: SignedDelta
+    victim_fp_clean: SignedCount
+    victim_fp_poisoned: SignedCount
+    victim_fn_clean: SignedCount
+    victim_fn_poisoned: SignedCount
+    victim_n_test_benign: SignedCount
+    victim_n_test_attack: SignedCount
 
-    nonvictim_mean_tpr_clean: NanFloat
-    nonvictim_mean_tpr_poisoned: NanFloat
-    nonvictim_mean_delta_tpr: NanFloat
-    nonvictim_worst_delta_tpr: NanFloat
-    nonvictim_mean_fpr_clean: NanFloat
-    nonvictim_mean_fpr_poisoned: NanFloat
-    nonvictim_mean_delta_fpr: NanFloat
-    nonvictim_worst_delta_fpr: NanFloat
-    nonvictim_mean_delta_ba: NanFloat
-    nonvictim_mean_delta_macro_f1: NanFloat
-    nonvictim_delta_fp_total: int
-    nonvictim_delta_fn_total: int
+    nonvictim_mean_tpr_clean: ManifestMetricValue
+    nonvictim_mean_tpr_poisoned: ManifestMetricValue
+    nonvictim_mean_delta_tpr: ManifestMetricValue
+    nonvictim_worst_delta_tpr: ManifestMetricValue
+    nonvictim_mean_fpr_clean: ManifestMetricValue
+    nonvictim_mean_fpr_poisoned: ManifestMetricValue
+    nonvictim_mean_delta_fpr: ManifestMetricValue
+    nonvictim_worst_delta_fpr: ManifestMetricValue
+    nonvictim_mean_delta_ba: ManifestMetricValue
+    nonvictim_mean_delta_macro_f1: ManifestMetricValue
+    nonvictim_delta_fp_total: SignedCount
+    nonvictim_delta_fn_total: SignedCount
 
-    victim_delta_tau_scale_base: NanFloat
-    iqr_median_clean: NanFloat
-    delta_tau_bound_utilization: NanFloat
+    victim_delta_tau_scale_base: ManifestMetricValue
+    iqr_median_clean: ManifestMetricValue
+    delta_tau_bound_utilization: ManifestMetricValue
 
-    n_replaced: int
-    cal_duplicate_rate_clean: NanFloat
-    cal_duplicate_rate_poisoned: NanFloat
+    n_replaced: SampleCount
+    cal_duplicate_rate_clean: ManifestMetricValue
+    cal_duplicate_rate_poisoned: ManifestMetricValue
 
-    cluster_sizes_clean: tuple[int, ...]
-    cluster_sizes_poisoned: tuple[int, ...]
-    cluster_victim_size_clean: NanFloat
-    cluster_victim_size_poisoned: NanFloat
-    cluster_n_reassigned: NanFloat
-    cluster_silhouette_clean: NanFloat
-    cluster_silhouette_poisoned: NanFloat
+    cluster_sizes_clean: tuple[SignedCount, ...]
+    cluster_sizes_poisoned: tuple[SignedCount, ...]
+    cluster_victim_size_clean: ManifestMetricValue
+    cluster_victim_size_poisoned: ManifestMetricValue
+    cluster_n_reassigned: ManifestMetricValue
+    cluster_silhouette_clean: ManifestMetricValue
+    cluster_silhouette_poisoned: ManifestMetricValue
 
-    fixed_cluster_victim_delta_tau: NanFloat
-    fixed_cluster_victim_delta_tpr: NanFloat
-    fixed_cluster_victim_delta_fpr: NanFloat
-    fixed_cluster_delta_cv_fpr: NanFloat
-    fixed_cluster_delta_mean_fpr: NanFloat
-    fixed_cluster_nonvictim_mean_delta_tpr: NanFloat
-    fixed_cluster_nonvictim_mean_delta_fpr: NanFloat
+    fixed_cluster_victim_delta_tau: ManifestMetricValue
+    fixed_cluster_victim_delta_tpr: ManifestMetricValue
+    fixed_cluster_victim_delta_fpr: ManifestMetricValue
+    fixed_cluster_delta_cv_fpr: ManifestMetricValue
+    fixed_cluster_delta_mean_fpr: ManifestMetricValue
+    fixed_cluster_nonvictim_mean_delta_tpr: ManifestMetricValue
+    fixed_cluster_nonvictim_mean_delta_fpr: ManifestMetricValue
+
+
+class ArtifactProvenance(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: ManifestProvenanceSource
 
 
 class BoundedSweepManifest(BaseModel):
-    """Top-level bounded-sweep manifest with provenance, sweep axes, and result rows."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: str = "2"
-    generated_at_utc: str
+    schema_version: SchemaVersion = "2"
+    generated_at_utc: NarrativeText
     dataset: DatasetID = DatasetID.NBAIOT
     stage: ExperimentStage = ExperimentStage.NBAIOT_MAIN
     injection_rule: CalibrationInjectionRule = (
         CalibrationInjectionRule.REPLACE_FIXED_BUDGET
     )
     target_scope: PoisoningTargetScope = PoisoningTargetScope.SINGLE_CLIENT
-    reservoir_mode: str = RESERVOIR_MODE
+    reservoir_mode: ReservoirMode = (
+        ReservoirMode.VICTIM_LOCAL_BENIGN_CAL_SOURCE_PRECEDENCE_RULE_2
+    )
     provenance: ProvenanceRecord
 
     policies: tuple[ThresholdPolicy, ...]
     sources: tuple[PoisoningSourceStrategy, ...]
-    source_objective_pairs: tuple[str, ...]
-    fractions: tuple[float, ...]
-    training_seeds: tuple[int, ...]
-    poisoning_seeds: tuple[int, ...]
-    analysis_seeds: tuple[int, ...]
-    config_hash: str
-    artifact_provenance: dict[str, str]
+    source_objective_pairs: tuple[NarrativeText, ...]
+    fractions: tuple[PoisonFraction, ...]
+    training_seeds: tuple[RandomSeed, ...]
+    poisoning_seeds: tuple[RandomSeed, ...]
+    analysis_seeds: tuple[RandomSeed, ...]
+    config_hash: ContentHash
+    artifact_provenance: ArtifactProvenance
 
-    mu_flag_threshold_by_training_seed: dict[int, float]
+    mu_flag_threshold_by_training_seed: dict[RandomSeed, Threshold]
 
-    n_cells: int
+    n_cells: SampleCount
     results: tuple[BoundedSweepResultRow, ...]
 
     @model_validator(mode="after")
     def _check_consistency(self) -> BoundedSweepManifest:
-        """Validate seed tuples and result-count consistency."""
         if self.training_seeds != TRAINING_SEEDS:
             raise ValueError("bounded-sweep reporting requires training seeds 0..9")
         if self.poisoning_seeds != POISONING_SEEDS:

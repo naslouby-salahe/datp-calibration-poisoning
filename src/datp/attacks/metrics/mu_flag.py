@@ -1,11 +1,14 @@
-"""Mu-flag threshold computation for CV(FPR) instability gating."""
 
 from __future__ import annotations
+from datp.types import (
+    FalsePositiveRate,
+    Threshold,
+)
 
 from datp.attacks.constants import MU_FLAG_DIVISOR
 
 
-def compute_mu_flag_threshold(mean_clean_fpr: float) -> float:
+def compute_mu_flag_threshold(mean_clean_fpr: FalsePositiveRate) -> Threshold:
     """``mu_flag_threshold = mean_clean_fpr / MU_FLAG_DIVISOR``.
 
     The locked protocol formula divides by MU_FLAG_DIVISOR exactly. No

@@ -1,17 +1,32 @@
-"""Metric reproduction: re-derive thresholds, re-evaluate, and compare binary metrics."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClassificationScore,
+    ClientId,
+    ColumnName,
+    FalsePositiveRate,
+    JsonRecord,
+    JsonValue,
+    NarrativeText,
+    RandomSeed,
+    RunId,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    SignedDelta,
+    Threshold,
+    Tolerance,
+    TruePositiveRate,
+)
+
 
 import dataclasses
 import json
 import math
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import cast
 
-import numpy as np
-
-from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
 from datp.artifacts.names import ArtifactDir, ArtifactFile
 from datp.config.compose import compose_config
@@ -27,12 +42,12 @@ from datp.core.enums import (
 )
 from datp.core.identity import PolicyRunId, TrainingCellId
 from datp.core.types import ThresholdResult
+from datp.data.catalog import DatasetID
 from datp.evaluation.metrics import EvaluationResult, evaluate_policy_run
 from datp.scoring.loading import ScoreProvider, load_parquets_from_dir
-from datp.thresholding.thresholds import _DeriveInput, derive_threshold
-from datp.validation.discovery import iter_score_cells, parse_score_cell_dir
+from datp.thresholding.derivation import ThresholdDerivation, derive_threshold
+from datp.validation.discovery import parse_score_cell_dir
 from datp.validation.enums import (
-    AuditArtifact,
     AuditStatus,
     DenominatorStatus,
     MetricCheckCode,
@@ -42,6 +57,9 @@ from datp.validation.schemas import (
     CellReproductionResult,
     MetricRecomputationRecord,
     PolicyReproductionResult,
+    RecomputedClientMetricsSnapshot,
+    RecomputedMetricsSnapshot,
+    StoredMetricsSnapshot,
     ValidationCheck,
 )
 
@@ -59,7 +77,7 @@ SCALAR_METRIC_FIELDS: tuple[MetricName, ...] = (
     MetricName.TAU_GLOBAL,
 )
 
-CONFUSION_KEYS: tuple[str, ...] = tuple(ConfusionKey)
+CONFUSION_KEYS: tuple[ConfusionKey, ...] = tuple(ConfusionKey)
 RECOMPUTATION_EPSILON = 1e-9
 RECOMPUTE_METRICS = (
     MetricName.FPR,
@@ -71,45 +89,68 @@ RECOMPUTE_METRICS = (
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RecomputationParams:
-    """Parameters needed to recompute binary classification metrics from raw confusion counts."""
 
-    run_id: str
-    seed: int
+    run_id: RunId
+    seed: RandomSeed
     stage: ExperimentStage
     policy: ThresholdPolicy
-    client_id: str
-    tp: int
-    fp: int
-    tn: int
-    fn: int
-    n_benign: int
-    n_attack: int
-    saved_fpr: float | None
-    saved_tpr: float | None
-    saved_balanced_accuracy: float | None
-    saved_macro_f1: float | None
+    client_id: ClientId
+    tp: SampleCount
+    fp: SampleCount
+    tn: SampleCount
+    fn: SampleCount
+    n_benign: SampleCount
+    n_attack: SampleCount
+    saved_fpr: FalsePositiveRate | None
+    saved_tpr: TruePositiveRate | None
+    saved_balanced_accuracy: ClassificationScore | None
+    saved_macro_f1: ClassificationScore | None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RecomputationResult:
-    """Result of comparing a saved metric value against a recomputed value."""
 
-    diff: float | None
-    saved_value: float | None
-    recomputed_value: float | None
+    diff: SignedDelta | None
+    saved_value: ScoreValue | None
+    recomputed_value: ScoreValue | None
     status: DenominatorStatus
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _StoredClientMetric:
+
+    client_id: ClientId
+    confusion: dict[ConfusionKey, SampleCount] | None
+    threshold: Threshold | None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _StoredMetrics:
+
+    policy: ThresholdPolicy | None
+    stage: ExperimentStage | None
+    seed: RandomSeed | None
+    dataset: DatasetID | None
+    direct_metrics: dict[MetricName | PayloadKey, ScoreValue | None]
+    aggregate_metrics: dict[MetricName, ScoreValue | None]
+    client_count: SampleCount | None
+    eligible_count: SampleCount | None
+    pending_count: SampleCount | None
+    eligible_ids: tuple[ClientId, ...] | None
+    pending_ids: tuple[ClientId, ...] | None
+    per_client: dict[ClientId, _StoredClientMetric]
+    worst_client_id: ClientId | None
 
 
 def build_recomputation_record(
     params: RecomputationParams,
     metric: MetricName,
     *,
-    saved_value: float | None = None,
-    recomputed_value: float | None = None,
-    abs_diff: float | None = None,
+    saved_value: ScoreValue | None = None,
+    recomputed_value: ScoreValue | None = None,
+    abs_diff: SignedDelta | None = None,
     status: DenominatorStatus,
 ) -> MetricRecomputationRecord:
-    """Build a MetricRecomputationRecord from recomputation parameters and results."""
     return MetricRecomputationRecord(
         run_id=params.run_id,
         seed=params.seed,
@@ -124,8 +165,7 @@ def build_recomputation_record(
     )
 
 
-def compare_recomputation(saved: float | None, recomp: float) -> RecomputationResult:
-    """Compare a saved metric value against a recomputed value with pass/fail status."""
+def compare_recomputation(saved: ScoreValue | None, recomp: ScoreValue) -> RecomputationResult:
     recomp_val = recomp if math.isfinite(recomp) else None
 
     if saved is not None and math.isfinite(saved) and math.isfinite(recomp):
@@ -146,7 +186,6 @@ def compare_recomputation(saved: float | None, recomp: float) -> RecomputationRe
 def compute_metric_status(
     metric: MetricName, params: RecomputationParams
 ) -> DenominatorStatus | None:
-    """Return EXCLUDED_EVALUATION_INCOMPLETE when a metric's denominator is zero, else None."""
     if (
         metric in (MetricName.TPR, MetricName.BALANCED_ACCURACY, MetricName.MACRO_F1)
         and params.n_attack == 0
@@ -161,7 +200,6 @@ def append_recomputation_records(
     records: list[MetricRecomputationRecord],
     params: RecomputationParams,
 ) -> None:
-    """Recompute binary metrics from confusion counts and append comparison records."""
     from datp.evaluation.metrics import recompute_binary_metrics
 
     bm = recompute_binary_metrics(params.tp, params.fp, params.tn, params.fn)
@@ -200,15 +238,14 @@ def append_recomputation_records(
 
 
 def format_check_detail(
-    field: str = "",
-    expected: Any = None,
-    actual: Any = None,
-    abs_diff: float | None = None,
-    tolerance: float | None = None,
-    detail: str = "",
-) -> str:
-    """Format validation check details as a comma-separated key=value string."""
-    parts = []
+    field: ColumnName = "",
+    expected: JsonValue | list[NarrativeText] = None,
+    actual: JsonValue | list[NarrativeText] = None,
+    abs_diff: SignedDelta | None = None,
+    tolerance: Tolerance | None = None,
+    detail: NarrativeText = "",
+) -> NarrativeText:
+    parts: list[NarrativeText] = []
     if field:
         parts.append(f"field={field}")
     if expected is not None:
@@ -225,13 +262,12 @@ def format_check_detail(
 
 
 def scalar_check(
-    field: str,
-    expected: float | None,
-    actual: float | None,
-    tolerance: float,
+    field: ColumnName,
+    expected: ScoreValue | None,
+    actual: ScoreValue | None,
+    tolerance: Tolerance,
     code: MetricCheckCode = MetricCheckCode.SCALAR_WITHIN_TOLERANCE,
 ) -> ValidationCheck:
-    """Compare expected and actual scalar values within tolerance, handling None and NaN."""
     if expected is None or actual is None:
         return ValidationCheck(
             code=code,
@@ -286,9 +322,8 @@ def scalar_check(
 
 
 def exact_match_check(
-    code: MetricCheckCode, field: str, expected: Any, actual: Any
+    code: MetricCheckCode, field: ColumnName, expected: JsonValue, actual: JsonValue
 ) -> ValidationCheck:
-    """Check that expected and actual values match exactly, returning a pass/fail ValidationCheck."""
     if expected == actual:
         return ValidationCheck(
             code=code,
@@ -308,9 +343,11 @@ def exact_match_check(
 
 
 def id_set_check(
-    code: MetricCheckCode, field: str, expected: list[str], actual: list[str]
+    code: MetricCheckCode,
+    field: ColumnName,
+    expected: list[ClientId],
+    actual: list[ClientId],
 ) -> ValidationCheck:
-    """Check that two lists contain the same set of IDs, reporting differences on failure."""
     expected_set, actual_set = set(expected), set(actual)
     if expected_set == actual_set:
         return ValidationCheck(
@@ -333,10 +370,9 @@ def id_set_check(
 
 
 def confusion_check(
-    expected_per_client: Mapping[str, Mapping[str, int]],
-    actual_per_client: Mapping[str, Mapping[str, int]],
+    expected_per_client: Mapping[ClientId, Mapping[ConfusionKey, SampleCount]],
+    actual_per_client: Mapping[ClientId, Mapping[ConfusionKey, SampleCount]],
 ) -> ValidationCheck:
-    """Compare per-client confusion matrices and return a pass/fail check with mismatches listed."""
     diffs = [
         f"{cid}.{key}: expected={expected_per_client[cid][key]}, actual={actual_per_client[cid][key]}"
         for cid in sorted(set(expected_per_client) & set(actual_per_client))
@@ -363,17 +399,14 @@ def confusion_check(
 
 
 def thresholds_check(
-    expected_per_client: dict[str, float],
-    actual_per_client: dict[str, float],
-    tolerance: float,
+    expected_per_client: Mapping[ClientId, Threshold],
+    actual_per_client: Mapping[ClientId, Threshold],
+    tolerance: Tolerance,
 ) -> ValidationCheck:
-    """Compare per-client thresholds within tolerance and return a pass/fail check."""
     diffs = [
         (cid, exp, act, abs(exp - act))
         for cid in sorted(set(expected_per_client) & set(actual_per_client))
-        for exp, act in [
-            (float(expected_per_client[cid]), float(actual_per_client[cid]))
-        ]
+        for exp, act in [(expected_per_client[cid], actual_per_client[cid])]
         if abs(exp - act) > tolerance
     ]
 
@@ -399,7 +432,6 @@ def thresholds_check(
 
 
 def evaluate_overall_status(checks: list[ValidationCheck]) -> AuditStatus:
-    """Derive an overall AuditStatus: FAIL > PARTIAL > PASS."""
     statuses = {c.status for c in checks}
     if AuditStatus.FAIL in statuses:
         return AuditStatus.FAIL
@@ -408,28 +440,146 @@ def evaluate_overall_status(checks: list[ValidationCheck]) -> AuditStatus:
     return AuditStatus.PASS
 
 
-def read_metrics_json(path: Path) -> dict[str, Any]:
-    """Read and parse a JSON metrics file from the given path."""
-    return json.loads(path.read_text())
+def read_metrics_json(path: Path) -> _StoredMetrics:
+    payload = _validate_json_value(json.loads(path.read_text()))
+    if not isinstance(payload, dict):
+        raise TypeError("Metrics artifact must contain a JSON object")
+    return _parse_stored_metrics(payload)
 
 
-def normalize_per_client(stored: dict[str, Any]) -> list[dict[str, Any]]:
-    """Normalize stored per-client data from dict or list form into a uniform list."""
-    per_client = stored[PayloadKey.PER_CLIENT]
-    return (
-        [dict(v, client_id=k) for k, v in per_client.items()]
-        if isinstance(per_client, dict)
-        else list(per_client)
+def _optional_score(value: JsonValue) -> ScoreValue | None:
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    return None
+
+
+def _optional_count(value: JsonValue) -> SampleCount | None:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return None
+
+
+def _client_ids(value: JsonValue) -> tuple[ClientId, ...] | None:
+    if not isinstance(value, list):
+        return None
+    result: list[ClientId] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise TypeError("Client IDs must be strings")
+        result.append(ClientId(item))
+    return tuple(result)
+
+
+def _parse_stored_client(
+    client_id: ClientId, row: JsonRecord
+) -> _StoredClientMetric:
+    raw_confusion = row.get(PayloadKey.CONFUSION_MATRIX)
+    confusion: dict[ConfusionKey, SampleCount] | None = None
+    if isinstance(raw_confusion, dict):
+        confusion = {}
+        for key in CONFUSION_KEYS:
+            count = _optional_count(raw_confusion.get(key))
+            if count is None:
+                raise TypeError(f"Invalid confusion count for {client_id}/{key}")
+            confusion[key] = count
+    return _StoredClientMetric(
+        client_id=client_id,
+        confusion=confusion,
+        threshold=_optional_score(row.get(PayloadKey.THRESHOLD_VALUE)),
     )
+
+
+def _parse_stored_metrics(payload: JsonRecord) -> _StoredMetrics:
+    direct_fields: tuple[MetricName | PayloadKey, ...] = (
+        *SCALAR_METRIC_FIELDS,
+        PayloadKey.COVERAGE_RATIO,
+    )
+    direct_metrics = {
+        field: _optional_score(payload[field])
+        for field in direct_fields
+        if field in payload
+    }
+    raw_aggregate = payload.get(PayloadKey.AGGREGATE_METRICS)
+    aggregate_metrics = (
+        {
+            field: _optional_score(raw_aggregate[field])
+            for field in SCALAR_METRIC_FIELDS
+            if field in raw_aggregate
+        }
+        if isinstance(raw_aggregate, dict)
+        else {}
+    )
+
+    raw_per_client = payload.get(PayloadKey.PER_CLIENT)
+    if isinstance(raw_per_client, dict):
+        per_client: dict[ClientId, _StoredClientMetric] = {}
+        for client_label, raw_row in raw_per_client.items():
+            if not isinstance(raw_row, dict):
+                raise TypeError("Per-client metric entries must be JSON objects")
+            client_id = ClientId(client_label)
+            per_client[client_id] = _parse_stored_client(client_id, raw_row)
+    elif isinstance(raw_per_client, list):
+        per_client = {}
+        for raw_row in raw_per_client:
+            if not isinstance(raw_row, dict):
+                raise TypeError("Per-client metric entries must be JSON objects")
+            raw_client_id = raw_row.get(PayloadKey.CLIENT_ID)
+            if not isinstance(raw_client_id, str):
+                raise TypeError("Per-client metric ID must be a string")
+            client_id = ClientId(raw_client_id)
+            per_client[client_id] = _parse_stored_client(client_id, raw_row)
+    else:
+        raise TypeError("Per-client metrics must be a list or keyed object")
+
+    raw_policy = payload.get(PayloadKey.POLICY)
+    raw_stage = payload.get(PayloadKey.STAGE)
+    raw_seed = payload.get(PayloadKey.SEED)
+    raw_dataset = payload.get(PayloadKey.DATASET)
+    raw_worst_client = payload.get(MetricName.WORST_CLIENT_ID)
+    return _StoredMetrics(
+        policy=ThresholdPolicy(raw_policy) if isinstance(raw_policy, str) else None,
+        stage=ExperimentStage(raw_stage) if isinstance(raw_stage, str) else None,
+        seed=RandomSeed(raw_seed)
+        if isinstance(raw_seed, int) and not isinstance(raw_seed, bool)
+        else None,
+        dataset=DatasetID(raw_dataset) if isinstance(raw_dataset, str) else None,
+        direct_metrics=direct_metrics,
+        aggregate_metrics=aggregate_metrics,
+        client_count=_optional_count(payload.get(PayloadKey.CLIENT_COUNT)),
+        eligible_count=_optional_count(payload.get(PayloadKey.ELIGIBLE_COUNT)),
+        pending_count=_optional_count(payload.get(PayloadKey.PENDING_COUNT)),
+        eligible_ids=_client_ids(payload.get(PayloadKey.ELIGIBLE_IDS)),
+        pending_ids=_client_ids(payload.get(PayloadKey.PENDING_IDS)),
+        per_client=per_client,
+        worst_client_id=ClientId(raw_worst_client)
+        if isinstance(raw_worst_client, str)
+        else None,
+    )
+
+
+def _validate_json_value(value: object) -> JsonValue:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, list):
+        sequence = cast(list[object], value)
+        return [_validate_json_value(item) for item in sequence]
+    if isinstance(value, dict):
+        record = cast(dict[object, object], value)
+        if not all(isinstance(key, str) for key in record):
+            raise TypeError("JSON object keys must be strings")
+        string_keyed = cast(dict[str, object], record)
+        return {
+            key: _validate_json_value(item) for key, item in string_keyed.items()
+        }
+    raise TypeError(f"Unsupported JSON value: {type(value).__name__}")
 
 
 def evaluate_policy(
     threshold_result: ThresholdResult,
     score_provider: ScoreProvider,
     stage: ExperimentStage,
-    seed: int,
-) -> tuple[EvaluationResult, dict[str, float]]:
-    """Evaluate a threshold policy run and return the EvaluationResult with client thresholds."""
+    seed: RandomSeed,
+) -> tuple[EvaluationResult, dict[ClientId, ScoreValue]]:
     evaluation = evaluate_policy_run(
         threshold_result.client_thresholds,
         Path(""),
@@ -438,57 +588,56 @@ def evaluate_policy(
         score_provider=score_provider,
     )
     return evaluation, {
-        ct.client_id: float(ct.threshold) for ct in threshold_result.client_thresholds
+        ct.client_id: ct.threshold for ct in threshold_result.client_thresholds
     }
 
 
 def compute_global_tau(
-    cal_errors: dict[str, np.ndarray], cfg: DatpConfig, *, seed: int = 0
-) -> float:
-    """Derive the global threshold tau from calibration errors using configured parameters."""
-    return float(
-        derive_threshold(
-            _DeriveInput(
-                policy=ThresholdPolicy.GLOBAL_THRESHOLD,
-                client_errors=cal_errors,
-                n_min=cfg.threshold.n_min,
-                q=cfg.threshold.q,
-                tau_global=0.0,
-                threshold_cfg=cfg.threshold,
-                seed=seed,
-            )
-        ).tau_global
-    )
+    cal_errors: dict[ClientId, ScoreVector],
+    cfg: DatpConfig,
+    *,
+    seed: RandomSeed = RandomSeed(0),
+) -> ScoreValue:
+    return derive_threshold(
+        ThresholdDerivation(
+            policy=ThresholdPolicy.GLOBAL_THRESHOLD,
+            client_errors=cal_errors,
+            n_min=cfg.threshold.n_min,
+            q=cfg.threshold.q,
+            tau_global=0.0,
+            threshold_cfg=cfg.threshold,
+            seed=seed,
+        )
+    ).tau_global
 
 
-def stored_per_client_map(stored: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Build a client-id-keyed map from stored per-client data."""
-    return {row[PayloadKey.CLIENT_ID]: row for row in normalize_per_client(stored)}
-
-
-def stored_scalar(stored: dict[str, Any], field: str) -> Any:
-    """Retrieve a scalar from stored metrics, checking top-level and aggregate_metrics fallback."""
-    return stored.get(field) or stored.get("aggregate_metrics", {}).get(field)
+def stored_scalar(
+    stored: _StoredMetrics, field: MetricName | PayloadKey
+) -> ScoreValue | None:
+    if field in stored.direct_metrics:
+        return stored.direct_metrics[field]
+    if isinstance(field, MetricName):
+        return stored.aggregate_metrics.get(field)
+    return None
 
 
 def scalar_checks_for_policy_run(
-    stored: dict[str, Any],
+    stored: _StoredMetrics,
     evaluation: EvaluationResult,
     threshold_result: ThresholdResult,
 ) -> list[ValidationCheck]:
-    """Build scalar metric validation checks comparing stored values against recomputed results."""
     actuals = {
-        MetricName.CV_FPR: evaluation.cv_fpr,
-        MetricName.CV_TPR: evaluation.cv_tpr,
-        MetricName.MEAN_FPR: evaluation.mean_fpr,
-        MetricName.STD_FPR: evaluation.std_fpr,
-        MetricName.IQR_FPR: evaluation.iqr_fpr,
-        MetricName.IQR_TPR: evaluation.iqr_tpr,
-        MetricName.MAX_MIN_FPR_GAP: evaluation.max_min_fpr_gap,
-        MetricName.WORST_CLIENT_FPR: evaluation.worst_client_fpr,
-        MetricName.WORST_BA: evaluation.worst_ba,
-        MetricName.P10_MACRO_F1: evaluation.p10_macro_f1,
-        MetricName.TAU_GLOBAL: float(threshold_result.tau_global),
+        MetricName.CV_FPR: evaluation.dispersion.cv_fpr,
+        MetricName.CV_TPR: evaluation.dispersion.cv_tpr,
+        MetricName.MEAN_FPR: evaluation.dispersion.mean_fpr,
+        MetricName.STD_FPR: evaluation.dispersion.std_fpr,
+        MetricName.IQR_FPR: evaluation.dispersion.iqr_fpr,
+        MetricName.IQR_TPR: evaluation.dispersion.iqr_tpr,
+        MetricName.MAX_MIN_FPR_GAP: evaluation.dispersion.max_min_fpr_gap,
+        MetricName.WORST_CLIENT_FPR: evaluation.dispersion.worst_client_fpr,
+        MetricName.WORST_BA: evaluation.dispersion.worst_ba,
+        MetricName.P10_MACRO_F1: evaluation.dispersion.p10_macro_f1,
+        MetricName.TAU_GLOBAL: threshold_result.tau_global,
     }
 
     checks = [
@@ -496,7 +645,7 @@ def scalar_checks_for_policy_run(
             f,
             stored_scalar(stored, f),
             actuals[f],
-            ValidationThreshold.SCALAR_METRIC_TOLERANCE.value,
+            ValidationThreshold.SCALAR_METRIC_TOLERANCE,
         )
         for f in SCALAR_METRIC_FIELDS
     ]
@@ -505,104 +654,109 @@ def scalar_checks_for_policy_run(
             PayloadKey.COVERAGE_RATIO,
             stored_scalar(stored, PayloadKey.COVERAGE_RATIO),
             evaluation.coverage_ratio,
-            ValidationThreshold.COVERAGE_RATIO_TOLERANCE.value,
+            ValidationThreshold.COVERAGE_RATIO_TOLERANCE,
             MetricCheckCode.COVERAGE_RATIO_WITHIN_TOLERANCE,
         )
     )
     return checks
 
 
+def _required_count(value: SampleCount | None) -> SampleCount:
+    if value is None:
+        raise TypeError(f"Expected a count, received {value!r}")
+    return value
+
+
 def count_and_id_checks(
-    stored: dict[str, Any], evaluation: EvaluationResult
+    stored: _StoredMetrics, evaluation: EvaluationResult
 ) -> list[ValidationCheck]:
-    """Build exact-match checks for client counts and ID sets from stored versus evaluated data."""
+    if stored.eligible_ids is None:
+        raise TypeError("Expected a list of client IDs")
+    if stored.pending_ids is None:
+        raise TypeError("Expected a list of client IDs")
     return [
         exact_match_check(
             MetricCheckCode.ELIGIBLE_COUNT_EXACT,
             PayloadKey.ELIGIBLE_COUNT,
-            int(stored[PayloadKey.ELIGIBLE_COUNT]),
-            int(evaluation.eligible_count),
+            _required_count(stored.eligible_count),
+            evaluation.dispersion.eligible_count,
         ),
         exact_match_check(
             MetricCheckCode.PENDING_COUNT_EXACT,
             PayloadKey.PENDING_COUNT,
-            int(stored[PayloadKey.PENDING_COUNT]),
-            int(len(evaluation.pending_ids)),
+            _required_count(stored.pending_count),
+            len(evaluation.pending_ids),
         ),
         exact_match_check(
             MetricCheckCode.CLIENT_COUNT_EXACT,
             PayloadKey.CLIENT_COUNT,
-            int(stored[PayloadKey.CLIENT_COUNT]),
-            int(evaluation.client_count),
+            _required_count(stored.client_count),
+            evaluation.dispersion.client_count,
         ),
         id_set_check(
             MetricCheckCode.ELIGIBLE_IDS_EXACT,
             PayloadKey.ELIGIBLE_IDS,
-            list(map(str, stored[PayloadKey.ELIGIBLE_IDS])),
-            list(map(str, evaluation.eligible_ids)),
+            list(stored.eligible_ids),
+            list(evaluation.eligible_ids),
         ),
         id_set_check(
             MetricCheckCode.PENDING_IDS_EXACT,
             PayloadKey.PENDING_IDS,
-            list(map(str, stored[PayloadKey.PENDING_IDS])),
-            list(map(str, evaluation.pending_ids)),
+            list(stored.pending_ids),
+            list(evaluation.pending_ids),
         ),
     ]
 
 
 def per_client_checks(
-    stored_per_client: dict[str, dict[str, Any]],
+    stored_per_client: dict[ClientId, _StoredClientMetric],
     evaluation: EvaluationResult,
-    client_thresholds_actual: dict[str, float],
+    client_thresholds_actual: Mapping[ClientId, Threshold],
 ) -> list[ValidationCheck]:
-    """Build per-client confusion and threshold validation checks against recomputed results."""
     actual_per_client = {cr.client_id: cr for cr in evaluation.clients}
 
-    expected_confusion = {
-        cid: {k: int(row[PayloadKey.CONFUSION_MATRIX][k]) for k in CONFUSION_KEYS}
-        for cid, row in stored_per_client.items()
-        if PayloadKey.CONFUSION_MATRIX in row
-    }
+    expected_confusion: dict[ClientId, dict[ConfusionKey, SampleCount]] = {}
+    for client_id, row in stored_per_client.items():
+        if row.confusion is not None:
+            expected_confusion[client_id] = row.confusion
 
     actual_confusion = {
         cid: {
-            ConfusionKey.TP.value: cr.confusion.tp,
-            ConfusionKey.FP.value: cr.confusion.fp,
-            ConfusionKey.TN.value: cr.confusion.tn,
-            ConfusionKey.FN.value: cr.confusion.fn,
+            ConfusionKey.TP: cr.confusion.tp,
+            ConfusionKey.FP: cr.confusion.fp,
+            ConfusionKey.TN: cr.confusion.tn,
+            ConfusionKey.FN: cr.confusion.fn,
         }
         for cid, cr in actual_per_client.items()
     }
 
-    expected_thresholds = {
-        cid: float(row[PayloadKey.THRESHOLD_VALUE])
-        for cid, row in stored_per_client.items()
-        if row.get(PayloadKey.THRESHOLD_VALUE) is not None
-    }
+    expected_thresholds: dict[ClientId, Threshold] = {}
+    for client_id, row in stored_per_client.items():
+        if row.threshold is not None:
+            expected_thresholds[client_id] = row.threshold
 
     return [
         confusion_check(expected_confusion, actual_confusion),
         thresholds_check(
             expected_thresholds,
             client_thresholds_actual,
-            ValidationThreshold.SCALAR_METRIC_TOLERANCE.value,
+            ValidationThreshold.SCALAR_METRIC_TOLERANCE,
         ),
     ]
 
 
 def build_policy_checks(
     *,
-    stored: dict[str, Any],
+    stored: _StoredMetrics,
     evaluation: EvaluationResult,
     threshold_result: ThresholdResult,
-    client_thresholds_actual: dict[str, float],
+    client_thresholds_actual: Mapping[ClientId, Threshold],
 ) -> list[ValidationCheck]:
-    """Assemble scalar, count, ID-set, and per-client checks for a single policy."""
     return (
         scalar_checks_for_policy_run(stored, evaluation, threshold_result)
         + count_and_id_checks(stored, evaluation)
         + per_client_checks(
-            stored_per_client_map(stored), evaluation, client_thresholds_actual
+            stored.per_client, evaluation, client_thresholds_actual
         )
     )
 
@@ -610,99 +764,94 @@ def build_policy_checks(
 def serialize_recomputed(
     evaluation: EvaluationResult,
     threshold_result: ThresholdResult,
-    client_thresholds: dict[str, float],
-) -> dict[str, Any]:
-    """Serialize evaluation and threshold results into a JSON-compatible dict."""
-    return {
-        PayloadKey.POLICY: evaluation.policy.value,
-        PayloadKey.STAGE: evaluation.stage.value,
-        PayloadKey.SEED: evaluation.seed,
-        PayloadKey.DATASET: evaluation.dataset,
-        MetricName.TAU_GLOBAL: float(threshold_result.tau_global),
-        PayloadKey.COVERAGE_RATIO: evaluation.coverage_ratio,
-        MetricName.CV_FPR: evaluation.cv_fpr,
-        MetricName.CV_TPR: evaluation.cv_tpr,
-        MetricName.MEAN_FPR: evaluation.mean_fpr,
-        MetricName.STD_FPR: evaluation.std_fpr,
-        MetricName.IQR_FPR: evaluation.iqr_fpr,
-        MetricName.IQR_TPR: evaluation.iqr_tpr,
-        MetricName.MAX_MIN_FPR_GAP: evaluation.max_min_fpr_gap,
-        MetricName.WORST_CLIENT_FPR: evaluation.worst_client_fpr,
-        MetricName.WORST_CLIENT_ID: evaluation.worst_client_id,
-        MetricName.WORST_BA: evaluation.worst_ba,
-        MetricName.P10_MACRO_F1: evaluation.p10_macro_f1,
-        PayloadKey.CLIENT_COUNT: evaluation.client_count,
-        PayloadKey.ELIGIBLE_COUNT: evaluation.eligible_count,
-        PayloadKey.PENDING_COUNT: len(evaluation.pending_ids),
-        PayloadKey.ELIGIBLE_IDS: sorted(evaluation.eligible_ids),
-        PayloadKey.PENDING_IDS: sorted(evaluation.pending_ids),
-        PayloadKey.PER_CLIENT: {
-            cr.client_id: {
-                MetricName.FPR: cr.metrics.fpr,
-                MetricName.TPR: cr.metrics.tpr,
-                MetricName.BALANCED_ACCURACY: cr.metrics.balanced_accuracy,
-                MetricName.MACRO_F1: cr.metrics.macro_f1,
-                PayloadKey.N_BENIGN: cr.n_benign,
-                PayloadKey.N_ATTACK: cr.n_attack,
-                PayloadKey.CONFUSION_MATRIX: {
-                    ConfusionKey.TP.value: cr.confusion.tp,
-                    ConfusionKey.FP.value: cr.confusion.fp,
-                    ConfusionKey.TN.value: cr.confusion.tn,
-                    ConfusionKey.FN.value: cr.confusion.fn,
+    client_thresholds: Mapping[ClientId, Threshold],
+) -> RecomputedMetricsSnapshot:
+    return RecomputedMetricsSnapshot(
+        policy=evaluation.run.policy,
+        stage=evaluation.run.stage,
+        seed=evaluation.run.seed,
+        dataset=evaluation.dataset,
+        tau_global=threshold_result.tau_global,
+        coverage_ratio=evaluation.coverage_ratio,
+        cv_fpr=evaluation.dispersion.cv_fpr,
+        cv_tpr=evaluation.dispersion.cv_tpr,
+        mean_fpr=evaluation.dispersion.mean_fpr,
+        std_fpr=evaluation.dispersion.std_fpr,
+        iqr_fpr=evaluation.dispersion.iqr_fpr,
+        iqr_tpr=evaluation.dispersion.iqr_tpr,
+        max_min_fpr_gap=evaluation.dispersion.max_min_fpr_gap,
+        worst_client_fpr=evaluation.dispersion.worst_client_fpr,
+        worst_client_id=evaluation.dispersion.worst_client_id,
+        worst_ba=evaluation.dispersion.worst_ba,
+        p10_macro_f1=evaluation.dispersion.p10_macro_f1,
+        client_count=evaluation.dispersion.client_count,
+        eligible_count=evaluation.dispersion.eligible_count,
+        pending_count=len(evaluation.pending_ids),
+        eligible_ids=tuple(sorted(evaluation.eligible_ids)),
+        pending_ids=tuple(sorted(evaluation.pending_ids)),
+        per_client={
+            record.client_id: RecomputedClientMetricsSnapshot(
+                fpr=record.metrics.fpr,
+                tpr=record.metrics.tpr,
+                balanced_accuracy=record.metrics.balanced_accuracy,
+                macro_f1=record.metrics.macro_f1,
+                n_benign=record.n_benign,
+                n_attack=record.n_attack,
+                confusion_matrix={
+                    ConfusionKey.TP: record.confusion.tp,
+                    ConfusionKey.FP: record.confusion.fp,
+                    ConfusionKey.TN: record.confusion.tn,
+                    ConfusionKey.FN: record.confusion.fn,
                 },
-                PayloadKey.THRESHOLD_VALUE: client_thresholds[cr.client_id],
-            }
-            for cr in evaluation.clients
+                threshold_value=client_thresholds[record.client_id],
+            )
+            for record in evaluation.clients
         },
-    }
-
-
-def select_stored_summary(stored: dict[str, Any]) -> dict[str, Any]:
-    """Extract a subset of known keys from stored metrics for summary comparison."""
-    keys = (
-        PayloadKey.POLICY,
-        PayloadKey.STAGE,
-        PayloadKey.SEED,
-        PayloadKey.DATASET,
-        MetricName.TAU_GLOBAL,
-        PayloadKey.COVERAGE_RATIO,
-        MetricName.CV_FPR,
-        MetricName.CV_TPR,
-        MetricName.MEAN_FPR,
-        MetricName.STD_FPR,
-        MetricName.IQR_FPR,
-        MetricName.IQR_TPR,
-        MetricName.MAX_MIN_FPR_GAP,
-        MetricName.WORST_CLIENT_FPR,
-        MetricName.WORST_CLIENT_ID,
-        MetricName.WORST_BA,
-        MetricName.P10_MACRO_F1,
-        PayloadKey.CLIENT_COUNT,
-        PayloadKey.ELIGIBLE_COUNT,
-        PayloadKey.PENDING_COUNT,
-        PayloadKey.ELIGIBLE_IDS,
-        PayloadKey.PENDING_IDS,
     )
-    return {k: stored.get(k) for k in keys}
+
+
+def select_stored_summary(stored: _StoredMetrics) -> StoredMetricsSnapshot:
+    return StoredMetricsSnapshot(
+        policy=stored.policy,
+        stage=stored.stage,
+        seed=stored.seed,
+        dataset=stored.dataset,
+        tau_global=stored_scalar(stored, MetricName.TAU_GLOBAL),
+        coverage_ratio=stored_scalar(stored, PayloadKey.COVERAGE_RATIO),
+        cv_fpr=stored_scalar(stored, MetricName.CV_FPR),
+        cv_tpr=stored_scalar(stored, MetricName.CV_TPR),
+        mean_fpr=stored_scalar(stored, MetricName.MEAN_FPR),
+        std_fpr=stored_scalar(stored, MetricName.STD_FPR),
+        iqr_fpr=stored_scalar(stored, MetricName.IQR_FPR),
+        iqr_tpr=stored_scalar(stored, MetricName.IQR_TPR),
+        max_min_fpr_gap=stored_scalar(stored, MetricName.MAX_MIN_FPR_GAP),
+        worst_client_fpr=stored_scalar(stored, MetricName.WORST_CLIENT_FPR),
+        worst_client_id=stored.worst_client_id,
+        worst_ba=stored_scalar(stored, MetricName.WORST_BA),
+        p10_macro_f1=stored_scalar(stored, MetricName.P10_MACRO_F1),
+        client_count=stored.client_count,
+        eligible_count=stored.eligible_count,
+        pending_count=stored.pending_count,
+        eligible_ids=stored.eligible_ids,
+        pending_ids=stored.pending_ids,
+    )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class CellReproductionContext:
-    """Shared context for reproducing metrics across all policies of a single training cell."""
 
     cell: TrainingCellId
     layout: ArtifactLayout
-    cal_errors: dict[str, np.ndarray]
+    cal_errors: dict[ClientId, ScoreVector]
     score_provider: ScoreProvider
     cfg: DatpConfig
-    tau_global_ref: float
+    tau_global_ref: Threshold
 
 
 def reproduce_one_policy(
     policy: ThresholdPolicy,
     ctx: CellReproductionContext,
 ) -> PolicyReproductionResult | None:
-    """Recompute metrics for one policy and compare against stored results."""
     metrics_path = (
         ctx.layout.policy_run(PolicyRunId(cell=ctx.cell, policy=policy)).result_dir
         / ArtifactFile.METRICS
@@ -712,7 +861,7 @@ def reproduce_one_policy(
 
     stored = read_metrics_json(metrics_path)
     threshold_result = derive_threshold(
-        _DeriveInput(
+        ThresholdDerivation(
             policy=policy,
             client_errors=ctx.cal_errors,
             n_min=ctx.cfg.threshold.n_min,
@@ -745,7 +894,6 @@ def reproduce_one_policy(
 def reproduce_cell_metrics(
     cell_dir: Path, base_dir: Path, *, config: DatpConfig | None = None
 ) -> CellReproductionResult:
-    """Recompute and compare metrics for all policies in a single training cell."""
     cell_dir, base_dir = cell_dir.resolve(), base_dir.resolve()
     location = parse_score_cell_dir(base_dir / ArtifactDir.SCORES, cell_dir)
     stage, seed = location.cell.stage, location.cell.seed
@@ -767,11 +915,14 @@ def reproduce_cell_metrics(
         tau_global_ref=compute_global_tau(cal_errors, cfg, seed=seed),
     )
 
-    policy_results = []
-    missing_policies = []
+    policy_results: list[PolicyReproductionResult] = []
+    missing_policies: list[ThresholdPolicy] = []
     for policy in CONTROLLED_POLICIES:
         result = reproduce_one_policy(policy, ctx)
-        (policy_results if result else missing_policies).append(result or policy)
+        if result is None:
+            missing_policies.append(policy)
+        else:
+            policy_results.append(result)
 
     return CellReproductionResult(
         cell=cell,
@@ -786,7 +937,6 @@ def reproduce_cell_metrics(
 def aggregate_overall(
     statuses: list[AuditStatus], missing_policies: list[ThresholdPolicy]
 ) -> AuditStatus:
-    """Determine overall cell status from policy-level statuses and missing policies."""
     if AuditStatus.FAIL in statuses:
         return AuditStatus.FAIL
     if (
@@ -796,31 +946,3 @@ def aggregate_overall(
     ):
         return AuditStatus.PARTIAL
     return AuditStatus.PASS if statuses else AuditStatus.MISSING
-
-
-def reproduce_all_cells(
-    base_dir: Path, *, config: DatpConfig | None = None, write_reports: bool = False
-) -> list[CellReproductionResult]:
-    """Run metric reproduction across all score cells in parallel."""
-    base_dir = base_dir.resolve()
-
-    with ThreadPoolExecutor() as executor:
-        futures = [
-            executor.submit(
-                reproduce_cell_metrics, loc.cell_dir, base_dir, config=config
-            )
-            for loc in iter_score_cells(base_dir)
-        ]
-        results = [f.result() for f in futures]
-
-    if write_reports:
-        for loc, result in zip(iter_score_cells(base_dir), results):
-            write_json_atomic(
-                loc.cell_dir / AuditArtifact.RECOMPUTED_METRICS,
-                result.model_dump(mode="json"),
-            )
-        write_json_atomic(
-            base_dir / ArtifactDir.SCORES / AuditArtifact.RECOMPUTED_METRICS_INDEX,
-            {"cells": [r.model_dump(mode="json") for r in results]},
-        )
-    return results

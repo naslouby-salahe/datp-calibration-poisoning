@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pytest
 import yaml
+from typer.testing import CliRunner
 
-from datp.cli import main
+from datp.cli import app
 from datp.cli.config import preview_config
 from datp.artifacts.names import ArtifactFile
 from datp.config.compose import (
@@ -22,6 +23,10 @@ from datp.config.models import ExperimentStage
 from datp.core.enums import CONTROLLED_POLICIES
 
 _STAGE = ExperimentStage.NBAIOT_MAIN
+
+
+def _run_cli(arguments: list[str]) -> int:
+    return CliRunner().invoke(app, arguments).exit_code
 
 
 class TestComposeRequest:
@@ -194,7 +199,7 @@ class TestCLI:
     """CLI integration for config preview."""
 
     def test_preview_exits_zero(self, tmp_path: Path) -> None:
-        rc = main(
+        rc = _run_cli(
             [
                 "config",
                 "preview",
@@ -208,7 +213,7 @@ class TestCLI:
         assert (tmp_path / ArtifactFile.RESOLVED_CONFIG).exists()
 
     def test_preview_invalid_stage_exits_one(self, tmp_path: Path) -> None:
-        rc = main(
+        rc = _run_cli(
             [
                 "config",
                 "preview",
@@ -221,5 +226,5 @@ class TestCLI:
         assert rc != 0
 
     def test_no_command_exits_one(self) -> None:
-        rc = main([])
+        rc = _run_cli([])
         assert rc == 1

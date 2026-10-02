@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from datp.config.models import ExperimentStage
+from datp.core.enums import ClientStatus
 from datp.data.common.audit import audit_partitions
 from datp.data.contracts import PartitionResult
 from datp.validation.enums import AuditDir
@@ -34,7 +35,11 @@ def _make_partition_results(
             test_benign_count=500 + i,
             test_attack_count=800 + i,
             attack_classes=[f"atk_a_{i}", f"atk_b_{i}"],
-            calibration_pending=cal_count + i < 100,
+            status=(
+                ClientStatus.CALIBRATION_PENDING
+                if cal_count + i < 100
+                else ClientStatus.ELIGIBLE
+            ),
             evaluation_incomplete=eval_incomplete,
         )
     return results

@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import json
 
-from datp.core.enums import PayloadKey
+from datp.core.enums import (
+    MetricName,
+    POLICY_THRESHOLD_SOURCE,
+    PayloadKey,
+    RunKind,
+    ThresholdPolicy,
+)
 
 
 def valid_metrics_dict(
@@ -24,27 +30,28 @@ def valid_metrics_dict(
         PayloadKey.CONFUSION_MATRIX: {"tp": 10, "fp": 0, "tn": 10, "fn": 0},
         PayloadKey.N_BENIGN: 10,
         PayloadKey.N_ATTACK: 10,
-        "benign_count": 10,
-        "attack_count": 10,
         PayloadKey.CALIBRATION_PENDING: False,
         PayloadKey.EVALUATION_INCOMPLETE: False,
         PayloadKey.THRESHOLD_VALUE: 0.5,
-        PayloadKey.THRESHOLD_SOURCE: policy,
+        PayloadKey.THRESHOLD_SOURCE: POLICY_THRESHOLD_SOURCE[
+            ThresholdPolicy(policy)
+        ].value,
     }
     return {
         PayloadKey.SCHEMA_VERSION: "2",
         PayloadKey.METRIC_SCHEMA_VERSION: "2",
         PayloadKey.THRESHOLD_SCHEMA_VERSION: "1",
         PayloadKey.RUN_ID: f"{stage}_{policy}_seed{seed}",
-        PayloadKey.RUN_KIND: "main",
+        PayloadKey.RUN_KIND: RunKind.CORE_LADDER.value,
         PayloadKey.DATASET: "nbaiot",
         PayloadKey.POLICY: policy,
         PayloadKey.STAGE: stage,
         PayloadKey.SEED: seed,
+        "checkpoint_round": None,
         PayloadKey.THRESHOLD_SCOPE: "eligible_client_arithmetic_mean",
         PayloadKey.THRESHOLD_STRATEGY_NAME: policy,
         "tau_global": 0.5,
-        PayloadKey.PER_CLIENT: {client[PayloadKey.CLIENT_ID]: client},
+        PayloadKey.PER_CLIENT: [client],
         PayloadKey.ELIGIBLE_IDS: ["c1"],
         PayloadKey.PENDING_IDS: [],
         PayloadKey.EVAL_INCOMPLETE_IDS: [],
@@ -63,7 +70,10 @@ def valid_metrics_dict(
         "worst_client_id": "c1",
         "worst_ba": 1.0,
         "p10_macro_f1": 1.0,
-        PayloadKey.AGGREGATE_METRICS: {"cv_fpr": 0.0, "p10_client_macro_f1": 1.0},
+        PayloadKey.AGGREGATE_METRICS: {
+            MetricName.CV_FPR.value: 0.0,
+            MetricName.P10_MACRO_F1.value: 1.0,
+        },
         PayloadKey.PROVENANCE: {
             PayloadKey.CONFIG_IDENTITY: "abc123",
             PayloadKey.SPLIT_MANIFEST_IDENTITY: "def456",

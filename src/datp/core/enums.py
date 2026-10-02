@@ -1,49 +1,83 @@
-"""Central enum registry for DATP domain vocabulary."""
-
 from __future__ import annotations
 
 import enum
 
 
 class DatasetID(enum.StrEnum):
-    """Supported dataset identifiers."""
 
     NBAIOT = "nbaiot"
 
 
+class NBaIoTDevice(enum.StrEnum):
+
+    DANMINI_DOORBELL = "Danmini_Doorbell"
+    ECOBEE_THERMOSTAT = "Ecobee_Thermostat"
+    ENNIO_DOORBELL = "Ennio_Doorbell"
+    PHILIPS_B120N10_BABY_MONITOR = "Philips_B120N10_Baby_Monitor"
+    PROVISION_PT_737E_SECURITY_CAMERA = "Provision_PT_737E_Security_Camera"
+    PROVISION_PT_838_SECURITY_CAMERA = "Provision_PT_838_Security_Camera"
+    SAMSUNG_SNH_1011_N_WEBCAM = "Samsung_SNH_1011_N_Webcam"
+    SIMPLEHOME_XCS7_1002_WHT_SECURITY_CAMERA = "SimpleHome_XCS7_1002_WHT_Security_Camera"
+    SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA = "SimpleHome_XCS7_1003_WHT_Security_Camera"
+
+class NBaIoTDeviceFamily(enum.StrEnum):
+
+    DOORBELL = "doorbell"
+    CAMERA = "camera"
+    OTHER = "other"
+
+
+class NBaIoTAttackFamily(enum.StrEnum):
+
+    GAFGYT = "gafgyt_attacks"
+    MIRAI = "mirai_attacks"
+
+
+class NBaIoTBalancePolicy(enum.StrEnum):
+
+    NATURAL_DISTRIBUTION = "natural_distribution"
+    BALANCED = "balanced"
+
+
 class ThresholdPolicy(enum.StrEnum):
-    """Threshold computation strategy: global, local, or cluster-based."""
 
     GLOBAL_THRESHOLD = "global_threshold"
     LOCAL_THRESHOLD = "local_threshold"
     CLUSTER_THRESHOLD = "cluster_threshold"
 
 
-class ClientIdentity(enum.StrEnum):
-    """How a client is identified in the dataset."""
+class ClusterFingerprintFeature(enum.StrEnum):
 
-    DEVICE_DIRECTORY = "device_directory"
-    MERGED_FILE = "merged_file"
-    VICTIM_MAC = "victim_mac"
-    VIRTUAL_CLIENT = "virtual_client"
+    MEAN = "mean"
+    STANDARD_DEVIATION = "std"
+    SKEWNESS = "skew"
+    NINETY_FIFTH_PERCENTILE = "p95"
 
 
 class DeviceType(enum.StrEnum):
-    """Compute device type for PyTorch."""
 
     CUDA = "cuda"
     CPU = "cpu"
 
 
-class ArtifactFile(enum.StrEnum):
-    """Canonical artifact file names used across the pipeline."""
+class LogLevel(enum.StrEnum):
 
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class ArtifactFile(enum.StrEnum):
+
+    BENIGN_TRAFFIC = "benign_traffic.csv"
     MODEL_CHECKPOINT = "model.pt"
-    DECODER_CHECKPOINT = "decoder.pt"
     SCORING_SENTINEL = "SCORING_DONE.txt"
     SCORING_MANIFEST = "scoring_manifest.json"
     METRICS = "metrics.json"
-    METRICS_TMP = "metrics.json.tmp"
+    NBAIOT_MAIN_MANIFEST = "nbaiot_main_manifest.json"
+    SENSITIVITY_MANIFEST = "sensitivity_manifest.json"
     REPORTING_AUDIT = "reporting_audit.json"
     BOOTSTRAP_CIS_JSON = "bootstrap_cis.json"
     BOOTSTRAP_CIS_CSV = "bootstrap_cis.csv"
@@ -54,7 +88,6 @@ class ArtifactFile(enum.StrEnum):
     CONVERGENCE_CURVE = "convergence_curve.csv"
     CONVERGENCE_SUMMARY = "convergence_summary.json"
     PARAMS_SNAPSHOT = "params.npz"
-    JS_DIVERGENCE = "js_divergence.json"
     RUN_IN_PROGRESS = "IN_PROGRESS"
     RUN_DONE = "DONE.txt"
     RUN_ABORTED = "ABORTED.txt"
@@ -62,30 +95,27 @@ class ArtifactFile(enum.StrEnum):
 
 
 class PathToken(enum.StrEnum):
-    """Reusable path string tokens for artifact layout."""
 
     PARQUET_EXT = ".parquet"
     PARQUET_GLOB = "*.parquet"
+    CSV_EXT = ".csv"
+    PDF_EXT = ".pdf"
+    PNG_EXT = ".png"
+    TEX_EXT = ".tex"
+    JSON_EXT = ".json"
     CSV_GLOB = "*.csv"
     SEED_PREFIX = "seed_"
     ROUND_PREFIX = "round_"
-    ALPHA_PREFIX = "alpha_"
-    FRACTION_PREFIX = "f_"
-    SCOPE_PREFIX = "scope_"
-    TRAIN_PREFIX = "train_"
-    POISON_PREFIX = "poison_"
-    ALPHA_IID = "alpha_iid"
+    CHECKPOINT_PROTOCOL_SMOKE_TEMP_PREFIX = "datp_checkpoint_protocol_smoke_"
 
 
 class ClientStatus(enum.StrEnum):
-    """Whether a client meets the calibration eligibility threshold."""
 
     ELIGIBLE = "eligible"
     CALIBRATION_PENDING = "calibration_pending"
 
 
 class ThresholdAggregationMethod(enum.StrEnum):
-    """How per-client thresholds are aggregated into a global operating point."""
 
     ELIGIBLE_CLIENT_ARITHMETIC_MEAN = "eligible_client_arithmetic_mean"
     PER_CLIENT_PERCENTILE = "per_client_percentile"
@@ -93,7 +123,6 @@ class ThresholdAggregationMethod(enum.StrEnum):
 
 
 class ThresholdSource(enum.StrEnum):
-    """Origin of a threshold value."""
 
     GLOBAL = "global"
     LOCAL = "local"
@@ -101,28 +130,19 @@ class ThresholdSource(enum.StrEnum):
     TAU_GLOBAL_FALLBACK = "tau_global_fallback"
 
 
-class NormalizationScope(enum.StrEnum):
-    """Scope of normalization applied to reconstruction errors."""
+class ProvenanceSentinel(enum.StrEnum):
 
-    GLOBAL = "global"
-    PER_CLIENT = "per_client"
-    PER_CLIENT_ZSCORE = "per_client_zscore"
-    POOLED_ZSCORE = "pooled_zscore"
+    UNKNOWN = "UNKNOWN"
+    UNKNOWN_LOWERCASE = "unknown"
+    MISSING_MANIFEST_HASH = "MISSING_MANIFEST_HASH"
 
 
-class PipelineStage(enum.StrEnum):
-    """Pipeline stages from data preparation through reporting."""
+class PayloadValidationErrorType(enum.StrEnum):
 
-    PREPARE = "prepare"
-    TRAIN = "train"
-    SCORE = "score"
-    THRESHOLD = "threshold"
-    EVALUATE = "evaluate"
-    REPORT = "report"
+    MISSING = "missing"
 
 
 class Activation(enum.StrEnum):
-    """Supported activation functions for neural network layers."""
 
     RELU = "relu"
     LEAKY_RELU = "leaky_relu"
@@ -131,39 +151,43 @@ class Activation(enum.StrEnum):
     SIGMOID = "sigmoid"
 
 
+class ClientDataAttribute(enum.StrEnum):
+
+    VAL = "val"
+    TEST_BENIGN = "test_benign"
+    TEST_ATTACK = "test_attack"
+
+
 class ScoringStage(enum.StrEnum):
-    """Scoring data splits: calibration, test-benign, and test-attack."""
 
     CAL = "cal"
     TEST_BENIGN = "test_benign"
     TEST_ATTACK = "test_attack"
 
     @property
-    def client_data_attr(self) -> str:
-        """Return the attribute name used to access this stage's data on a client object."""
-        return "val" if self == ScoringStage.CAL else self.value
+    def client_data_attr(self) -> ClientDataAttribute:
+        if self is ScoringStage.CAL:
+            return ClientDataAttribute.VAL
+        if self is ScoringStage.TEST_BENIGN:
+            return ClientDataAttribute.TEST_BENIGN
+        return ClientDataAttribute.TEST_ATTACK
 
     @classmethod
     def all(cls) -> tuple["ScoringStage", ...]:
-        """Return all ScoringStage members as a tuple."""
         return tuple(cls)
 
 
 class MetricName(enum.StrEnum):
-    """Canonical metric names used across the pipeline."""
 
     FPR = "fpr"
     TPR = "tpr"
-    TNR = "tnr"
-    FNR = "fnr"
-    PRECISION = "precision"
-    RECALL = "recall"
     MACRO_F1 = "macro_f1"
     BALANCED_ACCURACY = "balanced_accuracy"
     AUROC = "auroc"
     PR_AUC = "pr_auc"
     CV_FPR = "cv_fpr"
     CV_TPR = "cv_tpr"
+    CV_FPR_DELTA_GLOBAL_MINUS_LOCAL = "cv_fpr_delta_global_minus_local"
     MEAN_FPR = "mean_fpr"
     STD_FPR = "std_fpr"
     IQR_FPR = "iqr_fpr"
@@ -174,13 +198,58 @@ class MetricName(enum.StrEnum):
     WORST_CLIENT_TPR = "worst_client_tpr"
     WORST_CLIENT_MACRO_F1 = "worst_client_macro_f1"
     WORST_CLIENT_BALANCED_ACCURACY = "worst_client_balanced_accuracy"
+    MACRO_F1_MEAN = "macro_f1_mean"
+    MACRO_F1_P10 = "macro_f1_p10"
+    AUROC_MEAN = "auroc_mean"
+    PR_AUC_MEAN = "pr_auc_mean"
+    CONVERGENCE_ROUND = "convergence_round"
     MAX_MIN_FPR_GAP = "max_min_fpr_gap"
     TAU_GLOBAL = "tau_global"
     WORST_CLIENT_ID = "worst_client_id"
+    VICTIM_DELTA_TAU = "delta_tau"
+    VICTIM_DELTA_TPR = "victim_delta_tpr"
+    VICTIM_DELTA_FPR = "victim_delta_fpr"
+    VICTIM_DELTA_FN = "victim_delta_fn"
+    VICTIM_DELTA_FP = "victim_delta_fp"
+    VICTIM_DELTA_BA = "victim_delta_ba"
+    VICTIM_DELTA_MACRO_F1 = "victim_delta_macro_f1"
+    NONVICTIM_MEAN_DELTA_TPR = "nonvictim_mean_delta_tpr"
+    NONVICTIM_WORST_DELTA_TPR = "nonvictim_worst_delta_tpr"
+    NONVICTIM_MEAN_DELTA_FPR = "nonvictim_mean_delta_fpr"
+    NONVICTIM_WORST_DELTA_FPR = "nonvictim_worst_delta_fpr"
+    NONVICTIM_MEAN_DELTA_BA = "nonvictim_mean_delta_ba"
+    NONVICTIM_MEAN_DELTA_MACRO_F1 = "nonvictim_mean_delta_macro_f1"
+    NONVICTIM_DELTA_FN_TOTAL = "nonvictim_delta_fn_total"
+    NONVICTIM_DELTA_FP_TOTAL = "nonvictim_delta_fp_total"
+    DELTA_MEAN_FPR = "delta_mean_fpr"
+    DELTA_CV_FPR = "delta_cv_fpr"
+    DELTA_IQR_FPR = "delta_iqr_fpr"
+    DELTA_MAX_MIN_FPR = "delta_max_min_fpr"
+    DELTA_WORST_CLIENT_FPR = "delta_worst_client_fpr"
+    FIXED_CLUSTER_VICTIM_DELTA_TAU = "fixed_cluster_victim_delta_tau"
+    FIXED_CLUSTER_VICTIM_DELTA_TPR = "fixed_cluster_victim_delta_tpr"
+    FIXED_CLUSTER_VICTIM_DELTA_FPR = "fixed_cluster_victim_delta_fpr"
+    FIXED_CLUSTER_DELTA_CV_FPR = "fixed_cluster_delta_cv_fpr"
+    FIXED_CLUSTER_DELTA_MEAN_FPR = "fixed_cluster_delta_mean_fpr"
+    FIXED_CLUSTER_NONVICTIM_MEAN_DELTA_TPR = "fixed_cluster_nonvictim_mean_delta_tpr"
+    FIXED_CLUSTER_NONVICTIM_MEAN_DELTA_FPR = "fixed_cluster_nonvictim_mean_delta_fpr"
+    WORST_VICTIM_DROP = "worst_victim_drop"
+    DELTA_TAU_BOUND_UTILIZATION = "delta_tau_bound_utilization"
+    CAL_DUPLICATE_RATE = "cal_duplicate_rate"
+    TNR = "tnr"
+    FNR = "fnr"
+    PRECISION = "precision"
+    RECALL = "recall"
+
+
+class NormalizationScope(enum.StrEnum):
+
+    GLOBAL = "global"
+    PER_CLIENT = "per_client"
+    PER_CLIENT_ZSCORE = "per_client_zscore"
 
 
 class PayloadKey(enum.StrEnum):
-    """Keys used in JSON metric payloads."""
 
     CLIENT_ID = "client_id"
     PER_CLIENT = "per_client"
@@ -188,7 +257,6 @@ class PayloadKey(enum.StrEnum):
     POLICY = "policy"
     STAGE = "stage"
     SEED = "seed"
-    JS_DIVERGENCE = "js_divergence"
     COVERAGE_RATIO = "coverage_ratio"
     DATASET = "dataset"
     ELIGIBLE_COUNT = "eligible_count"
@@ -214,8 +282,6 @@ class PayloadKey(enum.StrEnum):
     AGGREGATE_METRICS = "aggregate_metrics"
     PROVENANCE = "provenance"
     NORMALIZATION_SCOPE = "normalization_scope"
-    NORMALIZATION_MODE = "normalization_mode"
-    TAU_B0 = "tau_b0"
     CONFIG_IDENTITY = "config_identity"
     SPLIT_MANIFEST_IDENTITY = "split_manifest_identity"
     MODEL_CHECKPOINT_IDENTITY = "model_checkpoint_identity"
@@ -227,7 +293,6 @@ class PayloadKey(enum.StrEnum):
 
 
 class ConfusionKey(enum.StrEnum):
-    """Keys for confusion matrix entries in JSON payloads."""
 
     TP = "tp"
     FP = "fp"
@@ -236,7 +301,6 @@ class ConfusionKey(enum.StrEnum):
 
 
 class AuditField(enum.StrEnum):
-    """Fields in the audit summary JSON payload."""
 
     SCHEMA_VERSION = "schema_version"
     GENERATED_TABLES = "generated_tables"
@@ -257,7 +321,6 @@ class AuditField(enum.StrEnum):
 
 
 class ValidationField(enum.StrEnum):
-    """Fields in validation result JSON payloads."""
 
     STATUS = "status"
     SOURCE = "source"
@@ -266,16 +329,15 @@ class ValidationField(enum.StrEnum):
 
 
 class RunKind(enum.StrEnum):
-    """Kind of experiment run."""
 
     CORE_LADDER = "core_ladder"
 
 
 class SeedScope(enum.StrEnum):
-    """Whether a result covers a single representative seed or all seeds."""
 
     REPRESENTATIVE_SEED = "representative_seed"
     ALL_SEEDS = "all_seeds"
+    ALL_TRAINING_SEEDS = "all_training_seeds"
 
 
 SCORING_STAGES: tuple[ScoringStage, ...] = ScoringStage.all()
@@ -306,4 +368,9 @@ CONTROLLED_POLICIES: tuple[ThresholdPolicy, ...] = (
     ThresholdPolicy.CLUSTER_THRESHOLD,
 )
 
-CLUSTER_FINGERPRINT_FEATURES: tuple[str, ...] = ("mean", "std", "skew", "p95")
+CLUSTER_FINGERPRINT_FEATURES: tuple[ClusterFingerprintFeature, ...] = (
+    ClusterFingerprintFeature.MEAN,
+    ClusterFingerprintFeature.STANDARD_DEVIATION,
+    ClusterFingerprintFeature.SKEWNESS,
+    ClusterFingerprintFeature.NINETY_FIFTH_PERCENTILE,
+)

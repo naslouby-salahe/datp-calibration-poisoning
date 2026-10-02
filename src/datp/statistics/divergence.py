@@ -1,6 +1,14 @@
-"""Jensen-Shannon divergence over calibration-score histograms with pooling."""
-
 from __future__ import annotations
+
+from datp.types import (
+    BinCount,
+    ClientId,
+    RecordKey,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+)
+
 
 from dataclasses import dataclass
 from itertools import combinations
@@ -17,27 +25,24 @@ from datp.statistics.constants import (
 
 @dataclass(frozen=True, slots=True)
 class JSSummary:
-    """Summary statistics for a set of pairwise Jensen-Shannon divergences."""
 
-    n_compared: int
-    n_pairs: int
-    n_bins: int
-    mean: float | None
-    std: float | None
-    p50: float | None
-    p95: float | None
-    max: float | None
+    n_compared: SampleCount
+    n_pairs: SampleCount
+    n_bins: BinCount
+    mean: ScoreValue | None
+    std: ScoreValue | None
+    p50: ScoreValue | None
+    p95: ScoreValue | None
+    max: ScoreValue | None
 
 
-def histogram_distribution(arr: np.ndarray, bin_edges: np.ndarray) -> np.ndarray:
-    """Return a Laplace-smoothed probability distribution from a histogram of arr."""
+def histogram_distribution(arr: ScoreVector, bin_edges: ScoreVector) -> ScoreVector:
     counts, _ = np.histogram(arr, bins=bin_edges)
     smoothed = counts.astype(np.float64) + JS_LAPLACE_SMOOTHING
     return smoothed / smoothed.sum()
 
 
-def pairwise_js_divergence(probs: list[np.ndarray]) -> np.ndarray:
-    """Compute squared Jensen-Shannon divergences for all pairs of distributions."""
+def pairwise_js_divergence(probs: list[ScoreVector]) -> ScoreVector:
     if len(probs) < 2:
         return np.array([], dtype=np.float64)
     return np.array(
@@ -46,12 +51,12 @@ def pairwise_js_divergence(probs: list[np.ndarray]) -> np.ndarray:
     )
 
 
-def _js_array_to_summary(js: np.ndarray, n_compared: int, n_bins: int) -> JSSummary:
+def _js_array_to_summary(js: ScoreVector, n_compared: SampleCount, n_bins: BinCount) -> JSSummary:
     if js.size == 0:
         return JSSummary(n_compared, 0, n_bins, None, None, None, None, None)
     return JSSummary(
         n_compared=n_compared,
-        n_pairs=int(js.size),
+        n_pairs=js.size,
         n_bins=n_bins,
         mean=float(js.mean()),
         std=float(js.std(ddof=1)) if js.size > 1 else 0.0,
@@ -61,14 +66,13 @@ def _js_array_to_summary(js: np.ndarray, n_compared: int, n_bins: int) -> JSSumm
     )
 
 
-def _get_bin_edges(arrays: list[np.ndarray], n_bins: int) -> np.ndarray:
+def _get_bin_edges(arrays: list[ScoreVector], n_bins: BinCount) -> ScoreVector:
     pooled = np.concatenate(arrays)
     upper, lower = float(np.percentile(pooled, 99.0)), float(np.min(pooled))
     return np.linspace(lower, max(upper, lower + JS_BIN_EPSILON), n_bins + 1)
 
 
-def pairwise_js_summary(arrays: list[np.ndarray], *, n_bins: int) -> JSSummary:
-    """Bin raw score arrays into histograms and return a JS-divergence summary."""
+def pairwise_js_summary(arrays: list[ScoreVector], *, n_bins: BinCount) -> JSSummary:
     non_empty = [arr for arr in arrays if arr.size > 0]
     if len(non_empty) < 2:
         return _js_array_to_summary(np.array([]), len(non_empty), n_bins)
@@ -78,16 +82,14 @@ def pairwise_js_summary(arrays: list[np.ndarray], *, n_bins: int) -> JSSummary:
     return _js_array_to_summary(pairwise_js_divergence(probs), len(non_empty), n_bins)
 
 
-def pairwise_js_from_distributions(distributions: list[np.ndarray]) -> JSSummary:
-    """Compute pairwise JS divergence summary from pre-binned probability distributions."""
+def pairwise_js_from_distributions(distributions: list[ScoreVector]) -> JSSummary:
     n, n_bins = len(distributions), distributions[0].shape[0] if distributions else 0
     return _js_array_to_summary(pairwise_js_divergence(distributions), n, n_bins)
 
 
 def js_divergence_to_pool(
-    client_arrays: dict[str, np.ndarray], *, n_bins: int
-) -> dict[str, float]:
-    """Compute per-client JS divergence against a pooled distribution from all arrays."""
+    client_arrays: dict[ClientId, ScoreVector], *, n_bins: BinCount
+) -> dict[RecordKey, ScoreValue]:
     if not client_arrays:
         return {}
 

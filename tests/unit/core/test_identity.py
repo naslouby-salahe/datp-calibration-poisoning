@@ -9,7 +9,6 @@ from datp.config.models import ExperimentStage
 from datp.core.identity import (
     PolicyRunId,
     TrainingCellId,
-    make_run_id,
     seed_segment,
 )
 
@@ -137,24 +136,3 @@ class TestSeedSegment:
     def test_zero_seed(self) -> None:
         """Confirm seed zero directory segment is correctly formatted."""
         assert seed_segment(0) == "seed_0"
-
-
-class TestMakeRunId:
-    """Tests verifying dynamic run ID generator logic."""
-
-    def test_includes_stage_and_seed(self) -> None:
-        """Verify generated run ID string contains the stage prefix and seed."""
-        rid = make_run_id(_STAGE, seed=42)
-        assert rid.startswith("nbaiot_main_seed42_")
-
-    def test_no_alpha_in_run_id(self) -> None:
-        """Verify generated run ID does not contain alpha parameter naming by default."""
-        rid = make_run_id(_STAGE, seed=42)
-        assert "alpha" not in rid
-
-    def test_different_seeds_produce_different_prefixes(self) -> None:
-        """Verify different seed inputs generate run IDs with distinct prefixes."""
-        r1 = make_run_id(_STAGE, seed=0)
-        r2 = make_run_id(_STAGE, seed=1)
-        assert r1.startswith("nbaiot_main_seed0_")
-        assert r2.startswith("nbaiot_main_seed1_")

@@ -1,10 +1,8 @@
-"""Statistics constants: bootstrap settings, Cliff's delta boundaries, and field enums."""
+from datp.types import SeedCount
 
 import enum
 
-DEFAULT_CI_LEVEL: float = 0.95
-BOOTSTRAP_RANDOM_STATE: int = 42
-BCA_MIN_PAIRED_SEEDS: int = 3
+BCA_MIN_PAIRED_SEEDS: SeedCount = 3
 
 # Cliff's delta magnitude boundaries (Romano et al., 2006).
 CLIFFS_DELTA_NEGLIGIBLE = 0.147
@@ -17,14 +15,12 @@ JS_BIN_EPSILON = 1e-9
 
 
 class BootstrapMethod(enum.StrEnum):
-    """Bootstrap confidence interval methods: percentile or bias-corrected accelerated."""
 
     PERCENTILE = "percentile"
     BCA = "bca"
 
 
 class EffectMagnitude(enum.StrEnum):
-    """Cliff's delta magnitude categories: negligible, small, medium, or large."""
 
     NEGLIGIBLE = "negligible"
     SMALL = "small"
@@ -33,8 +29,9 @@ class EffectMagnitude(enum.StrEnum):
 
 
 class BootstrapField(enum.StrEnum):
-    """Bootstrap CI payload keys."""
 
+    SCOPE = "scope"
+    COMPARISON = "comparison"
     PER_SEED_DELTAS = "per_seed_deltas"
     MEAN_DELTA = "mean_delta"
     CI_LOWER = "ci_lower"
@@ -46,9 +43,10 @@ class BootstrapField(enum.StrEnum):
 
 
 class StatsField(enum.StrEnum):
-    """Statistics output payload keys."""
 
     PRIMARY_ENDPOINT = "primary_endpoint"
+    SECONDARY_NBAIOT = "secondary_nbaiot"
+    SECONDARY_NBAIOT_ADDITIONAL = "secondary_nbaiot_additional"
     HETEROGENEITY_CONTEXT_CHECK = "heterogeneity_context_check"
     CONDITION = "condition"
     GLOBAL_CV_FPR_MEAN = "global_cv_fpr_mean"
@@ -57,6 +55,3 @@ class StatsField(enum.StrEnum):
     PRIMARY_ENDPOINT_CI_EXCLUDES_ZERO = "primary_endpoint_ci_excludes_zero"
     CONTEXT_RESULT = "context_result"
     NOTE = "note"
-    PAIRED_CLIENT_FPR_POLICY = "paired_client_fpr_policy"
-    WILCOXON_GLOBAL_VS_LOCAL = "wilcoxon_global_vs_local"
-    CLIFFS_DELTA_GLOBAL_VS_LOCAL = "cliffs_delta_global_vs_local"

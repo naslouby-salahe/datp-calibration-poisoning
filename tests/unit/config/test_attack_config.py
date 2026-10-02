@@ -30,16 +30,10 @@ class TestSeedPools:
         assert pools.training == tuple(range(10))
         assert pools.poisoning == tuple(range(100, 110))
         assert pools.analysis == tuple(range(300, 310))
-        assert pools.compromise_pattern == 400
         assert pools.split == 0
 
     def test_len_returns_training_length(self) -> None:
         assert len(SeedPools()) == 10
-
-    def test_triplet_returns_correct_index(self) -> None:
-        pools = SeedPools()
-        assert pools.triplet(0) == (0, 100, 300)
-        assert pools.triplet(9) == (9, 109, 309)
 
     def test_mismatched_pool_lengths_raise(self) -> None:
         with pytest.raises(ValidationError, match="same length"):
@@ -145,7 +139,6 @@ class TestConfigValid:
         cfg = _valid_config()
         assert cfg.seeds.training == tuple(range(10))
         assert cfg.seeds.poisoning == tuple(range(100, 110))
-        assert cfg.seeds.compromise_pattern == 400
 
     def test_default_cluster_locked_values(self) -> None:
         cfg = _valid_config()
@@ -196,7 +189,6 @@ class TestForBoundedSweep:
         cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert cfg.seeds.training == tuple(range(10))
         assert cfg.seeds.poisoning == tuple(range(100, 110))
-        assert cfg.seeds.compromise_pattern == 400
 
     def test_scale_is_bounded(self) -> None:
         cfg = CalibrationPoisoningConfig.for_bounded_sweep()

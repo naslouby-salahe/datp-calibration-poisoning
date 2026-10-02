@@ -19,6 +19,7 @@ from datp.experiments.executor import (
 )
 from datp.experiments.models import PipelineRequest, SharedPipelineContext
 from datp.experiments.stages.train_encoder import ensure_fl_checkpoint
+from datp.thresholding.eligibility import EligibilityResult
 
 
 def _make_request(
@@ -78,7 +79,7 @@ class TestSharedTrainingExecutor:
             ),
             patch(
                 "datp.experiments.executor.identify_eligible",
-                return_value=(["c1"], []),
+                return_value=EligibilityResult(eligible_ids=("c1",), pending_ids=()),
             ),
             patch(
                 "datp.experiments.executor.compute_client_thresholds",
@@ -108,7 +109,7 @@ class TestSharedTrainingExecutor:
             ),
             patch(
                 "datp.experiments.executor.identify_eligible",
-                return_value=(["c1"], []),
+                return_value=EligibilityResult(eligible_ids=("c1",), pending_ids=()),
             ),
             patch(
                 "datp.experiments.executor.compute_client_thresholds",
@@ -125,8 +126,8 @@ class TestSharedTrainingExecutor:
         assert ctx.key == request.key
         assert list(ctx.client_errors.keys()) == ["c1"]
         assert np.array_equal(ctx.client_errors["c1"], np.array([0.1, 0.2]))
-        assert ctx.eligible == ["c1"]
-        assert ctx.pending == []
+        assert ctx.eligible == ("c1",)
+        assert ctx.pending == ()
         assert ctx.client_taus == pytest.approx({"c1": 0.15})
         assert ctx.tau_global == pytest.approx(0.15)
         assert ctx.score_provider is mock_sp.return_value
@@ -175,7 +176,7 @@ class TestThresholdEvaluationExecutor:
                 "datp.experiments.executor.build_metrics_dict",
                 return_value=mock_metrics,
             ),
-            patch("datp.experiments.executor.write_metrics_atomic"),
+            patch("datp.experiments.executor.write_json_atomic"),
             patch("datp.experiments.executor.RunLifecycle"),
             patch("datp.experiments.executor.log_metrics"),
         ):
@@ -221,7 +222,7 @@ class TestThresholdEvaluationExecutor:
                 "datp.experiments.executor.build_metrics_dict",
                 return_value=MagicMock(),
             ),
-            patch("datp.experiments.executor.write_metrics_atomic"),
+            patch("datp.experiments.executor.write_json_atomic"),
             patch("datp.experiments.executor.RunLifecycle"),
             patch("datp.experiments.executor.log_metrics"),
         ):

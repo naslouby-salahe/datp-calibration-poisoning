@@ -16,12 +16,13 @@ import pytest
 from datp.artifacts.names import ArtifactFile
 from datp.core.enums import (
     SCORING_STAGES,
+    ScoringStage,
 )
 from datp.config.models import ExperimentStage
 from datp.data.catalog import DatasetID
 from datp.data.common.storage import write_artifact
 from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
-from datp.scoring.manifest import SCORE_COLUMN
+from datp.scoring.manifest import ScoringColumn
 from datp.validation.discovery import iter_score_cells
 from datp.validation.enums import AuditArtifact, AuditStatus
 from datp.validation.score_manifest import (
@@ -41,7 +42,7 @@ def _sha256(path: Path) -> str:
 
 def _write_score_parquet(path: Path, values: np.ndarray) -> None:
     """Helper to write a mock scores parquet file."""
-    write_artifact(pl.DataFrame({SCORE_COLUMN: values.astype(np.float32)}), path)
+    write_artifact(pl.DataFrame({ScoringColumn.RECONSTRUCTION_ERROR: values.astype(np.float32)}), path)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -127,7 +128,7 @@ def _write_manifest_file(
         else str(ckpt),
         "model_checkpoint_hash": spec.checkpoint_hash_override or ckpt_hash,
         "scoring_code_version": "fixture",
-        "score_column_name": SCORE_COLUMN,
+        "score_column_name": ScoringColumn.RECONSTRUCTION_ERROR,
         "expected_client_ids": sorted(spec.clients),
         "expected_splits": [s.value for s in SCORING_STAGES],
         "actual_client_ids": sorted(spec.clients),
@@ -186,6 +187,8 @@ def test_valid_cell_passes_all_checks(tmp_path: Path) -> None:
     assert report.cell.stage == ExperimentStage.NBAIOT_MAIN
     assert report.cell.seed == 0
     assert set(report.expected_client_ids) == set(CLIENTS)
+    assert report.expected_splits == list(SCORING_STAGES)
+    assert all(isinstance(split, ScoringStage) for split in report.expected_splits)
 
 
 def test_missing_manifest_fails(tmp_path: Path) -> None:
@@ -322,7 +325,7 @@ def test_empty_parquet_fails(tmp_path: Path) -> None:
     cell = _build_cell(_CellSpec(base_dir=base_dir, data_root=tmp_path))
 
     bad = cell / "cal" / f"{CLIENTS[0]}.parquet"
-    table = pa.table({SCORE_COLUMN: pa.array([], type=pa.float32())})
+    table = pa.table({ScoringColumn.RECONSTRUCTION_ERROR: pa.array([], type=pa.float32())})
     pq.write_table(table, bad)
 
     report = verify_score_cell(cell, base_dir, data_root=tmp_path)
@@ -418,7 +421,7 @@ def test_iter_score_cells_and_verify_all(tmp_path: Path) -> None:
     )
 
     cells = iter_score_cells(base_dir)
-    assert {(c.stage, c.seed) for c in cells} == {
+    assert {(c.cell.stage, c.cell.seed) for c in cells} == {
         (ExperimentStage.NBAIOT_MAIN, 0),
         (ExperimentStage.NBAIOT_MAIN, 1),
     }

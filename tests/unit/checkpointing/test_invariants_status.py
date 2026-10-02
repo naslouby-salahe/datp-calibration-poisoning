@@ -84,7 +84,7 @@ class TestCheckpointArtifactStatusPresent:
         layout = ArtifactLayout(base_dir=tmp_path, stage=_STAGE)
         cell = TrainingCellId(stage=_STAGE, seed=1)
         ckpt_path = (
-            layout.checkpoint_dir_for_round(cell, 50) / ArtifactFile.MODEL_CHECKPOINT
+            layout.checkpoint_dir(cell, 50) / ArtifactFile.MODEL_CHECKPOINT
         )
         ckpt_path.parent.mkdir(parents=True, exist_ok=True)
         ckpt_path.write_bytes(b"fake weights")

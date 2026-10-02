@@ -11,9 +11,8 @@ import pytest
 from datp.core.enums import ThresholdPolicy
 from datp.config.models import ExperimentStage
 from datp.core.identity import TrainingCellId
-from datp.experiments.models import ContingencyDecision, SweepStep
+from datp.experiments.models import SweepStep
 from datp.experiments.models import (
-    ContingencyRecord,
     PipelineRequest,
     SharedPipelineContext,
 )
@@ -156,59 +155,6 @@ class TestSharedPipelineContext:
             checkpoint_round=None,
         )
         assert not hasattr(ctx, "test_scores"), "test_scores must be removed"
-
-
-class TestContingencyRecord:
-    """ContingencyRecord decisions and immutability."""
-
-    def test_valid_go_decision(self) -> None:
-        record = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_global=0.45,
-            cv_fpr_local=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="GLOBAL_THRESHOLD CV(FPR) exceeds dispersion threshold",
-        )
-        assert record.decision == ContingencyDecision.GO
-        assert record.cv_fpr_global == pytest.approx(0.45)
-        assert record.cv_fpr_local == pytest.approx(0.32)
-        assert record.delta_cv_fpr == pytest.approx(0.13)
-        assert record.is_preliminary_diagnostic is True
-
-    def test_valid_contingency_decision(self) -> None:
-        record = ContingencyRecord(
-            decision=ContingencyDecision.CONTINGENCY,
-            cv_fpr_global=0.05,
-            cv_fpr_local=0.04,
-            delta_cv_fpr=0.01,
-            dispersion_threshold=0.10,
-            rationale="GLOBAL_THRESHOLD CV(FPR) below dispersion threshold — abort",
-        )
-        assert record.decision == ContingencyDecision.CONTINGENCY
-
-    def test_immutable(self) -> None:
-        record = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_global=0.45,
-            cv_fpr_local=0.32,
-            delta_cv_fpr=0.13,
-            dispersion_threshold=0.10,
-            rationale="test",
-        )
-        with pytest.raises((AttributeError, TypeError, ValueError)):
-            setattr(record, "decision", ContingencyDecision.CONTINGENCY)
-
-    def test_is_preliminary_diagnostic_default(self) -> None:
-        record = ContingencyRecord(
-            decision=ContingencyDecision.GO,
-            cv_fpr_global=0.1,
-            cv_fpr_local=0.1,
-            delta_cv_fpr=0.0,
-            dispersion_threshold=0.10,
-            rationale="test",
-        )
-        assert record.is_preliminary_diagnostic is True
 
 
 class TestSweepStep:

@@ -1,16 +1,35 @@
-"""SweepMetrics model and serialization from EvaluationResult + ThresholdResult."""
+from datp.types import (
+    ClassificationScore,
+    ClientCount,
+    ClientId,
+    ContentHash,
+    FalseNegativeRate,
+    FalsePositiveRate,
+    NarrativeText,
+    RandomSeed,
+    Ratio,
+    RoundIndex,
+    RunId,
+    SampleCount,
+    SchemaVersion,
+    ScoreValue,
+    Threshold,
+    TrueNegativeRate,
+    TruePositiveRate,
+)
 
 from dataclasses import dataclass
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from datp.config.models import ExperimentStage
 from datp.core.enums import (
+    ClientStatus,
     POLICY_THRESHOLD_SOURCE,
     THRESHOLD_AGGREGATION_BY_POLICY,
-    ConfusionKey,
     MetricName,
+    ProvenanceSentinel,
     RunKind,
     ThresholdAggregationMethod,
     ThresholdPolicy,
@@ -21,84 +40,175 @@ from datp.core.types import MetricsProvenance, ThresholdResult
 from datp.data.catalog import DatasetID
 from datp.evaluation.metrics import ClientEvaluationRecord, EvaluationResult
 
-METRICS_SCHEMA_VERSION = "2"
-METRIC_SCHEMA_VERSION = "2"
-THRESHOLD_SCHEMA_VERSION = "1"
+METRICS_SCHEMA_VERSION: SchemaVersion = "2"
+METRIC_SCHEMA_VERSION: SchemaVersion = "2"
+THRESHOLD_SCHEMA_VERSION: SchemaVersion = "1"
 
 
 @dataclass(frozen=True, slots=True)
 class MetricsBuildRequest:
-    """Request bundling evaluation, threshold, and provenance inputs for building a SweepMetrics instance."""
 
     eval_result: EvaluationResult
     threshold_result: ThresholdResult
-    config_identity: str
-    split_manifest_identity: str
-    model_checkpoint_identity: str
-    score_artifact_identity: str
-    checkpoint_round: int | None
+    config_identity: ContentHash
+    split_manifest_identity: ContentHash
+    model_checkpoint_identity: ContentHash
+    score_artifact_identity: ContentHash
+    checkpoint_round: RoundIndex | None
+
+
+class ConfusionMatrix(BaseModel):
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    tp: SampleCount
+    fp: SampleCount
+    tn: SampleCount
+    fn: SampleCount
 
 
 class MetricsClientDetail(BaseModel):
-    """Per-client metrics: FPR/TPR, confusion matrix, and threshold source."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    client_id: str
-    fpr: float
-    tpr: float
-    tnr: float
-    fnr: float
-    precision: float
-    recall: float
-    balanced_accuracy: float
-    macro_f1: float
-    confusion_matrix: dict[str, int]
-    n_benign: int
-    n_attack: int
+    client_id: ClientId
+    fpr: FalsePositiveRate
+    tpr: TruePositiveRate
+    tnr: TrueNegativeRate
+    fnr: FalseNegativeRate
+    precision: ClassificationScore
+    recall: ClassificationScore
+    balanced_accuracy: ClassificationScore
+    macro_f1: ClassificationScore
+    confusion_matrix: ConfusionMatrix
+    n_benign: SampleCount
+    n_attack: SampleCount
     calibration_pending: bool
     evaluation_incomplete: bool
-    threshold_value: float
+    threshold_value: Threshold
     threshold_source: ThresholdSource
 
 
 class SweepMetrics(BaseModel):
-    """Top-level sweep result aggregating fleet metrics, per-client details, and provenance."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    schema_version: str
-    metric_schema_version: str
-    threshold_schema_version: str
-    run_id: str
+    schema_version: SchemaVersion
+    metric_schema_version: SchemaVersion
+    threshold_schema_version: SchemaVersion
+    run_id: RunId
     run_kind: RunKind
     policy: ThresholdPolicy
     stage: ExperimentStage
-    seed: int
-    checkpoint_round: int | None
+    seed: RandomSeed
+    checkpoint_round: RoundIndex | None
     dataset: DatasetID
     threshold_scope: ThresholdAggregationMethod
-    threshold_strategy_name: str
-    tau_global: float
-    eligible_ids: tuple[str, ...]
-    pending_ids: tuple[str, ...]
-    eval_incomplete_ids: tuple[str, ...]
-    eligible_count: int
-    pending_count: int
-    eval_incomplete_count: int
-    client_count: int
-    coverage_ratio: float
-    cv_fpr: float
-    mean_fpr: float
-    std_fpr: float
-    cv_tpr: float
-    iqr_fpr: float
-    iqr_tpr: float
-    worst_client_fpr: float
-    worst_client_id: str | None
-    worst_ba: float
-    p10_macro_f1: float
-    aggregate_metrics: dict[MetricName, float | str | None]
+    threshold_strategy_name: NarrativeText
+    tau_global: Threshold
+    eligible_ids: tuple[ClientId, ...]
+    pending_ids: tuple[ClientId, ...]
+    eval_incomplete_ids: tuple[ClientId, ...]
+    eligible_count: ClientCount
+    pending_count: ClientCount
+    eval_incomplete_count: ClientCount
+    client_count: ClientCount
+    coverage_ratio: Ratio
+    cv_fpr: FalsePositiveRate
+    mean_fpr: FalsePositiveRate | None = None
+    std_fpr: FalsePositiveRate | None = None
+    cv_tpr: TruePositiveRate
+    iqr_fpr: FalsePositiveRate
+    iqr_tpr: TruePositiveRate
+    worst_client_fpr: FalsePositiveRate
+    worst_client_id: ClientId | None
+    worst_ba: ScoreValue
+    p10_macro_f1: ClassificationScore
+    aggregate_metrics: dict[MetricName, ScoreValue | ClientId | None]
     provenance: MetricsProvenance
     per_client: tuple[MetricsClientDetail, ...]
+
+    @model_validator(mode="after")
+    def validate_partition(self) -> "SweepMetrics":
+        client_ids = tuple(client.client_id for client in self.per_client)
+        client_id_set = set(client_ids)
+        eligible = set(self.eligible_ids)
+        pending = set(self.pending_ids)
+        incomplete = set(self.eval_incomplete_ids)
+        _validate_client_membership(
+            self, client_ids, client_id_set, eligible, pending, incomplete
+        )
+        _validate_client_states(self, pending, incomplete)
+        _validate_provenance(self.provenance)
+        return self
+
+
+def _validate_client_membership(
+    metrics: SweepMetrics,
+    client_ids: tuple[ClientId, ...],
+    client_id_set: set[ClientId],
+    eligible: set[ClientId],
+    pending: set[ClientId],
+    incomplete: set[ClientId],
+) -> None:
+    if len(client_id_set) != len(client_ids):
+        raise ValueError("per_client contains duplicate client IDs")
+    if overlap := eligible & pending:
+        raise ValueError(f"eligible_ids overlap pending_ids: {sorted(overlap)}")
+    if missing := (eligible | pending | incomplete) - client_id_set:
+        raise ValueError(f"eligibility IDs missing per_client rows: {sorted(missing)}")
+    if metrics.eligible_count != len(eligible):
+        raise ValueError("eligible_count does not match eligible_ids")
+    if metrics.pending_count != len(pending):
+        raise ValueError("pending_count does not match pending_ids")
+    if metrics.eval_incomplete_count != len(incomplete):
+        raise ValueError("eval_incomplete_count does not match eval_incomplete_ids")
+    if metrics.client_count != len(client_id_set):
+        raise ValueError("client_count does not match per_client rows")
+    if not 0.0 <= metrics.coverage_ratio <= 1.0:
+        raise ValueError("coverage_ratio must be within [0, 1]")
+
+
+def _validate_client_states(
+    metrics: SweepMetrics,
+    pending: set[ClientId],
+    incomplete: set[ClientId],
+) -> None:
+    for client in metrics.per_client:
+        if client.client_id in pending and not client.calibration_pending:
+            raise ValueError(
+                f"pending client {client.client_id} missing calibration_pending=true"
+            )
+        if client.client_id in incomplete and not client.evaluation_incomplete:
+            raise ValueError(
+                f"eval-incomplete client {client.client_id} missing evaluation_incomplete=true"
+            )
+
+
+def _validate_provenance(provenance: MetricsProvenance) -> None:
+    values = (
+        provenance.config_identity,
+        provenance.split_manifest_identity,
+        provenance.model_checkpoint_identity,
+        provenance.score_artifact_identity,
+        provenance.metric_code_version,
+        provenance.threshold_code_version,
+        provenance.package_version,
+        provenance.generated_at_utc,
+    )
+    if any(
+        value in {
+            ProvenanceSentinel.UNKNOWN,
+            ProvenanceSentinel.UNKNOWN_LOWERCASE,
+        }
+        for value in values
+    ):
+        raise ValueError("provenance contains a vague UNKNOWN value")
+    identities = (
+        provenance.config_identity,
+        provenance.split_manifest_identity,
+        provenance.model_checkpoint_identity,
+        provenance.score_artifact_identity,
+    )
+    if any(value.startswith("MISSING_") for value in identities):
+        raise ValueError("provenance contains an unresolved MISSING_* identity")
 
 
 def _to_client_detail(
@@ -114,40 +224,39 @@ def _to_client_detail(
         recall=record.metrics.recall,
         balanced_accuracy=record.metrics.balanced_accuracy,
         macro_f1=record.metrics.macro_f1,
-        confusion_matrix={
-            ConfusionKey.TP.value: record.confusion.tp,
-            ConfusionKey.FP.value: record.confusion.fp,
-            ConfusionKey.TN.value: record.confusion.tn,
-            ConfusionKey.FN.value: record.confusion.fn,
-        },
+        confusion_matrix=ConfusionMatrix(
+            tp=record.confusion.tp,
+            fp=record.confusion.fp,
+            tn=record.confusion.tn,
+            fn=record.confusion.fn,
+        ),
         n_benign=record.n_benign,
         n_attack=record.n_attack,
-        calibration_pending=record.threshold.calibration_pending,
+        calibration_pending=record.threshold.status is ClientStatus.CALIBRATION_PENDING,
         evaluation_incomplete=record.evaluation_incomplete,
         threshold_value=record.threshold.threshold,
         threshold_source=ThresholdSource.TAU_GLOBAL_FALLBACK
-        if record.threshold.calibration_pending
+        if record.threshold.status is ClientStatus.CALIBRATION_PENDING
         else default_source,
     )
 
 
 def build_metrics_dict(req: MetricsBuildRequest) -> SweepMetrics:
-    """Build a complete SweepMetrics from evaluation, threshold, and provenance inputs."""
     er = req.eval_result
     tr = req.threshold_result
 
     aggregate_metrics = {
-        MetricName.CV_FPR: er.cv_fpr,
-        MetricName.MEAN_FPR: er.mean_fpr,
-        MetricName.STD_FPR: er.std_fpr,
-        MetricName.CV_TPR: er.cv_tpr,
-        MetricName.IQR_FPR: er.iqr_fpr,
-        MetricName.IQR_TPR: er.iqr_tpr,
-        MetricName.MAX_MIN_FPR_GAP: er.max_min_fpr_gap,
-        MetricName.WORST_CLIENT_FPR: er.worst_client_fpr,
-        MetricName.WORST_CLIENT_ID: er.worst_client_id,
-        MetricName.WORST_BA: er.worst_ba,
-        MetricName.P10_MACRO_F1: er.p10_macro_f1,
+        MetricName.CV_FPR: er.dispersion.cv_fpr,
+        MetricName.MEAN_FPR: er.dispersion.mean_fpr,
+        MetricName.STD_FPR: er.dispersion.std_fpr,
+        MetricName.CV_TPR: er.dispersion.cv_tpr,
+        MetricName.IQR_FPR: er.dispersion.iqr_fpr,
+        MetricName.IQR_TPR: er.dispersion.iqr_tpr,
+        MetricName.MAX_MIN_FPR_GAP: er.dispersion.max_min_fpr_gap,
+        MetricName.WORST_CLIENT_FPR: er.dispersion.worst_client_fpr,
+        MetricName.WORST_CLIENT_ID: er.dispersion.worst_client_id,
+        MetricName.WORST_BA: er.dispersion.worst_ba,
+        MetricName.P10_MACRO_F1: er.dispersion.p10_macro_f1,
     }
 
     provenance = MetricsProvenance(
@@ -165,15 +274,15 @@ def build_metrics_dict(req: MetricsBuildRequest) -> SweepMetrics:
         schema_version=METRICS_SCHEMA_VERSION,
         metric_schema_version=METRIC_SCHEMA_VERSION,
         threshold_schema_version=THRESHOLD_SCHEMA_VERSION,
-        run_id=f"{er.stage.value}_{er.policy.value}_seed{er.seed}",
+        run_id=RunId(f"{er.run.stage}_{er.run.policy}_seed{er.run.seed}"),
         run_kind=RunKind.CORE_LADDER,
-        policy=er.policy,
-        stage=er.stage,
-        seed=er.seed,
+        policy=er.run.policy,
+        stage=er.run.stage,
+        seed=er.run.seed,
         checkpoint_round=req.checkpoint_round,
         dataset=er.dataset,
-        threshold_scope=THRESHOLD_AGGREGATION_BY_POLICY[er.policy],
-        threshold_strategy_name=tr.run.policy.value,
+        threshold_scope=THRESHOLD_AGGREGATION_BY_POLICY[er.run.policy],
+        threshold_strategy_name=tr.run.policy,
         tau_global=tr.tau_global,
         eligible_ids=er.eligible_ids,
         pending_ids=er.pending_ids,
@@ -181,21 +290,21 @@ def build_metrics_dict(req: MetricsBuildRequest) -> SweepMetrics:
         eligible_count=tr.eligible_count,
         pending_count=tr.pending_count,
         eval_incomplete_count=len(er.incomplete_ids),
-        client_count=er.client_count,
+        client_count=er.dispersion.client_count,
         coverage_ratio=er.coverage_ratio,
-        cv_fpr=er.cv_fpr,
-        mean_fpr=er.mean_fpr,
-        std_fpr=er.std_fpr,
-        cv_tpr=er.cv_tpr,
-        iqr_fpr=er.iqr_fpr,
-        iqr_tpr=er.iqr_tpr,
-        worst_client_fpr=er.worst_client_fpr,
-        worst_client_id=er.worst_client_id,
-        worst_ba=er.worst_ba,
-        p10_macro_f1=er.p10_macro_f1,
+        cv_fpr=er.dispersion.cv_fpr,
+        mean_fpr=er.dispersion.mean_fpr,
+        std_fpr=er.dispersion.std_fpr,
+        cv_tpr=er.dispersion.cv_tpr,
+        iqr_fpr=er.dispersion.iqr_fpr,
+        iqr_tpr=er.dispersion.iqr_tpr,
+        worst_client_fpr=er.dispersion.worst_client_fpr,
+        worst_client_id=er.dispersion.worst_client_id,
+        worst_ba=er.dispersion.worst_ba,
+        p10_macro_f1=er.dispersion.p10_macro_f1,
         aggregate_metrics=aggregate_metrics,
         provenance=provenance,
         per_client=tuple(
-            _to_client_detail(c, POLICY_THRESHOLD_SOURCE[er.policy]) for c in er.clients
+            _to_client_detail(c, POLICY_THRESHOLD_SOURCE[er.run.policy]) for c in er.clients
         ),
     )

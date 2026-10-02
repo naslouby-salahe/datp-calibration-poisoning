@@ -1,4 +1,3 @@
-"""Entry point for running FedAvg FL training with artifact layout support."""
 
 from __future__ import annotations
 
@@ -6,11 +5,13 @@ from typing import TYPE_CHECKING
 
 from datp.artifacts.layout import ArtifactLayout
 from datp.core.identity import TrainingCellId
+from datp.types import RandomSeed
 from datp.federated.simulation import (
     FlSimulationRequest,
     run_fl_simulation,
     validate_stage,
 )
+from datp.types import ClientId
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -22,14 +23,13 @@ if TYPE_CHECKING:
 
 def run_fl_training(
     cfg: DatpConfig,
-    client_data: dict[str, ClientData],
-    seed: int,
+    client_data: dict[ClientId, ClientData],
+    seed: RandomSeed,
     *,
     base_dir: Path | None = None,
     prepared_dir: Path | None = None,
     output_layout: ArtifactLayout | None = None,
 ) -> TrainingResult:
-    """Run FedAvg federated training with automatic artifact-layout routing."""
     stage = validate_stage(cfg)
     if output_layout is not None:
         layout = output_layout

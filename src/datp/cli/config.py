@@ -1,4 +1,3 @@
-"""Config CLI: compose and preview resolved configurations."""
 
 from pathlib import Path
 
@@ -12,6 +11,7 @@ from datp.config.compose import ComposeError, compose_config, write_resolved_con
 from datp.config.models import ExperimentStage
 from datp.core.enums import ThresholdPolicy
 from datp.core.identity import PolicyRunId, TrainingCellId
+from datp.types import RandomSeed
 
 app = typer.Typer()
 _stdout = Console()
@@ -22,16 +22,17 @@ def preview_config(
     *,
     stage: ExperimentStage,
     policy: ThresholdPolicy,
-    seed: int,
+    seed: RandomSeed,
     output_dir: Path | None = None,
 ) -> Path:
-    """Compose and write the resolved config for a stage/policy/seed triplet."""
     cfg = compose_config(stage=stage, policy=policy, seed=seed)
     if not output_dir:
         output_dir = (
             ArtifactLayout(base_dir=Path(ArtifactDir.OUTPUTS), stage=stage)
             .policy_run(
-                PolicyRunId(cell=TrainingCellId(stage=stage, seed=seed), policy=policy)
+                PolicyRunId(
+                    cell=TrainingCellId(stage=stage, seed=seed), policy=policy
+                )
             )
             .result_dir
         )
@@ -39,7 +40,7 @@ def preview_config(
     return write_resolved_config(cfg, output_dir)
 
 
-@app.command(ConfigCommand.PREVIEW.value)
+@app.command(ConfigCommand.PREVIEW)
 def preview(
     stage: ExperimentStage = typer.Option(...),
     policy: ThresholdPolicy = typer.Option(...),
@@ -49,11 +50,14 @@ def preview(
     """CLI command to preview a resolved configuration."""
     try:
         dest = preview_config(
-            stage=stage, policy=policy, seed=seed, output_dir=output_dir
+            stage=stage,
+            policy=policy,
+            seed=RandomSeed(seed),
+            output_dir=output_dir,
         )
     except ComposeError as exc:
         _stderr.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=CliExitCode.ERROR.value) from exc
+        raise typer.Exit(code=CliExitCode.ERROR) from exc
 
     _stdout.print(dest.read_text(), end="", highlight=False)
     _stderr.print(f"[dim]# Written to: {dest}[/dim]")

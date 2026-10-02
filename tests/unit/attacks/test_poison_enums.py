@@ -60,7 +60,6 @@ class TestCanonicalEnumVocabulary:
         """Verify that PoisoningKnowledge keys map to their proper values."""
         assert {k.name: k.value for k in PoisoningKnowledge} == {
             "GRAY_BOX_SCORE_ACCESS": "gray_box_score_access",
-            "WHITE_BOX_DIAGNOSTIC_ONLY": "white_box_diagnostic_only",
         }
 
     def test_poisoning_target_scope(self) -> None:
@@ -68,7 +67,6 @@ class TestCanonicalEnumVocabulary:
         assert {t.name: t.value for t in PoisoningTargetScope} == {
             "SINGLE_CLIENT": "single_client",
             "MULTI_CLIENT": "multi_client",
-            "ALL_CLIENTS_DIAGNOSTIC_ONLY": "all_clients_diagnostic_only",
         }
 
     def test_poisoning_defense(self) -> None:

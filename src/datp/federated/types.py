@@ -1,6 +1,10 @@
-"""Shared types and validators for federated client data."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    SignedCount,
+)
+
 
 import enum
 from dataclasses import dataclass
@@ -9,15 +13,23 @@ import torch
 
 
 class ClientMetricKey(enum.StrEnum):
-    """Keys for per-client training and validation loss metrics."""
 
     TRAIN_LOSS = "train_loss"
     VAL_LOSS = "val_loss"
 
 
+class FederatedTensorLabel(enum.StrEnum):
+
+    TRAIN = "train"
+    VALIDATION = "val"
+    BENIGN_TEST = "test_benign"
+    ATTACK_TEST = "test_attack"
+    TRAIN_DATA = "train_data"
+    CALIBRATION_DATA = "cal_data"
+
+
 @dataclass(frozen=True, slots=True)
 class ClientData:
-    """Per-client tensors for train, validation, benign test, and attack test splits."""
 
     train: torch.Tensor
     val: torch.Tensor
@@ -26,9 +38,11 @@ class ClientData:
 
 
 def validate_tensor_input(
-    tensor: torch.Tensor, name: str, client_id: str, expected_dim: int | None = None
+    tensor: torch.Tensor,
+    name: FederatedTensorLabel,
+    client_id: ClientId,
+    expected_dim: SignedCount | None = None,
 ) -> None:
-    """Validate that a client tensor is 2-D, non-empty, finite, and of expected width."""
     if tensor.ndim != 2:
         raise ValueError(f"{name} must be 2-D for {client_id} (got {tensor.ndim})")
     if tensor.numel() == 0:
@@ -42,8 +56,13 @@ def validate_tensor_input(
 
 
 def validate_client_data(
-    client_data: ClientData, client_id: str, expected_dim: int | None = None
+    client_data: ClientData, client_id: ClientId, expected_dim: SignedCount | None = None
 ) -> None:
-    """Validate all four tensors in a ClientData record."""
-    for name in ("train", "val", "test_benign", "test_attack"):
-        validate_tensor_input(getattr(client_data, name), name, client_id, expected_dim)
+    validate_tensor_input(client_data.train, FederatedTensorLabel.TRAIN, client_id, expected_dim)
+    validate_tensor_input(client_data.val, FederatedTensorLabel.VALIDATION, client_id, expected_dim)
+    validate_tensor_input(
+        client_data.test_benign, FederatedTensorLabel.BENIGN_TEST, client_id, expected_dim
+    )
+    validate_tensor_input(
+        client_data.test_attack, FederatedTensorLabel.ATTACK_TEST, client_id, expected_dim
+    )

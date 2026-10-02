@@ -1,6 +1,6 @@
-"""Poisoning CLI: preview, dry-run, smoke, run, and stage listing."""
 
 from __future__ import annotations
+from datp.types import JsonRecord
 
 import dataclasses
 import json
@@ -13,7 +13,7 @@ from datp.attacks.constants import NBAIOT_MAIN_SOURCE_OBJECTIVE_PAIRS
 from datp.attacks.execution.bounded_sweep_run import write_nbaiot_main_manifest
 from datp.attacks.execution.sensitivity_run import write_sensitivity_manifest
 from datp.cli.enums import (
-    _EXECUTION_GATE_NOTICE,
+    EXECUTION_GATE_NOTICE,
     CliExitCode,
     PoisonCommand,
     PoisonOutputKey,
@@ -31,16 +31,15 @@ _stdout = Console()
 _stderr = Console(stderr=True)
 
 
-def _stage_config_as_dict(cfg: ExperimentStageConfig) -> dict[str, object]:
-    """Serialize an ExperimentStageConfig to a dict with stage and dataset keys."""
+def _stage_config_as_dict(cfg: ExperimentStageConfig) -> JsonRecord:
     return {
         **dataclasses.asdict(cfg),
-        PoisonOutputKey.STAGE.value: str(cfg.stage),
-        PoisonOutputKey.DATASET.value: cfg.dataset.value if cfg.dataset else None,
+        PoisonOutputKey.STAGE: cfg.stage,
+        PoisonOutputKey.DATASET: cfg.dataset if cfg.dataset else None,
     }
 
 
-@app.command(PoisonCommand.PREVIEW.value)
+@app.command(PoisonCommand.PREVIEW)
 def preview(stage: ExperimentStage = typer.Option(ExperimentStage.NBAIOT_MAIN)) -> None:
     """Print the poisoning stage configuration and gate status."""
     cfg = get_stage_config(stage)
@@ -52,18 +51,18 @@ def preview(stage: ExperimentStage = typer.Option(ExperimentStage.NBAIOT_MAIN)) 
         )
 
 
-@app.command(PoisonCommand.DRY_RUN.value)
+@app.command(PoisonCommand.DRY_RUN)
 def dry_run(stage: ExperimentStage = typer.Option(ExperimentStage.NBAIOT_MAIN)) -> None:
     """Print a detailed dry-run summary for a poisoning stage."""
     cfg = get_stage_config(stage)
 
     _stdout.print(f"[bold]dry-run[/bold]: stage={stage!r}")
     _stdout.print(
-        f" {PoisonOutputKey.DATASET.value}     : {cfg.dataset.value if cfg.dataset else 'none'}"
+        f" {PoisonOutputKey.DATASET}     : {cfg.dataset if cfg.dataset else 'none'}"
     )
-    _stdout.print(f" {PoisonOutputKey.ALLOW_RUN.value}   : {cfg.allow_run}")
-    _stdout.print(f" {PoisonOutputKey.GATE.value}        : {cfg.gate or 'none'}")
-    _stdout.print(f" {PoisonOutputKey.DESCRIPTION.value} : {cfg.description}")
+    _stdout.print(f" {PoisonOutputKey.ALLOW_RUN}   : {cfg.allow_run}")
+    _stdout.print(f" {PoisonOutputKey.GATE}        : {cfg.gate or 'none'}")
+    _stdout.print(f" {PoisonOutputKey.DESCRIPTION} : {cfg.description}")
 
     if stage == ExperimentStage.NBAIOT_MAIN:
         config = CalibrationPoisoningConfig.for_bounded_sweep()
@@ -74,9 +73,9 @@ def dry_run(stage: ExperimentStage = typer.Option(ExperimentStage.NBAIOT_MAIN)) 
             * len(config.seeds)
         )
 
-        _stdout.print(f" config_policies  : {[p.value for p in config.policies]}")
-        _stdout.print(f" config_sources   : {[s.value for s in config.sources]}")
-        _stdout.print(f" config_objectives: {[o.value for o in config.objectives]}")
+        _stdout.print(f" config_policies  : {[p for p in config.policies]}")
+        _stdout.print(f" config_sources   : {[s for s in config.sources]}")
+        _stdout.print(f" config_objectives: {[o for o in config.objectives]}")
         _stdout.print(f" config_fractions : {list(config.fractions)}")
         _stdout.print(f" config_seeds     : {len(config.seeds)} seed triplets")
         _stdout.print(f" cells/victim     : {cells_per_victim}")
@@ -86,25 +85,25 @@ def dry_run(stage: ExperimentStage = typer.Option(ExperimentStage.NBAIOT_MAIN)) 
         )
 
     if not cfg.allow_run:
-        _stderr.print(f"[yellow]{_EXECUTION_GATE_NOTICE}[/yellow]")
+        _stderr.print(f"[yellow]{EXECUTION_GATE_NOTICE}[/yellow]")
         if cfg.gate:
             _stderr.print(
                 f"[yellow]Gate[/yellow] {cfg.gate!r} must be resolved before execution."
             )
 
 
-@app.command(PoisonCommand.SMOKE.value)
+@app.command(PoisonCommand.SMOKE)
 def smoke() -> None:
     """Print the synthetic smoke stage description."""
     cfg = get_stage_config(ExperimentStage.SYNTHETIC_SMOKE)
     _stdout.print(f"[bold]smoke stage[/bold]: {cfg.description}")
     _stdout.print(
-        f" {PoisonOutputKey.DATASET.value}: {cfg.dataset.value if cfg.dataset else 'none'}"
+        f" {PoisonOutputKey.DATASET}: {cfg.dataset if cfg.dataset else 'none'}"
     )
-    _stderr.print(f"[yellow]{_EXECUTION_GATE_NOTICE}[/yellow]")
+    _stderr.print(f"[yellow]{EXECUTION_GATE_NOTICE}[/yellow]")
 
 
-@app.command(PoisonCommand.RUN_BOUNDED_SWEEP.value)
+@app.command(PoisonCommand.RUN_BOUNDED_SWEEP)
 def run_bounded_sweep(base_dir: Path = typer.Option(...)) -> None:
     """Execute the bounded sweep and write its manifest."""
     cfg = get_stage_config(ExperimentStage.NBAIOT_MAIN)
@@ -113,13 +112,13 @@ def run_bounded_sweep(base_dir: Path = typer.Option(...)) -> None:
         _stderr.print(
             f"[red]Refusing to run:[/red] {ExperimentStage.NBAIOT_MAIN!r} allow_run is False (gate {cfg.gate!r} not satisfied)."
         )
-        raise typer.Exit(code=CliExitCode.ERROR.value)
+        raise typer.Exit(code=CliExitCode.ERROR)
 
     out_path = write_nbaiot_main_manifest(base_dir)
     _stdout.print(f"[bold green]Wrote bounded-sweep manifest:[/bold green] {out_path}")
 
 
-@app.command(PoisonCommand.RUN_SENSITIVITY.value)
+@app.command(PoisonCommand.RUN_SENSITIVITY)
 def run_sensitivity(base_dir: Path = typer.Option(...)) -> None:
     """Execute the sensitivity analyses and write their manifest."""
     cfg = get_stage_config(ExperimentStage.NBAIOT_MAIN)
@@ -128,16 +127,16 @@ def run_sensitivity(base_dir: Path = typer.Option(...)) -> None:
         _stderr.print(
             f"[red]Refusing to run:[/red] {ExperimentStage.NBAIOT_MAIN!r} allow_run is False (gate {cfg.gate!r} not satisfied)."
         )
-        raise typer.Exit(code=CliExitCode.ERROR.value)
+        raise typer.Exit(code=CliExitCode.ERROR)
 
     out_path = write_sensitivity_manifest(base_dir)
     _stdout.print(f"[bold green]Wrote sensitivity manifest:[/bold green] {out_path}")
 
 
-@app.command(PoisonCommand.STAGES.value)
+@app.command(PoisonCommand.STAGES)
 def stages() -> None:
     """List all experiment stages with their gate and run status."""
     for cfg in all_stage_configs():
         gate_label = f"gate={cfg.gate!r}" if cfg.gate else "no gate"
         run_label = "BLOCKED" if not cfg.allow_run else "RUNNABLE"
-        _stdout.print(f" {str(cfg.stage):<30} {run_label:<8} {gate_label}")
+        _stdout.print(f" {cfg.stage:<30} {run_label:<8} {gate_label}")

@@ -1,7 +1,8 @@
-"""Calibration-poisoning attack sweep configuration with seed pools and grid-lock validation."""
 
 from __future__ import annotations
-from typing import Literal
+
+from collections.abc import Sequence
+from typing import Literal, cast
 
 from pydantic import Field, field_validator, model_validator
 
@@ -11,7 +12,6 @@ from datp.attacks.constants import (
     CLUSTER_MAX_ITER,
     CLUSTER_N_INIT,
     CLUSTER_RANDOM_STATE,
-    COMPROMISE_PATTERN_SEED,
     DEFAULT_POLICIES,
     N_MIN,
     NBAIOT_MAIN_SWEEP_FRACTION_SET,
@@ -33,6 +33,13 @@ from datp.attacks.enums import (
 )
 from datp.config.models import ExperimentStage, StrictModel
 from datp.core.enums import ThresholdPolicy
+from datp.types import (
+    IterationCount,
+    PoisonFraction,
+    RandomSeed,
+    SampleCount,
+    Threshold,
+)
 
 _DEFAULT_POLICY_SET: frozenset[ThresholdPolicy] = frozenset(DEFAULT_POLICIES)
 _NBAIOT_MAIN_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(
@@ -41,17 +48,13 @@ _NBAIOT_MAIN_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(
 
 
 class SeedPools(StrictModel):
-    """Pool of training, poisoning, and analysis seeds with pairwise-distinct validation."""
 
-    training: tuple[int, ...] = TRAINING_SEEDS
-    poisoning: tuple[int, ...] = POISONING_SEEDS
-    analysis: tuple[int, ...] = ANALYSIS_SEEDS
-    split: int = 0
-    compromise_pattern: int = COMPROMISE_PATTERN_SEED
-
+    training: tuple[RandomSeed, ...] = TRAINING_SEEDS
+    poisoning: tuple[RandomSeed, ...] = POISONING_SEEDS
+    analysis: tuple[RandomSeed, ...] = ANALYSIS_SEEDS
+    split: RandomSeed = RandomSeed(0)
     @model_validator(mode="after")
     def validate_pools(self) -> "SeedPools":
-        """Validate seed pools are non-empty, equal-length, and pairwise distinct."""
         if not self.training:
             raise ValueError("seed pools must not be empty")
         if len({len(self.training), len(self.poisoning), len(self.analysis)}) > 1:
@@ -61,26 +64,19 @@ class SeedPools(StrictModel):
             raise ValueError("all seeds must be pairwise distinct")
         return self
 
-    def triplet(self, index: int) -> tuple[int, int, int]:
-        """Return the (training, poisoning, analysis) seed triplet at an index."""
-        return self.training[index], self.poisoning[index], self.analysis[index]
-
     def __len__(self) -> int:
-        """Return the number of seed triplets."""
         return len(self.training)
 
 
 class ClusterConfig(StrictModel):
-    """KMeans clustering hyperparameters for client grouping."""
 
-    k: Literal[3] = CLUSTER_K_NBAIOT  # type: ignore[assignment]
-    n_init: int = Field(default=CLUSTER_N_INIT, gt=0)
-    max_iter: int = Field(default=CLUSTER_MAX_ITER, gt=0)
-    random_state: Literal[42] = CLUSTER_RANDOM_STATE  # type: ignore[assignment]
+    k: Literal[3] = cast(Literal[3], CLUSTER_K_NBAIOT)
+    n_init: IterationCount = Field(default=CLUSTER_N_INIT, gt=0)
+    max_iter: IterationCount = Field(default=CLUSTER_MAX_ITER, gt=0)
+    random_state: Literal[42] = cast(Literal[42], CLUSTER_RANDOM_STATE)
 
 
 class CalibrationPoisoningConfig(StrictModel):
-    """Configuration for the calibration-poisoning attack sweep."""
 
     local_epochs: Literal[1] = 1
 
@@ -94,35 +90,61 @@ class CalibrationPoisoningConfig(StrictModel):
     knowledge: PoisoningKnowledge
     target_scope: PoisoningTargetScope
     defense: PoisoningDefense = PoisoningDefense.NONE
-    trim_fraction: float = Field(default=TRIM_FRACTION_PRIMARY, ge=0.0, lt=0.5)
+    trim_fraction: PoisonFraction = Field(default=TRIM_FRACTION_PRIMARY, ge=0.0, lt=0.5)
     stage: ExperimentStage
 
-    fractions: tuple[float, ...] = NBAIOT_MAIN_SWEEP_FRACTIONS
+    fractions: tuple[PoisonFraction, ...] = NBAIOT_MAIN_SWEEP_FRACTIONS
     seeds: SeedPools = SeedPools()
-    n_min: int = Field(default=N_MIN, gt=0)
+    n_min: SampleCount = Field(default=N_MIN, gt=0)
     cluster: ClusterConfig = ClusterConfig()
-    tail_mass: float = Field(default=TAIL_MASS, gt=0.0, le=1.0)
-    mu_flag_threshold: float | None = None
+    tail_mass: PoisonFraction = Field(default=TAIL_MASS, gt=0.0, le=1.0)
+    mu_flag_threshold: Threshold | None = None
 
-    @field_validator("policies", "sources", "objectives", "fractions")
+    @field_validator("policies")
     @classmethod
-    def require_non_empty(cls, v: tuple) -> tuple:
-        """Validate that a collection field is non-empty."""
+    def require_policies(cls, v: tuple[ThresholdPolicy, ...]) -> tuple[ThresholdPolicy, ...]:
         if not v:
-            raise ValueError("Collection must not be empty")
+            raise ValueError("Policies must not be empty")
         return v
+
+    @field_validator("sources")
+    @classmethod
+    def require_sources(
+        cls, v: tuple[PoisoningSourceStrategy, ...]
+    ) -> tuple[PoisoningSourceStrategy, ...]:
+        if not v:
+            raise ValueError("Sources must not be empty")
+        return v
+
+    @field_validator("objectives")
+    @classmethod
+    def require_objectives(cls, v: tuple[AttackerObjective, ...]) -> tuple[AttackerObjective, ...]:
+        if not v:
+            raise ValueError("Objectives must not be empty")
+        return v
+
+    @field_validator("fractions", mode="before")
+    @classmethod
+    def validate_fractions(cls, v: object) -> object:
+        if isinstance(v, (str, bytes)) or not isinstance(v, Sequence):
+            return v
+        fractions = cast(Sequence[object], v)
+        if any(
+            isinstance(item, (int, float)) and not (0.0 <= item <= 1.0)
+            for item in fractions
+        ):
+            raise ValueError("Fractions must be within [0.0, 1.0]")
+        return fractions
 
     @field_validator("fractions")
     @classmethod
-    def validate_fractions(cls, v: tuple[float, ...]) -> tuple[float, ...]:
-        """Validate fractions are within [0.0, 1.0]."""
-        if any(not (0.0 <= f <= 1.0) for f in v):
-            raise ValueError("Fractions must be within [0.0, 1.0]")
+    def require_fractions(cls, v: tuple[PoisonFraction, ...]) -> tuple[PoisonFraction, ...]:
+        if not v:
+            raise ValueError("Fractions must not be empty")
         return v
 
     @model_validator(mode="after")
     def nbaiot_main_grid_lock(self) -> "CalibrationPoisoningConfig":
-        """Enforce the fixed grid of policies, sources, objectives, and fractions for NBAIOT_MAIN."""
         if self.stage != ExperimentStage.NBAIOT_MAIN:
             return self
         if self.target_scope != PoisoningTargetScope.SINGLE_CLIENT:
@@ -143,7 +165,6 @@ class CalibrationPoisoningConfig(StrictModel):
 
     @classmethod
     def for_bounded_sweep(cls) -> "CalibrationPoisoningConfig":
-        """Create a config preset for the bounded sweep with gray-box single-client settings."""
         return cls(
             knowledge=PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
             target_scope=PoisoningTargetScope.SINGLE_CLIENT,

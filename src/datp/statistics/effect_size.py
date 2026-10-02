@@ -1,6 +1,9 @@
-"""Cliff's delta effect-size computation with magnitude classification."""
 
 from __future__ import annotations
+from datp.types import (
+    ScoreVector,
+    SignedDelta,
+)
 
 from dataclasses import dataclass
 
@@ -16,13 +19,12 @@ from datp.statistics.constants import (
 
 @dataclass(frozen=True, slots=True)
 class CliffsDeltaResult:
-    """Cliff's delta value with effect-size magnitude classification."""
 
-    delta: float
+    delta: SignedDelta
     magnitude: EffectMagnitude
 
 
-def _cliffs_magnitude(abs_delta: float) -> EffectMagnitude:
+def _cliffs_magnitude(abs_delta: SignedDelta) -> EffectMagnitude:
     if abs_delta < CLIFFS_DELTA_NEGLIGIBLE:
         return EffectMagnitude.NEGLIGIBLE
     if abs_delta < CLIFFS_DELTA_SMALL:
@@ -32,8 +34,7 @@ def _cliffs_magnitude(abs_delta: float) -> EffectMagnitude:
     return EffectMagnitude.LARGE
 
 
-def cliffs_delta(x: np.ndarray, y: np.ndarray) -> CliffsDeltaResult:
-    """Compute Cliff's delta effect size between two arrays."""
+def cliffs_delta(x: ScoreVector, y: ScoreVector) -> CliffsDeltaResult:
     x_arr = np.asarray(x, dtype=np.float64).ravel()
     y_arr = np.asarray(y, dtype=np.float64).ravel()
     if x_arr.size == 0 or y_arr.size == 0:

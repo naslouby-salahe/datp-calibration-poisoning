@@ -9,9 +9,9 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from datp.artifacts.io import write_csv, write_metrics_atomic
+from datp.artifacts.io import write_csv, write_json_atomic
 from datp.artifacts.lifecycle import RunLifecycle, check_run_state
-from datp.artifacts.names import RunState
+from datp.artifacts.names import ArtifactFile, RunState
 from datp.core.enums import ThresholdPolicy
 
 
@@ -148,10 +148,10 @@ class TestMetricsAtomicRename:
     """Tests verifying atomic writer guarantees for metrics.json."""
 
     def test_metrics_atomic_rename_writes_valid_json(self, tmp_path: Path) -> None:
-        """Verify that write_metrics_atomic writes correct values and leaves no temp files."""
+        """Verify that the atomic JSON writer writes metrics and leaves no temp files."""
         run_dir = tmp_path / "metrics_ok"
         metrics = {"auc_roc": 0.95, "cv_fpr": 0.12}
-        final = write_metrics_atomic(run_dir, metrics)
+        final = write_json_atomic(run_dir / ArtifactFile.METRICS, metrics)
 
         assert final.name == "metrics.json"
         assert final.exists()
@@ -161,17 +161,17 @@ class TestMetricsAtomicRename:
         assert loaded == metrics
 
     def test_metrics_atomic_rename_no_placeholder(self, tmp_path: Path) -> None:
-        """Verify that files do not exist prior to calling write_metrics_atomic."""
+        """Verify that files do not exist before the atomic JSON writer runs."""
         run_dir = tmp_path / "no_placeholder"
         run_dir.mkdir()
         assert not (run_dir / "metrics.json").exists()
         assert not (run_dir / "metrics.json.tmp").exists()
 
     def test_metrics_atomic_rename_overwrites_previous(self, tmp_path: Path) -> None:
-        """Verify that write_metrics_atomic successfully overwrites existing files."""
+        """Verify that the atomic JSON writer overwrites existing metrics."""
         run_dir = tmp_path / "overwrite"
-        write_metrics_atomic(run_dir, {"v": 1})
-        write_metrics_atomic(run_dir, {"v": 2})
+        write_json_atomic(run_dir / ArtifactFile.METRICS, {"v": 1})
+        write_json_atomic(run_dir / ArtifactFile.METRICS, {"v": 2})
         loaded = json.loads((run_dir / "metrics.json").read_text())
         assert loaded == {"v": 2}
 
@@ -181,7 +181,7 @@ def test_clean_run_has_metrics_and_done(tmp_path: Path) -> None:
     run_dir = tmp_path / "full_run"
     with RunLifecycle(run_dir, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=0) as rl:
         rl.last_completed_round = 40
-        write_metrics_atomic(run_dir, {"auc": 0.99})
+        write_json_atomic(run_dir / ArtifactFile.METRICS, {"auc": 0.99})
 
     assert (run_dir / "metrics.json").exists()
     assert (run_dir / "DONE.txt").exists()

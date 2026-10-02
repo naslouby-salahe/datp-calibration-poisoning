@@ -7,7 +7,6 @@ import pytest
 
 from datp.core.seeds import (
     SeedRecord,
-    derive_seed_record,
     make_seed_rng,
 )
 from datp.core.seeds import SeedPair
@@ -63,8 +62,8 @@ class TestDeriveSeedRecord:
 
     def test_returns_correct_record(self) -> None:
         """Verify derived SeedRecord fields correspond to the source seeds and indices."""
-        record = derive_seed_record(
-            SeedPair(training_seed=2, poisoning_seed=102),
+        record = SeedRecord(
+            pair=SeedPair(training_seed=2, poisoning_seed=102),
             client_idx=5,
             scope_idx=1,
         )

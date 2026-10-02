@@ -1,14 +1,25 @@
-"""Dataset-level audit helpers: N-BaIoT device counts and cluster-stability records."""
-
 from __future__ import annotations
 
+from datp.types import (
+    ArtifactName,
+    ClientId,
+    ClusterId,
+    ContentHash,
+    RandomSeed,
+    Ratio,
+    SignedCount,
+)
+
+
 import dataclasses
-from collections.abc import Iterator, Mapping
 from pathlib import Path
+
+from sklearn.metrics import adjusted_rand_score
 
 import pyarrow.parquet as pq
 
 from datp.config.models import ExperimentStage
+from datp.core.enums import NBaIoTAttackFamily, NBaIoTDevice
 from datp.data.datasets.nbaiot.spec import NBAIOT_SPEC
 from datp.data.splits import Split, split_path
 from datp.validation.schemas import ClusterStabilityRecord, NBaIoTDeviceCounts
@@ -16,13 +27,17 @@ from datp.validation.schemas import ClusterStabilityRecord, NBaIoTDeviceCounts
 _MODULE = "validation.datasets"
 
 
-def _parquet_num_rows(path: Path) -> int | None:
-    return int(pq.read_metadata(path).num_rows) if path.exists() else None
+def _parquet_num_rows(path: Path) -> SignedCount | None:
+    return pq.read_metadata(path).num_rows if path.exists() else None
 
 
-def _attack_files_mapping(file_hash_keys: list[str], device: str) -> AttackFilesMapping:
+def _attack_files_mapping(
+    file_hash_keys: list[ContentHash], device: NBaIoTDevice
+) -> dict[NBaIoTAttackFamily, list[ArtifactName]]:
     prefix = f"{device}/"
-    grouped: dict[str, list[str]] = {f: [] for f in NBAIOT_SPEC.attack_family_dirs}
+    grouped: dict[NBaIoTAttackFamily, list[ArtifactName]] = {
+        family: [] for family in NBAIOT_SPEC.attack_family_dirs
+    }
 
     for key in file_hash_keys:
         if key.startswith(prefix):
@@ -32,15 +47,12 @@ def _attack_files_mapping(file_hash_keys: list[str], device: str) -> AttackFiles
                     grouped[family].append(rest[len(family) + 1 :])
                     break
 
-    return AttackFilesMapping(
-        tuple((fam, sorted(files)) for fam, files in grouped.items())
-    )
+    return {family: sorted(files) for family, files in grouped.items()}
 
 
 def build_nbaiot_per_device(
-    processed_root: Path, file_hash_keys: list[str]
+    processed_root: Path, file_hash_keys: list[ContentHash]
 ) -> list[NBaIoTDeviceCounts]:
-    """Build per-device N-BaIoT row counts and attack-file mappings for audit validation."""
     family_map = NBAIOT_SPEC.family_map
     if family_map is None:
         raise ValueError(
@@ -55,7 +67,7 @@ def build_nbaiot_per_device(
         benign_test_n = _parquet_num_rows(split_path(device_dir, Split.TEST_BENIGN))
         attack_test_n = _parquet_num_rows(split_path(device_dir, Split.TEST_ATTACK))
 
-        ratio: float | None = None
+        ratio: Ratio | None = None
         if benign_test_n is not None and attack_test_n is not None:
             denom = benign_test_n + attack_test_n
             ratio = float(benign_test_n / denom) if denom > 0 else None
@@ -76,45 +88,16 @@ def build_nbaiot_per_device(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AttackFilesMapping(Mapping[str, list[str]]):
-    """Immutable mapping from attack family names to lists of attack file keys."""
-
-    entries: tuple[tuple[str, list[str]], ...]
-
-    @property
-    def _dict(self) -> dict[str, list[str]]:
-        return dict(self.entries)
-
-    def __getitem__(self, key: str) -> list[str]:
-        """Return the list of attack file keys for a given family name."""
-        return self._dict[key]
-
-    def __iter__(self) -> Iterator[str]:
-        """Iterate over the attack family names."""
-        return iter(self._dict)
-
-    def __len__(self) -> int:
-        """Return the number of attack families."""
-        return len(self.entries)
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
 class ClusterAssignments:
-    """Cluster label assignments for a single random seed."""
 
-    seed: int
-    assignments: tuple[tuple[str, int], ...]
+    seed: RandomSeed
+    assignments: dict[ClientId, ClusterId]
 
 
 def compute_cluster_stability(
     cluster_assignments_by_seed: tuple[ClusterAssignments, ...],
     stage: ExperimentStage,
 ) -> list[ClusterStabilityRecord]:
-    """Compute pairwise adjusted Rand index across seeds to quantify cluster stability."""
-    from sklearn.metrics import (
-        adjusted_rand_score,  # type: ignore[import-untyped]  # noqa: PLC0415
-    )
-
     seed_to_assigns = {
         item.seed: dict(item.assignments) for item in cluster_assignments_by_seed
     }

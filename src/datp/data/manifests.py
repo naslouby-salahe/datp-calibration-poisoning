@@ -1,9 +1,17 @@
-"""Partition manifest model, I/O, and hash verification."""
-
 from __future__ import annotations
 
+from datp.types import (
+    ContentHash,
+    FeatureCount,
+    JsonValue,
+    NarrativeText,
+    RecordKey,
+    SampleCount,
+)
+
+from datp.core.enums import DatasetID
+
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -15,16 +23,14 @@ logger = get_logger(__name__)
 
 
 class ManifestMetadata(BaseModel):
-    """Dataset-level metadata carried inside a partition manifest."""
 
     model_config = ConfigDict(extra="allow")
-    n_features: int
-    n_devices: int | None = None
-    n_clients: int | None = None
+    n_features: FeatureCount
+    n_devices: SampleCount | None = None
+    n_clients: SampleCount | None = None
 
     @model_validator(mode="after")
     def check_client_count(self) -> "ManifestMetadata":
-        """Ensure at least one client-count field is provided."""
         if self.n_devices is None and self.n_clients is None:
             raise ValueError(
                 f"[{MANIFEST_MODULE}] metadata missing client count. Expected: n_devices or n_clients. Got: None."
@@ -33,17 +39,15 @@ class ManifestMetadata(BaseModel):
 
 
 class PartitionManifest(BaseModel):
-    """Serializable manifest capturing dataset identity, file hashes, and metadata."""
 
     model_config = ConfigDict(extra="forbid")
-    dataset: str = Field(min_length=1, pattern=r"\S")
-    file_hashes: dict[str, str] = Field(min_length=1)
+    dataset: DatasetID = Field(min_length=1, pattern=r"\S")
+    file_hashes: dict[RecordKey, ContentHash] = Field(min_length=1)
     metadata: ManifestMetadata
-    created: str = Field(min_length=1)
+    created: NarrativeText = Field(min_length=1)
 
     @classmethod
     def load(cls, path: Path) -> "PartitionManifest":
-        """Load and validate a manifest from a JSON file."""
         if not path.exists():
             raise RuntimeError(f"[{MANIFEST_MODULE}] Manifest file {path} not found.")
         try:
@@ -54,7 +58,6 @@ class PartitionManifest(BaseModel):
             ) from exc
 
     def write(self, path: Path) -> None:
-        """Atomically write the manifest as JSON."""
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(self.model_dump_json(indent=2))
@@ -62,7 +65,6 @@ class PartitionManifest(BaseModel):
         logger.info("manifest written", path=str(path))
 
     def verify_hashes(self, raw_base_dir: Path) -> None:
-        """Check every file hash in the manifest against the raw directory."""
         for rel_path_str, expected_hash in self.file_hashes.items():
             fpath = raw_base_dir / rel_path_str
             if not fpath.exists():
@@ -81,13 +83,12 @@ class PartitionManifest(BaseModel):
 
 def create_manifest(
     *,
-    dataset: str,
+    dataset: DatasetID,
     raw_files: list[Path],
     raw_base_dir: Path,
-    metadata: dict[str, Any] | ManifestMetadata,
+    metadata: JsonValue,
     manifest_path: Path,
 ) -> PartitionManifest:
-    """Build, hash, and write a PartitionManifest for a set of raw files."""
     manifest = PartitionManifest(
         dataset=dataset,
         created=utc_timestamp(),

@@ -238,7 +238,7 @@ def test_sensitivity_run_end_to_end(trained_base_dir, monkeypatch) -> None:
 @pytest.mark.integration
 def test_sensitivity_manifest_is_written(trained_base_dir, monkeypatch) -> None:
     """The sensitivity manifest is written to the poisoning layout and validates on reload."""
-    from datp.artifacts.poison_layout import PoisonLayout
+    from datp.artifacts.layout import sensitivity_manifest_path
     from datp.attacks.execution import sensitivity_run
     from datp.attacks.manifests.sensitivity_manifest import SensitivityManifest
 
@@ -246,7 +246,7 @@ def test_sensitivity_manifest_is_written(trained_base_dir, monkeypatch) -> None:
     monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_RANDOM_STATES", (0,))
     monkeypatch.setattr(sensitivity_run, "CLUSTER_SENSITIVITY_N_INIT_GRID", (1,))
     path = sensitivity_run.write_sensitivity_manifest(trained_base_dir)
-    assert path == PoisonLayout(base_dir=trained_base_dir).sensitivity_manifest()
+    assert path == sensitivity_manifest_path(trained_base_dir)
     SensitivityManifest.model_validate_json(path.read_text())
 
 
@@ -285,8 +285,8 @@ def test_score_collection_matches_trained_clients(tmp_path) -> None:
     )
 
     assert sorted(collection.clients.keys()) == client_ids
-    assert collection.eligible_ids == tuple(client_ids)
-    assert collection.pending_ids == ()
+    assert collection.eligibility.eligible_ids == tuple(client_ids)
+    assert collection.eligibility.pending_ids == ()
     for cid in client_ids:
         client = collection.clients[cid]
         assert client.cal.shape[0] == _N_CAL

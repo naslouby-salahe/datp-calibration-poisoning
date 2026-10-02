@@ -1,8 +1,26 @@
-"""Threshold-policy implementations for the locked policy ladder (GLOBAL, LOCAL, CLUSTER)."""
-
 from __future__ import annotations
 
+from datp.types import (
+    ClassificationScore,
+    ClientId,
+    ClusterCount,
+    ClusterId,
+    ClusterIndex,
+    FeatureMatrix,
+    Index,
+    IterationCount,
+    Quantile,
+    RandomSeed,
+    SampleCount,
+    ScoreValue,
+    ScoreVector,
+    SignedCount,
+    Threshold,
+)
+
+
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -16,15 +34,13 @@ from datp.core.identity import PolicyRunId
 from datp.core.logging import get_logger
 from datp.core.types import (
     ClientFingerprint,
-    ClientFingerprintTuple,
-    ClientSilhouetteScore,
-    ClientSilhouetteScoreTuple,
+    ClusterCountSilhouetteScore,
     ClusterInfo,
-    ClusterInfoTuple,
     ClusterMetadata,
     ThresholdResult,
 )
 from datp.thresholding.eligibility import (
+    EligibilityResult,
     build_threshold_result,
     compute_client_thresholds,
     compute_tau_global,
@@ -64,92 +80,87 @@ if len(CLUSTER_FINGERPRINT_FEATURES) != 4:
 
 @dataclass(frozen=True, slots=True)
 class ClusterAssignments:
-    """Maps eligible clients to their assigned cluster and per-cluster thresholds."""
 
-    client_cluster: dict[str, int]
-    cluster_taus_map: dict[int, list[float]]
-    tau_per_cluster: dict[int, float]
+    client_cluster: dict[ClientId, SignedCount]
+    cluster_taus_map: dict[ClusterIndex, list[ScoreValue]]
+    tau_per_cluster: dict[ClusterIndex, Threshold]
 
 
 @dataclass(frozen=True, slots=True)
 class ClusterMetadataInput:
-    """Aggregated clustering inputs for building ClusterMetadata."""
 
-    k: int
-    client_cluster: dict[str, int]
-    tau_per_cluster: dict[int, float]
-    silhouette: float
-    silhouette_scores: dict[int, float]
-    fingerprints: dict[str, np.ndarray]
-    eligible_ids: list[str]
+    k: ClusterCount
+    client_cluster: dict[ClientId, SignedCount]
+    tau_per_cluster: dict[ClusterIndex, Threshold]
+    silhouette: ClassificationScore
+    silhouette_scores: dict[ClusterIndex, ClassificationScore]
+    fingerprints: dict[ClientId, FeatureMatrix]
+    eligible_ids: list[ClientId]
 
 
 @dataclass(frozen=True, slots=True)
 class _ClusterComputationRequest:
-    client_errors: dict[str, np.ndarray]
-    eligible: list[str]
-    q: float
-    random_state: int
-    cluster_k: int
-    n_init: int
-    max_iter: int
+    client_errors: dict[ClientId, ScoreVector]
+    eligibility: EligibilityResult
+    q: Quantile
+    random_state: RandomSeed
+    cluster_k: ClusterCount
+    n_init: IterationCount
+    max_iter: IterationCount
 
 
 @dataclass(frozen=True, slots=True)
 class _ClusterComputationResult:
-    eligible_map: dict[str, float]
+    eligible_map: dict[ClientId, ScoreValue]
     metadata: ClusterMetadata
 
 
 def compute_global(
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    q: float,
+    client_errors: dict[ClientId, ScoreVector],
+    n_min: SampleCount,
+    q: Quantile,
     run: PolicyRunId,
 ) -> ThresholdResult:
-    """Compute a single global threshold shared by all eligible clients."""
-    eligible, pending = identify_eligible(client_errors, n_min=n_min)
-    client_taus = compute_client_thresholds(client_errors, eligible, q=q)
+    eligibility = identify_eligible(client_errors, n_min=n_min)
+    client_taus = compute_client_thresholds(client_errors, eligibility, q=q)
     tau_global = compute_tau_global(client_taus)
-    eligible_map = dict.fromkeys(eligible, tau_global)
+    eligible_map = dict.fromkeys(eligibility.eligible_ids, tau_global)
 
     return build_threshold_result(
         run=run,
         tau_global=tau_global,
         eligible_thresholds=eligible_map,
-        pending_clients=pending,
+        pending_clients=eligibility.pending_ids,
         cluster_metadata=None,
     )
 
 
 def compute_local(
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    tau_global: float,
-    q: float,
+    client_errors: dict[ClientId, ScoreVector],
+    n_min: SampleCount,
+    tau_global: Threshold,
+    q: Quantile,
     run: PolicyRunId,
 ) -> ThresholdResult:
-    """Compute per-client local thresholds without clustering."""
-    eligible, pending = identify_eligible(client_errors, n_min=n_min)
-    client_taus = compute_client_thresholds(client_errors, eligible, q=q)
+    eligibility = identify_eligible(client_errors, n_min=n_min)
+    client_taus = compute_client_thresholds(client_errors, eligibility, q=q)
 
     return build_threshold_result(
         run=run,
         tau_global=tau_global,
         eligible_thresholds=client_taus,
-        pending_clients=pending,
+        pending_clients=eligibility.pending_ids,
         cluster_metadata=None,
     )
 
 
 def compute_fingerprints(
-    client_errors: dict[str, np.ndarray],
-    eligible: list[str],
+    client_errors: dict[ClientId, ScoreVector],
+    eligible: Sequence[ClientId],
     *,
-    q: float,
-) -> dict[str, np.ndarray]:
-    """Compute four-feature statistical fingerprints per eligible client."""
-    fingerprints: dict[str, np.ndarray] = {}
+    q: Quantile,
+) -> dict[ClientId, FeatureMatrix]:
+    fingerprints: dict[ClientId, FeatureMatrix] = {}
     for cid in eligible:
         errors = np.asarray(client_errors[cid], dtype=np.float64)
         mean_error = float(np.mean(errors))
@@ -168,7 +179,7 @@ def compute_fingerprints(
     return fingerprints
 
 
-def _validate_fingerprint_matrix(fingerprint_matrix: np.ndarray) -> None:
+def _validate_fingerprint_matrix(fingerprint_matrix: FeatureMatrix) -> None:
     if not np.isfinite(fingerprint_matrix).all():
         raise ValueError(
             f"[{_MODULE}] Invalid fingerprint values. Expected: finite mean/std/skew/p95. Got: NaN or inf."
@@ -176,17 +187,16 @@ def _validate_fingerprint_matrix(fingerprint_matrix: np.ndarray) -> None:
     unique_rows = np.unique(fingerprint_matrix, axis=0)
     if unique_rows.shape[0] < 2:
         raise ValueError(
-            f"[{_MODULE}] Degenerate fingerprints: all eligible clients have identical fingerprints. Expected: at least 2 distinct eligible fingerprints. Got: {str(unique_rows.shape[0])}."
+            f"[{_MODULE}] Degenerate fingerprints: all eligible clients have identical fingerprints. Expected: at least 2 distinct eligible fingerprints. Got: {unique_rows.shape[0]}."
         )
 
 
 def scaled_fingerprints(
-    client_errors: dict[str, np.ndarray],
-    eligible_ids: list[str],
+    client_errors: dict[ClientId, ScoreVector],
+    eligible_ids: list[ClientId],
     *,
-    q: float,
-) -> tuple[dict[str, np.ndarray], np.ndarray]:
-    """Compute and standard-scale fingerprint vectors for eligible clients."""
+    q: Quantile,
+) -> tuple[dict[ClientId, FeatureMatrix], FeatureMatrix]:
     fingerprints = compute_fingerprints(client_errors, eligible_ids, q=q)
     fingerprint_matrix = np.array([fingerprints[cid] for cid in eligible_ids])
     _validate_fingerprint_matrix(fingerprint_matrix)
@@ -198,8 +208,7 @@ def scaled_fingerprints(
     return fingerprints, fingerprint_scaled
 
 
-def validate_k_candidates(k_candidates: list[int]) -> list[int]:
-    """Validate and deduplicate cluster-count candidates, requiring integers >= 2."""
+def validate_k_candidates(k_candidates: list[SignedCount]) -> list[SignedCount]:
     if not k_candidates:
         raise ValueError(
             f"[{_MODULE}] k_candidates is empty. Expected: at least one integer k. Got: empty list."
@@ -207,20 +216,19 @@ def validate_k_candidates(k_candidates: list[int]) -> list[int]:
     invalid = [k for k in k_candidates if k < 2]
     if invalid:
         raise ValueError(
-            f"[{_MODULE}] Invalid k_candidates. Expected: integers >= 2. Got: {str(invalid)}."
+            f"[{_MODULE}] Invalid k_candidates. Expected: integers >= 2. Got: {invalid}."
         )
     return sorted(set(k_candidates))
 
 
 def silhouette_scores_by_k(
-    x_scaled: np.ndarray,
-    k_candidates: list[int],
-    random_state: int,
-    n_init: int,
-    max_iter: int,
-) -> dict[int, float]:
-    """Compute silhouette scores for each candidate k on scaled fingerprints."""
-    scores: dict[int, float] = {}
+    x_scaled: ScoreVector,
+    k_candidates: list[SignedCount],
+    random_state: RandomSeed,
+    n_init: IterationCount,
+    max_iter: IterationCount,
+) -> dict[Index, ClassificationScore]:
+    scores: dict[Index, ScoreValue] = {}
     for k in k_candidates:
         if k >= x_scaled.shape[0]:
             continue
@@ -228,8 +236,8 @@ def silhouette_scores_by_k(
             n_clusters=k,
             init="k-means++",
             random_state=random_state,
-            n_init=int(n_init),  # type: ignore[arg-type]
-            max_iter=int(max_iter),
+            n_init=n_init,
+            max_iter=max_iter,
         )
         labels = kmeans.fit_predict(x_scaled)
         n_labels = len(set(labels))
@@ -245,53 +253,50 @@ def silhouette_scores_by_k(
 
 def select_cluster_k(
     *,
-    cluster_k: int,
-    eligible_count: int,
-    silhouette_scores: dict[int, float],
-) -> tuple[int, float]:
-    """Validate the locked cluster k and retrieve its precomputed silhouette score."""
+    cluster_k: ClusterCount,
+    eligible_count: SampleCount,
+    silhouette_scores: dict[ClusterIndex, ClassificationScore],
+) -> tuple[ClusterCount, ScoreValue]:
     if cluster_k <= 0:
         raise ValueError(
-            f"[{_MODULE}] Invalid cluster k. Expected: locked fixed K > 0. Got: {str(cluster_k)}."
+            f"[{_MODULE}] Invalid cluster k. Expected: locked fixed K > 0. Got: {cluster_k}."
         )
     if cluster_k >= eligible_count:
         raise ValueError(
-            f"[{_MODULE}] Invalid cluster k. Expected: 2 <= k < eligible_count ({eligible_count}). Got: {str(cluster_k)}."
+            f"[{_MODULE}] Invalid cluster k. Expected: 2 <= k < eligible_count ({eligible_count}). Got: {cluster_k}."
         )
     silhouette = silhouette_scores.get(cluster_k)
     if silhouette is None:
         raise ValueError(
-            f"[{_MODULE}] Cluster k has no valid silhouette score. Expected: non-degenerate clustering. Got: {str(cluster_k)}."
+            f"[{_MODULE}] Cluster k has no valid silhouette score. Expected: non-degenerate clustering. Got: {cluster_k}."
         )
     return cluster_k, silhouette
 
 
 def fit_cluster_labels(
-    fingerprint_scaled: np.ndarray,
+    fingerprint_scaled: FeatureMatrix,
     *,
-    k: int,
-    random_state: int,
-    n_init: int,
-    max_iter: int,
-) -> np.ndarray:
-    """Run KMeans on scaled fingerprints and return cluster labels."""
+    k: ClusterCount,
+    random_state: RandomSeed,
+    n_init: IterationCount,
+    max_iter: IterationCount,
+) -> ScoreVector:
     kmeans = KMeans(
         n_clusters=k,
         init="k-means++",
         random_state=random_state,
-        n_init=int(n_init),  # type: ignore[arg-type]
-        max_iter=int(max_iter),
+        n_init=n_init,
+        max_iter=max_iter,
     )
     return kmeans.fit_predict(fingerprint_scaled)
 
 
 def final_silhouette(
-    fingerprint_scaled: np.ndarray,
-    labels: np.ndarray,
+    fingerprint_scaled: FeatureMatrix,
+    labels: ScoreVector,
     *,
-    random_state: int,
-) -> float:
-    """Compute the silhouette score for the final clustering assignment."""
+    random_state: RandomSeed,
+) -> ClassificationScore:
     if len(set(labels)) <= 1:
         return 0.0
     return float(
@@ -301,13 +306,12 @@ def final_silhouette(
 
 def cluster_assignments(
     *,
-    eligible_ids: list[str],
-    labels: np.ndarray,
-    client_taus: dict[str, float],
+    eligible_ids: list[ClientId],
+    labels: ScoreVector,
+    client_taus: dict[ClientId, ScoreValue],
 ) -> ClusterAssignments:
-    """Build cluster-to-client and cluster-to-tau mappings from KMeans labels."""
     client_cluster = dict(zip(eligible_ids, labels.astype(int), strict=True))
-    cluster_taus_map: dict[int, list[float]] = defaultdict(list)
+    cluster_taus_map: dict[ClusterIndex, list[ScoreValue]] = defaultdict(list)
     for cid in eligible_ids:
         cluster_taus_map[client_cluster[cid]].append(client_taus[cid])
     tau_per_cluster = {
@@ -323,9 +327,9 @@ def cluster_assignments(
 
 def _log_clustering(
     *,
-    k: int,
-    cluster_taus_map: dict[int, list[float]],
-    silhouette: float,
+    k: ClusterCount,
+    cluster_taus_map: dict[ClusterIndex, list[ScoreValue]],
+    silhouette: ClassificationScore,
 ) -> None:
     logger.info(
         "CLUSTER clustering complete",
@@ -337,25 +341,25 @@ def _log_clustering(
 
 def cluster_info(
     *,
-    eligible_ids: list[str],
-    client_cluster: dict[str, int],
-    tau_per_cluster: dict[int, float],
-) -> dict[str, ClusterInfo]:
-    """Build per-cluster metadata dicts keyed by cluster identifier string."""
-    return {
-        f"cluster_{cluster}": ClusterInfo(
-            cluster_id=f"cluster_{cluster}",
+    eligible_ids: list[ClientId],
+    client_cluster: dict[ClientId, SignedCount],
+    tau_per_cluster: dict[ClusterIndex, Threshold],
+) -> tuple[ClusterInfo, ...]:
+    return tuple(
+        ClusterInfo(
+            cluster_id=ClusterId(f"cluster_{cluster}"),
             tau_cluster=tau_per_cluster[cluster],
             members=tuple(
-                cid for cid in eligible_ids if client_cluster[cid] == cluster
+                ClientId(cid)
+                for cid in eligible_ids
+                if client_cluster[cid] == cluster
             ),
         )
         for cluster in sorted(tau_per_cluster)
-    }
+    )
 
 
 def build_cluster_metadata(metadata_input: ClusterMetadataInput) -> ClusterMetadata:
-    """Assemble a ClusterMetadata object from fingerprint, silhouette, and assignment inputs."""
     info = cluster_info(
         eligible_ids=metadata_input.eligible_ids,
         client_cluster=metadata_input.client_cluster,
@@ -363,15 +367,15 @@ def build_cluster_metadata(metadata_input: ClusterMetadataInput) -> ClusterMetad
     )
     return ClusterMetadata(
         k=metadata_input.k,
-        cluster_info=ClusterInfoTuple(info.values()),
+        cluster_info=info,
         silhouette=metadata_input.silhouette,
-        silhouette_scores=ClientSilhouetteScoreTuple(
-            ClientSilhouetteScore(client_id=str(k), score=v)
+        silhouette_scores=tuple(
+            ClusterCountSilhouetteScore(cluster_count=k, score=v)
             for k, v in metadata_input.silhouette_scores.items()
         ),
-        fingerprints=ClientFingerprintTuple(
+        fingerprints=tuple(
             ClientFingerprint(
-                client_id=cid,
+                client_id=ClientId(cid),
                 mean=float(metadata_input.fingerprints[cid][0]),
                 std=float(metadata_input.fingerprints[cid][1]),
                 skewness=float(metadata_input.fingerprints[cid][2]),
@@ -387,10 +391,10 @@ def _compute_cluster_thresholds(
 ) -> _ClusterComputationResult:
     client_taus = compute_client_thresholds(
         request.client_errors,
-        request.eligible,
+        request.eligibility,
         q=request.q,
     )
-    eligible_ids = sorted(request.eligible)
+    eligible_ids = sorted(request.eligibility.eligible_ids)
     fingerprints, fingerprint_scaled = scaled_fingerprints(
         request.client_errors,
         eligible_ids,
@@ -405,7 +409,7 @@ def _compute_cluster_thresholds(
     )
     k, _ = select_cluster_k(
         cluster_k=request.cluster_k,
-        eligible_count=len(request.eligible),
+        eligible_count=len(request.eligibility.eligible_ids),
         silhouette_scores=silhouette_scores,
     )
     labels = fit_cluster_labels(
@@ -450,32 +454,31 @@ def _compute_cluster_thresholds(
 
 
 def compute_cluster(
-    client_errors: dict[str, np.ndarray],
-    n_min: int,
-    tau_global: float,
-    q: float,
-    random_state: int,
-    cluster_k: int,
-    n_init: int,
-    max_iter: int,
+    client_errors: dict[ClientId, ScoreVector],
+    n_min: SampleCount,
+    tau_global: Threshold,
+    q: Quantile,
+    random_state: RandomSeed,
+    cluster_k: ClusterCount,
+    n_init: IterationCount,
+    max_iter: IterationCount,
     run: PolicyRunId,
 ) -> ThresholdResult:
-    """Compute per-cluster thresholds via KMeans on four-feature client fingerprints."""
     if cluster_k <= 0:
         raise ValueError(
-            f"[{_MODULE}] Invalid cluster k. Expected: locked fixed K > 0. Got: {str(cluster_k)}."
+            f"[{_MODULE}] Invalid cluster k. Expected: locked fixed K > 0. Got: {cluster_k}."
         )
-    eligible, pending = identify_eligible(client_errors, n_min=n_min)
+    eligibility = identify_eligible(client_errors, n_min=n_min)
 
-    if len(eligible) < _MIN_CLUSTER_ELIGIBLE:
+    if len(eligibility.eligible_ids) < _MIN_CLUSTER_ELIGIBLE:
         raise ValueError(
-            f"[{_MODULE}] Cannot cluster. Expected: at least {_MIN_CLUSTER_ELIGIBLE} eligible clients. Got: {str(len(eligible))}."
+            f"[{_MODULE}] Cannot cluster. Expected: at least {_MIN_CLUSTER_ELIGIBLE} eligible clients. Got: {len(eligibility.eligible_ids)}."
         )
 
     result = _compute_cluster_thresholds(
         _ClusterComputationRequest(
             client_errors=client_errors,
-            eligible=eligible,
+            eligibility=eligibility,
             q=q,
             random_state=random_state,
             cluster_k=cluster_k,
@@ -488,6 +491,6 @@ def compute_cluster(
         run=run,
         tau_global=tau_global,
         eligible_thresholds=result.eligible_map,
-        pending_clients=pending,
+        pending_clients=eligibility.pending_ids,
         cluster_metadata=result.metadata,
     )

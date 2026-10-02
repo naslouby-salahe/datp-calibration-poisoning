@@ -1,6 +1,10 @@
-"""Cell-level reuse verdicts: manifest checks + metric reproduction → safe/blocked."""
-
 from __future__ import annotations
+
+from datp.types import (
+    NarrativeText,
+    SignedCount,
+)
+
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -10,7 +14,14 @@ from datp.artifacts.names import ArtifactDir
 from datp.config.models import DatpConfig
 from datp.config.models import ExperimentStage
 from datp.validation.discovery import iter_score_cells
-from datp.validation.enums import AuditArtifact, AuditStatus, ReuseVerdict
+from datp.validation.discovery import ScoreCellLocation
+from datp.validation.enums import (
+    AuditArtifact,
+    AuditStatus,
+    CellVerdictReason,
+    ReuseVerdict,
+    ValidationCodePrefix,
+)
 from datp.validation.metric_reproducer import (
     CellReproductionResult,
     reproduce_cell_metrics,
@@ -26,18 +37,12 @@ from datp.validation.score_manifest import (
     verify_score_cell,
 )
 
-REASON_ALL_PASS = "all checks passed"
-MANIFEST_PREFIX = "manifest"
-REPRODUCTION_PREFIX = "reproduction"
-
-
 def failing_manifest_entries(
     manifest_report: ScoreCellVerification,
 ) -> list[ValidationCheck]:
-    """Extract manifest checks that did not pass from a score-cell verification report."""
     return [
         ValidationCheck(
-            code=f"{MANIFEST_PREFIX}:{check.code}",
+            code=f"{ValidationCodePrefix.MANIFEST}:{check.code}",
             status=check.status,
             detail=check.detail,
         )
@@ -49,10 +54,9 @@ def failing_manifest_entries(
 def failing_reproduction_entries(
     reproduction_result: CellReproductionResult,
 ) -> list[ValidationCheck]:
-    """Extract reproduction checks that did not pass, including missing-policy entries."""
     entries = [
         ValidationCheck(
-            code=f"{REPRODUCTION_PREFIX}:{policy_result.policy.value}.{check.code}",
+            code=f"{ValidationCodePrefix.REPRODUCTION}:{policy_result.policy}.{check.code}",
             status=check.status,
             detail=check.detail,
         )
@@ -63,9 +67,9 @@ def failing_reproduction_entries(
     entries.extend(
         [
             ValidationCheck(
-                code=f"{REPRODUCTION_PREFIX}:{missing_policy.value}.metrics_json_missing",
+                code=f"{ValidationCodePrefix.REPRODUCTION}:{missing_policy}.metrics_json_missing",
                 status=AuditStatus.MISSING,
-                detail=f"metrics.json absent for policy {missing_policy.value}",
+                detail=f"metrics.json absent for policy {missing_policy}",
             )
             for missing_policy in reproduction_result.missing_policies
         ]
@@ -73,11 +77,12 @@ def failing_reproduction_entries(
     return entries
 
 
-def summarize_reason(failed_checks: list[ValidationCheck]) -> str:
-    """Condense a list of failed checks into a short human-readable reason string."""
+def summarize_reason(
+    failed_checks: list[ValidationCheck],
+) -> CellVerdictReason | NarrativeText:
     if not failed_checks:
-        return REASON_ALL_PASS
-    codes = [f"{entry.code}({entry.status.value})" for entry in failed_checks]
+        return CellVerdictReason.ALL_CHECKS_PASSED
+    codes = [f"{entry.code}({entry.status})" for entry in failed_checks]
     return (
         "; ".join(codes)
         if len(codes) <= 5
@@ -88,7 +93,6 @@ def summarize_reason(failed_checks: list[ValidationCheck]) -> str:
 def compute_reuse_verdict(
     manifest_report: ScoreCellVerification, reproduction_result: CellReproductionResult
 ) -> CellVerdict:
-    """Combine manifest and reproduction results into a single reuse-verdict for a score cell."""
     if manifest_report.cell != reproduction_result.cell:
         raise ValueError(
             f"verdict inputs disagree on cell: manifest={manifest_report.cell!r}, reproduction={reproduction_result.cell!r}"
@@ -116,8 +120,7 @@ def compute_reuse_verdict(
 
 
 def summarize_verdicts(cells: list[CellVerdict]) -> VerdictSummary:
-    """Aggregate cell-level verdicts into a summary with per-stage breakdowns."""
-    by_stage: dict[ExperimentStage, dict[ReuseVerdict, int]] = {}
+    by_stage: dict[ExperimentStage, dict[ReuseVerdict, SignedCount]] = {}
     safe, blocked = 0, 0
 
     for cell in cells:
@@ -145,11 +148,12 @@ def compute_all_verdicts(
     config: DatpConfig | None = None,
     write_reports: bool = False,
 ) -> VerdictTable:
-    """Compute reuse verdicts for all score cells under base_dir, optionally writing reports."""
     resolved_base = base_dir.resolve()
     resolved_data_root = (data_root or resolved_base.parent).resolve()
 
-    def process_location(location):
+    def process_location(
+        location: ScoreCellLocation,
+    ) -> tuple[ScoreCellLocation, CellVerdict]:
         manifest_report = verify_score_cell(
             location.cell_dir, resolved_base, data_root=resolved_data_root
         )

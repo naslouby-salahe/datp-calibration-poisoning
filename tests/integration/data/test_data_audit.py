@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from datp.config.models import ExperimentStage
+from datp.core.enums import ClientStatus
 from datp.data.common.audit import audit_partitions
 from datp.data.contracts import PartitionResult
 from datp.data.datasets.nbaiot import DEVICE_DIRS
@@ -38,7 +39,11 @@ def _make_nbaiot_partition_results(
             test_benign_count=2000 + i * 50,
             test_attack_count=3000 + i * 200,
             attack_classes=["gafgyt_combo", "gafgyt_junk", "mirai_ack"],
-            calibration_pending=(cal_count + i * 10) < 100,
+            status=(
+                ClientStatus.CALIBRATION_PENDING
+                if (cal_count + i * 10) < 100
+                else ClientStatus.ELIGIBLE
+            ),
             evaluation_incomplete=eval_incomplete,
         )
     return results

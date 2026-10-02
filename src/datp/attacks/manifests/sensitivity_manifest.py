@@ -1,11 +1,23 @@
-"""Sensitivity manifest: cluster stability, scale normalization, and distinct-draw rows."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ClientId,
+    ClusterCount,
+    ContentHash,
+    IterationCount,
+    ManifestMetricValue,
+    NarrativeText,
+    PoisonFraction,
+    RandomSeed,
+    SampleCount,
+    SchemaVersion,
+    SignedCount,
+)
+
 
 from pydantic import BaseModel, ConfigDict
 
 from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy, ReservoirDraw
-from datp.attacks.manifests.bounded_sweep_manifest import NanFloat
 from datp.attacks.manifests.run_manifest import ProvenanceRecord
 from datp.core.enums import ThresholdPolicy
 
@@ -13,82 +25,77 @@ from datp.core.enums import ThresholdPolicy
 class _SensitivityRow(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    training_seed: int
-    victim_id: str
+    training_seed: RandomSeed
+    victim_id: ClientId
     source: PoisoningSourceStrategy
     objective: AttackerObjective
-    fraction: float
+    fraction: PoisonFraction
 
 
 class ClusterStabilityRow(_SensitivityRow):
-    """Cluster-policy victim effect and assignment transitions for one K, init, and seed setting."""
 
-    k: int
-    n_init: int
-    random_state: int
-    victim_delta_tau: NanFloat
-    fixed_victim_delta_tau: NanFloat
-    victim_size_clean: int
-    victim_size_poisoned: int
-    n_reassigned: int
-    silhouette_clean: NanFloat
-    silhouette_poisoned: NanFloat
-    sizes_clean: tuple[int, ...]
-    sizes_poisoned: tuple[int, ...]
+    k: ClusterCount
+    n_init: IterationCount
+    random_state: RandomSeed
+    victim_delta_tau: ManifestMetricValue
+    fixed_victim_delta_tau: ManifestMetricValue
+    victim_size_clean: SignedCount
+    victim_size_poisoned: SignedCount
+    n_reassigned: SampleCount
+    silhouette_clean: ManifestMetricValue
+    silhouette_poisoned: ManifestMetricValue
+    sizes_clean: tuple[SignedCount, ...]
+    sizes_poisoned: tuple[SignedCount, ...]
 
 
 class ScaleNormalizationRow(_SensitivityRow):
-    """Raw versus scale-normalized GLOBAL_THRESHOLD effect and clean per-client scale dispersion."""
 
-    tau_local_cv_clean: NanFloat
-    tau_local_max_min_ratio_clean: NanFloat
-    score_scale_cv_clean: NanFloat
-    raw_global_victim_delta_tau: NanFloat
-    normalized_global_victim_delta_tau: NanFloat
-    raw_global_victim_delta_fpr: NanFloat
-    normalized_global_victim_delta_fpr: NanFloat
-    raw_global_cv_fpr_clean: NanFloat
-    normalized_global_cv_fpr_clean: NanFloat
-    raw_global_cv_fpr_poisoned: NanFloat
-    normalized_global_cv_fpr_poisoned: NanFloat
+    tau_local_cv_clean: ManifestMetricValue
+    tau_local_max_min_ratio_clean: ManifestMetricValue
+    score_scale_cv_clean: ManifestMetricValue
+    raw_global_victim_delta_tau: ManifestMetricValue
+    normalized_global_victim_delta_tau: ManifestMetricValue
+    raw_global_victim_delta_fpr: ManifestMetricValue
+    normalized_global_victim_delta_fpr: ManifestMetricValue
+    raw_global_cv_fpr_clean: ManifestMetricValue
+    normalized_global_cv_fpr_clean: ManifestMetricValue
+    raw_global_cv_fpr_poisoned: ManifestMetricValue
+    normalized_global_cv_fpr_poisoned: ManifestMetricValue
 
 
 class DrawVariantRow(_SensitivityRow):
-    """Threshold shift under an alternative draw mode versus the with-replacement baseline."""
 
     policy: ThresholdPolicy
     draw: ReservoirDraw
-    requested_n_replaced: int
-    effective_n_replaced: int
-    pool_size: int
-    delta_tau_with_replacement: NanFloat
-    delta_tau_variant: NanFloat
-    duplicate_rate_with_replacement: NanFloat
-    duplicate_rate_variant: NanFloat
+    requested_n_replaced: SignedCount
+    effective_n_replaced: SignedCount
+    pool_size: SignedCount
+    delta_tau_with_replacement: ManifestMetricValue
+    delta_tau_variant: ManifestMetricValue
+    duplicate_rate_with_replacement: ManifestMetricValue
+    duplicate_rate_variant: ManifestMetricValue
 
 
 class TrustBoundaryRow(_SensitivityRow):
-    """Score-buffer attack versus trimmed-calibration defenses and a direct threshold-overwrite reference."""
 
     policy: ThresholdPolicy
-    delta_tau_undefended: NanFloat
-    delta_tau_trim_primary: NanFloat
-    delta_tau_trim_appendix: NanFloat
-    residual_vs_clean_trim_primary: NanFloat
-    residual_vs_clean_trim_appendix: NanFloat
-    overwrite_reference_shift: NanFloat
-    buffer_to_overwrite_ratio: NanFloat
+    delta_tau_undefended: ManifestMetricValue
+    delta_tau_trim_primary: ManifestMetricValue
+    delta_tau_trim_appendix: ManifestMetricValue
+    residual_vs_clean_trim_primary: ManifestMetricValue
+    residual_vs_clean_trim_appendix: ManifestMetricValue
+    overwrite_reference_shift: ManifestMetricValue
+    buffer_to_overwrite_ratio: ManifestMetricValue
 
 
 class SensitivityManifest(BaseModel):
-    """Top-level sensitivity manifest with provenance and result rows."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: str = "1"
-    generated_at_utc: str
+    schema_version: SchemaVersion = "1"
+    generated_at_utc: NarrativeText
     provenance: ProvenanceRecord
-    config_hash: str
+    config_hash: ContentHash
     cluster_stability: tuple[ClusterStabilityRow, ...]
     scale_normalization: tuple[ScaleNormalizationRow, ...]
     draw_variants: tuple[DrawVariantRow, ...]

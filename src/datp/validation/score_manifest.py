@@ -1,14 +1,22 @@
-"""Score-manifest verification: presence, parseability, field checks, and client-id cross-referencing."""
-
 from __future__ import annotations
 
+from datp.types import (
+    ArtifactName,
+    ClientId,
+    ColumnName,
+    NarrativeText,
+)
+
+
 import json
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import TypeVar
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+from pydantic import ValidationError
 
 from datp.artifacts.io import write_json_atomic
 from datp.artifacts.layout import ArtifactLayout
@@ -17,7 +25,12 @@ from datp.config.models import get_stage_config
 from datp.core.enums import SCORING_STAGES, ScoringStage
 from datp.core.provenance import hash_file
 from datp.data.catalog import dataset_spec
-from datp.scoring.manifest import SCORE_COLUMN, SCORING_MANIFEST_NOT_PROVIDED
+from datp.scoring.manifest import (
+    ScoringColumn,
+    ScoringManifestAuditView,
+    ScoringManifestSentinel,
+    ScoringManifestStatus,
+)
 from datp.validation.discovery import (
     ScoreCellLocation,
     iter_score_cells,
@@ -26,7 +39,7 @@ from datp.validation.discovery import (
 from datp.validation.enums import AuditArtifact, AuditStatus, ScoreCheckCode
 from datp.validation.schemas import ScoreCellVerification, ValidationCheck
 
-REQUIRED_MANIFEST_FIELDS: tuple[str, ...] = (
+REQUIRED_MANIFEST_FIELDS: tuple[ColumnName, ...] = (
     "dataset",
     "seed",
     "expected_client_ids",
@@ -40,11 +53,15 @@ REQUIRED_MANIFEST_FIELDS: tuple[str, ...] = (
     "records",
 )
 
+_ExactMatchValue = TypeVar("_ExactMatchValue")
+_ManifestComparisonValue = TypeVar(
+    "_ManifestComparisonValue", ClientId, ScoringStage
+)
+
 
 def expected_partition_clients(
     data_root: Path, location: ScoreCellLocation
-) -> tuple[str, ...] | None:
-    """Return expected client IDs for a partition from the dataset spec or processed directory."""
+) -> tuple[ClientId, ...] | None:
     from datp.data.paths import processed_root
 
     stage_cfg = get_stage_config(location.cell.stage)
@@ -53,18 +70,21 @@ def expected_partition_clients(
 
     spec = dataset_spec(stage_cfg.dataset)
     if spec.device_ids:
-        return tuple(sorted(spec.device_ids))
+        return tuple(ClientId(device_id) for device_id in sorted(spec.device_ids))
 
     prepared_root = processed_root(stage_cfg.dataset, base_dir=data_root)
     if not prepared_root.exists():
         return None
-    return tuple(sorted(p.name for p in prepared_root.iterdir() if p.is_dir()))
+    return tuple(
+        ClientId(path.name)
+        for path in sorted(prepared_root.iterdir())
+        if path.is_dir()
+    )
 
 
 def read_manifest(
     path: Path,
-) -> tuple[dict[str, Any] | None, ValidationCheck, ValidationCheck]:
-    """Read and parse a scoring manifest JSON file, returning (manifest, presence_check, parse_check)."""
+) -> tuple[ScoringManifestAuditView | None, ValidationCheck, ValidationCheck]:
     if not path.exists():
         return (
             None,
@@ -84,8 +104,8 @@ def read_manifest(
         code=ScoreCheckCode.MANIFEST_PRESENT, status=AuditStatus.PASS
     )
     try:
-        manifest = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
+        manifest = ScoringManifestAuditView.model_validate_json(path.read_text())
+    except (OSError, json.JSONDecodeError, ValidationError) as exc:
         return (
             None,
             present,
@@ -105,9 +125,8 @@ def read_manifest(
     )
 
 
-def check_required_fields(manifest: dict[str, Any]) -> ValidationCheck:
-    """Verify that all required manifest fields are present."""
-    missing = [f for f in REQUIRED_MANIFEST_FIELDS if f not in manifest]
+def check_required_fields(manifest: ScoringManifestAuditView) -> ValidationCheck:
+    missing = [field for field in REQUIRED_MANIFEST_FIELDS if field not in manifest.model_fields_set]
     if missing:
         return ValidationCheck(
             code=ScoreCheckCode.MANIFEST_FIELDS_PRESENT,
@@ -119,14 +138,12 @@ def check_required_fields(manifest: dict[str, Any]) -> ValidationCheck:
     )
 
 
-def check_completion_status(manifest: dict[str, Any]) -> ValidationCheck:
-    """Check that the manifest's completion_status equals 'complete'."""
-    status = manifest.get("completion_status")
-    if status != "complete":
+def check_completion_status(manifest: ScoringManifestAuditView) -> ValidationCheck:
+    if manifest.completion_status != ScoringManifestStatus.COMPLETE:
         return ValidationCheck(
             code=ScoreCheckCode.MANIFEST_COMPLETION_STATUS,
             status=AuditStatus.FAIL,
-            detail=f"completion_status is {status!r}; expected 'complete'",
+            detail=f"completion_status is {manifest.completion_status!r}; expected 'complete'",
         )
     return ValidationCheck(
         code=ScoreCheckCode.MANIFEST_COMPLETION_STATUS, status=AuditStatus.PASS
@@ -134,7 +151,6 @@ def check_completion_status(manifest: dict[str, Any]) -> ValidationCheck:
 
 
 def check_sentinel(cell_dir: Path) -> ValidationCheck:
-    """Verify the scoring sentinel file exists in the cell directory."""
     if not (cell_dir / ArtifactFile.SCORING_SENTINEL).exists():
         return ValidationCheck(
             code=ScoreCheckCode.SCORING_SENTINEL_PRESENT,
@@ -146,8 +162,12 @@ def check_sentinel(cell_dir: Path) -> ValidationCheck:
     )
 
 
-def exact_match(code: ScoreCheckCode, *, actual: Any, expected: Any) -> ValidationCheck:
-    """Return a PASS check if actual equals expected, otherwise FAIL."""
+def exact_match(
+    code: ScoreCheckCode,
+    *,
+    actual: _ExactMatchValue,
+    expected: _ExactMatchValue,
+) -> ValidationCheck:
     if actual != expected:
         return ValidationCheck(
             code=code,
@@ -158,9 +178,9 @@ def exact_match(code: ScoreCheckCode, *, actual: Any, expected: Any) -> Validati
 
 
 def check_clients_match_partition(
-    manifest: dict[str, Any], expected_partition_clients: tuple[str, ...] | None
+    manifest: ScoringManifestAuditView,
+    expected_partition_clients: tuple[ClientId, ...] | None,
 ) -> ValidationCheck:
-    """Cross-check manifest client IDs against the expected partition client directories."""
     if expected_partition_clients is None:
         return ValidationCheck(
             code=ScoreCheckCode.CLIENT_IDS_MATCH_PARTITION,
@@ -168,7 +188,7 @@ def check_clients_match_partition(
             detail="Partition root not found; cannot cross-check client IDs",
         )
 
-    declared = set(map(str, manifest.get("expected_client_ids", [])))
+    declared = set(manifest.expected_client_ids)
     expected_set = set(expected_partition_clients)
 
     if declared != expected_set:
@@ -183,23 +203,25 @@ def check_clients_match_partition(
 
 
 def check_expected_vs_actual(
-    code: ScoreCheckCode, expected: list[Any], actual: list[Any]
+    code: ScoreCheckCode,
+    expected: Sequence[_ManifestComparisonValue],
+    actual: Sequence[_ManifestComparisonValue],
 ) -> ValidationCheck:
-    """Compare expected vs actual lists, reporting missing and extra elements."""
-    expected_set, actual_set = set(map(str, expected)), set(map(str, actual))
+    expected_set, actual_set = set(expected), set(actual)
     if expected_set != actual_set:
+        missing = ", ".join(str(item) for item in sorted(expected_set - actual_set))
+        extra = ", ".join(str(item) for item in sorted(actual_set - expected_set))
         return ValidationCheck(
             code=code,
             status=AuditStatus.FAIL,
-            detail=f"missing={sorted(expected_set - actual_set)}, extra={sorted(actual_set - expected_set)}",
+            detail=f"missing=[{missing}], extra=[{extra}]",
         )
     return ValidationCheck(code=code, status=AuditStatus.PASS)
 
 
 def check_split_directories(cell_dir: Path) -> ValidationCheck:
-    """Verify that all scoring stage split directories exist within the cell directory."""
     if missing := [
-        stage.value for stage in SCORING_STAGES if not (cell_dir / stage.value).is_dir()
+        stage for stage in SCORING_STAGES if not (cell_dir / stage).is_dir()
     ]:
         return ValidationCheck(
             code=ScoreCheckCode.SPLIT_DIRECTORIES_PRESENT,
@@ -212,13 +234,12 @@ def check_split_directories(cell_dir: Path) -> ValidationCheck:
 
 
 def check_per_client_split_files(
-    cell_dir: Path, expected_client_ids: list[str]
+    cell_dir: Path, expected_client_ids: list[ClientId]
 ) -> ValidationCheck:
-    """Check that per-client Parquet files exist for every expected client in every scoring stage."""
     missing = [
-        f"{stage.value}/{cid}.parquet"
+        f"{stage}/{cid}.parquet"
         for stage in SCORING_STAGES
-        if (stage_dir := cell_dir / stage.value).is_dir()
+        if (stage_dir := cell_dir / stage).is_dir()
         for cid in expected_client_ids
         if not (stage_dir / f"{cid}{PathToken.PARQUET_EXT}").is_file()
     ]
@@ -234,46 +255,45 @@ def check_per_client_split_files(
 
 
 def validate_score_file(
-    parquet: Path, stage: ScoringStage, client_id: str
-) -> tuple[str | None, str | None]:
-    """Validate a single Parquet score file's schema and non-emptiness."""
+    parquet: Path, stage: ScoringStage, client_id: ClientId
+) -> tuple[ArtifactName | None, ArtifactName | None]:
     try:
         schema = pq.read_schema(parquet)
-        if schema.names != [SCORE_COLUMN]:
+        if schema.names != [ScoringColumn.RECONSTRUCTION_ERROR]:
             return (
-                f"{stage.value}/{client_id}.parquet: columns: expected [{SCORE_COLUMN}], got {schema.names}",
+                f"{stage}/{client_id}.parquet: columns: expected [{ScoringColumn.RECONSTRUCTION_ERROR}], got {schema.names}",
                 None,
             )
-        if not pa.types.is_floating(schema.field(SCORE_COLUMN).type):
+        if not pa.types.is_floating(schema.field(ScoringColumn.RECONSTRUCTION_ERROR).type):
             return (
-                f"{stage.value}/{client_id}.parquet: type: expected floating, got {schema.field(SCORE_COLUMN).type}",
+                f"{stage}/{client_id}.parquet: type: expected floating, got {schema.field(ScoringColumn.RECONSTRUCTION_ERROR).type}",
                 None,
             )
 
         row_count = pq.read_metadata(parquet).num_rows
         if row_count == 0 and stage != ScoringStage.TEST_ATTACK:
-            return None, f"{stage.value}/{client_id}.parquet"
+            return None, f"{stage}/{client_id}.parquet"
     except Exception as exc:
-        return f"{stage.value}/{client_id}.parquet: read failed: {exc}", None
+        return f"{stage}/{client_id}.parquet: read failed: {exc}", None
 
     return None, None
 
 
 def _check_client_parquet(
-    parquet: Path, stage: ScoringStage, cid: str
-) -> tuple[str | None, str | None]:
+    parquet: Path, stage: ScoringStage, cid: ClientId
+) -> tuple[NarrativeText | None, NarrativeText | None]:
     if not parquet.is_file():
         return None, None
     return validate_score_file(parquet, stage, cid)
 
 
 def _scan_score_files(
-    cell_dir: Path, expected_client_ids: list[str]
-) -> tuple[list[str], list[str]]:
-    schema_errors: list[str] = []
-    empty: list[str] = []
+    cell_dir: Path, expected_client_ids: list[ClientId]
+) -> tuple[list[NarrativeText], list[NarrativeText]]:
+    schema_errors: list[NarrativeText] = []
+    empty: list[NarrativeText] = []
     for stage in SCORING_STAGES:
-        stage_dir = cell_dir / stage.value
+        stage_dir = cell_dir / stage
         if not stage_dir.is_dir():
             continue
         for cid in expected_client_ids:
@@ -287,9 +307,8 @@ def _scan_score_files(
 
 
 def check_parquet_schema(
-    cell_dir: Path, expected_client_ids: list[str]
+    cell_dir: Path, expected_client_ids: list[ClientId]
 ) -> tuple[ValidationCheck, ValidationCheck]:
-    """Run schema validity and non-emptiness checks on all score Parquet files for a cell."""
     schema_errors, empty = _scan_score_files(cell_dir, expected_client_ids)
 
     schema_check = ValidationCheck(
@@ -311,13 +330,12 @@ def check_checkpoint(
     base_dir: Path,
     data_root: Path,
     location: ScoreCellLocation,
-    manifest: dict[str, Any],
+    manifest: ScoringManifestAuditView,
 ) -> tuple[ValidationCheck, ValidationCheck, ValidationCheck]:
-    """Verify checkpoint hash field presence, file existence, and hash match against the manifest."""
-    declared_hash = manifest.get("model_checkpoint_hash")
-    declared_path = manifest.get("model_checkpoint_path")
+    declared_hash = manifest.model_checkpoint_hash
+    declared_path = manifest.model_checkpoint_path
 
-    if not declared_hash or declared_hash == SCORING_MANIFEST_NOT_PROVIDED:
+    if not declared_hash or declared_hash == ScoringManifestSentinel.NOT_PROVIDED:
         return (
             ValidationCheck(
                 code=ScoreCheckCode.CHECKPOINT_HASH_FIELD_PRESENT,
@@ -387,7 +405,6 @@ def check_checkpoint(
 
 
 def evaluate_overall_status(checks: list[ValidationCheck]) -> AuditStatus:
-    """Compute overall AuditStatus from ValidationChecks (FAIL > PARTIAL > PASS)."""
     statuses = {c.status for c in checks}
     if AuditStatus.FAIL in statuses:
         return AuditStatus.FAIL
@@ -398,15 +415,14 @@ def evaluate_overall_status(checks: list[ValidationCheck]) -> AuditStatus:
 
 def append_full_manifest_checks(
     checks: list[ValidationCheck],
-    manifest: dict[str, Any],
+    manifest: ScoringManifestAuditView,
     location: ScoreCellLocation,
     cell_dir: Path,
     base_dir: Path,
     data_root: Path,
-) -> tuple[list[str], list[str]]:
-    """Append field-match, client/split, schema, and checkpoint checks to the checks list."""
-    expected_client_ids = list(map(str, manifest.get("expected_client_ids", [])))
-    expected_splits = list(map(str, manifest.get("expected_splits", [])))
+) -> tuple[list[ClientId], list[ScoringStage]]:
+    expected_client_ids = list(manifest.expected_client_ids)
+    expected_splits = list(manifest.expected_splits)
 
     stage_cfg = get_stage_config(location.cell.stage)
 
@@ -415,28 +431,28 @@ def append_full_manifest_checks(
             check_completion_status(manifest),
             exact_match(
                 ScoreCheckCode.STAGE_MATCH,
-                actual=manifest.get("stage"),
-                expected=location.cell.stage.value,
+                actual=manifest.stage,
+                expected=location.cell.stage,
             ),
             exact_match(
                 ScoreCheckCode.SEED_MATCH,
-                actual=manifest.get("seed"),
+                actual=manifest.seed,
                 expected=location.seed,
             ),
             exact_match(
                 ScoreCheckCode.DATASET_MATCH,
-                actual=manifest.get("dataset"),
-                expected=stage_cfg.dataset.value if stage_cfg.dataset else None,
+                actual=manifest.dataset,
+                expected=stage_cfg.dataset,
             ),
             check_expected_vs_actual(
                 ScoreCheckCode.EXPECTED_VS_ACTUAL_CLIENTS,
-                manifest.get("expected_client_ids", []),
-                manifest.get("actual_client_ids", []),
+                manifest.expected_client_ids,
+                manifest.actual_client_ids,
             ),
             check_expected_vs_actual(
                 ScoreCheckCode.EXPECTED_VS_ACTUAL_SPLITS,
-                manifest.get("expected_splits", []),
-                manifest.get("actual_splits", []),
+                manifest.expected_splits,
+                manifest.actual_splits,
             ),
             check_clients_match_partition(
                 manifest, expected_partition_clients(data_root, location)
@@ -454,8 +470,7 @@ def append_full_manifest_checks(
 def verify_at_location(
     base_dir: Path, data_root: Path, location: ScoreCellLocation
 ) -> ScoreCellVerification:
-    """Run all manifest, schema, parquet, and checkpoint checks at one score-cell location."""
-    checks = []
+    checks: list[ValidationCheck] = []
     manifest, present, parseable = read_manifest(
         location.cell_dir / ArtifactFile.SCORING_MANIFEST
     )
@@ -481,8 +496,8 @@ def verify_at_location(
     if fields_check.status != AuditStatus.PASS:
         return ScoreCellVerification(
             cell=location.cell,
-            expected_client_ids=list(map(str, manifest.get("expected_client_ids", []))),
-            expected_splits=list(map(str, manifest.get("expected_splits", []))),
+            expected_client_ids=list(manifest.expected_client_ids),
+            expected_splits=[split for split in manifest.expected_splits],
             checks=checks,
             overall_status=evaluate_overall_status(checks),
         )
@@ -502,7 +517,6 @@ def verify_at_location(
 def verify_score_cell(
     cell_dir: Path, base_dir: Path, *, data_root: Path | None = None
 ) -> ScoreCellVerification:
-    """Resolve a score cell directory and delegate to verify_at_location."""
     cell_dir, base_dir = cell_dir.resolve(), base_dir.resolve()
     return verify_at_location(
         base_dir,
@@ -514,7 +528,6 @@ def verify_score_cell(
 def verify_all_score_cells(
     base_dir: Path, *, data_root: Path | None = None, write_reports: bool = False
 ) -> list[ScoreCellVerification]:
-    """Audit every discovered score cell in parallel and optionally write per-cell reports."""
     resolved_base = base_dir.resolve()
     resolved_data_root = (data_root or resolved_base.parent).resolve()
 

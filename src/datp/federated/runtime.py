@@ -1,6 +1,14 @@
-"""Ray resource estimation and preflight checks for FL simulations."""
-
 from __future__ import annotations
+
+from datp.types import (
+    ByteCount,
+    GpuShare,
+    MemoryAmount,
+    ScoreValue,
+    Threshold,
+    WorkerCount,
+)
+
 
 import math
 import os
@@ -16,32 +24,28 @@ _RAY_MEMORY_ENV_KEY = "RAY_memory_usage_threshold"
 
 
 class ObjectStorePreflight(TypedDict):
-    """Result of an object-store capacity check: configured size and available RAM."""
 
-    object_store_mb: int
-    available_ram_mb: int
+    object_store_mb: ByteCount
+    available_ram_mb: ByteCount
 
 
 class ClientResources(TypedDict):
-    """Per-actor resource allocations derived from available RAM and request parameters."""
 
-    num_cpus: float
-    num_gpus: float
+    num_cpus: ScoreValue
+    num_gpus: GpuShare
 
 
 @dataclass(frozen=True, slots=True)
 class RayClientResourceRequest:
-    """Parameters needed to estimate per-client resource requirements."""
 
-    per_client_ram_gb: float
-    reserve_ram_gb: float
-    max_concurrent_override: int | None
+    per_client_ram_gb: MemoryAmount
+    reserve_ram_gb: MemoryAmount
+    max_concurrent_override: WorkerCount | None
     require_cuda: bool
-    num_gpus_per_client: float
+    num_gpus_per_client: GpuShare
 
 
-def ensure_ray_memory_threshold(threshold: float) -> None:
-    """Set the Ray memory threshold env var if not already set lower."""
+def ensure_ray_memory_threshold(threshold: Threshold) -> None:
     current = os.environ.get(_RAY_MEMORY_ENV_KEY)
     if current is None:
         os.environ[_RAY_MEMORY_ENV_KEY] = str(threshold)
@@ -54,8 +58,7 @@ def ensure_ray_memory_threshold(threshold: float) -> None:
         raise RuntimeError(f"{_RAY_MEMORY_ENV_KEY} too high: {val} > {threshold}")
 
 
-def get_available_ram_gb() -> float:
-    """Return available system RAM in GiB via psutil or /proc/meminfo."""
+def get_available_ram_gb() -> MemoryAmount:
     try:
         import psutil
 
@@ -73,8 +76,7 @@ def get_available_ram_gb() -> float:
     )
 
 
-def check_object_store_capacity(object_store_mb: int) -> ObjectStorePreflight:
-    """Validate that the configured object store fits in available RAM."""
+def check_object_store_capacity(object_store_mb: ByteCount) -> ObjectStorePreflight:
     available_ram_mb = int(get_available_ram_gb() * _MIB_PER_GIB)
     if object_store_mb > available_ram_mb:
         raise RuntimeError(
@@ -84,7 +86,6 @@ def check_object_store_capacity(object_store_mb: int) -> ObjectStorePreflight:
 
 
 def derive_client_resources(request: RayClientResourceRequest) -> ClientResources:
-    """Compute per-actor CPU/GPU allocations from available RAM and request params."""
     available_ram_gb = get_available_ram_gb()
     if request.max_concurrent_override is not None:
         max_concurrent = request.max_concurrent_override
