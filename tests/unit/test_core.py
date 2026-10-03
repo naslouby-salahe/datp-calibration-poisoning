@@ -1044,19 +1044,25 @@ class TestNoHardcodedOutputPathsInReporting:
         """Ensure 'figures' directory name is not hardcoded in reporting build."""
         build_py = _SRC_ROOT / "reporting" / "build.py"
         self._check_no_hardcoded_path(
-            _source_no_scientific_policy_leaks(build_py), "figures", "reporting/build.py"
+            _source_no_scientific_policy_leaks(build_py),
+            "figures",
+            "reporting/build.py",
         )
 
     def test_no_hardcoded_tables_in_build(self) -> None:
         """Ensure 'tables' directory name is not hardcoded in reporting build."""
         build_py = _SRC_ROOT / "reporting" / "build.py"
-        self._check_no_hardcoded_path(_source_no_scientific_policy_leaks(build_py), "tables", "reporting/build.py")
+        self._check_no_hardcoded_path(
+            _source_no_scientific_policy_leaks(build_py), "tables", "reporting/build.py"
+        )
 
     def test_no_hardcoded_analysis_in_build(self) -> None:
         """Ensure 'analysis' directory name is not hardcoded in reporting build."""
         build_py = _SRC_ROOT / "reporting" / "build.py"
         self._check_no_hardcoded_path(
-            _source_no_scientific_policy_leaks(build_py), "analysis", "reporting/build.py"
+            _source_no_scientific_policy_leaks(build_py),
+            "analysis",
+            "reporting/build.py",
         )
 
 
@@ -1392,6 +1398,20 @@ class TestMakeRng:
             _seed_record(training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0)
         )
         assert isinstance(rng, np.random.Generator)
+
+    @pytest.mark.parametrize("child_index", [0, 1, 17, 4000])
+    def test_child_stream_matches_spawned_sequence(self, child_index: int) -> None:
+        """Verify the direct spawn key reproduces the stream of SeedSequence.spawn."""
+        record = _seed_record(
+            training_seed=3, poisoning_seed=103, client_idx=2, scope_idx=1
+        )
+        legacy = np.random.default_rng(
+            np.random.SeedSequence(list(record.entropy)).spawn(child_index + 1)[
+                child_index
+            ]
+        )
+        current = make_seed_rng(record, child_index=child_index)
+        assert np.array_equal(legacy.random(10), current.random(10))
 
     def test_same_inputs_produce_identical_sequences(self) -> None:
         """Confirm that identical seed records produce identical RNG sequences."""

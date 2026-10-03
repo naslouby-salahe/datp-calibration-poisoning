@@ -36,7 +36,6 @@ from datp.types import (
 
 @dataclass(frozen=True, slots=True)
 class ConfusionCounts:
-
     tp: SampleCount
     fp: SampleCount
     tn: SampleCount
@@ -45,7 +44,6 @@ class ConfusionCounts:
 
 @dataclass(frozen=True, slots=True)
 class BinaryMetrics:
-
     fpr: FalsePositiveRate
     tpr: TruePositiveRate
     tnr: TrueNegativeRate
@@ -58,14 +56,12 @@ class BinaryMetrics:
 
 @dataclass(frozen=True, slots=True)
 class BinaryRankingMetrics:
-
     auroc: ClassificationScore | None
     pr_auc: ClassificationScore | None
 
 
 @dataclass(frozen=True, slots=True)
 class ClientEvaluationRecord:
-
     client_id: ClientId
     metrics: BinaryMetrics
     confusion: ConfusionCounts
@@ -77,7 +73,6 @@ class ClientEvaluationRecord:
 
 @dataclass(frozen=True, slots=True)
 class DispersionMetrics:
-
     cv_fpr: FalsePositiveRate
     mean_fpr: FalsePositiveRate
     std_fpr: FalsePositiveRate
@@ -95,7 +90,6 @@ class DispersionMetrics:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationResult:
-
     run: PolicyRunId
     dataset: DatasetID
     clients: tuple[ClientEvaluationRecord, ...]
@@ -106,7 +100,9 @@ class EvaluationResult:
     dispersion: DispersionMetrics
 
 
-def recompute_binary_metrics(tp: SampleCount, fp: SampleCount, tn: SampleCount, fn: SampleCount) -> BinaryMetrics:
+def recompute_binary_metrics(
+    tp: SampleCount, fp: SampleCount, tn: SampleCount, fn: SampleCount
+) -> BinaryMetrics:
     n_benign, n_attack = fp + tn, tp + fn
     fpr = fp / n_benign if n_benign else math.nan
     tpr = tp / n_attack if n_attack else math.nan
@@ -311,7 +307,9 @@ def evaluate_policy_run(
     for ct in client_thresholds:
         sb, sa = provider.load_test_scores(ct.client_id)
         clients.append(compute_client_record(ct.client_id, sb, sa, ct))
-        (pending if ct.status is ClientStatus.CALIBRATION_PENDING else eligible).append(ct.client_id)
+        (pending if ct.status is ClientStatus.CALIBRATION_PENDING else eligible).append(
+            ct.client_id
+        )
         if sa.size == 0:
             incomplete.append(ct.client_id)
 

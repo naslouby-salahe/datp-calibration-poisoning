@@ -297,7 +297,9 @@ def _write_score_artifact(path: Path, values: list[float]) -> None:
     """Write score values as a single-column Parquet table artifact."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.table({ScoringColumn.RECONSTRUCTION_ERROR: pa.array(values, type=pa.float32())})
+    table = pa.table(
+        {ScoringColumn.RECONSTRUCTION_ERROR: pa.array(values, type=pa.float32())}
+    )
     pq.write_table(table, path)
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import multiprocessing
+import os
 import time
 from collections import defaultdict
 from collections.abc import Mapping
@@ -25,6 +26,7 @@ from datp.config import (
 from datp.core import (
     PolicyRunId,
     TrainingCellId,
+    configure_logging,
     get_logger,
     hash_file,
     hash_jsonable,
@@ -47,6 +49,7 @@ from datp.data import (
 )
 from datp.enums import (
     CONTROLLED_POLICIES,
+    ArtifactDir,
     ArtifactFile,
     DeviceType,
     ProvenanceSentinel,
@@ -495,6 +498,13 @@ def build_experiment_matrix() -> list[PolicyRunId]:
     ]
 
 
+def _init_worker(base_dir: Path) -> None:
+    configure_logging(
+        BASE_CONFIG.logging,
+        base_dir / ArtifactDir.LOGS / ArtifactDir.WORKER_LOGS / str(os.getpid()),
+    )
+
+
 def _run_group_worker(
     key: TrainingCellId,
     group_cells: list[PolicyRunId],
@@ -553,6 +563,8 @@ def run_sweep(
         with ProcessPoolExecutor(
             max_workers=min(workers, len(ordered)),
             mp_context=multiprocessing.get_context("spawn"),
+            initializer=_init_worker,
+            initargs=(base_dir,),
         ) as pool:
             futures = [
                 pool.submit(

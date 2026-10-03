@@ -16,7 +16,9 @@
   "ignore": [
     "**/.vscode-server/**",
     "**/site-packages/**",
-    "**/dist-packages/**"
+    "**/dist-packages/**",
+    "tests",
+    "tests_support"
   ],
   "venvPath": ".",
   "venv": ".venv",

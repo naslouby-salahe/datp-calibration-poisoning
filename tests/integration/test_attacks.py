@@ -5,16 +5,6 @@ import math
 
 import numpy as np
 import pytest
-from tests.integration.conftest import (
-    N_CAL,
-    N_CLIENTS,
-    N_TEST,
-    TINY_FRACTIONS,
-    TINY_PAIR_COUNT,
-    TINY_POLICY_COUNT,
-    TINY_SEEDS,
-    TRAINING_SEED,
-)
 
 from datp.artifacts import (
     ArtifactLayout,
@@ -49,6 +39,16 @@ from datp.enums import (
 from datp.scoring import load_main_cal_errors, load_parquets_from_dir
 from datp.thresholding import ClientThresholdsCollection
 from datp.types import ClientId
+from tests.integration.conftest import (
+    N_CAL,
+    N_CLIENTS,
+    N_TEST,
+    TINY_FRACTIONS,
+    TINY_PAIR_COUNT,
+    TINY_POLICY_COUNT,
+    TINY_SEEDS,
+    TRAINING_SEED,
+)
 from tests_support.inference import (
     InferenceInput,
     PairedDeltas,
@@ -79,16 +79,12 @@ def test_run_nbaiot_main_sweep_end_to_end(sweep_manifest) -> None:
     """Full nbaiot_main sweep runs poisoning and writes a manifest with AUROC invariance."""
     manifest = sweep_manifest
 
-    assert manifest.n_cells == len(TINY_SEEDS.training) * N_CLIENTS * TINY_POLICY_COUNT * TINY_PAIR_COUNT * len(
-        TINY_FRACTIONS
-    )
-    assert len(manifest.results) == manifest.n_cells
-    assert set(manifest.mu_flag_threshold_by_training_seed) == set(
+    assert manifest.n_cells == len(
         TINY_SEEDS.training
-    )
-    assert tuple(sorted(manifest.training_seeds)) == tuple(
-        sorted(TINY_SEEDS.training)
-    )
+    ) * N_CLIENTS * TINY_POLICY_COUNT * TINY_PAIR_COUNT * len(TINY_FRACTIONS)
+    assert len(manifest.results) == manifest.n_cells
+    assert set(manifest.mu_flag_threshold_by_training_seed) == set(TINY_SEEDS.training)
+    assert tuple(sorted(manifest.training_seeds)) == tuple(sorted(TINY_SEEDS.training))
     assert tuple(sorted(manifest.poisoning_seeds)) == tuple(
         sorted(TINY_SEEDS.poisoning)
     )
@@ -156,7 +152,10 @@ def test_cluster_rows_have_transition_and_fixed_assignment_fields(
         for r in sweep_manifest.results
         if r.policy != ThresholdPolicy.CLUSTER_THRESHOLD
     ]
-    assert all(r.cluster_sizes_clean and sum(r.cluster_sizes_clean) == N_CLIENTS for r in cluster)
+    assert all(
+        r.cluster_sizes_clean and sum(r.cluster_sizes_clean) == N_CLIENTS
+        for r in cluster
+    )
     assert all(math.isfinite(r.fixed_cluster_victim_delta_tau) for r in cluster)
     assert all(r.cluster_n_reassigned >= 0 for r in cluster)
     assert all(not r.cluster_sizes_clean for r in other)
@@ -221,7 +220,10 @@ def test_sensitivity_manifest_is_written(
     )
     path = sensitivity_run.write_sensitivity_manifest(tmp_path)
     assert path == sensitivity_manifest_path(tmp_path)
-    assert SensitivityManifest.model_validate_json(path.read_text()) == sensitivity_manifest
+    assert (
+        SensitivityManifest.model_validate_json(path.read_text())
+        == sensitivity_manifest
+    )
 
 
 @pytest.mark.integration
@@ -232,7 +234,9 @@ def test_score_collection_matches_synthetic_clients(scores_dir) -> None:
     )
     score_dir = (
         ArtifactLayout(base_dir=scores_dir, stage=ExperimentStage.NBAIOT_MAIN)
-        .score_cell(TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=TRAINING_SEED))
+        .score_cell(
+            TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=TRAINING_SEED)
+        )
         .score_dir
     )
     test_benign = load_parquets_from_dir(
@@ -274,13 +278,17 @@ def test_write_nbaiot_main_manifest_writes_canonical_path(
     tmp_path, monkeypatch, sweep_manifest
 ) -> None:
     """Manifest is written to the canonical layout path and validates on reload."""
-    monkeypatch.setattr(sweep_module, "run_nbaiot_main", lambda *_a, **_k: sweep_manifest)
+    monkeypatch.setattr(
+        sweep_module, "run_nbaiot_main", lambda *_a, **_k: sweep_manifest
+    )
 
     out_path = write_nbaiot_main_manifest(tmp_path)
 
     assert out_path == nbaiot_main_manifest_path(tmp_path)
     assert out_path.name == "nbaiot_main_manifest.json"
-    assert BoundedSweepManifest.model_validate_json(out_path.read_text()) == sweep_manifest
+    assert (
+        BoundedSweepManifest.model_validate_json(out_path.read_text()) == sweep_manifest
+    )
 
 
 def test_run_nbaiot_main_sweep_config_is_required() -> None:
@@ -360,7 +368,10 @@ def test_invariant_2_cardinality_preserved(collection):
         )
         rebuilt[cid] = (cal, c.test_benign, c.test_attack)
     poisoned_collection = build_score_collection(rebuilt)
-    assert poisoned_collection.eligibility.eligible_ids == collection.eligibility.eligible_ids
+    assert (
+        poisoned_collection.eligibility.eligible_ids
+        == collection.eligibility.eligible_ids
+    )
 
 
 def test_invariant_3_no_inplace_mutation(collection):
@@ -378,9 +389,7 @@ def test_invariant_3_no_inplace_mutation(collection):
     assert_no_inplace_mutation(snapshot, collection.clients[_VICTIM].cal)
 
     assert cell.outcome.poisoned_cal_set[_VICTIM].cal is not victim_clean
-    assert not np.array_equal(
-        cell.outcome.poisoned_cal_set[_VICTIM].cal, snapshot
-    )
+    assert not np.array_equal(cell.outcome.poisoned_cal_set[_VICTIM].cal, snapshot)
 
 
 def test_invariant_4_high_raises_low_lowers_local_threshold(collection):
@@ -564,7 +573,9 @@ def test_invariant_11_cv_fpr_reported_with_coverage(collection):
     )
     fleet = cell.poisoned_metrics.fleet_fpr
 
-    expected_coverage = len(collection.eligibility.eligible_ids) / len(collection.clients)
+    expected_coverage = len(collection.eligibility.eligible_ids) / len(
+        collection.clients
+    )
     assert fleet.coverage_ratio == pytest.approx(expected_coverage)
     assert 0.0 < fleet.coverage_ratio <= 1.0
 

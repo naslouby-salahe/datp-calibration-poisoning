@@ -5,12 +5,10 @@ from collections.abc import Mapping, Sequence
 
 
 class DatasetID(enum.StrEnum):
-
     NBAIOT = "nbaiot"
 
 
 class NBaIoTDevice(enum.StrEnum):
-
     DANMINI_DOORBELL = "Danmini_Doorbell"
     ECOBEE_THERMOSTAT = "Ecobee_Thermostat"
     ENNIO_DOORBELL = "Ennio_Doorbell"
@@ -18,44 +16,42 @@ class NBaIoTDevice(enum.StrEnum):
     PROVISION_PT_737E_SECURITY_CAMERA = "Provision_PT_737E_Security_Camera"
     PROVISION_PT_838_SECURITY_CAMERA = "Provision_PT_838_Security_Camera"
     SAMSUNG_SNH_1011_N_WEBCAM = "Samsung_SNH_1011_N_Webcam"
-    SIMPLEHOME_XCS7_1002_WHT_SECURITY_CAMERA = "SimpleHome_XCS7_1002_WHT_Security_Camera"
-    SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA = "SimpleHome_XCS7_1003_WHT_Security_Camera"
+    SIMPLEHOME_XCS7_1002_WHT_SECURITY_CAMERA = (
+        "SimpleHome_XCS7_1002_WHT_Security_Camera"
+    )
+    SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA = (
+        "SimpleHome_XCS7_1003_WHT_Security_Camera"
+    )
 
 
 class NBaIoTDeviceFamily(enum.StrEnum):
-
     DOORBELL = "doorbell"
     CAMERA = "camera"
     OTHER = "other"
 
 
 class NBaIoTAttackFamily(enum.StrEnum):
-
     GAFGYT = "gafgyt_attacks"
     MIRAI = "mirai_attacks"
 
 
 class NBaIoTBalancePolicy(enum.StrEnum):
-
     NATURAL_DISTRIBUTION = "natural_distribution"
     BALANCED = "balanced"
 
 
 class ThresholdPolicy(enum.StrEnum):
-
     GLOBAL_THRESHOLD = "global_threshold"
     LOCAL_THRESHOLD = "local_threshold"
     CLUSTER_THRESHOLD = "cluster_threshold"
 
 
 class DeviceType(enum.StrEnum):
-
     CUDA = "cuda"
     CPU = "cpu"
 
 
 class LogLevel(enum.StrEnum):
-
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -64,7 +60,6 @@ class LogLevel(enum.StrEnum):
 
 
 class ArtifactFile(enum.StrEnum):
-
     BENIGN_TRAFFIC = "benign_traffic.csv"
     SCORING_SENTINEL = "SCORING_DONE.txt"
     SCORING_MANIFEST = "scoring_manifest.json"
@@ -87,7 +82,6 @@ class ArtifactFile(enum.StrEnum):
 
 
 class PathToken(enum.StrEnum):
-
     PARQUET_EXT = ".parquet"
     PARQUET_GLOB = "*.parquet"
     CSV_EXT = ".csv"
@@ -100,20 +94,17 @@ class PathToken(enum.StrEnum):
 
 
 class ClientStatus(enum.StrEnum):
-
     ELIGIBLE = "eligible"
     CALIBRATION_PENDING = "calibration_pending"
 
 
 class ThresholdAggregationMethod(enum.StrEnum):
-
     ELIGIBLE_CLIENT_ARITHMETIC_MEAN = "eligible_client_arithmetic_mean"
     PER_CLIENT_PERCENTILE = "per_client_percentile"
     ELIGIBLE_CLUSTER_ARITHMETIC_MEAN = "eligible_cluster_arithmetic_mean"
 
 
 class ThresholdSource(enum.StrEnum):
-
     GLOBAL = "global"
     LOCAL = "local"
     CLUSTER = "cluster"
@@ -121,19 +112,16 @@ class ThresholdSource(enum.StrEnum):
 
 
 class ProvenanceSentinel(enum.StrEnum):
-
     UNKNOWN = "UNKNOWN"
     UNKNOWN_LOWERCASE = "unknown"
     MISSING_MANIFEST_HASH = "MISSING_MANIFEST_HASH"
 
 
 class PayloadValidationErrorType(enum.StrEnum):
-
     MISSING = "missing"
 
 
 class Activation(enum.StrEnum):
-
     RELU = "relu"
     LEAKY_RELU = "leaky_relu"
     ELU = "elu"
@@ -142,14 +130,12 @@ class Activation(enum.StrEnum):
 
 
 class ClientDataAttribute(enum.StrEnum):
-
     VAL = "val"
     TEST_BENIGN = "test_benign"
     TEST_ATTACK = "test_attack"
 
 
 class ScoringStage(enum.StrEnum):
-
     CAL = "cal"
     TEST_BENIGN = "test_benign"
     TEST_ATTACK = "test_attack"
@@ -168,7 +154,6 @@ class ScoringStage(enum.StrEnum):
 
 
 class MetricName(enum.StrEnum):
-
     FPR = "fpr"
     TPR = "tpr"
     MACRO_F1 = "macro_f1"
@@ -233,14 +218,12 @@ class MetricName(enum.StrEnum):
 
 
 class NormalizationScope(enum.StrEnum):
-
     GLOBAL = "global"
     PER_CLIENT = "per_client"
     PER_CLIENT_ZSCORE = "per_client_zscore"
 
 
 class PayloadKey(enum.StrEnum):
-
     CLIENT_ID = "client_id"
     PER_CLIENT = "per_client"
     CONFUSION_MATRIX = "confusion_matrix"
@@ -283,7 +266,6 @@ class PayloadKey(enum.StrEnum):
 
 
 class ConfusionKey(enum.StrEnum):
-
     TP = "tp"
     FP = "fp"
     TN = "tn"
@@ -291,7 +273,6 @@ class ConfusionKey(enum.StrEnum):
 
 
 class AuditField(enum.StrEnum):
-
     SCHEMA_VERSION = "schema_version"
     GENERATED_TABLES = "generated_tables"
     GENERATED_FIGURES = "generated_figures"
@@ -311,7 +292,6 @@ class AuditField(enum.StrEnum):
 
 
 class ValidationField(enum.StrEnum):
-
     STATUS = "status"
     SOURCE = "source"
     VALIDATED_STAGES = "validated_stages"
@@ -319,12 +299,10 @@ class ValidationField(enum.StrEnum):
 
 
 class RunKind(enum.StrEnum):
-
     CORE_LADDER = "core_ladder"
 
 
 class SeedScope(enum.StrEnum):
-
     REPRESENTATIVE_SEED = "representative_seed"
     ALL_SEEDS = "all_seeds"
     ALL_TRAINING_SEEDS = "all_training_seeds"
@@ -364,13 +342,11 @@ CONTROLLED_POLICIES: tuple[ThresholdPolicy, ...] = (
 
 
 class AttackerObjective(enum.StrEnum):
-
     THRESHOLD_RAISE = "threshold_raise"
     THRESHOLD_LOWER = "threshold_lower"
 
 
 class ClaimClassification(enum.StrEnum):
-
     CALIBRATION_INSTABILITY = "calibration_instability"
     FULL_VULNERABILITY = "full_vulnerability"
     MECHANISM_ONLY = "mechanism_only"
@@ -378,7 +354,6 @@ class ClaimClassification(enum.StrEnum):
 
 
 class ThresholdScaleScenario(enum.StrEnum):
-
     RAW_CLEAN = "raw_clean"
     RAW_POISONED = "raw_pois"
     NORMALIZED_CLEAN = "norm_clean"
@@ -386,7 +361,6 @@ class ThresholdScaleScenario(enum.StrEnum):
 
 
 class PoisoningSourceStrategy(enum.StrEnum):
-
     RANDOM_BENIGN = "random_benign"
     HIGH_SCORE_BENIGN = "high_score_benign"
     LOW_SCORE_BENIGN = "low_score_benign"
@@ -396,19 +370,14 @@ class PoisoningSourceStrategy(enum.StrEnum):
 
 
 class CalibrationInjectionRule(enum.StrEnum):
-
     REPLACE_FIXED_BUDGET = "replace_fixed_budget"
 
 
 class SplitSemantics(enum.StrEnum):
-
-    CHRONOLOGICAL_BENIGN_ONLY_60_1_20_1_18 = (
-        "chronological_benign_only_60_1_20_1_18"
-    )
+    CHRONOLOGICAL_BENIGN_ONLY_60_1_20_1_18 = "chronological_benign_only_60_1_20_1_18"
 
 
 class ReservoirMode(enum.StrEnum):
-
     VICTIM_LOCAL_BENIGN_CAL_SOURCE_PRECEDENCE_RULE_2 = (
         "victim_local_benign_cal_source_precedence_rule_2"
     )
@@ -419,7 +388,6 @@ class ManifestProvenanceSource(enum.StrEnum):
 
 
 class ReservoirDraw(enum.StrEnum):
-
     WITH_REPLACEMENT = "with_replacement"
     WITHOUT_REPLACEMENT = "without_replacement"
     DISJOINT_RESERVOIR = "disjoint_reservoir"
@@ -427,7 +395,6 @@ class ReservoirDraw(enum.StrEnum):
 
 
 class SeedAggregationMethod(enum.StrEnum):
-
     MEAN = "mean"
     MAXIMUM = "max"
 
@@ -438,24 +405,20 @@ SYNTHESIZED_DRAWS: frozenset[ReservoirDraw] = frozenset(
 
 
 class PoisoningKnowledge(enum.StrEnum):
-
     GRAY_BOX_SCORE_ACCESS = "gray_box_score_access"
 
 
 class PoisoningTargetScope(enum.StrEnum):
-
     SINGLE_CLIENT = "single_client"
     MULTI_CLIENT = "multi_client"
 
 
 class PoisoningDefense(enum.StrEnum):
-
     NONE = "none"
     TRIMMED_CALIBRATION = "trimmed_calibration"
 
 
 class ReservoirStatus(enum.StrEnum):
-
     FEASIBLE = "feasible"
     INFEASIBLE_DEGENERATE_TAIL = "infeasible_degenerate_tail"
 
@@ -492,7 +455,6 @@ class FederatedRoundStage(enum.StrEnum):
 
 
 class ConvergenceStatus(enum.StrEnum):
-
     CONVERGED = "converged"
     NOT_CONVERGED = "not_converged"
     UNKNOWN = "unknown"
@@ -500,7 +462,6 @@ class ConvergenceStatus(enum.StrEnum):
 
 
 class ConvergenceSummaryKey(enum.StrEnum):
-
     ROUNDS_INITIAL = "rounds_initial"
     ROUNDS_MAX = "rounds_max"
     RELATIVE_THRESHOLD = "relative_threshold"
@@ -513,7 +474,6 @@ class ConvergenceSummaryKey(enum.StrEnum):
 
 
 class AuditStatus(enum.StrEnum):
-
     PASS = "PASS"
     FAIL = "FAIL"
     MISSING = "MISSING"
@@ -523,7 +483,6 @@ class AuditStatus(enum.StrEnum):
 
 
 class InvariantField(enum.StrEnum):
-
     SPLIT_HASH = "split_hash"
     SCORING_CODE_HASH = "scoring_code_hash"
     METRICS_CODE_HASH = "metrics_code_hash"
@@ -532,7 +491,6 @@ class InvariantField(enum.StrEnum):
 
 
 class WarningCode(enum.StrEnum):
-
     GLOBAL_NOT_POOLED_PERCENTILE = "GLOBAL_NOT_POOLED_PERCENTILE"
     LOCAL_UTILITY_TRADEOFF = "LOCAL_UTILITY_TRADEOFF"
     CLUSTER_DIAGNOSTICS_INCOMPLETE = "CLUSTER_DIAGNOSTICS_INCOMPLETE"
@@ -551,7 +509,6 @@ class WarningCode(enum.StrEnum):
 
 
 class AuditSeverity(enum.StrEnum):
-
     INFO = "INFO"
     WARNING = "WARNING"
     FAIL = "FAIL"
@@ -559,7 +516,6 @@ class AuditSeverity(enum.StrEnum):
 
 
 class DenominatorStatus(enum.StrEnum):
-
     PASS = "PASS"
     FAIL = "FAIL"
     EXCLUDED_EVALUATION_INCOMPLETE = "EXCLUDED_EVALUATION_INCOMPLETE"
@@ -567,7 +523,6 @@ class DenominatorStatus(enum.StrEnum):
 
 
 class WorstDirection(enum.StrEnum):
-
     MAX_IS_WORST = "max_is_worst"
     MIN_IS_WORST = "min_is_worst"
 
@@ -581,13 +536,11 @@ WORST_CLIENT_DIRECTIONS: Mapping[MetricName, WorstDirection] = {
 
 
 class AuditDir(enum.StrEnum):
-
     AUDIT = "audit"
     DATA_AUDIT = "data_audit"
 
 
 class AuditArtifact(enum.StrEnum):
-
     POLICY_INVARIANTS = "policy_invariants.json"
     RUN_MANIFEST = "run_manifest.csv"
     SEED_DELTAS = "seed_deltas.csv"
@@ -608,38 +561,31 @@ class AuditArtifact(enum.StrEnum):
 
 
 class AuditSchemaVersion(enum.StrEnum):
-
     V1_0 = "1.0"
 
 
 class AttackLabel(enum.StrEnum):
-
     BINARY_ATTACK = "binary_attack"
 
 
 class RemediationCommand(enum.StrEnum):
-
     RUN_BASELINE = "datp baseline"
     REPORT = "datp report"
 
 
 class CoverageFallback(enum.StrEnum):
-
     DEFAULT = "0/0"
 
 
 class ValidationThreshold(float, enum.Enum):
-
     FLAT_CV_TPR_EPSILON = 1e-6
 
 
 class ValidationCountThreshold(int, enum.Enum):
-
     WORST_CLIENT_STABLE_MIN_SEEDS = 3
 
 
 class AuditOutputName(enum.StrEnum):
-
     POLICY_INVARIANTS = "policy_invariants"
     RUN_MANIFEST = "run_manifest"
     SEED_DELTAS = "seed_deltas"
@@ -660,7 +606,6 @@ class AuditOutputName(enum.StrEnum):
 
 
 class FigureName(enum.StrEnum):
-
     FIGURE_1 = "figure_1"
     FIGURE_2 = "figure_2"
     FIGURE_3 = "figure_3"
@@ -669,14 +614,12 @@ class FigureName(enum.StrEnum):
 
 
 class ReportTerm(enum.StrEnum):
-
     FIXED_CLUSTER = "fixed_cluster"
     CELL = "cell"
     SEED_AGGREGATE = "seed_aggregate"
 
 
 class AnalysisReportStem(enum.StrEnum):
-
     THRESHOLD_SHIFT_SUMMARY = "threshold_shift_summary"
     DIRECTIONAL_EXCESS_OVER_RANDOM = "directional_excess_over_random"
     RANDOM_CONTROL_INSTABILITY = "random_control_instability"
@@ -697,20 +640,17 @@ class AnalysisReportStem(enum.StrEnum):
 
 
 class HeterogeneityContextResult(enum.StrEnum):
-
     PARTIAL_CONTEXT = "PARTIAL_CONTEXT"
     CONTEXT_NOT_AVAILABLE = "CONTEXT_NOT_AVAILABLE_OR_WEAK"
 
 
 class ComparisonLabel(enum.StrEnum):
-
     GLOBAL_VS_LOCAL = "global_vs_local"
     GLOBAL_VS_CLUSTER = "global_vs_cluster"
     CLUSTER_VS_LOCAL = "cluster_vs_local"
 
 
 class SidecarField(enum.StrEnum):
-
     FIGURE = "figure"
     TITLE = "title"
     DATASET = "dataset"
@@ -747,7 +687,6 @@ class SidecarField(enum.StrEnum):
 
 
 class EvidenceRole(enum.StrEnum):
-
     DESCRIPTIVE = "descriptive"
     DESCRIPTIVE_WITH_CONFIRMATORY_SIDECAR_DELTA = (
         "descriptive_with_confirmatory_sidecar_delta"
@@ -755,26 +694,24 @@ class EvidenceRole(enum.StrEnum):
 
 
 class PackageDir(enum.StrEnum):
-
     CONFIG = "config"
     AUDIT = "audit"
     MANIFESTS = "manifests"
 
 
 class ArtifactDir(enum.StrEnum):
-
     OUTPUTS = "outputs"
     RESULTS = "results"
     CALIBRATION_POISONING = "conference_calibration_poisoning"
     SCORES = "scores"
     LOGS = "logs"
+    WORKER_LOGS = "workers"
     ANALYSIS = "analysis"
     FIGURES = "figures"
     TABLES = "tables"
 
 
 class RunState(enum.StrEnum):
-
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
     ABORTED = "ABORTED"
@@ -782,13 +719,11 @@ class RunState(enum.StrEnum):
 
 
 class CliExitCode(enum.IntEnum):
-
     SUCCESS = 0
     ERROR = 1
 
 
 class CliCommand(enum.StrEnum):
-
     BASELINE = "baseline"
     PLAN = "plan"
     POISON = "poison"
@@ -805,7 +740,6 @@ class CliCommand(enum.StrEnum):
 
 
 class StatusColumn(enum.StrEnum):
-
     SCOPE = "Scope"
     COMPLETE = "Complete"
     MISSING = "Missing"
@@ -814,5 +748,4 @@ class StatusColumn(enum.StrEnum):
 
 
 class StatusScope(enum.StrEnum):
-
     OVERALL = "Overall"

@@ -17,7 +17,6 @@ _ACTIVATION_CLASSES: dict[Activation, type[nn.Module]] = {
 
 
 class Autoencoder(nn.Module):
-
     def __init__(
         self,
         input_dim: FeatureCount,

@@ -34,10 +34,7 @@ DATA_ROOT: Path = Path(".")
 
 
 def nbaiot_main_manifest_path(base_dir: Path) -> Path:
-    return (
-        poisoning_output_root(base_dir)
-        / ArtifactFile.NBAIOT_MAIN_MANIFEST
-    )
+    return poisoning_output_root(base_dir) / ArtifactFile.NBAIOT_MAIN_MANIFEST
 
 
 def poisoning_output_root(base_dir: Path) -> Path:
@@ -50,7 +47,6 @@ def sensitivity_manifest_path(base_dir: Path) -> Path:
 
 @dataclass(frozen=True, slots=True)
 class ScoreCellPaths:
-
     cell: TrainingCellId
     score_dir: Path
     manifest_path: Path
@@ -58,7 +54,6 @@ class ScoreCellPaths:
 
 @dataclass(frozen=True, slots=True)
 class PolicyRunPaths:
-
     run: PolicyRunId
     result_dir: Path
     log_dir: Path
@@ -67,7 +62,6 @@ class PolicyRunPaths:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactLayout:
-
     base_dir: Path
     stage: ExperimentStage
 
@@ -146,7 +140,6 @@ def check_run_state(run_dir: Path) -> RunState:
 
 
 class RunLifecycle:
-
     def __init__(
         self,
         run_dir: Path,
@@ -182,9 +175,7 @@ class RunLifecycle:
         try:
             tb_str = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
             self._aborted.write_text(
-                f"policy: {self.policy}\n"
-                f"seed: {self.seed}\n"
-                f"traceback:\n{tb_str}"
+                f"policy: {self.policy}\nseed: {self.seed}\ntraceback:\n{tb_str}"
             )
         except Exception as e:
             with contextlib.suppress(Exception):

@@ -16,6 +16,7 @@ import torch.nn as nn
 from flwr.common import (
     Code,
     Context,
+    EvaluateRes,
     FitRes,
     RecordDict,
     Status,
@@ -1265,6 +1266,15 @@ class TestLoadSingleClientTrainingData:
         assert cal_t.shape == (20, 4)
         assert train_t.dtype == torch.float32
 
+    def test_repeated_loads_reuse_cached_tensors(self, tmp_path: Path) -> None:
+        """Verify each client's data is read from disk once per process."""
+        _write_client_splits(tmp_path, splits=(Split.TRAIN, Split.CAL))
+        device = torch.device(DeviceType.CPU)
+        first = load_single_client_training_data(tmp_path, device)
+        second = load_single_client_training_data(tmp_path, device)
+        assert first[0] is second[0]
+        assert first[1] is second[1]
+
     def test_missing_cal_raises(self, tmp_path: Path) -> None:
         """Ensure FileNotFoundError is raised if calibration split is missing."""
         _write_client_splits(tmp_path, splits=(Split.TRAIN,))
@@ -2057,7 +2067,9 @@ class TestScoringData:
             "datp.federated.load_client_data", lambda *_, **__: from_disk
         )
 
-        result = _scoring_data({"in_memory": _client_data_simulation()}, tmp_path, expected_dim=2)
+        result = _scoring_data(
+            {"in_memory": _client_data_simulation()}, tmp_path, expected_dim=2
+        )
         assert result is from_disk
 
 
@@ -2066,14 +2078,16 @@ def _make_strategy() -> DatpFedAvg:
     return DatpFedAvg(make_fl_cfg(rounds=10), ndarrays_to_parameters([params]), 1)
 
 
-def _make_fit_result(params: np.ndarray) -> tuple[MagicMock, FitRes]:
+def _make_fit_result(
+    params: np.ndarray, client_id: str = "c0", num_examples: int = 10
+) -> tuple[MagicMock, FitRes]:
     """Helper to package weight parameters as Flower fit results."""
     proxy = MagicMock()
     fit_res = FitRes(
         status=Status(code=Code.OK, message=""),
         parameters=ndarrays_to_parameters([params]),
-        num_examples=10,
-        metrics={},
+        num_examples=num_examples,
+        metrics={ClientMetricKey.CLIENT_ID: client_id},
     )
     return proxy, fit_res
 
@@ -2095,6 +2109,60 @@ class TestLatestParameters:
         latest = strategy.latest_parameters
         assert latest is not None
         np.testing.assert_array_equal(latest[0], params)
+
+
+class TestDeterministicAggregation:
+    """Tests verifying aggregation does not depend on client completion order."""
+
+    @staticmethod
+    def _fit_results() -> list[tuple[MagicMock, FitRes]]:
+        rng = np.random.default_rng(0)
+        return [
+            _make_fit_result(
+                rng.normal(size=(2, 2)).astype(np.float32),
+                client_id=f"c{i}",
+                num_examples=10 + 7 * i,
+            )
+            for i in range(6)
+        ]
+
+    def test_fit_aggregation_is_independent_of_arrival_order(self) -> None:
+        """Verify permuting the fit results yields bitwise-identical parameters."""
+        results = self._fit_results()
+        reference = _make_strategy()
+        reference.aggregate_fit(1, list(results), [])
+        for shuffle_seed in range(5):
+            order = np.random.default_rng(shuffle_seed).permutation(len(results))
+            strategy = _make_strategy()
+            strategy.aggregate_fit(1, [results[i] for i in order], [])
+            assert reference.latest_parameters is not None
+            assert strategy.latest_parameters is not None
+            np.testing.assert_array_equal(
+                reference.latest_parameters[0], strategy.latest_parameters[0]
+            )
+
+    def test_evaluate_aggregation_is_independent_of_arrival_order(self) -> None:
+        """Verify permuting the evaluate results yields a bitwise-identical loss."""
+        rng = np.random.default_rng(1)
+        results = [
+            (
+                MagicMock(),
+                EvaluateRes(
+                    status=Status(code=Code.OK, message=""),
+                    loss=float(rng.random()),
+                    num_examples=100 + 13 * i,
+                    metrics={ClientMetricKey.CLIENT_ID: f"c{i}"},
+                ),
+            )
+            for i in range(6)
+        ]
+        reference, _ = _make_strategy().aggregate_evaluate(1, list(results), [])
+        for shuffle_seed in range(5):
+            order = np.random.default_rng(shuffle_seed).permutation(len(results))
+            loss, _ = _make_strategy().aggregate_evaluate(
+                1, [results[i] for i in order], []
+            )
+            assert loss == reference
 
 
 class TestFullParticipationDiagnostics:

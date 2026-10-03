@@ -7,7 +7,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Collection, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -117,12 +117,10 @@ from datp.types import (
 
 
 class AuditModel(BaseModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class RunManifestRecord(AuditModel):
-
     run_id: RunId
     timestamp: NarrativeText
     git_commit_hash: ContentHash
@@ -156,7 +154,6 @@ class RunManifestRecord(AuditModel):
 
 
 class ThresholdRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -171,7 +168,6 @@ class ThresholdRecord(AuditModel):
 
 
 class ClientMetricRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -196,7 +192,6 @@ class ClientMetricRecord(AuditModel):
 
 
 class PerAttackMetricRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -210,7 +205,6 @@ class PerAttackMetricRecord(AuditModel):
 
 
 class ReconstructionErrorSummaryRecord(AuditModel):
-
     run_id: RunId | None = None
     policy: ThresholdPolicy | None = None
     seed: RandomSeed
@@ -229,7 +223,6 @@ class ReconstructionErrorSummaryRecord(AuditModel):
 
 
 class NBaIoTDeviceCounts(AuditModel):
-
     device: NBaIoTDevice
     family: NBaIoTDeviceFamily
     benign_train: SignedCount | None
@@ -238,14 +231,11 @@ class NBaIoTDeviceCounts(AuditModel):
     attack_test_total: SignedCount | None
     benign_class_imbalance_ratio: Ratio | None
     attack_files_by_family: dict[NBaIoTAttackFamily, list[ArtifactName]] = Field(
-        default_factory=lambda: {
-            family: [] for family in NBaIoTAttackFamily
-        }
+        default_factory=lambda: {family: [] for family in NBaIoTAttackFamily}
     )
 
 
 class DatasetPartitionAudit(AuditModel):
-
     dataset: DatasetID
     stage: ExperimentStage
     seed: RandomSeed | None
@@ -263,7 +253,6 @@ class DatasetPartitionAudit(AuditModel):
 
 
 class MetricDenominatorAuditRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -280,7 +269,6 @@ class MetricDenominatorAuditRecord(AuditModel):
 
 
 class MetricRecomputationRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -294,7 +282,6 @@ class MetricRecomputationRecord(AuditModel):
 
 
 class PolicyInvariantResult(AuditModel):
-
     stage: ExperimentStage
     seed: RandomSeed
     status: AuditStatus
@@ -311,7 +298,6 @@ class PolicyInvariantResult(AuditModel):
 
 
 class WarningRecord(AuditModel):
-
     severity: AuditSeverity
     code: WarningCode
     message: NarrativeText
@@ -319,7 +305,6 @@ class WarningRecord(AuditModel):
 
 
 class ConvergenceAuditRecord(AuditModel):
-
     stage: ExperimentStage
     seed: RandomSeed
     score_dir: ArtifactName
@@ -330,7 +315,6 @@ class ConvergenceAuditRecord(AuditModel):
 
 
 class SeedDeltaRecord(AuditModel):
-
     stage: ExperimentStage
     seed: RandomSeed
     global_cv_fpr: FalsePositiveRate | None
@@ -393,7 +377,6 @@ class SeedDeltaRecord(AuditModel):
 
 
 class FPRCompanionRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -409,7 +392,6 @@ class FPRCompanionRecord(AuditModel):
 
 
 class WorstClientRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -422,7 +404,6 @@ class WorstClientRecord(AuditModel):
 
 
 class ClusterAssignmentRecord(AuditModel):
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -435,11 +416,12 @@ class ClusterAssignmentRecord(AuditModel):
     fingerprint_p95: ScoreValue | None = None
     k_selected: ClusterCount | None = None
     silhouette: ClassificationScore | None = None
-    silhouette_scores: dict[RecordKey, ClassificationScore] = Field(default_factory=dict)
+    silhouette_scores: dict[RecordKey, ClassificationScore] = Field(
+        default_factory=dict
+    )
 
 
 class ClusterStabilityRecord(AuditModel):
-
     stage: ExperimentStage
     seed_a: SignedCount
     seed_b: SignedCount
@@ -448,14 +430,12 @@ class ClusterStabilityRecord(AuditModel):
 
 @dataclass(frozen=True, slots=True)
 class InvariantKey:
-
     stage: ExperimentStage
     seed: RandomSeed
 
 
 @dataclass(frozen=True, slots=True)
 class InvariantHashes:
-
     split_hash: ContentHash
     model_hash: ContentHash
     encoder_hash: ContentHash
@@ -564,7 +544,6 @@ RECOMPUTE_METRICS = (
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RecomputationParams:
-
     run_id: RunId
     seed: RandomSeed
     stage: ExperimentStage
@@ -584,7 +563,6 @@ class RecomputationParams:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RecomputationResult:
-
     diff: SignedDelta | None
     saved_value: ScoreValue | None
     recomputed_value: ScoreValue | None
@@ -614,7 +592,9 @@ def build_recomputation_record(
     )
 
 
-def compare_recomputation(saved: ScoreValue | None, recomp: ScoreValue) -> RecomputationResult:
+def compare_recomputation(
+    saved: ScoreValue | None, recomp: ScoreValue
+) -> RecomputationResult:
     recomp_val = recomp if math.isfinite(recomp) else None
 
     if saved is not None and math.isfinite(saved) and math.isfinite(recomp):
@@ -751,7 +731,6 @@ def build_nbaiot_per_device(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ClusterAssignments:
-
     seed: RandomSeed
     assignments: dict[ClientId, ClusterId]
 
@@ -838,7 +817,6 @@ METRICS_SOURCE_FILES = (Path("src/datp/evaluation.py"),)
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ConvergencePayload:
-
     convergence_round: RoundIndex | None
     convergence_criterion_value: ScoreValue | None
     convergence_status: ConvergenceStatus
@@ -870,7 +848,6 @@ def convergence_payload(score_root: Path) -> ConvergencePayload:
 
 @dataclass(frozen=True, slots=True)
 class CellPanel:
-
     cv_fpr: FalsePositiveRate | None = None
     cv_tpr: TruePositiveRate | None = None
     macro_f1_mean: ClassificationScore | None = None
@@ -888,10 +865,28 @@ class CellPanel:
     tau_global: Threshold | None = None
     coverage_ratio: CoverageLabel | None = None
 
+    def metrics(self) -> dict[MetricName, JsonValue]:
+        return {
+            MetricName.CV_FPR: self.cv_fpr,
+            MetricName.CV_TPR: self.cv_tpr,
+            MetricName.MACRO_F1_MEAN: self.macro_f1_mean,
+            MetricName.MACRO_F1_P10: self.macro_f1_p10,
+            MetricName.AUROC_MEAN: self.auroc_mean,
+            MetricName.PR_AUC_MEAN: self.pr_auc_mean,
+            MetricName.MEAN_FPR: self.mean_fpr,
+            MetricName.STD_FPR: self.std_fpr,
+            MetricName.IQR_FPR: self.iqr_fpr,
+            MetricName.WORST_CLIENT_FPR: self.worst_client_fpr,
+            MetricName.WORST_CLIENT_TPR: self.worst_client_tpr,
+            MetricName.WORST_CLIENT_MACRO_F1: self.worst_client_macro_f1,
+            MetricName.WORST_CLIENT_BALANCED_ACCURACY: self.worst_client_balanced_accuracy,
+            MetricName.CONVERGENCE_ROUND: self.convergence_round,
+            MetricName.TAU_GLOBAL: self.tau_global,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class EligibleMetricPairs:
-
     fprs: list[tuple[ClientId, FalsePositiveRate]]
     tprs: list[tuple[ClientId, TruePositiveRate]]
     macro_f1s: list[tuple[ClientId, ClassificationScore]]
@@ -900,7 +895,6 @@ class EligibleMetricPairs:
 
 @dataclass(frozen=True, slots=True)
 class WorstClientMetrics:
-
     fpr: FalsePositiveRate | None
     tpr: TruePositiveRate | None
     macro_f1: ClassificationScore | None
@@ -909,7 +903,6 @@ class WorstClientMetrics:
 
 @dataclass(frozen=True, slots=True)
 class CellPanelInputs:
-
     cv_fpr: FalsePositiveRate
     worst_client: WorstClientMetrics
     eligible_macro_f1s: list[tuple[ClientId, ClassificationScore]]
@@ -921,7 +914,6 @@ class CellPanelInputs:
 
 @dataclass(slots=True)
 class AuditAccumulator:
-
     manifest_records: list[RunManifestRecord] = field(
         default_factory=lambda: list[RunManifestRecord]()
     )
@@ -964,16 +956,14 @@ class AuditAccumulator:
     recomputation_records: list[MetricRecomputationRecord] = field(
         default_factory=lambda: list[MetricRecomputationRecord]()
     )
-    cell_panel: dict[
-        tuple[ExperimentStage, RandomSeed, ThresholdPolicy], CellPanel
-    ] = field(
-        default_factory=lambda: dict[
-            tuple[ExperimentStage, RandomSeed, ThresholdPolicy], CellPanel
-        ]()
+    cell_panel: dict[tuple[ExperimentStage, RandomSeed, ThresholdPolicy], CellPanel] = (
+        field(
+            default_factory=lambda: dict[
+                tuple[ExperimentStage, RandomSeed, ThresholdPolicy], CellPanel
+            ]()
+        )
     )
-    warnings: list[WarningRecord] = field(
-        default_factory=lambda: list[WarningRecord]()
-    )
+    warnings: list[WarningRecord] = field(default_factory=lambda: list[WarningRecord]())
     missing_confusion_warned: set[NarrativeText] = field(
         default_factory=lambda: set[str]()
     )
@@ -1063,7 +1053,6 @@ class RunContext:
 
 @dataclass(frozen=True, slots=True)
 class ScoreArrays:
-
     cal_errors: dict[ClientId, ScoreVector]
     test_benign_scores: dict[ClientId, ScoreVector]
     test_attack_scores: dict[ClientId, ScoreVector]
@@ -1072,7 +1061,6 @@ class ScoreArrays:
 
 @dataclass(frozen=True, slots=True)
 class AuditHashes:
-
     git_commit: NarrativeText
     timestamp: NarrativeText
     scoring_hash: ContentHash
@@ -1130,7 +1118,6 @@ def score_stage_files(score_root: Path, stage: ScoringStage) -> list[Path]:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ThresholdState:
-
     client_thresholds: dict[ClientId, Threshold]
     threshold_aggregation_method: ThresholdAggregationMethod
     test_benign_scores: dict[ClientId, ScoreVector]
@@ -1205,9 +1192,7 @@ def _typed_client_metrics(
             "confusion_matrix": row[PayloadKey.CONFUSION_MATRIX],
             "n_benign": row[PayloadKey.N_BENIGN],
             "n_attack": row[PayloadKey.N_ATTACK],
-            "auroc": (
-                row[MetricName.AUROC] if MetricName.AUROC in row else None
-            ),
+            "auroc": (row[MetricName.AUROC] if MetricName.AUROC in row else None),
             "pr_auc": row[MetricName.PR_AUC] if MetricName.PR_AUC in row else None,
             "ranking_metrics_provided": (
                 MetricName.AUROC in row or MetricName.PR_AUC in row
@@ -1227,7 +1212,9 @@ def build_run_context(
     base_dir: Path,
 ) -> RunContext:
     cell = TrainingCellId(stage=stage, seed=seed)
-    score_root = ArtifactLayout(base_dir=base_dir, stage=stage).score_cell(cell).score_dir
+    score_root = (
+        ArtifactLayout(base_dir=base_dir, stage=stage).score_cell(cell).score_dir
+    )
 
     partition_path = (
         processed_root(dataset_for_stage(stage), base_dir=data_root)
@@ -1679,9 +1666,7 @@ def _build_cell_panel(
         float(np.std(inputs.eligible_fpr_values, ddof=1))
         if inputs.eligible_fpr_values.size > 1
         else None,
-        iqr(inputs.eligible_fpr_values)
-        if inputs.eligible_fpr_values.size
-        else None,
+        iqr(inputs.eligible_fpr_values) if inputs.eligible_fpr_values.size else None,
         inputs.worst_client.fpr,
         inputs.worst_client.tpr,
         inputs.worst_client.macro_f1,
@@ -1836,12 +1821,14 @@ def _record_manifest_and_partition(
             test_count=ctx.test_count,
         )
     )
-    acc.invariant_inputs[ctx.identity.invariant_key][ctx.identity.policy] = InvariantHashes(
-        ctx.hashes.split,
-        ctx.hashes.model,
-        ctx.hashes.model,
-        hashes.scoring_hash,
-        hashes.metrics_hash,
+    acc.invariant_inputs[ctx.identity.invariant_key][ctx.identity.policy] = (
+        InvariantHashes(
+            ctx.hashes.split,
+            ctx.hashes.model,
+            ctx.hashes.model,
+            hashes.scoring_hash,
+            hashes.metrics_hash,
+        )
     )
 
     if ctx.paths.partition_manifest.exists():
@@ -1854,15 +1841,11 @@ def _record_manifest_and_partition(
             split_hash=ctx.hashes.split,
             feature_count=feature_count,
             client_count=(
-                metadata.n_clients or metadata.n_devices
-                if metadata
-                else None
+                metadata.n_clients or metadata.n_devices if metadata else None
             ),
             nbaiot_per_device=build_nbaiot_per_device(
                 ctx.paths.partition_manifest.parent,
-                list(ctx.partition.file_hashes)
-                if ctx.partition
-                else [],
+                list(ctx.partition.file_hashes) if ctx.partition else [],
             ),
             confound_summary=NBAIOT_CONFOUND_SUMMARY,
             chronological_split_verified=True,
@@ -1923,7 +1906,9 @@ def _record_score_hashes(
     ctx: RunContext,
     acc: AuditAccumulator,
 ) -> None:
-    if not (ctx.identity.policy in CONTROLLED_POLICIES and ctx.paths.score_root.exists()):
+    if not (
+        ctx.identity.policy in CONTROLLED_POLICIES and ctx.paths.score_root.exists()
+    ):
         return
 
     cell_hashes: set[ScoreArtifactHash] = set()
@@ -1939,7 +1924,9 @@ def _record_score_hashes(
             )
             if ctx.identity.policy == ThresholdPolicy.GLOBAL_THRESHOLD:
                 _add_reconstruction_record(ctx, sp, arr, stage, acc)
-    acc.score_hashes_by_cell[ctx.identity.invariant_key][ctx.identity.policy] = frozenset(cell_hashes)
+    acc.score_hashes_by_cell[ctx.identity.invariant_key][ctx.identity.policy] = (
+        frozenset(cell_hashes)
+    )
 
 
 def process_run(
@@ -1973,25 +1960,6 @@ def process_run(
         _record_score_hashes(ctx, acc)
 
 
-_PANEL_FIELD_NAMES: tuple[MetricName, ...] = (
-    MetricName.CV_FPR,
-    MetricName.CV_TPR,
-    MetricName.MACRO_F1_MEAN,
-    MetricName.MACRO_F1_P10,
-    MetricName.AUROC_MEAN,
-    MetricName.PR_AUC_MEAN,
-    MetricName.MEAN_FPR,
-    MetricName.STD_FPR,
-    MetricName.IQR_FPR,
-    MetricName.WORST_CLIENT_FPR,
-    MetricName.WORST_CLIENT_TPR,
-    MetricName.WORST_CLIENT_MACRO_F1,
-    MetricName.WORST_CLIENT_BALANCED_ACCURACY,
-    MetricName.CONVERGENCE_ROUND,
-    MetricName.TAU_GLOBAL,
-)
-
-
 _DELTA_FIELD_MAP: tuple[tuple[MetricName, MetricName], ...] = (
     (MetricName.CV_FPR, MetricName.CV_FPR),
     (MetricName.CV_TPR, MetricName.CV_TPR),
@@ -2001,12 +1969,7 @@ _DELTA_FIELD_MAP: tuple[tuple[MetricName, MetricName], ...] = (
 )
 
 
-def _panel_value(panel: CellPanel, metric: MetricName) -> JsonValue:
-    return asdict(panel)[metric.value]
-
-
-def _panel_score(panel: CellPanel, metric: MetricName) -> ScoreValue | None:
-    value = asdict(panel)[metric.value]
+def _score(value: JsonValue) -> ScoreValue | None:
     return value if isinstance(value, float) else None
 
 
@@ -2014,9 +1977,9 @@ def _panel_field_dict(
     panels: list[tuple[ThresholdSource, CellPanel]],
 ) -> JsonRecord:
     return {
-        f"{prefix}_{field}": _panel_value(panel, field)
+        f"{prefix}_{field}": value
         for prefix, panel in panels
-        for field in _PANEL_FIELD_NAMES
+        for field, value in panel.metrics().items()
     }
 
 
@@ -2024,10 +1987,14 @@ def _delta_field_dict(
     g: CellPanel,
     comparisons: list[tuple[ThresholdSource, CellPanel]],
 ) -> JsonRecord:
+    global_values = g.metrics()
+    compared = [(p, panel.metrics()) for p, panel in comparisons]
     return {
-        f"delta_{k}_global_minus_{p}": safe_diff(_panel_score(g, v), _panel_score(panel, v))
+        f"delta_{k}_global_minus_{p}": safe_diff(
+            _score(global_values[v]), _score(values[v])
+        )
         for k, v in _DELTA_FIELD_MAP
-        for p, panel in comparisons
+        for p, values in compared
     }
 
 
@@ -2037,9 +2004,7 @@ def build_seed_deltas(
 ) -> list[SeedDeltaRecord]:
     out: list[SeedDeltaRecord] = []
     for stage, seed in sorted({(s, sd) for s, sd, _ in cell_panel}):
-        g = cell_panel.get(
-            (stage, seed, ThresholdPolicy.GLOBAL_THRESHOLD), CellPanel()
-        )
+        g = cell_panel.get((stage, seed, ThresholdPolicy.GLOBAL_THRESHOLD), CellPanel())
         loc = cell_panel.get(
             (stage, seed, ThresholdPolicy.LOCAL_THRESHOLD), CellPanel()
         )
@@ -2225,7 +2190,6 @@ def emit_flat_cv_tpr_warnings(
 
 @dataclass(frozen=True, slots=True)
 class AuditOutputPaths:
-
     paths: tuple[tuple[AuditOutputName, Path], ...]
 
     def __contains__(self, name: JsonValue) -> bool:
@@ -2243,7 +2207,9 @@ def _compute_cluster_stability_records(
         defaultdict[RandomSeed, dict[ClientId, ClusterId]],
     ] = defaultdict(lambda: defaultdict(dict))
     for record in acc.cluster_records:
-        assignments_by_stage[record.stage][record.seed][record.client_id] = record.cluster_id
+        assignments_by_stage[record.stage][record.seed][record.client_id] = (
+            record.cluster_id
+        )
 
     return [
         record
@@ -2332,12 +2298,18 @@ _AUDIT_OUTPUT_NAME_ARTIFACT_PAIRS: tuple[tuple[AuditOutputName, AuditArtifact], 
     (AuditOutputName.PER_CLIENT_METRICS, AuditArtifact.PER_CLIENT_METRICS),
     (AuditOutputName.PER_ATTACK_METRICS, AuditArtifact.PER_ATTACK_METRICS),
     (AuditOutputName.THRESHOLD_VALUES, AuditArtifact.THRESHOLD_VALUES),
-    (AuditOutputName.RECONSTRUCTION_ERROR_SUMMARY, AuditArtifact.RECONSTRUCTION_ERROR_SUMMARY),
+    (
+        AuditOutputName.RECONSTRUCTION_ERROR_SUMMARY,
+        AuditArtifact.RECONSTRUCTION_ERROR_SUMMARY,
+    ),
     (AuditOutputName.CLUSTER_ASSIGNMENTS, AuditArtifact.CLUSTER_ASSIGNMENTS),
     (AuditOutputName.DATASET_PARTITION_AUDIT, AuditArtifact.DATASET_PARTITION_AUDIT),
     (AuditOutputName.CONVERGENCE_AUDIT, AuditArtifact.CONVERGENCE_AUDIT),
     (AuditOutputName.METRIC_DENOMINATOR_AUDIT, AuditArtifact.METRIC_DENOMINATOR_AUDIT),
-    (AuditOutputName.METRIC_RECOMPUTATION_AUDIT, AuditArtifact.METRIC_RECOMPUTATION_AUDIT),
+    (
+        AuditOutputName.METRIC_RECOMPUTATION_AUDIT,
+        AuditArtifact.METRIC_RECOMPUTATION_AUDIT,
+    ),
     (AuditOutputName.FPR_COMPANION_METRICS, AuditArtifact.FPR_COMPANION_METRICS),
     (AuditOutputName.WORST_CLIENT_TRACKING, AuditArtifact.WORST_CLIENT_TRACKING),
     (AuditOutputName.CLUSTER_STABILITY, AuditArtifact.CLUSTER_STABILITY),

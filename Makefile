@@ -23,8 +23,9 @@ help: ## Show available targets.
 # ---------------------------------------------------------------------------
 
 .PHONY: check
-check: ## Run ruff, pyright, and Semgrep (no tests).
+check: ## Run ruff (lint + format), pyright, and Semgrep (no tests).
 	$(PYTHON) -m ruff check src/ tests/
+	$(PYTHON) -m ruff format --check src/ tests/ tests_support/
 	$(PYTHON) -m ruff check --select C901 src/datp/
 	$(PYTHON) -m pyright src/
 	mkdir -p $${TMPDIR:-/tmp}/datp-semgrep/config $${TMPDIR:-/tmp}/datp-semgrep/cache

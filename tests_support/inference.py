@@ -9,7 +9,12 @@ from typing import cast
 import numpy as np
 from statsmodels.stats.multitest import multipletests
 
-from datp.config import BOOTSTRAP_CI, BOOTSTRAP_MIN_FINITE, BOOTSTRAP_N, SIGN_CONSISTENCY_THRESHOLD
+from datp.config import (
+    BOOTSTRAP_CI,
+    BOOTSTRAP_MIN_FINITE,
+    BOOTSTRAP_N,
+    SIGN_CONSISTENCY_THRESHOLD,
+)
 from datp.enums import AttackerObjective
 from datp.statistics import BootstrapResult, bootstrap_ci
 

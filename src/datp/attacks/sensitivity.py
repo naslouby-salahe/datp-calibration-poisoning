@@ -86,7 +86,6 @@ logger = get_logger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class _CellBase:
-
     training_seed: RandomSeed
     victim_id: ClientId
     source: PoisoningSourceStrategy
@@ -499,7 +498,9 @@ def run_sensitivity(
         ),
         scale_normalization=tuple(result.scale_normalization for result in results),
         draw_variants=tuple(row for result in results for row in result.draw_variants),
-        trust_boundary=tuple(row for result in results for row in result.trust_boundary),
+        trust_boundary=tuple(
+            row for result in results for row in result.trust_boundary
+        ),
     )
     logger.info(
         "sensitivity analysis completed",

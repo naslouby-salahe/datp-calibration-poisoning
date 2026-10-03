@@ -428,7 +428,10 @@ def test_cv_fpr_eligible_only() -> None:
 
     expected_cv = cv(np.array([0.10, 0.15, 0.20]), ddof=0)
     assert abs(ev.dispersion.cv_fpr - expected_cv) < 1e-12
-    assert abs(ev.dispersion.cv_fpr - cv(np.array([0.10, 0.15, 0.20, 0.50]), ddof=0)) > 0.01
+    assert (
+        abs(ev.dispersion.cv_fpr - cv(np.array([0.10, 0.15, 0.20, 0.50]), ddof=0))
+        > 0.01
+    )
 
 
 def test_coverage_ratio() -> None:
@@ -448,7 +451,9 @@ def test_fpr_bundle_includes_mean_std_worst() -> None:
     ev = _make_eval_result([c1, c2, c3], ["c1", "c2", "c3"], [])
 
     assert ev.dispersion.mean_fpr == pytest.approx(0.20, abs=1e-10)
-    assert ev.dispersion.std_fpr == pytest.approx(np.std([0.10, 0.20, 0.30], ddof=1), abs=1e-10)
+    assert ev.dispersion.std_fpr == pytest.approx(
+        np.std([0.10, 0.20, 0.30], ddof=1), abs=1e-10
+    )
     assert ev.dispersion.worst_client_fpr == pytest.approx(0.30, abs=1e-10)
     assert ev.dispersion.worst_client_id == "c3"
     assert ev.dispersion.eligible_count == 3
@@ -590,6 +595,7 @@ class TestComputeBinaryRankingMetrics:
 
 class TestRecomputeBinaryMetrics:
     """Recomputation of binary classification metrics from saved artifacts."""
+
     def test_matches_compute_client_record(self) -> None:
         benign = np.array([0.1, 0.2, 0.7], dtype=float)
         attack = np.array([0.8, 0.9, 0.95], dtype=float)

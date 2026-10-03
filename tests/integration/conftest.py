@@ -113,7 +113,9 @@ def _patch_tiny_runtime(
     monkeypatch.setattr(manifests_module, "POISONING_SEEDS", TINY_SEEDS.poisoning)
     monkeypatch.setattr(manifests_module, "ANALYSIS_SEEDS", TINY_SEEDS.analysis)
     monkeypatch.setattr(
-        CalibrationPoisoningConfig, "for_bounded_sweep", classmethod(lambda _cls: tiny_config)
+        CalibrationPoisoningConfig,
+        "for_bounded_sweep",
+        classmethod(lambda _cls: tiny_config),
     )
     monkeypatch.setattr(sensitivity_module, "CLUSTER_SENSITIVITY_K_GRID", (2, 3))
     monkeypatch.setattr(sensitivity_module, "CLUSTER_SENSITIVITY_RANDOM_STATES", (0,))
@@ -124,7 +126,13 @@ def _patch_tiny_runtime(
         sensitivity_module,
         "NBAIOT_MAIN_SOURCE_OBJECTIVE_PAIRS",
         (
-            (PoisoningSourceStrategy.HIGH_SCORE_BENIGN, AttackerObjective.THRESHOLD_RAISE),
-            (PoisoningSourceStrategy.LOW_SCORE_BENIGN, AttackerObjective.THRESHOLD_LOWER),
+            (
+                PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
+                AttackerObjective.THRESHOLD_RAISE,
+            ),
+            (
+                PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+                AttackerObjective.THRESHOLD_LOWER,
+            ),
         ),
     )

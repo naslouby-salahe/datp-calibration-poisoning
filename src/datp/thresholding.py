@@ -27,6 +27,7 @@ from datp.core import (
     PolicyRunId,
     ThresholdResult,
     TrainingCellId,
+    array_hash,
     get_logger,
     git_commit,
     source_hash,
@@ -106,14 +107,12 @@ def arithmetic_mean_threshold(tau_list: list[Threshold] | ScoreVector) -> Thresh
 
 @dataclass(frozen=True, slots=True)
 class EligibilityResult:
-
     eligible_ids: tuple[ClientId, ...]
     pending_ids: tuple[ClientId, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ClientCalibrationErrors:
-
     client_id: ClientId
     errors: ScoreVector
 
@@ -123,7 +122,6 @@ class ClientCalibrationErrors:
 
 @dataclass(frozen=True, slots=True)
 class CalibrationErrorSet:
-
     clients: tuple[ClientCalibrationErrors, ...]
 
     @classmethod
@@ -147,7 +145,6 @@ class CalibrationErrorSet:
 
 @dataclass(frozen=True, slots=True)
 class ClientThresholdsCollection(Mapping[ClientId, float]):
-
     entries: tuple[ClientThreshold, ...]
 
     @classmethod
@@ -215,7 +212,7 @@ def compute_client_thresholds(
         error_set = CalibrationErrorSet.from_mapping(error_set)
     return ClientThresholdsCollection(
         entries=tuple(
-                ClientThreshold(
+            ClientThreshold(
                 client_id=cid,
                 threshold=percentile_threshold(error_set.for_client(cid).errors, q=q),
                 status=ClientStatus.ELIGIBLE,
@@ -282,7 +279,6 @@ _MIN_CLUSTER_ELIGIBLE = 2
 
 @dataclass(frozen=True, slots=True)
 class ClusterAssignments:
-
     client_cluster: dict[ClientId, SignedCount]
     cluster_taus_map: dict[ClusterIndex, list[ScoreValue]]
     tau_per_cluster: dict[ClusterIndex, Threshold]
@@ -290,7 +286,6 @@ class ClusterAssignments:
 
 @dataclass(frozen=True, slots=True)
 class ClusterMetadataInput:
-
     k: ClusterCount
     client_cluster: dict[ClientId, SignedCount]
     tau_per_cluster: dict[ClusterIndex, Threshold]
@@ -539,9 +534,7 @@ def cluster_info(
             cluster_id=ClusterId(f"cluster_{cluster}"),
             tau_cluster=tau_per_cluster[cluster],
             members=tuple(
-                ClientId(cid)
-                for cid in eligible_ids
-                if client_cluster[cid] == cluster
+                ClientId(cid) for cid in eligible_ids if client_cluster[cid] == cluster
             ),
         )
         for cluster in sorted(tau_per_cluster)
@@ -642,6 +635,23 @@ def _compute_cluster_thresholds(
     )
 
 
+_CLUSTER_CACHE_LIMIT = 256
+_CLUSTER_CACHE: dict[
+    tuple[
+        tuple[tuple[ClientId, ContentHash], ...],
+        SampleCount,
+        Threshold,
+        Quantile,
+        RandomSeed,
+        ClusterCount,
+        IterationCount,
+        IterationCount,
+        PolicyRunId,
+    ],
+    ThresholdResult,
+] = {}
+
+
 def compute_cluster(
     client_errors: dict[ClientId, ScoreVector],
     n_min: SampleCount,
@@ -657,6 +667,21 @@ def compute_cluster(
         raise ValueError(
             f"[{_MODULE_policies}] Invalid cluster k. Expected: locked fixed K > 0. Got: {cluster_k}."
         )
+    cache_key = (
+        tuple(
+            sorted((cid, array_hash(errors)) for cid, errors in client_errors.items())
+        ),
+        n_min,
+        tau_global,
+        q,
+        random_state,
+        cluster_k,
+        n_init,
+        max_iter,
+        run,
+    )
+    if (cached := _CLUSTER_CACHE.get(cache_key)) is not None:
+        return cached
     eligibility = identify_eligible(client_errors, n_min=n_min)
 
     if len(eligibility.eligible_ids) < _MIN_CLUSTER_ELIGIBLE:
@@ -676,13 +701,17 @@ def compute_cluster(
         )
     )
 
-    return build_threshold_result(
+    threshold_result = build_threshold_result(
         run=run,
         tau_global=tau_global,
         eligible_thresholds=result.eligible_map,
         pending_clients=eligibility.pending_ids,
         cluster_metadata=result.metadata,
     )
+    if len(_CLUSTER_CACHE) >= _CLUSTER_CACHE_LIMIT:
+        _CLUSTER_CACHE.clear()
+    _CLUSTER_CACHE[cache_key] = threshold_result
+    return threshold_result
 
 
 _MODULE_derivation = "thresholding.derivation"
@@ -746,7 +775,6 @@ THRESHOLD_SCHEMA_VERSION: SchemaVersion = "1"
 
 @dataclass(frozen=True, slots=True)
 class MetricsBuildRequest:
-
     eval_result: EvaluationResult
     threshold_result: ThresholdResult
     config_identity: ContentHash
@@ -756,7 +784,6 @@ class MetricsBuildRequest:
 
 
 class ConfusionMatrix(BaseModel):
-
     model_config = ConfigDict(frozen=True, extra="forbid")
     tp: SampleCount
     fp: SampleCount
@@ -765,7 +792,6 @@ class ConfusionMatrix(BaseModel):
 
 
 class MetricsClientDetail(BaseModel):
-
     model_config = ConfigDict(frozen=True, extra="forbid")
     client_id: ClientId
     fpr: FalsePositiveRate
@@ -786,7 +812,6 @@ class MetricsClientDetail(BaseModel):
 
 
 class SweepMetrics(BaseModel):
-
     model_config = ConfigDict(frozen=True, extra="forbid")
     schema_version: SchemaVersion
     metric_schema_version: SchemaVersion
@@ -891,7 +916,8 @@ def _validate_provenance(provenance: MetricsProvenance) -> None:
         provenance.generated_at_utc,
     )
     if any(
-        value in {
+        value
+        in {
             ProvenanceSentinel.UNKNOWN,
             ProvenanceSentinel.UNKNOWN_LOWERCASE,
         }
@@ -1001,7 +1027,8 @@ def build_metrics_dict(req: MetricsBuildRequest) -> SweepMetrics:
         aggregate_metrics=aggregate_metrics,
         provenance=provenance,
         per_client=tuple(
-            _to_client_detail(c, POLICY_THRESHOLD_SOURCE[er.run.policy]) for c in er.clients
+            _to_client_detail(c, POLICY_THRESHOLD_SOURCE[er.run.policy])
+            for c in er.clients
         ),
     )
 
@@ -1013,7 +1040,9 @@ def results_exist(
     *,
     base_dir: Path,
 ) -> bool:
-    run = PolicyRunId(cell=TrainingCellId(stage=stage, seed=RandomSeed(seed)), policy=policy)
+    run = PolicyRunId(
+        cell=TrainingCellId(stage=stage, seed=RandomSeed(seed)), policy=policy
+    )
     path = ArtifactLayout(base_dir=base_dir, stage=stage).policy_run(run).metrics_path
 
     if not path.is_file() or path.stat().st_size == 0:
@@ -1025,9 +1054,7 @@ def results_exist(
     return False
 
 
-def _client_id_from_payload(
-    payload: JsonRecord, row_index: Index
-) -> ClientId | None:
+def _client_id_from_payload(payload: JsonRecord, row_index: Index) -> ClientId | None:
     rows = payload.get(PayloadKey.PER_CLIENT)
     if isinstance(rows, Sequence) and not isinstance(rows, str | bytes):
         if row_index < len(rows):
@@ -1066,9 +1093,13 @@ def _validation_message(
     return f"[{module}] INVALID metrics payload at {'.'.join(parts)}: {message}"
 
 
-def validate_metrics_payload(payload: JsonRecord, *, module: NarrativeText) -> list[NarrativeText]:
+def validate_metrics_payload(
+    payload: JsonRecord, *, module: NarrativeText
+) -> list[NarrativeText]:
     try:
         SweepMetrics.model_validate(payload)
     except ValidationError as error:
-        return [_validation_message(payload, detail, module) for detail in error.errors()]
+        return [
+            _validation_message(payload, detail, module) for detail in error.errors()
+        ]
     return []

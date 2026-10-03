@@ -46,6 +46,7 @@ from datp.enums import (
     ThresholdPolicy,
 )
 from datp.thresholding import (
+    _CLUSTER_CACHE,
     EligibilityResult,
     arithmetic_mean_threshold,
     build_threshold_result,
@@ -144,6 +145,12 @@ def _valid_payload(**overrides) -> dict:
     }
     payload.update(overrides)
     return payload
+
+
+@pytest.fixture(autouse=True)
+def _clear_cluster_cache() -> None:
+    """Cluster results are memoised per process; isolate tests that patch KMeans."""
+    _CLUSTER_CACHE.clear()
 
 
 class TestProvenanceValidation:
@@ -314,6 +321,25 @@ class TestClusterThresholdFixedMode:
         assert result.cluster is not None
         assert result.cluster.k == CLUSTER_K_NBAIOT
 
+    def test_identical_inputs_are_memoised(
+        self, eligible_errors: dict[str, np.ndarray]
+    ) -> None:
+        """Verify repeated clustering of identical errors returns the cached result."""
+        kwargs = dict(
+            n_min=N_MIN,
+            tau_global=0.5,
+            q=THRESHOLD_QUANTILE,
+            random_state=CLUSTER_RANDOM_STATE,
+            cluster_k=CLUSTER_K_NBAIOT,
+            n_init=CLUSTER_N_INIT,
+            max_iter=CLUSTER_MAX_ITER,
+            run=_run(),
+        )
+        first = compute_cluster(eligible_errors, **kwargs)
+        assert compute_cluster(eligible_errors, **kwargs) is first
+        changed = {**eligible_errors, "c0": eligible_errors["c0"] + 0.01}
+        assert compute_cluster(changed, **kwargs) is not first
+
     def test_fixed_k_pending_excluded(
         self, eligible_errors: dict[str, np.ndarray]
     ) -> None:
@@ -370,10 +396,9 @@ class TestClusterThresholdKLock:
             run=_run(),
         )
         assert result.cluster is not None
-        assert {
-            score.cluster_count
-            for score in result.cluster.silhouette_scores
-        } <= {CLUSTER_K_NBAIOT}
+        assert {score.cluster_count for score in result.cluster.silhouette_scores} <= {
+            CLUSTER_K_NBAIOT
+        }
 
 
 class TestClusterThresholdFingerprintRobustness:
@@ -539,7 +564,9 @@ class TestClusterThresholdKMeansHyperparametersLocked:
             assert call.kwargs["random_state"] == CLUSTER_RANDOM_STATE
 
 
-def _run_eligibility(policy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD) -> PolicyRunId:
+def _run_eligibility(
+    policy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD,
+) -> PolicyRunId:
     """Helper to build a PolicyRunId instance."""
     return PolicyRunId(
         cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=0), policy=policy
@@ -609,13 +636,17 @@ class TestComputeClientThresholds:
     def test_eligible_only(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify that thresholds are computed only for the eligible subset."""
         eligibility = identify_eligible(client_errors, n_min=N_MIN)
-        taus = compute_client_thresholds(client_errors, eligibility, q=THRESHOLD_QUANTILE)
+        taus = compute_client_thresholds(
+            client_errors, eligibility, q=THRESHOLD_QUANTILE
+        )
         assert "client_d" not in taus
 
     def test_matches_percentile(self, client_errors: dict[str, np.ndarray]) -> None:
         """Verify calculated thresholds match the exact percentile values from numpy."""
         eligibility = identify_eligible(client_errors, n_min=N_MIN)
-        taus = compute_client_thresholds(client_errors, eligibility, q=THRESHOLD_QUANTILE)
+        taus = compute_client_thresholds(
+            client_errors, eligibility, q=THRESHOLD_QUANTILE
+        )
         for cid in eligibility.eligible_ids:
             expected = float(np.percentile(client_errors[cid], THRESHOLD_QUANTILE))
             assert taus[cid] == pytest.approx(expected)
@@ -780,7 +811,9 @@ class TestBuildThresholdResult:
                 assert ct.strategy == policy
 
 
-def _run_policies(policy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD) -> PolicyRunId:
+def _run_policies(
+    policy: ThresholdPolicy = ThresholdPolicy.GLOBAL_THRESHOLD,
+) -> PolicyRunId:
     """Helper to build a PolicyRunId instance."""
     return PolicyRunId(
         cell=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=0), policy=policy
@@ -822,7 +855,9 @@ class TestGlobalThreshold:
         for ct in result.client_thresholds:
             assert ct.threshold == pytest.approx(result.tau_global)
 
-    def test_pending_flagged(self, client_errors_policies: dict[str, np.ndarray]) -> None:
+    def test_pending_flagged(
+        self, client_errors_policies: dict[str, np.ndarray]
+    ) -> None:
         """Verify pending clients are flagged and pending count is correct in global mode."""
         result = compute_global(
             client_errors_policies,
@@ -845,7 +880,9 @@ class TestGlobalThreshold:
     ) -> None:
         """Verify global threshold is the unweighted mean of eligible client percentiles."""
         eligibility = identify_eligible(client_errors_policies, n_min=N_MIN)
-        taus = compute_client_thresholds(client_errors_policies, eligibility, q=THRESHOLD_QUANTILE)
+        taus = compute_client_thresholds(
+            client_errors_policies, eligibility, q=THRESHOLD_QUANTILE
+        )
         expected = sum(taus.values()) / len(taus)
         result = compute_global(
             client_errors_policies,
@@ -897,7 +934,9 @@ class TestLocalThreshold:
             )
             assert ct.threshold == pytest.approx(expected)
 
-    def test_pending_get_tau_global(self, client_errors_policies: dict[str, np.ndarray]) -> None:
+    def test_pending_get_tau_global(
+        self, client_errors_policies: dict[str, np.ndarray]
+    ) -> None:
         """Verify pending clients receive the global fallback threshold value."""
         tau_global = 0.42
         result = compute_local(
@@ -948,14 +987,20 @@ class TestClusterThresholdFingerprints:
     def test_four_scalars(self, client_errors_policies: dict[str, np.ndarray]) -> None:
         """Verify that fingerprint tensors contain exactly 4 scalars per client."""
         eligibility = identify_eligible(client_errors_policies, n_min=N_MIN)
-        fps = compute_fingerprints(client_errors_policies, eligibility.eligible_ids, q=THRESHOLD_QUANTILE)
+        fps = compute_fingerprints(
+            client_errors_policies, eligibility.eligible_ids, q=THRESHOLD_QUANTILE
+        )
         for cid in eligibility.eligible_ids:
             assert fps[cid].shape == (4,)
 
-    def test_pending_excluded(self, client_errors_policies: dict[str, np.ndarray]) -> None:
+    def test_pending_excluded(
+        self, client_errors_policies: dict[str, np.ndarray]
+    ) -> None:
         """Verify that pending clients are completely excluded from fingerprint output."""
         eligibility = identify_eligible(client_errors_policies, n_min=N_MIN)
-        fps = compute_fingerprints(client_errors_policies, eligibility.eligible_ids, q=THRESHOLD_QUANTILE)
+        fps = compute_fingerprints(
+            client_errors_policies, eligibility.eligible_ids, q=THRESHOLD_QUANTILE
+        )
         assert "client_d" not in fps
 
 
@@ -1453,8 +1498,7 @@ def test_apply_defense_none_is_identity() -> None:
         ),
     )
     poisoned_cal = {
-        cid: outcome.poisoned_cal_set[cid].cal
-        for cid in outcome.poisoned_cal_set
+        cid: outcome.poisoned_cal_set[cid].cal for cid in outcome.poisoned_cal_set
     }
     col2, pois2 = apply_defense(
         col, poisoned_cal, defense=PoisoningDefense.NONE, trim_fraction=0.05
@@ -1541,10 +1585,7 @@ def test_defense_runs_end_to_end_through_recompute_pipeline() -> None:
     )
     work_col, work_pois = apply_defense(
         col,
-        {
-            cid: outcome.poisoned_cal_set[cid].cal
-            for cid in outcome.poisoned_cal_set
-        },
+        {cid: outcome.poisoned_cal_set[cid].cal for cid in outcome.poisoned_cal_set},
         defense=PoisoningDefense.TRIMMED_CALIBRATION,
         trim_fraction=0.05,
     )

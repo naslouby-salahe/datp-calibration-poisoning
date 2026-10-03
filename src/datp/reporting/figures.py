@@ -54,14 +54,10 @@ NBAIOT_DEVICE_SHORT_LABELS: dict[NBaIoTDevice, NarrativeText] = {
 REPORTING_AUDIT_SCHEMA_VERSION: SchemaVersion = "1"
 
 
-SEED_SELECTION_RULE: NarrativeText = (
-    "training seed whose GLOBAL_THRESHOLD CV(FPR) is the lower median across all training seeds"
-)
+SEED_SELECTION_RULE: NarrativeText = "training seed whose GLOBAL_THRESHOLD CV(FPR) is the lower median across all training seeds"
 
 
-CLIENT_SELECTION_RULE: NarrativeText = (
-    "clients with the lowest, median and highest GLOBAL_THRESHOLD FPR in the representative seed"
-)
+CLIENT_SELECTION_RULE: NarrativeText = "clients with the lowest, median and highest GLOBAL_THRESHOLD FPR in the representative seed"
 
 
 POISONING_FIGURE_FRACTION: PoisonFraction = 0.40
@@ -127,20 +123,57 @@ class _BoxplotOutput(Protocol):
 
 
 class _Axes(Protocol):
-    def bar(self, x: NDArray[np.generic], height: Sequence[float], width: float, *, label: str, color: str) -> None: ...
+    def bar(
+        self,
+        x: NDArray[np.generic],
+        height: Sequence[float],
+        width: float,
+        *,
+        label: str,
+        color: str,
+    ) -> None: ...
     def set(self, **kwargs: str) -> None: ...
-    def set_xticks(self, ticks: NDArray[np.generic], labels: Sequence[str] | None = None) -> None: ...
-    def set_xticklabels(self, labels: Sequence[str], **kwargs: str | float | int) -> None: ...
+    def set_xticks(
+        self, ticks: NDArray[np.generic], labels: Sequence[str] | None = None
+    ) -> None: ...
+    def set_xticklabels(
+        self, labels: Sequence[str], **kwargs: str | float | int
+    ) -> None: ...
     def legend(self, **kwargs: str | float | int) -> None: ...
-    def plot(self, x: NDArray[np.generic], y: NDArray[np.generic], **kwargs: str | float | int) -> None: ...
+    def plot(
+        self,
+        x: NDArray[np.generic],
+        y: NDArray[np.generic],
+        **kwargs: str | float | int,
+    ) -> None: ...
     def axvline(self, x: float, **kwargs: str | float | int) -> None: ...
-    def boxplot(self, data: Sequence[NDArray[np.generic]], **kwargs: bool | Sequence[str]) -> _BoxplotOutput: ...
+    def boxplot(
+        self, data: Sequence[NDArray[np.generic]], **kwargs: bool | Sequence[str]
+    ) -> _BoxplotOutput: ...
     def tick_params(self, *, axis: str, **kwargs: str | float | int) -> None: ...
-    def fill_between(self, x: NDArray[np.generic], y1: NDArray[np.generic], y2: NDArray[np.generic], **kwargs: str | float | int) -> None: ...
-    def errorbar(self, x: Sequence[float], y: Sequence[float], **kwargs: str | float | int | Sequence[Sequence[float]]) -> None: ...
+    def fill_between(
+        self,
+        x: NDArray[np.generic],
+        y1: NDArray[np.generic],
+        y2: NDArray[np.generic],
+        **kwargs: str | float | int,
+    ) -> None: ...
+    def errorbar(
+        self,
+        x: Sequence[float],
+        y: Sequence[float],
+        **kwargs: str | float | int | Sequence[Sequence[float]],
+    ) -> None: ...
     def axhline(self, y: float, **kwargs: str | float | int) -> None: ...
-    def scatter(self, x: NDArray[np.generic], y: NDArray[np.generic], **kwargs: str | float | int) -> None: ...
-    def hlines(self, y: float, xmin: float, xmax: float, **kwargs: str | float | int) -> None: ...
+    def scatter(
+        self,
+        x: NDArray[np.generic],
+        y: NDArray[np.generic],
+        **kwargs: str | float | int,
+    ) -> None: ...
+    def hlines(
+        self, y: float, xmin: float, xmax: float, **kwargs: str | float | int
+    ) -> None: ...
 
 
 class _Figure(Protocol):
@@ -265,7 +298,9 @@ def generate_figure3(
 
 
 def generate_figure5(
-    client_effects: dict[NarrativeText, dict[ThresholdPolicy, dict[ClientId, list[ScoreValue]]]],
+    client_effects: dict[
+        NarrativeText, dict[ThresholdPolicy, dict[ClientId, list[ScoreValue]]]
+    ],
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
@@ -375,7 +410,9 @@ def validate_main_body_role(policies: list[ThresholdPolicy]) -> None:
             )
 
 
-def format_mean_std(mean: ScoreValue, std: ScoreValue, bold: bool = False) -> NarrativeText:
+def format_mean_std(
+    mean: ScoreValue, std: ScoreValue, bold: bool = False
+) -> NarrativeText:
     if np.isnan(mean):
         return "---"
     text = f"{mean:.3f} ± {std:.3f}"
@@ -384,7 +421,6 @@ def format_mean_std(mean: ScoreValue, std: ScoreValue, bold: bool = False) -> Na
 
 @dataclass(frozen=True, slots=True)
 class TableRow:
-
     policy: ThresholdPolicy
     cv_fpr_mean: FalsePositiveRate
     cv_fpr_std: FalsePositiveRate
@@ -401,7 +437,6 @@ class TableRow:
 
 @dataclass(slots=True)
 class ResultTable:
-
     title: NarrativeText
     style: StyleConfig
     rows: list[TableRow] = field(default_factory=lambda: list[TableRow]())
@@ -451,7 +486,7 @@ ThresholdPolicy & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ & Worst BA & P10 client 
         labels = self.style.policy_labels
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            writer = csv.writer(f, lineterminator="\n")
             writer.writerow(
                 [
                     "ThresholdPolicy",
@@ -511,9 +546,7 @@ def _build_table_row(
 
     cv_fpr_mean, cv_fpr_std = _mean_std([r.dispersion.cv_fpr for r in results])
     cv_tpr_mean, cv_tpr_std = _mean_std([r.dispersion.cv_tpr for r in results])
-    worst_ba_mean, worst_ba_std = _mean_std(
-        [r.dispersion.worst_ba for r in results]
-    )
+    worst_ba_mean, worst_ba_std = _mean_std([r.dispersion.worst_ba for r in results])
     macro_f1_mean, macro_f1_std = _mean_std(
         [r.dispersion.p10_macro_f1 for r in results]
     )

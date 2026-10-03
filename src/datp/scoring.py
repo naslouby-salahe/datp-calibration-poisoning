@@ -42,34 +42,28 @@ _MODULE = "scoring.manifest"
 
 
 class ScoringColumn(enum.StrEnum):
-
     RECONSTRUCTION_ERROR = "reconstruction_error"
 
 
 class ScoringManifestField(enum.StrEnum):
-
     COMPLETION_STATUS = "completion_status"
 
 
 class ScoringManifestSentinel(enum.StrEnum):
-
     NOT_PROVIDED = "NOT_PROVIDED"
 
 
 class ScoringManifestStatus(enum.StrEnum):
-
     COMPLETE = "complete"
     PARTIAL = "partial"
 
 
 class ScoringColumnDtype(BaseModel):
-
     column: ScoringColumn
     dtype: NarrativeText
 
 
 class ScoringRecord(BaseModel):
-
     client_id: ClientId
     split: ScoringStage
     path: ArtifactName
@@ -86,19 +80,19 @@ class ScoringRecord(BaseModel):
     def _parse_dtypes(cls, value: JsonValue) -> JsonValue:
         if isinstance(value, dict):
             return [
-                {"column": column, "dtype": dtype}
-                for column, dtype in value.items()
+                {"column": column, "dtype": dtype} for column, dtype in value.items()
             ]
         return value
 
 
 class ScoringManifest(BaseModel):
-
     dataset: DatasetID
     stage: ExperimentStage | None
     seed: RandomSeed | None = None
     model_hash: ContentHash
-    scoring_code_version: SchemaVersion | ScoringManifestSentinel = ScoringManifestSentinel.NOT_PROVIDED
+    scoring_code_version: SchemaVersion | ScoringManifestSentinel = (
+        ScoringManifestSentinel.NOT_PROVIDED
+    )
     score_column_name: ScoringColumn = ScoringColumn.RECONSTRUCTION_ERROR
     expected_client_ids: tuple[ClientId, ...]
     expected_splits: tuple[ScoringStage, ...]
@@ -122,7 +116,9 @@ class ScoringManifestAuditView(BaseModel):
     dataset: DatasetID | None = None
     stage: ExperimentStage | None = None
     seed: RandomSeed | None = None
-    model_hash: ContentHash | ScoringManifestSentinel = ScoringManifestSentinel.NOT_PROVIDED
+    model_hash: ContentHash | ScoringManifestSentinel = (
+        ScoringManifestSentinel.NOT_PROVIDED
+    )
     expected_client_ids: tuple[ClientId, ...] = ()
     expected_splits: tuple[ScoringStage, ...] = ()
     actual_client_ids: tuple[ClientId, ...] = ()
@@ -133,7 +129,6 @@ class ScoringManifestAuditView(BaseModel):
 
 
 class ScoringManifestContext(BaseModel):
-
     dataset: DatasetID
     stage: ExperimentStage | None = None
     seed: RandomSeed | None = None
@@ -141,7 +136,6 @@ class ScoringManifestContext(BaseModel):
 
 
 class ScoringManifestCoverage(BaseModel):
-
     missing_pairs: tuple[tuple[ClientId, ScoringStage], ...]
     missing_files: tuple[ArtifactName, ...]
     invalid_files: tuple[ArtifactName, ...]
@@ -170,9 +164,7 @@ def check_manifest_coverage(
         for client_id in manifest.expected_client_ids
         for split in manifest.expected_splits
     }
-    actual_pairs = {
-        (record.client_id, record.split) for record in manifest.records
-    }
+    actual_pairs = {(record.client_id, record.split) for record in manifest.records}
     missing_pairs = tuple(sorted(expected_pairs - actual_pairs))
 
     missing_files: list[ArtifactName] = []
@@ -291,7 +283,11 @@ def _score_record(
         path=record_path,
         row_count=errors.size,
         columns=(ScoringColumn.RECONSTRUCTION_ERROR,),
-        dtypes=(ScoringColumnDtype(column=ScoringColumn.RECONSTRUCTION_ERROR, dtype="Float32"),),
+        dtypes=(
+            ScoringColumnDtype(
+                column=ScoringColumn.RECONSTRUCTION_ERROR, dtype="Float32"
+            ),
+        ),
         score_min=float(finite.min()) if finite.size else None,
         score_max=float(finite.max()) if finite.size else None,
         score_nan_count=int(np.isnan(errors).sum()),
@@ -324,7 +320,10 @@ def _score_one_split(params: _SplitScoringParams) -> ScoringRecord:
     out_path = _score_output_path(params.score_base, params.stage, params.client_id)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     write_artifact(
-        pl.DataFrame({ScoringColumn.RECONSTRUCTION_ERROR: errors.astype(np.float32, copy=False)}), out_path
+        pl.DataFrame(
+            {ScoringColumn.RECONSTRUCTION_ERROR: errors.astype(np.float32, copy=False)}
+        ),
+        out_path,
     )
     logger.debug(
         "wrote scores",
@@ -451,14 +450,21 @@ _MODULE_loading = "scoring.loading"
 
 def read_score_column(path: Path) -> ScoreVector:
     validate_score_artifact(path)
-    return pl.read_parquet(path).get_column(ScoringColumn.RECONSTRUCTION_ERROR).to_numpy().astype(np.float64)
+    return (
+        pl.read_parquet(path)
+        .get_column(ScoringColumn.RECONSTRUCTION_ERROR)
+        .to_numpy()
+        .astype(np.float64)
+    )
 
 
 def load_parquets_from_dir(
     directory: Path, *, allow_empty: bool = True
 ) -> dict[ClientId, ScoreVector]:
     if not directory.is_dir():
-        raise FileNotFoundError(f"[{_MODULE_loading}] score directory {directory} not found.")
+        raise FileNotFoundError(
+            f"[{_MODULE_loading}] score directory {directory} not found."
+        )
 
     parquets = {
         ClientId(pf.stem): read_score_column(pf)
@@ -497,7 +503,6 @@ def load_main_cal_errors(
 
 
 class ScoreProvider:
-
     def __init__(self, score_root: Path) -> None:
         self.score_root = score_root
 
@@ -524,5 +529,5 @@ def validate_score_artifact(path: Path) -> None:
 
     if not schema[ScoringColumn.RECONSTRUCTION_ERROR].is_float():
         raise TypeError(
-                f"[{_MODULE_loading}] Column '{ScoringColumn.RECONSTRUCTION_ERROR}' has non-floating type. Expected: floating. Got: {schema[ScoringColumn.RECONSTRUCTION_ERROR]}."
+            f"[{_MODULE_loading}] Column '{ScoringColumn.RECONSTRUCTION_ERROR}' has non-floating type. Expected: floating. Got: {schema[ScoringColumn.RECONSTRUCTION_ERROR]}."
         )

@@ -53,14 +53,12 @@ from datp.types import (
 
 @dataclass(frozen=True, slots=True)
 class PoisonedClientCal:
-
     client_id: ClientId
     cal: ScoreVector
 
 
 @dataclass(frozen=True, slots=True)
 class PoisonedCalibrationSet(Mapping[ClientId, PoisonedClientCal]):
-
     clients: Mapping[ClientId, PoisonedClientCal]
 
     def __post_init__(self) -> None:
@@ -77,7 +75,8 @@ class PoisonedCalibrationSet(Mapping[ClientId, PoisonedClientCal]):
 
     @classmethod
     def from_mapping(
-        cls, poisoned_cal: Mapping[RecordKey, ScoreVector] | Mapping[ClientId, ScoreVector]
+        cls,
+        poisoned_cal: Mapping[RecordKey, ScoreVector] | Mapping[ClientId, ScoreVector],
     ) -> PoisonedCalibrationSet:
         return cls(
             {
@@ -89,7 +88,6 @@ class PoisonedCalibrationSet(Mapping[ClientId, PoisonedClientCal]):
 
 @dataclass(frozen=True, slots=True)
 class ThresholdPairBase:
-
     policy: ThresholdPolicy
     tau_global_clean: Threshold
     tau_global_pois: Threshold
@@ -99,14 +97,12 @@ class ThresholdPairBase:
 
 @dataclass(frozen=True, slots=True)
 class AurocRecord:
-
     client_id: ClientId
     auroc: ClassificationScore | None
 
 
 @dataclass(frozen=True, slots=True)
 class AurocSet(Mapping[ClientId, AurocRecord]):
-
     records: Mapping[ClientId, AurocRecord]
 
     def __post_init__(self) -> None:
@@ -128,7 +124,6 @@ class AurocSet(Mapping[ClientId, AurocRecord]):
 
 @dataclass(frozen=True, slots=True)
 class MetricEngineInput:
-
     collection: ScoreCollection
     pair: ThresholdPairBase
     mu_flag_threshold: Threshold | None = None
@@ -137,7 +132,6 @@ class MetricEngineInput:
 
 @dataclass(frozen=True, slots=True)
 class ClientScores:
-
     client_id: ClientId
     cal: ScoreVector
     test_benign: ScoreVector
@@ -145,13 +139,14 @@ class ClientScores:
 
 
 class ClientScoresById(Mapping[ClientId, ClientScores]):
-
     def __init__(self, clients: Iterable[ClientScores]):
         ordered = tuple(clients)
         self._clients = ordered
         self._map = MappingProxyType({c.client_id: c for c in ordered})
 
-    def __reduce__(self) -> tuple[type[ClientScoresById], tuple[tuple[ClientScores, ...]]]:
+    def __reduce__(
+        self,
+    ) -> tuple[type[ClientScoresById], tuple[tuple[ClientScores, ...]]]:
         return ClientScoresById, (self._clients,)
 
     def __iter__(self) -> Iterator[ClientId]:
@@ -169,7 +164,6 @@ class ClientScoresById(Mapping[ClientId, ClientScores]):
 
 @dataclass(frozen=True)
 class ScoreCollection:
-
     clients: ClientScoresById
     n_min: SampleCount = N_MIN
 
@@ -218,11 +212,7 @@ class ScoreCollection:
 
     @property
     def coverage_ratio(self) -> Ratio:
-        return (
-            len(self.eligible_ids) / len(self.clients)
-            if self.clients
-            else 0.0
-        )
+        return len(self.eligible_ids) / len(self.clients) if self.clients else 0.0
 
 
 def build_score_collection(
@@ -238,7 +228,6 @@ def build_score_collection(
 
 @dataclass(frozen=True, slots=True)
 class ReservoirResult:
-
     pool: ScoreVector
     status: ReservoirStatus
     source: PoisoningSourceStrategy
@@ -338,7 +327,6 @@ def apply_defense(
 
 @dataclass(frozen=True, slots=True)
 class InjectionResult:
-
     poisoned_cal: ScoreVector
     n_replaced: SampleCount
     n_total: SampleCount
@@ -402,7 +390,12 @@ def _draw_values(
             raise ValueError(f"Unsupported draw mode: {draw}")
 
 
-def disjoint_budget(n: SampleCount, requested: SignedCount, tail_mass: PoisonFraction, source: PoisoningSourceStrategy) -> SignedCount:
+def disjoint_budget(
+    n: SampleCount,
+    requested: SignedCount,
+    tail_mass: PoisonFraction,
+    source: PoisoningSourceStrategy,
+) -> SignedCount:
     for m in range(requested, 0, -1):
         source_size = n - m
         pool = (
@@ -490,7 +483,6 @@ def assert_valid_source_objective_pair(
 
 @dataclass(frozen=True, slots=True)
 class SweepCellSpec:
-
     seed_pair: SeedPair
     victim_id: ClientId
     policy: ThresholdPolicy

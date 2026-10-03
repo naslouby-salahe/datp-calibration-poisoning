@@ -43,13 +43,12 @@ from datp.types import (
 
 
 class ClientMetricKey(enum.StrEnum):
-
     TRAIN_LOSS = "train_loss"
     VAL_LOSS = "val_loss"
+    CLIENT_ID = "client_id"
 
 
 class FederatedTensorLabel(enum.StrEnum):
-
     TRAIN = "train"
     VALIDATION = "val"
     BENIGN_TEST = "test_benign"
@@ -60,7 +59,6 @@ class FederatedTensorLabel(enum.StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ClientData:
-
     train: torch.Tensor
     val: torch.Tensor
     test_benign: torch.Tensor
@@ -86,20 +84,31 @@ def validate_tensor_input(
 
 
 def validate_client_data(
-    client_data: ClientData, client_id: ClientId, expected_dim: SignedCount | None = None
+    client_data: ClientData,
+    client_id: ClientId,
+    expected_dim: SignedCount | None = None,
 ) -> None:
-    validate_tensor_input(client_data.train, FederatedTensorLabel.TRAIN, client_id, expected_dim)
-    validate_tensor_input(client_data.val, FederatedTensorLabel.VALIDATION, client_id, expected_dim)
     validate_tensor_input(
-        client_data.test_benign, FederatedTensorLabel.BENIGN_TEST, client_id, expected_dim
+        client_data.train, FederatedTensorLabel.TRAIN, client_id, expected_dim
     )
     validate_tensor_input(
-        client_data.test_attack, FederatedTensorLabel.ATTACK_TEST, client_id, expected_dim
+        client_data.val, FederatedTensorLabel.VALIDATION, client_id, expected_dim
+    )
+    validate_tensor_input(
+        client_data.test_benign,
+        FederatedTensorLabel.BENIGN_TEST,
+        client_id,
+        expected_dim,
+    )
+    validate_tensor_input(
+        client_data.test_attack,
+        FederatedTensorLabel.ATTACK_TEST,
+        client_id,
+        expected_dim,
     )
 
 
 class SplitPolicyRole(enum.StrEnum):
-
     TRAIN = "train"
     GAP1 = "gap1"
     CAL = "cal"
@@ -109,7 +118,6 @@ class SplitPolicyRole(enum.StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class DatasetSpec:
-
     id: DatasetID
     processed_slug: NarrativeText
     feature_count: FeatureCount
@@ -147,7 +155,6 @@ def processed_root(dataset: DatasetID, base_dir: Path) -> Path:
 
 
 class Split(enum.StrEnum):
-
     TRAIN = "train"
     CAL = "cal"
     TEST_BENIGN = "test_benign"
@@ -163,7 +170,6 @@ def split_path(client_dir: Path, split: Split) -> Path:
 
 
 class PartitionResult(BaseModel):
-
     model_config = ConfigDict(frozen=True)
     benign_train_count: SampleCount
     benign_cal_count: SampleCount
@@ -231,7 +237,6 @@ logger = get_logger(__name__)
 
 
 class ManifestMetadata(BaseModel):
-
     model_config = ConfigDict(extra="allow")
     n_features: FeatureCount
     n_devices: SampleCount | None = None
@@ -247,7 +252,6 @@ class ManifestMetadata(BaseModel):
 
 
 class PartitionManifest(BaseModel):
-
     model_config = ConfigDict(extra="forbid")
     dataset: DatasetID = Field(min_length=1, pattern=r"\S")
     file_hashes: dict[RecordKey, ContentHash] = Field(min_length=1)
@@ -344,7 +348,6 @@ _AUDIT_MODULE = "data.audit"
 
 
 class AuditClient(BaseModel):
-
     model_config = ConfigDict(extra="forbid")
     benign_train_count: SampleCount = Field(ge=0)
     benign_cal_count: SampleCount = Field(ge=0)
@@ -356,7 +359,6 @@ class AuditClient(BaseModel):
 
 
 class AuditSummary(BaseModel):
-
     model_config = ConfigDict(extra="forbid")
     total_benign_train: SignedCount = Field(ge=0)
     total_benign_cal: SignedCount = Field(ge=0)
@@ -368,7 +370,6 @@ class AuditSummary(BaseModel):
 
 
 class PartitionAudit(BaseModel):
-
     model_config = ConfigDict(extra="forbid")
     stage: ExperimentStage
     n_clients: SampleCount = Field(ge=0)
@@ -539,7 +540,9 @@ def _raw_nbaiot_files(raw_dir: Path) -> list[Path]:
         device_dir = raw_dir / device_id
         files.append(device_dir / ArtifactFile.BENIGN_TRAFFIC)
         for attack_family_dir in ATTACK_FAMILY_DIRS:
-            files.extend(sorted((device_dir / attack_family_dir).glob(PathToken.CSV_GLOB)))
+            files.extend(
+                sorted((device_dir / attack_family_dir).glob(PathToken.CSV_GLOB))
+            )
     return [path for path in files if path.exists()]
 
 

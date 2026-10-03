@@ -30,7 +30,6 @@ EXTREME_PERCENTILE = 95
 
 
 class BootstrapField(enum.StrEnum):
-
     SCOPE = "scope"
     COMPARISON = "comparison"
     PER_SEED_DELTAS = "per_seed_deltas"
@@ -44,7 +43,6 @@ class BootstrapField(enum.StrEnum):
 
 
 class StatsField(enum.StrEnum):
-
     PRIMARY_ENDPOINT = "primary_endpoint"
     SECONDARY_NBAIOT = "secondary_nbaiot"
     SECONDARY_NBAIOT_ADDITIONAL = "secondary_nbaiot_additional"
@@ -78,7 +76,6 @@ def iqr(arr: ScoreVector) -> ScoreValue:
 
 @dataclass(frozen=True, slots=True)
 class FprFleetStats:
-
     cv: ScoreValue
     mean: ScoreValue
     std: ScoreValue
@@ -112,7 +109,6 @@ def compute_fpr_fleet_stats(fpr_arr: ScoreVector) -> FprFleetStats:
 
 @dataclass(frozen=True, slots=True)
 class BootstrapResult:
-
     ci_lower: IntervalBound
     ci_upper: IntervalBound
     mean_delta: SignedDelta
@@ -153,7 +149,9 @@ def _validate_deltas(deltas: ScoreVector) -> ScoreVector:
     return values
 
 
-def _bootstrap_means(deltas: ScoreVector, n_bootstrap: BootstrapCount, seed: RandomSeed) -> ScoreVector:
+def _bootstrap_means(
+    deltas: ScoreVector, n_bootstrap: BootstrapCount, seed: RandomSeed
+) -> ScoreVector:
     n = len(deltas)
     rng = np.random.default_rng(seed)
     boot_means = np.empty(n_bootstrap, dtype=np.float64)

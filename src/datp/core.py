@@ -57,12 +57,10 @@ if TYPE_CHECKING:
 
 
 class FrozenModel(BaseModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class MetricsProvenance(FrozenModel):
-
     config_identity: ContentHash
     split_manifest_identity: ContentHash
     model_identity: ContentHash
@@ -82,7 +80,6 @@ class ClusterInfo:
 
 @dataclass(frozen=True, slots=True)
 class ClientFingerprint:
-
     client_id: ClientId
     mean: ScoreValue
     std: ScoreValue
@@ -92,7 +89,6 @@ class ClientFingerprint:
 
 @dataclass(frozen=True, slots=True)
 class ClusterCountSilhouetteScore:
-
     cluster_count: SampleCount
     score: ScoreValue
 
@@ -114,7 +110,6 @@ class ClusterMetadata:
 
 @dataclass(frozen=True, slots=True)
 class ClientThreshold:
-
     client_id: ClientId
     threshold: Threshold
     status: ClientStatus
@@ -123,7 +118,6 @@ class ClientThreshold:
 
 @dataclass(frozen=True, slots=True)
 class ThresholdResult:
-
     run: PolicyRunId
     tau_global: Threshold
     client_thresholds: tuple[ClientThreshold, ...]
@@ -131,7 +125,9 @@ class ThresholdResult:
 
     @property
     def eligible_count(self) -> SampleCount:
-        return sum(1 for ct in self.client_thresholds if ct.status is ClientStatus.ELIGIBLE)
+        return sum(
+            1 for ct in self.client_thresholds if ct.status is ClientStatus.ELIGIBLE
+        )
 
     @property
     def pending_count(self) -> SampleCount:
@@ -148,7 +144,6 @@ def seed_segment(seed: RandomSeed) -> NarrativeText:
 
 @dataclass(frozen=True, slots=True)
 class TrainingCellId:
-
     stage: ExperimentStage
     seed: RandomSeed
 
@@ -158,7 +153,6 @@ class TrainingCellId:
 
 @dataclass(frozen=True, slots=True)
 class PolicyRunId:
-
     cell: TrainingCellId
     policy: ThresholdPolicy
 
@@ -187,7 +181,6 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 @dataclass(frozen=True, slots=True)
 class SeedPair:
-
     training_seed: RandomSeed
     poisoning_seed: RandomSeed
 
@@ -204,7 +197,6 @@ def set_seeds(seed: RandomSeed) -> None:
 
 
 class SeedRecord(FrozenModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
     pair: SeedPair
     client_idx: Index
@@ -229,8 +221,9 @@ class SeedRecord(FrozenModel):
 
 
 def make_seed_rng(record: SeedRecord, *, child_index: Index = 0) -> np.random.Generator:
-    parent = np.random.SeedSequence(list(record.entropy))
-    return np.random.default_rng(parent.spawn(child_index + 1)[child_index])
+    return np.random.default_rng(
+        np.random.SeedSequence(list(record.entropy), spawn_key=(child_index,))
+    )
 
 
 def resolve_device(require_cuda: bool) -> torch.device:
@@ -294,7 +287,6 @@ def array_hash(arr: ScoreVector) -> ContentHash:
 
 
 class ExternalLibraryLogger(enum.StrEnum):
-
     FLOWER = "flwr"
     RAY = "ray"
     URLLIB3 = "urllib3"
@@ -336,7 +328,12 @@ def _parse_level(level: LogLevel) -> SignedCount:
 
 
 def _make_handlers(
-    *, level: LogLevel, json: bool, log_dir: Path, max_bytes: ByteCount, backup_count: SampleCount
+    *,
+    level: LogLevel,
+    json: bool,
+    log_dir: Path,
+    max_bytes: ByteCount,
+    backup_count: SampleCount,
 ) -> list[logging.Handler]:
     log_dir.mkdir(parents=True, exist_ok=True)
     lvl = _parse_level(level)
@@ -420,4 +417,3 @@ def configure_logging(cfg: LoggingConfig, log_dir: Path) -> None:
             logging.getLogger(name).setLevel(logging.WARNING)
 
         _SETUP_DONE.set()
-

@@ -13,7 +13,12 @@ from datp.attacks.manifests import (
     BoundedSweepResultRow,
     ProvenanceRecord,
 )
-from datp.attacks.sweep import SweepCellConfig, lock_mu_flag_threshold, run_sweep_cell
+from datp.attacks.sweep import (
+    SweepCellConfig,
+    clean_cell_metrics,
+    lock_mu_flag_threshold,
+    run_sweep_cell,
+)
 from datp.core import REPOSITORY_NAME, SeedPair, SeedRecord
 from datp.enums import (
     AttackerObjective,
@@ -80,8 +85,9 @@ def test_run_sweep_cell_zero_fraction_gives_zero_delta():
         training_seed=0,
         poisoning_seed=100,
     )
+    config = SweepCellConfig(collection=col, mu_flag_threshold=mu_flag)
     result = run_sweep_cell(
-        spec, config=SweepCellConfig(collection=col, mu_flag_threshold=mu_flag)
+        spec, config=config, clean_metrics=clean_cell_metrics(spec, config)
     )
     delta = result.poisoned_metrics.delta_tau[victim_id].delta_tau
     assert math.isclose(delta, 0.0, abs_tol=1e-12)
@@ -100,8 +106,9 @@ def test_run_sweep_cell_high_source_raises_threshold():
         training_seed=0,
         poisoning_seed=100,
     )
+    config = SweepCellConfig(collection=col, mu_flag_threshold=mu_flag)
     result = run_sweep_cell(
-        spec, config=SweepCellConfig(collection=col, mu_flag_threshold=mu_flag)
+        spec, config=config, clean_metrics=clean_cell_metrics(spec, config)
     )
     delta = result.poisoned_metrics.delta_tau[victim_id].delta_tau
     assert delta > 0.0
@@ -122,8 +129,9 @@ def test_run_sweep_cell_uses_passed_mu_flag_not_recomputed():
         training_seed=0,
         poisoning_seed=100,
     )
+    config = SweepCellConfig(collection=col, mu_flag_threshold=sentinel_mu)
     result = run_sweep_cell(
-        spec, config=SweepCellConfig(collection=col, mu_flag_threshold=sentinel_mu)
+        spec, config=config, clean_metrics=clean_cell_metrics(spec, config)
     )
     assert result.poisoned_metrics.mu_flag_threshold == sentinel_mu
 

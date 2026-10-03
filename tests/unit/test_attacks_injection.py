@@ -989,9 +989,7 @@ class TestFractionsInLockedGrid:
     """Fraction values must belong to the locked grid."""
 
     def test_bounded_fractions_all_pass(self) -> None:
-        assert_fractions_in_locked_grid(
-            NBAIOT_MAIN_SWEEP_FRACTIONS
-        )
+        assert_fractions_in_locked_grid(NBAIOT_MAIN_SWEEP_FRACTIONS)
 
     def test_zero_fraction_passes(self) -> None:
         assert_fractions_in_locked_grid([0.0])
@@ -1023,7 +1021,9 @@ class TestBoundedScaleRequiresSingleClient:
 
     def test_bounded_with_multi_client_raises(self) -> None:
         with pytest.raises(GuardrailError, match="SINGLE_CLIENT"):
-            assert_bounded_scale_requires_single_client(PoisoningTargetScope.MULTI_CLIENT)
+            assert_bounded_scale_requires_single_client(
+                PoisoningTargetScope.MULTI_CLIENT
+            )
 
 
 class TestValidSourceObjectivePair:
@@ -1090,12 +1090,16 @@ class TestScoreCollection:
         col = _collection_from_synthetics()
         assert len(col.eligibility.eligible_ids) == 3
         assert len(col.eligibility.pending_ids) == 1
-        assert set(col.eligibility.eligible_ids) | set(col.eligibility.pending_ids) == set(col.all_ids)
+        assert set(col.eligibility.eligible_ids) | set(
+            col.eligibility.pending_ids
+        ) == set(col.all_ids)
 
     def test_eligible_ids_sorted(self) -> None:
         """Verify that the list of eligible client IDs is returned sorted alphabetically."""
         col = _collection_from_synthetics()
-        assert col.eligibility.eligible_ids == tuple(sorted(col.eligibility.eligible_ids))
+        assert col.eligibility.eligible_ids == tuple(
+            sorted(col.eligibility.eligible_ids)
+        )
 
     def test_calibration_errors_include_all_clients(self) -> None:
         """Calibration error values retain each client's domain identity."""

@@ -201,8 +201,12 @@ def cluster_count(
     """Run CLUSTER_THRESHOLD and return the realized fixed cluster count."""
     typed_cal_dict = {ClientId(cid): arr for cid, arr in cal_dict.items()}
     eligibility = EligibilityResult(
-        eligible_ids=tuple(cid for cid, arr in typed_cal_dict.items() if arr.size >= n_min),
-        pending_ids=tuple(cid for cid, arr in typed_cal_dict.items() if arr.size < n_min),
+        eligible_ids=tuple(
+            cid for cid, arr in typed_cal_dict.items() if arr.size >= n_min
+        ),
+        pending_ids=tuple(
+            cid for cid, arr in typed_cal_dict.items() if arr.size < n_min
+        ),
     )
     taus = compute_client_thresholds(
         typed_cal_dict,

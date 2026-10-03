@@ -108,7 +108,6 @@ def compute_mu_flag_threshold(mean_clean_fpr: FalsePositiveRate) -> Threshold:
 
 @dataclass(frozen=True, slots=True)
 class FleetFprMetrics:
-
     policy: ThresholdPolicy
     cv_fpr: FalsePositiveRate
     mean_fpr: FalsePositiveRate
@@ -163,7 +162,6 @@ def compute_fleet_fpr(
 
 @dataclass(frozen=True, slots=True)
 class DeltaTauEntry:
-
     client_id: ClientId
     policy: ThresholdPolicy
     tau_clean: Threshold
@@ -193,7 +191,10 @@ def per_client_scale_base(clean_cal: ScoreVector, iqr: ScoreValue) -> ScoreValue
 
 
 def materiality_scale(
-    scale_base: ScoreValue, iqr_median: ScoreValue, factor: ScoreValue, floor_factor: ScoreValue
+    scale_base: ScoreValue,
+    iqr_median: ScoreValue,
+    factor: ScoreValue,
+    floor_factor: ScoreValue,
 ) -> ScoreValue:
     if math.isnan(scale_base):
         return math.nan
@@ -268,7 +269,6 @@ def n_reassigned(
 
 @dataclass(frozen=True, slots=True)
 class BlastRadiusRecord:
-
     policy: ThresholdPolicy
     victim_id: ClientId | None
     n_significant: SampleCount
@@ -278,7 +278,6 @@ class BlastRadiusRecord:
 
 @dataclass(frozen=True, slots=True)
 class SpilloverRecord:
-
     policy: ThresholdPolicy
     victim_id: ClientId
     spillover_client_ids: tuple[ClientId, ...]
@@ -388,7 +387,6 @@ def tau_bound_utilization(
 
 @dataclass(frozen=True, slots=True)
 class VictimDownstreamMetrics:
-
     tpr_clean: TruePositiveRate
     tpr_poisoned: TruePositiveRate
     delta_tpr: SignedDelta
@@ -411,7 +409,6 @@ class VictimDownstreamMetrics:
 
 @dataclass(frozen=True, slots=True)
 class NonVictimDownstreamMetrics:
-
     n_clients: SampleCount
     mean_tpr_clean: TruePositiveRate
     mean_tpr_poisoned: TruePositiveRate
@@ -441,7 +438,9 @@ def compute_victim_downstream_metrics(
     attack = client_scores.test_attack
     n_benign, n_attack = len(benign), len(attack)
 
-    def _metrics_at(thresh: ScoreValue) -> tuple[BinaryMetrics, SignedCount, SignedCount]:
+    def _metrics_at(
+        thresh: ScoreValue,
+    ) -> tuple[BinaryMetrics, SignedCount, SignedCount]:
         tp = _counts(attack, thresh)
         fp = _counts(benign, thresh)
         return (
@@ -524,7 +523,6 @@ def compute_non_victim_downstream(
 
 @dataclass(frozen=True, slots=True)
 class MetricResult:
-
     policy: ThresholdPolicy
     delta_tau: dict[ClientId, DeltaTauEntry]
     fleet_fpr: FleetFprMetrics
@@ -548,7 +546,9 @@ def get_threshold_data(
     collection: ScoreCollection,
     poisoned_cal: PoisonedCalibrationSet,
     q: Quantile,
-) -> tuple[ClientThresholdsCollection, ClientThresholdsCollection, tuple[ClientId, ...]]:
+) -> tuple[
+    ClientThresholdsCollection, ClientThresholdsCollection, tuple[ClientId, ...]
+]:
     eligible_ids = collection.eligible_ids
     eligibility = EligibilityResult(eligible_ids=eligible_ids, pending_ids=())
 
@@ -626,7 +626,6 @@ def compute_local_pair(
 
 @dataclass(frozen=True, slots=True)
 class ClusterHyperparams:
-
     k: ClusterCount = CLUSTER_K_NBAIOT
     n_init: IterationCount = CLUSTER_N_INIT
     max_iter: IterationCount = CLUSTER_MAX_ITER
@@ -637,7 +636,6 @@ class ClusterHyperparams:
 
 @dataclass(frozen=True, slots=True)
 class ClusterDecompEntry:
-
     client_id: ClientId
     tau_clean: Threshold
     tau_agg: Threshold
@@ -652,7 +650,6 @@ class ClusterDecompEntry:
 
 @dataclass(frozen=True, slots=True)
 class ClusterThresholdPair(ThresholdPairBase):
-
     decomposition: Mapping[ClientId, ClusterDecompEntry]
     fixed_assignment_thresholds: ClientThresholdsCollection
     clean_assignments: Mapping[ClientId, ClusterId]
@@ -801,10 +798,7 @@ def _frozen_scaler_assignments(
     ).fit_predict(
         StandardScaler().fit(clean_fingerprints).transform(poisoned_fingerprints)
     )
-    return {
-        client_id: int(label)
-        for client_id, label in zip(eligible_ids, labels)
-    }
+    return {client_id: int(label) for client_id, label in zip(eligible_ids, labels)}
 
 
 _ClusterAssignment = TypeVar("_ClusterAssignment", ClusterId, ClusterIndex)

@@ -354,7 +354,6 @@ class TestNBaIoTEnums:
 
 
 class TestDatasetPolicyEnums:
-
     def test_split_policy_role_members(self) -> None:
         assert set(SplitPolicyRole) == {
             SplitPolicyRole.TRAIN,

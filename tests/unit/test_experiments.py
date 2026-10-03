@@ -567,6 +567,76 @@ class TestIsDone:
         assert _is_done(run, tmp_path) is True
 
 
+class _InlinePool:
+    """Process-pool stand-in that runs submitted work in-process."""
+
+    instances: list["_InlinePool"] = []
+
+    def __init__(self, max_workers, mp_context, initializer, initargs) -> None:
+        self.max_workers = max_workers
+        self.mp_context = mp_context
+        initializer(*initargs)
+        _InlinePool.instances.append(self)
+
+    def __enter__(self) -> "_InlinePool":
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        return None
+
+    def submit(self, fn, *args):
+        from concurrent.futures import Future
+
+        future = Future()
+        future.set_result(fn(*args))
+        return future
+
+
+class TestParallelSweep:
+    """The multi-worker path submits one seed group per task and merges the counts."""
+
+    def test_groups_run_in_the_pool_and_counts_are_merged(self, tmp_path: Path):
+        from unittest.mock import patch
+
+        groups: list[int] = []
+
+        def fake_process_group(key, cells, _configs, _base, result, idx, total, _root):
+            groups.append(idx)
+            result.completed += len(cells)
+            result.skipped += 1
+
+        _InlinePool.instances.clear()
+        with (
+            patch("datp.experiments.ProcessPoolExecutor", _InlinePool),
+            patch("datp.experiments._process_group", fake_process_group),
+            patch("datp.experiments.configure_logging") as configure,
+        ):
+            result = run_sweep(base_dir=tmp_path, workers=3)
+
+        (pool,) = _InlinePool.instances
+        assert pool.max_workers == 3
+        assert pool.mp_context.get_start_method() == "spawn"
+        assert groups == list(range(1, 11))
+        assert result.completed == _TOTAL_CELLS
+        assert result.skipped == 10
+        assert result.failed == 0
+        log_dir = configure.call_args.args[1]
+        assert log_dir.parent == tmp_path / "logs" / "workers"
+
+    def test_pool_never_exceeds_the_number_of_seed_groups(self, tmp_path: Path):
+        from unittest.mock import patch
+
+        _InlinePool.instances.clear()
+        with (
+            patch("datp.experiments.ProcessPoolExecutor", _InlinePool),
+            patch("datp.experiments._process_group"),
+            patch("datp.experiments.configure_logging"),
+        ):
+            run_sweep(base_dir=tmp_path, workers=64)
+
+        assert _InlinePool.instances[0].max_workers == 10
+
+
 class TestRunSweep:
     """End-to-end sweep execution."""
 

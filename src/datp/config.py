@@ -57,22 +57,18 @@ from datp.types import (
 
 
 class ExperimentStage(enum.StrEnum):
-
     NBAIOT_MAIN = "nbaiot_main"
 
 
 class StrictModel(BaseModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True, protected_namespaces=())
 
 
 class SafetyBounds(StrictModel):
-
     max_batch_size_train: BatchSize
 
 
 class ConvergenceConfig(StrictModel):
-
     rounds_initial: RoundCount
     rounds_max: RoundCount
     relative_threshold: Threshold
@@ -81,7 +77,6 @@ class ConvergenceConfig(StrictModel):
 
 
 class ModelConfig(StrictModel):
-
     input_dim: FeatureCount
     encoder_dims: list[SignedCount]
     lr: LearningRate
@@ -91,13 +86,11 @@ class ModelConfig(StrictModel):
 
 
 class DatasetConfig(StrictModel):
-
     feature_count: FeatureCount
     nbaiot_test_balance: NBaIoTBalancePolicy
 
 
 class MachineConfig(StrictModel):
-
     batch_size_train: BatchSize = Field(gt=0)
     scoring_batch_size: BatchSize = Field(default=256, gt=0)
     require_cuda: bool = False
@@ -110,13 +103,11 @@ class MachineConfig(StrictModel):
 
 
 class FederationConfig(StrictModel):
-
     convergence: ConvergenceConfig
     local_epochs: RoundCount
 
 
 class ThresholdConfig(StrictModel):
-
     n_min: SampleCount
     q: Literal[95]
     cluster_k_nbaiot: Literal[3]
@@ -126,12 +117,10 @@ class ThresholdConfig(StrictModel):
 
 
 class ExperimentConfig(StrictModel):
-
     seeds: list[RandomSeed]
 
 
 class StatisticsConfig(StrictModel):
-
     n_bootstrap: BootstrapCount
     bootstrap_min_finite: BootstrapCount
     ci_level: IntervalBound
@@ -140,7 +129,6 @@ class StatisticsConfig(StrictModel):
 
 
 class StyleConfig(StrictModel):
-
     dpi: SignedCount
     font_size: SignedCount
     figsize_single_col: tuple[ScoreValue, ScoreValue]
@@ -150,7 +138,6 @@ class StyleConfig(StrictModel):
 
 
 class LoggingConfig(StrictModel):
-
     level: LogLevel
     json_format: bool
     max_bytes: ByteCount
@@ -158,13 +145,11 @@ class LoggingConfig(StrictModel):
 
 
 class RuntimeConfig(StrictModel):
-
     ray_memory_threshold: Threshold
     sweep_workers: WorkerCount
 
 
 class ReportingConfig(StrictModel):
-
     figure2_max_points: SignedCount
     figure2_rng_seed: RandomSeed
     metric_tol: Tolerance
@@ -172,11 +157,12 @@ class ReportingConfig(StrictModel):
 
 
 class PoisoningParams(StrictModel):
-
     policies: tuple[ThresholdPolicy, ...]
     sources: tuple[PoisoningSourceStrategy, ...]
     objectives: tuple[AttackerObjective, ...]
-    source_objective_pairs: tuple[tuple[PoisoningSourceStrategy, AttackerObjective], ...]
+    source_objective_pairs: tuple[
+        tuple[PoisoningSourceStrategy, AttackerObjective], ...
+    ]
     fractions: tuple[PoisonFraction, ...]
     poisoning_seeds: tuple[RandomSeed, ...]
     analysis_seeds: tuple[RandomSeed, ...]
@@ -194,7 +180,6 @@ class PoisoningParams(StrictModel):
 
 
 class SensitivityParams(StrictModel):
-
     sign_consistency_grid: tuple[SignedCount, ...]
     victim_majority_grid: tuple[SignedCount, ...]
     materiality_grid: tuple[ScoreValue, ...]
@@ -207,7 +192,6 @@ class SensitivityParams(StrictModel):
 
 
 class DatpConfig(StrictModel):
-
     model: ModelConfig
     dataset: DatasetConfig
     machine: MachineConfig
@@ -256,12 +240,13 @@ def _load_base_config() -> DatpConfig:
 BASE_CONFIG: DatpConfig = _load_base_config()
 
 
-
 _POISONING = BASE_CONFIG.poisoning
 _SENSITIVITY = BASE_CONFIG.sensitivity
 
 NBAIOT_MAIN_SWEEP_FRACTIONS: tuple[PoisonFraction, ...] = _POISONING.fractions
-NBAIOT_MAIN_SWEEP_FRACTION_SET: frozenset[PoisonFraction] = frozenset(_POISONING.fractions)
+NBAIOT_MAIN_SWEEP_FRACTION_SET: frozenset[PoisonFraction] = frozenset(
+    _POISONING.fractions
+)
 DEFAULT_POLICIES: tuple[ThresholdPolicy, ...] = _POISONING.policies
 NBAIOT_MAIN_SWEEP_OBJECTIVES: tuple[AttackerObjective, ...] = _POISONING.objectives
 NBAIOT_MAIN_SWEEP_SOURCES: tuple[PoisoningSourceStrategy, ...] = _POISONING.sources
@@ -271,7 +256,9 @@ NBAIOT_MAIN_SOURCE_OBJECTIVE_PAIRS: tuple[
 TRAINING_SEEDS: tuple[RandomSeed, ...] = tuple(BASE_CONFIG.experiment.seeds)
 POISONING_SEEDS: tuple[RandomSeed, ...] = _POISONING.poisoning_seeds
 ANALYSIS_SEEDS: tuple[RandomSeed, ...] = _POISONING.analysis_seeds
-CLUSTER_RANDOM_STATE: RandomSeed = RandomSeed(BASE_CONFIG.threshold.cluster_random_state)
+CLUSTER_RANDOM_STATE: RandomSeed = RandomSeed(
+    BASE_CONFIG.threshold.cluster_random_state
+)
 N_MIN: SampleCount = BASE_CONFIG.threshold.n_min
 TAIL_MASS: PoisonFraction = _POISONING.tail_mass
 MATERIALITY_FACTOR: ScoreValue = _POISONING.materiality_factor
@@ -289,16 +276,28 @@ BOOTSTRAP_MIN_FINITE: BootstrapCount = BASE_CONFIG.statistics.bootstrap_min_fini
 MU_FLAG_DIVISOR: ScoreValue = _POISONING.mu_flag_divisor
 VICTIM_MAJORITY_THRESHOLD: SignedCount = _POISONING.victim_majority_threshold
 IQR_FLOOR_FACTOR: ScoreValue = _POISONING.iqr_floor_factor
-SENSITIVITY_SIGN_CONSISTENCY_GRID: tuple[SignedCount, ...] = _SENSITIVITY.sign_consistency_grid
-SENSITIVITY_VICTIM_MAJORITY_GRID: tuple[SignedCount, ...] = _SENSITIVITY.victim_majority_grid
+SENSITIVITY_SIGN_CONSISTENCY_GRID: tuple[SignedCount, ...] = (
+    _SENSITIVITY.sign_consistency_grid
+)
+SENSITIVITY_VICTIM_MAJORITY_GRID: tuple[SignedCount, ...] = (
+    _SENSITIVITY.victim_majority_grid
+)
 SENSITIVITY_MATERIALITY_GRID: tuple[ScoreValue, ...] = _SENSITIVITY.materiality_grid
 SENSITIVITY_IQR_FLOOR_GRID: tuple[ScoreValue, ...] = _SENSITIVITY.iqr_floor_grid
 CLUSTER_SENSITIVITY_K_GRID: tuple[SignedCount, ...] = _SENSITIVITY.cluster_k_grid
-CLUSTER_SENSITIVITY_N_INIT_GRID: tuple[IterationCount, ...] = _SENSITIVITY.cluster_n_init_grid
-CLUSTER_SENSITIVITY_RANDOM_STATES: tuple[RandomSeed, ...] = _SENSITIVITY.cluster_random_states
-CLUSTER_SENSITIVITY_FRACTIONS: tuple[PoisonFraction, ...] = _SENSITIVITY.cluster_fractions
+CLUSTER_SENSITIVITY_N_INIT_GRID: tuple[IterationCount, ...] = (
+    _SENSITIVITY.cluster_n_init_grid
+)
+CLUSTER_SENSITIVITY_RANDOM_STATES: tuple[RandomSeed, ...] = (
+    _SENSITIVITY.cluster_random_states
+)
+CLUSTER_SENSITIVITY_FRACTIONS: tuple[PoisonFraction, ...] = (
+    _SENSITIVITY.cluster_fractions
+)
 DRAW_VARIANT_FRACTIONS: tuple[PoisonFraction, ...] = _SENSITIVITY.draw_variant_fractions
-SCALE_NORMALIZATION_STATISTIC_QUANTILE: Quantile = _POISONING.scale_normalization_statistic_quantile
+SCALE_NORMALIZATION_STATISTIC_QUANTILE: Quantile = (
+    _POISONING.scale_normalization_statistic_quantile
+)
 PERMUTATION_MAX_EXACT_SEEDS: RandomSeed = _POISONING.permutation_max_exact_seeds
 
 
@@ -311,11 +310,11 @@ _NBAIOT_MAIN_SOURCE_SET: frozenset[PoisoningSourceStrategy] = frozenset(
 
 
 class SeedPools(StrictModel):
-
     training: tuple[RandomSeed, ...] = TRAINING_SEEDS
     poisoning: tuple[RandomSeed, ...] = POISONING_SEEDS
     analysis: tuple[RandomSeed, ...] = ANALYSIS_SEEDS
     split: RandomSeed = RandomSeed(0)
+
     @model_validator(mode="after")
     def validate_pools(self) -> "SeedPools":
         if not self.training:
@@ -332,7 +331,6 @@ class SeedPools(StrictModel):
 
 
 class ClusterConfig(StrictModel):
-
     k: Literal[3] = CLUSTER_K_NBAIOT
     n_init: IterationCount = Field(default=CLUSTER_N_INIT, gt=0)
     max_iter: IterationCount = Field(default=CLUSTER_MAX_ITER, gt=0)
@@ -340,7 +338,6 @@ class ClusterConfig(StrictModel):
 
 
 class CalibrationPoisoningConfig(StrictModel):
-
     local_epochs: Literal[1] = 1
 
     policies: tuple[ThresholdPolicy, ...] = DEFAULT_POLICIES
@@ -365,7 +362,9 @@ class CalibrationPoisoningConfig(StrictModel):
 
     @field_validator("policies")
     @classmethod
-    def require_policies(cls, v: tuple[ThresholdPolicy, ...]) -> tuple[ThresholdPolicy, ...]:
+    def require_policies(
+        cls, v: tuple[ThresholdPolicy, ...]
+    ) -> tuple[ThresholdPolicy, ...]:
         if not v:
             raise ValueError("Policies must not be empty")
         return v
@@ -381,7 +380,9 @@ class CalibrationPoisoningConfig(StrictModel):
 
     @field_validator("objectives")
     @classmethod
-    def require_objectives(cls, v: tuple[AttackerObjective, ...]) -> tuple[AttackerObjective, ...]:
+    def require_objectives(
+        cls, v: tuple[AttackerObjective, ...]
+    ) -> tuple[AttackerObjective, ...]:
         if not v:
             raise ValueError("Objectives must not be empty")
         return v
@@ -401,7 +402,9 @@ class CalibrationPoisoningConfig(StrictModel):
 
     @field_validator("fractions")
     @classmethod
-    def require_fractions(cls, v: tuple[PoisonFraction, ...]) -> tuple[PoisonFraction, ...]:
+    def require_fractions(
+        cls, v: tuple[PoisonFraction, ...]
+    ) -> tuple[PoisonFraction, ...]:
         if not v:
             raise ValueError("Fractions must not be empty")
         return v

@@ -30,6 +30,7 @@ _STAGE = ExperimentStage.NBAIOT_MAIN
 
 class TestLoadMainCalErrors:
     """Loading calibration errors from the main experiment stage."""
+
     def test_loads_calibration_errors(self, tmp_path: Path) -> None:
         seed = 42
         score_dir = tmp_path / "scores" / _STAGE.value / f"seed_{seed}"
@@ -387,7 +388,14 @@ class TestReadScoreColumn:
 
         path = tmp_path / "bad.parquet"
         pq.write_table(
-            pa.table({ScoringColumn.RECONSTRUCTION_ERROR: pa.array([1, 2, 3], type=pa.int64())}), path
+            pa.table(
+                {
+                    ScoringColumn.RECONSTRUCTION_ERROR: pa.array(
+                        [1, 2, 3], type=pa.int64()
+                    )
+                }
+            ),
+            path,
         )
         with pytest.raises(TypeError, match="non-floating"):
             read_score_column(path)

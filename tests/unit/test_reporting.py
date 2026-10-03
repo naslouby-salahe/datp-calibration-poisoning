@@ -81,7 +81,9 @@ from datp.validation import AuditOutputPaths
 from tests.fixtures import extended_row_fields
 
 
-def _payload(*, cv_fpr: float = math.nan, pending: list[str] | None = None) -> SweepMetrics:
+def _payload(
+    *, cv_fpr: float = math.nan, pending: list[str] | None = None
+) -> SweepMetrics:
     pending_ids = pending or []
     per_client = [
         {
@@ -134,57 +136,59 @@ def _payload(*, cv_fpr: float = math.nan, pending: list[str] | None = None) -> S
         },
     ]
     eligible = 2 - len(pending_ids)
-    return SweepMetrics.model_validate({
-        "schema_version": "2",
-        "metric_schema_version": "2",
-        "threshold_schema_version": "1",
-        "run_id": "a_global_threshold_seed0",
-        "run_kind": RunKind.CORE_LADDER,
-        "dataset": "nbaiot",
-        "policy": "global_threshold",
-        "stage": "nbaiot_main",
-        "seed": 0,
-        "threshold_scope": "eligible_client_arithmetic_mean",
-        "threshold_strategy_name": "global_threshold",
-        "tau_global": 0.5,
-        "per_client": per_client,
-        "eligible_ids": [
-            row["client_id"]
-            for row in per_client
-            if row["client_id"] not in pending_ids
-        ],
-        "pending_ids": pending_ids,
-        "eval_incomplete_ids": [],
-        "eligible_count": eligible,
-        "pending_count": len(pending_ids),
-        "eval_incomplete_count": 0,
-        "client_count": 2,
-        "coverage_ratio": eligible / 2,
-        "cv_fpr": cv_fpr,
-        "mean_fpr": 0.0,
-        "std_fpr": 0.0,
-        "cv_tpr": 0.0,
-        "iqr_fpr": 0.0,
-        "iqr_tpr": 0.0,
-        "worst_client_fpr": 0.0,
-        "worst_client_id": "c1",
-        "worst_ba": 1.0,
-        "p10_macro_f1": 1.0,
-        "aggregate_metrics": {
-            MetricName.CV_FPR: cv_fpr,
-            MetricName.P10_MACRO_F1: 1.0,
-        },
-        "provenance": {
-            "config_identity": "test",
-            "split_manifest_identity": "test",
-            "model_identity": "test",
-            "score_artifact_identity": "test",
-            "metric_code_version": "test",
-            "threshold_code_version": "test",
-            "package_version": "test",
-            "generated_at_utc": "2026-01-01T00:00:00+00:00",
-        },
-    })
+    return SweepMetrics.model_validate(
+        {
+            "schema_version": "2",
+            "metric_schema_version": "2",
+            "threshold_schema_version": "1",
+            "run_id": "a_global_threshold_seed0",
+            "run_kind": RunKind.CORE_LADDER,
+            "dataset": "nbaiot",
+            "policy": "global_threshold",
+            "stage": "nbaiot_main",
+            "seed": 0,
+            "threshold_scope": "eligible_client_arithmetic_mean",
+            "threshold_strategy_name": "global_threshold",
+            "tau_global": 0.5,
+            "per_client": per_client,
+            "eligible_ids": [
+                row["client_id"]
+                for row in per_client
+                if row["client_id"] not in pending_ids
+            ],
+            "pending_ids": pending_ids,
+            "eval_incomplete_ids": [],
+            "eligible_count": eligible,
+            "pending_count": len(pending_ids),
+            "eval_incomplete_count": 0,
+            "client_count": 2,
+            "coverage_ratio": eligible / 2,
+            "cv_fpr": cv_fpr,
+            "mean_fpr": 0.0,
+            "std_fpr": 0.0,
+            "cv_tpr": 0.0,
+            "iqr_fpr": 0.0,
+            "iqr_tpr": 0.0,
+            "worst_client_fpr": 0.0,
+            "worst_client_id": "c1",
+            "worst_ba": 1.0,
+            "p10_macro_f1": 1.0,
+            "aggregate_metrics": {
+                MetricName.CV_FPR: cv_fpr,
+                MetricName.P10_MACRO_F1: 1.0,
+            },
+            "provenance": {
+                "config_identity": "test",
+                "split_manifest_identity": "test",
+                "model_identity": "test",
+                "score_artifact_identity": "test",
+                "metric_code_version": "test",
+                "threshold_code_version": "test",
+                "package_version": "test",
+                "generated_at_utc": "2026-01-01T00:00:00+00:00",
+            },
+        }
+    )
 
 
 def test_reporting_loader_recomputes_and_rejects_bad_saved_cv_fpr() -> None:
@@ -195,7 +199,9 @@ def test_reporting_loader_recomputes_and_rejects_bad_saved_cv_fpr() -> None:
 def test_reporting_loader_rejects_denominator_mismatch() -> None:
     payload = _payload()
     first = payload.per_client[0].model_copy(update={"n_benign": 11})
-    payload = payload.model_copy(update={"per_client": (first, *payload.per_client[1:])})
+    payload = payload.model_copy(
+        update={"per_client": (first, *payload.per_client[1:])}
+    )
     with pytest.raises(ValueError, match="Benign denominator mismatch"):
         _evaluation_from_payload(payload, metric_tol=1e-9)
 
@@ -328,9 +334,13 @@ def outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         lambda *_args: AuditOutputPaths((("audit_summary", audit_file),)),
     )
     monkeypatch.setattr(package, "build_all", lambda *_args: (table, figure))
-    monkeypatch.setattr(package, "build_poisoning_summaries", lambda *_args: (analysis,))
+    monkeypatch.setattr(
+        package, "build_poisoning_summaries", lambda *_args: (analysis,)
+    )
     monkeypatch.setattr(package, "build_poisoning_figures", lambda *_args: ())
-    monkeypatch.setattr(package, "build_sensitivity_summaries", lambda *_args: (sensitivity,))
+    monkeypatch.setattr(
+        package, "build_sensitivity_summaries", lambda *_args: (sensitivity,)
+    )
     return base_dir
 
 
@@ -921,7 +931,10 @@ def test_scale_normalization_summary(tmp_path: Path) -> None:
 def test_draw_variant_summary(tmp_path: Path) -> None:
     _write(tmp_path)
     build_sensitivity_summaries(tmp_path)
-    rows = {r["draw"]: r for r in _load_sensitivity_summaries(tmp_path, "draw_variant_summary")}
+    rows = {
+        r["draw"]: r
+        for r in _load_sensitivity_summaries(tmp_path, "draw_variant_summary")
+    }
     distinct = rows[ReservoirDraw.WITHOUT_REPLACEMENT.value]
     assert distinct["full_budget_feasible_rate"] == 0.0
     assert distinct["mean_duplicate_rate_variant"] == 0.0
@@ -1174,3 +1187,17 @@ def test_format_mean_std_zero_std() -> None:
     result = format_mean_std(0.5, 0.0, bold=False)
     assert "0.500" in result
     assert "0.000" in result
+
+
+def test_analysis_csv_uses_unix_line_endings(tmp_path: Path) -> None:
+    """Verify generated csv files end lines with LF so git never rewrites them."""
+    from datp.enums import AnalysisReportStem
+    from datp.reporting.poisoning import _write_records
+
+    _, csv_path = _write_records(
+        tmp_path,
+        AnalysisReportStem.THRESHOLD_SHIFT_SUMMARY,
+        [{"a": 1, "b": 2}, {"a": 3, "b": 4}],
+    )
+
+    assert b"\r" not in csv_path.read_bytes()

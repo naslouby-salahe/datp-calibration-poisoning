@@ -164,10 +164,12 @@ def _make_setup(fraction: float = 0.40):
     inj = inject_fixed_budget(
         clean_cal=cal, reservoir=reservoir, fraction=fraction, rng=rng
     )
-    pois_cal = PoisonedCalibrationSet.from_mapping({
-        cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
-        for cid in eligible_ids
-    })
+    pois_cal = PoisonedCalibrationSet.from_mapping(
+        {
+            cid: (inj.poisoned_cal if cid == victim_id else col.clients[cid].cal.copy())
+            for cid in eligible_ids
+        }
+    )
 
     global_pair = compute_global_pair(col, pois_cal, THRESHOLD_QUANTILE)
     local_pair = compute_local_pair(
@@ -365,7 +367,10 @@ def _make_collection():
 
 def _clean_calibration_set(collection):
     return PoisonedCalibrationSet.from_mapping(
-        {cid: collection.clients[cid].cal.copy() for cid in collection.eligibility.eligible_ids}
+        {
+            cid: collection.clients[cid].cal.copy()
+            for cid in collection.eligibility.eligible_ids
+        }
     )
 
 
@@ -618,7 +623,9 @@ class TestComputeMetrics:
             MetricEngineInput(collection=col, pair=local_pair, mu_flag_threshold=0.05)
         )
         assert set(result.delta_tau.keys()) == set(col.eligibility.eligible_ids)
-        assert set(result.auroc_records.records.keys()) == set(col.eligibility.eligible_ids)
+        assert set(result.auroc_records.records.keys()) == set(
+            col.eligibility.eligible_ids
+        )
         assert result.mu_flag_threshold == pytest.approx(0.05)
 
 
@@ -672,7 +679,9 @@ class TestBasicComputation:
 
     def test_tpr_all_attack_above_threshold(self) -> None:
         """Verify that TPR is 1.0 when all attack scores lie above the threshold."""
-        scores = _scores_victim_downstream_metrics(benign=[0.1, 0.2, 0.3], attack=[0.8, 0.9, 1.0])
+        scores = _scores_victim_downstream_metrics(
+            benign=[0.1, 0.2, 0.3], attack=[0.8, 0.9, 1.0]
+        )
         result = compute_victim_downstream_metrics(
             clean_threshold=0.5,
             poisoned_threshold=0.5,
@@ -685,7 +694,9 @@ class TestBasicComputation:
 
     def test_fpr_no_benign_above_threshold(self) -> None:
         """Verify balanced accuracy is 1.0 when no benign scores lie above the threshold."""
-        scores = _scores_victim_downstream_metrics(benign=[0.1, 0.2, 0.3], attack=[0.8, 0.9, 1.0])
+        scores = _scores_victim_downstream_metrics(
+            benign=[0.1, 0.2, 0.3], attack=[0.8, 0.9, 1.0]
+        )
         result = compute_victim_downstream_metrics(
             clean_threshold=0.5,
             poisoned_threshold=0.5,
@@ -762,7 +773,9 @@ class TestThresholdDirectionInvariants:
 
     def test_raising_threshold_does_not_increase_tpr(self) -> None:
         """Verify that raising the decision threshold results in a negative delta_tpr."""
-        scores = _scores_victim_downstream_metrics(benign=[0.1, 0.2, 0.3], attack=[0.6, 0.7, 0.8, 0.9])
+        scores = _scores_victim_downstream_metrics(
+            benign=[0.1, 0.2, 0.3], attack=[0.6, 0.7, 0.8, 0.9]
+        )
         result = compute_victim_downstream_metrics(
             clean_threshold=0.55,
             poisoned_threshold=0.75,
@@ -774,7 +787,9 @@ class TestThresholdDirectionInvariants:
 
     def test_lowering_threshold_does_not_decrease_fpr(self) -> None:
         """Verify that lowering the decision threshold decreases balanced accuracy by raising FPR."""
-        scores = _scores_victim_downstream_metrics(benign=[0.4, 0.5, 0.6, 0.7], attack=[0.5, 0.9, 1.0])
+        scores = _scores_victim_downstream_metrics(
+            benign=[0.4, 0.5, 0.6, 0.7], attack=[0.5, 0.9, 1.0]
+        )
         result = compute_victim_downstream_metrics(
             clean_threshold=0.65,
             poisoned_threshold=0.45,
@@ -790,7 +805,9 @@ class TestZeroFractionInvariant:
 
     def test_identical_thresholds_produce_zero_deltas(self) -> None:
         """Verify that equal thresholds produce exact zero metric delta values."""
-        scores = _scores_victim_downstream_metrics(benign=[0.1, 0.4, 0.7], attack=[0.6, 0.8, 0.95])
+        scores = _scores_victim_downstream_metrics(
+            benign=[0.1, 0.4, 0.7], attack=[0.6, 0.8, 0.95]
+        )
         result = compute_victim_downstream_metrics(
             clean_threshold=0.5,
             poisoned_threshold=0.5,
@@ -1034,7 +1051,9 @@ class TestDecompositionFrozenScaler:
     def test_f0_frozen_scaler_zero(self) -> None:
 
         col = _make_collection_cluster_threshold_recompute()
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids}
+        pois_cal = {
+            cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids
+        }
         pair = compute_cluster_pair(
             col,
             PoisonedCalibrationSet.from_mapping(pois_cal),
@@ -1052,7 +1071,9 @@ class TestFractionZero:
 
         col = _make_collection_cluster_threshold_recompute()
 
-        pois_cal = {cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids}
+        pois_cal = {
+            cid: col.clients[cid].cal.copy() for cid in col.eligibility.eligible_ids
+        }
         pair = compute_cluster_pair(
             col,
             PoisonedCalibrationSet.from_mapping(pois_cal),

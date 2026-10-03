@@ -9,6 +9,7 @@ import os
 from collections import deque
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Protocol, TypedDict, cast
 
@@ -253,6 +254,7 @@ def df_to_tensor(df: pl.DataFrame | ScoreVector, device: torch.device) -> torch.
     return torch.tensor(values, dtype=torch.float32, device=device)
 
 
+@cache
 def load_single_client_training_data(
     client_dir: Path, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -399,7 +401,10 @@ class DatpClient(NumPyClient):
         return (
             get_parameters(self.model),
             len(self.train_data),
-            {ClientMetricKey.TRAIN_LOSS: last_loss},
+            {
+                ClientMetricKey.TRAIN_LOSS: last_loss,
+                ClientMetricKey.CLIENT_ID: self.cid,
+            },
         )
 
     def evaluate(
@@ -407,7 +412,11 @@ class DatpClient(NumPyClient):
     ) -> tuple[float, SampleCount, dict[str, Scalar]]:
         set_parameters(self.model, parameters)
         loss = evaluate_benign(self.model, self.cal_data)
-        return loss, len(self.cal_data), {ClientMetricKey.VAL_LOSS: loss}
+        return (
+            loss,
+            len(self.cal_data),
+            {ClientMetricKey.VAL_LOSS: loss, ClientMetricKey.CLIENT_ID: self.cid},
+        )
 
 
 def build_model(cfg: DatpConfig) -> Autoencoder:
@@ -567,6 +576,10 @@ def derive_client_resources(machine: MachineConfig) -> ClientResources:
     return {"num_cpus": float(num_cpus_per_actor), "num_gpus": num_gpus}
 
 
+def _client_order(result: tuple[ClientProxy, FitRes | EvaluateRes]) -> str:
+    return str(result[1].metrics[ClientMetricKey.CLIENT_ID])
+
+
 class DatpFedAvg(FedAvg):
     def __init__(
         self,
@@ -627,7 +640,9 @@ class DatpFedAvg(FedAvg):
         failures: list[tuple[ClientProxy, FitRes] | BaseException],
     ) -> tuple[Parameters | None, dict[str, Scalar]]:
         self._raise_if_failures(FederatedRoundStage.FIT, server_round, failures)
-        aggregated = super().aggregate_fit(server_round, results, failures)
+        aggregated = super().aggregate_fit(
+            server_round, sorted(results, key=_client_order), failures
+        )
         if not aggregated or not aggregated[0]:
             return None, aggregated[1] if aggregated else {}
 
@@ -666,12 +681,13 @@ class DatpFedAvg(FedAvg):
         if not results:
             return None, {}
 
-        total_examples = sum(res.num_examples for _, res in results)
+        ordered = sorted(results, key=_client_order)
+        total_examples = sum(res.num_examples for _, res in ordered)
         if total_examples == 0:
             return None, {}
 
         weighted_loss = (
-            sum(res.loss * res.num_examples for _, res in results) / total_examples
+            sum(res.loss * res.num_examples for _, res in ordered) / total_examples
         )
         self._monitor.record(weighted_loss)
 

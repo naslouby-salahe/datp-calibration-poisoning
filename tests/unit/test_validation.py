@@ -1000,7 +1000,9 @@ def _write_minimal_outputs(root: Path) -> None:
     manifest_path = root / "data/processed/nbaiot" / ArtifactFile.MANIFEST
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest))
-    scoring_manifest = root / "scores/nbaiot_main/seed_0" / ArtifactFile.SCORING_MANIFEST
+    scoring_manifest = (
+        root / "scores/nbaiot_main/seed_0" / ArtifactFile.SCORING_MANIFEST
+    )
     scoring_manifest.write_text(json.dumps({"model_hash": "fixture-model-hash"}))
     for policy in (
         ThresholdPolicy.GLOBAL_THRESHOLD,

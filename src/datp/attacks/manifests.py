@@ -41,14 +41,15 @@ from datp.types import (
 
 
 class ProvenanceRecord(BaseModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     local_epochs: RoundCount
     pipeline_generated: bool = True
     repository: RepositoryName
     code_commit: NarrativeText = Field(default_factory=git_commit)
-    split_semantics: SplitSemantics = SplitSemantics.CHRONOLOGICAL_BENIGN_ONLY_60_1_20_1_18
+    split_semantics: SplitSemantics = (
+        SplitSemantics.CHRONOLOGICAL_BENIGN_ONLY_60_1_20_1_18
+    )
 
     @field_validator("local_epochs")
     @classmethod
@@ -61,7 +62,6 @@ class ProvenanceRecord(BaseModel):
 
 
 class BoundedSweepResultRow(BaseModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     policy: ThresholdPolicy
@@ -175,7 +175,6 @@ class ArtifactProvenance(BaseModel):
 
 
 class BoundedSweepManifest(BaseModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: SchemaVersion = "2"
@@ -246,7 +245,6 @@ class _SensitivityRow(BaseModel):
 
 
 class ClusterStabilityRow(_SensitivityRow):
-
     k: ClusterCount
     n_init: IterationCount
     random_state: RandomSeed
@@ -262,7 +260,6 @@ class ClusterStabilityRow(_SensitivityRow):
 
 
 class ScaleNormalizationRow(_SensitivityRow):
-
     tau_local_cv_clean: ManifestMetricValue
     tau_local_max_min_ratio_clean: ManifestMetricValue
     score_scale_cv_clean: ManifestMetricValue
@@ -277,7 +274,6 @@ class ScaleNormalizationRow(_SensitivityRow):
 
 
 class DrawVariantRow(_SensitivityRow):
-
     policy: ThresholdPolicy
     draw: ReservoirDraw
     requested_n_replaced: SignedCount
@@ -290,7 +286,6 @@ class DrawVariantRow(_SensitivityRow):
 
 
 class TrustBoundaryRow(_SensitivityRow):
-
     policy: ThresholdPolicy
     delta_tau_undefended: ManifestMetricValue
     delta_tau_trim_primary: ManifestMetricValue
@@ -302,7 +297,6 @@ class TrustBoundaryRow(_SensitivityRow):
 
 
 class SensitivityManifest(BaseModel):
-
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: SchemaVersion = "1"

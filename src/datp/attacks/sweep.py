@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -117,7 +118,6 @@ def cell_child_index(
 
 @dataclass(frozen=True, slots=True)
 class InjectionSpec:
-
     source: PoisoningSourceStrategy
     fraction: PoisonFraction
     seed_pair: SeedPair
@@ -129,7 +129,6 @@ class InjectionSpec:
 
 @dataclass(frozen=True)
 class InjectionOutcome:
-
     victim_id: ClientId
     poisoned_cal_set: PoisonedCalibrationSet
     reservoir: ReservoirResult
@@ -243,7 +242,6 @@ def lock_mu_flag_threshold(collection: ScoreCollection) -> Threshold:
 
 @dataclass(frozen=True, slots=True)
 class SweepCellConfig:
-
     collection: ScoreCollection
     mu_flag_threshold: Threshold
     auroc_set: AurocSet | None = None
@@ -251,7 +249,6 @@ class SweepCellConfig:
 
 @dataclass(frozen=True, slots=True)
 class SweepCellResult:
-
     thresholds_under_poisoning: ThresholdPairBase
     clean_metrics: MetricResult
     poisoned_metrics: MetricResult
@@ -288,14 +285,20 @@ def _cell_injection_and_metrics(
     return pair, metrics, outcome
 
 
-def run_sweep_cell(spec: SweepCellSpec, *, config: SweepCellConfig) -> SweepCellResult:
+def clean_cell_metrics(spec: SweepCellSpec, config: SweepCellConfig) -> MetricResult:
+    _, clean_metrics, _ = _cell_injection_and_metrics(
+        spec, config, fraction=0.0, mu_flag_threshold=None
+    )
+    return clean_metrics
+
+
+def run_sweep_cell(
+    spec: SweepCellSpec, *, config: SweepCellConfig, clean_metrics: MetricResult
+) -> SweepCellResult:
     assert_fractions_in_locked_grid([spec.fraction])
     assert_bounded_scale_requires_single_client(spec.target_scope)
     assert_valid_source_objective_pair(spec.source, spec.objective)
 
-    _, clean_metrics, _ = _cell_injection_and_metrics(
-        spec, config, fraction=0.0, mu_flag_threshold=None
-    )
     poisoned_pair, poisoned_metrics, outcome = _cell_injection_and_metrics(
         spec, config, fraction=spec.fraction, mu_flag_threshold=config.mu_flag_threshold
     )
@@ -314,10 +317,7 @@ logger = get_logger(__name__)
 
 def _auroc_invariant(result: SweepCellResult) -> bool:
     c, p = result.clean_metrics.auroc_records, result.poisoned_metrics.auroc_records
-    return all(
-        c[r.client_id].auroc == p[r.client_id].auroc
-        for r in c.values()
-    )
+    return all(c[r.client_id].auroc == p[r.client_id].auroc for r in c.values())
 
 
 def _threshold_pairs(
@@ -447,20 +447,28 @@ def _cluster_fields(
     )
 
 
+def _rows_for_group(
+    collection: ScoreCollection,
+    specs: tuple[SweepCellSpec, ...],
+    mu_flag_threshold: Threshold,
+    auroc_set: AurocSet,
+) -> list[BoundedSweepResultRow]:
+    config = SweepCellConfig(
+        collection=collection,
+        mu_flag_threshold=mu_flag_threshold,
+        auroc_set=auroc_set,
+    )
+    clean_metrics = clean_cell_metrics(specs[0], config)
+    return [_row_for_cell(collection, spec, config, clean_metrics) for spec in specs]
+
+
 def _row_for_cell(
     collection: ScoreCollection,
     spec: SweepCellSpec,
-    mu_flag_threshold: Threshold,
-    auroc_set: AurocSet,
+    config: SweepCellConfig,
+    clean_metrics: MetricResult,
 ) -> BoundedSweepResultRow:
-    res = run_sweep_cell(
-        spec,
-        config=SweepCellConfig(
-            collection=collection,
-            mu_flag_threshold=mu_flag_threshold,
-            auroc_set=auroc_set,
-        ),
-    )
+    res = run_sweep_cell(spec, config=config, clean_metrics=clean_metrics)
     entry = res.poisoned_metrics.delta_tau[spec.victim_id]
     blast = compute_blast_radius(res.poisoned_metrics, victim_id=spec.victim_id)
     spill = compute_spillover(
@@ -612,9 +620,7 @@ def load_seed_collections(
                 base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN
             )
             score_dir = layout.score_cell(
-                TrainingCellId(
-                    stage=ExperimentStage.NBAIOT_MAIN, seed=RandomSeed(seed)
-                )
+                TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=RandomSeed(seed))
             ).score_dir
             test_benign = load_parquets_from_dir(
                 score_dir / ScoringStage.TEST_BENIGN, allow_empty=False
@@ -647,6 +653,10 @@ def load_seed_collections(
     return collections
 
 
+def _seed_statics(collection: ScoreCollection) -> tuple[Threshold, AurocSet]:
+    return lock_mu_flag_threshold(collection), compute_auroc_records(collection)
+
+
 def run_nbaiot_main(
     base_dir: Path, config: CalibrationPoisoningConfig
 ) -> BoundedSweepManifest:
@@ -662,9 +672,14 @@ def run_nbaiot_main(
     auroc_by_seed: dict[RandomSeed, AurocSet] = {}
     victims_by_seed: dict[RandomSeed, tuple[ClientId, ...]] = {}
 
-    for seed, col in collections.items():
-        mu_flag_by_seed[seed] = lock_mu_flag_threshold(col)
-        auroc_by_seed[seed] = compute_auroc_records(col)
+    seed_statics = Parallel(n_jobs=-1)(
+        delayed(_seed_statics)(col) for col in collections.values()
+    )
+    for (seed, col), (mu_flag, auroc_records) in zip(
+        collections.items(), seed_statics, strict=True
+    ):
+        mu_flag_by_seed[seed] = mu_flag
+        auroc_by_seed[seed] = auroc_records
         victims_by_seed[seed] = col.eligible_ids
 
     cells = enumerate_bounded_sweep_matrix(victims_by_seed, config)
@@ -675,19 +690,32 @@ def run_nbaiot_main(
         eligible_client_count=sum(len(ids) for ids in victims_by_seed.values()),
     )
 
+    groups: dict[
+        tuple[RandomSeed, RandomSeed, ThresholdPolicy, ClientId], list[int]
+    ] = defaultdict(list)
+    for index, spec in enumerate(cells):
+        groups[
+            (spec.training_seed, spec.poisoning_seed, spec.policy, spec.victim_id)
+        ].append(index)
     try:
-        rows = Parallel(n_jobs=-1)(
-            delayed(_row_for_cell)(
-                collections[spec.training_seed],
-                spec,
-                mu_flag_by_seed[spec.training_seed],
-                auroc_by_seed[spec.training_seed],
+        grouped_rows = Parallel(n_jobs=-1)(
+            delayed(_rows_for_group)(
+                collections[key[0]],
+                tuple(cells[i] for i in indices),
+                mu_flag_by_seed[key[0]],
+                auroc_by_seed[key[0]],
             )
-            for spec in cells
+            for key, indices in groups.items()
         )
     except Exception:
         logger.exception("bounded sweep cell execution failed", cell_count=len(cells))
         raise
+
+    ordered: list[BoundedSweepResultRow | None] = [None] * len(cells)
+    for indices, group_rows in zip(groups.values(), grouped_rows, strict=True):
+        for index, row in zip(indices, group_rows, strict=True):
+            ordered[index] = row
+    rows = [row for row in ordered if row is not None]
 
     manifest = BoundedSweepManifest(
         generated_at_utc=datetime.now(UTC).isoformat(),
