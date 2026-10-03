@@ -22,20 +22,13 @@ keywords = [
     "N-BaIoT",
 ]
 dependencies = [
-    "cachetools",
-    "filelock",
     "flwr",
-    "hydra-core",
-    "jinja2",
     "joblib",
-    "lightning",
     "matplotlib",
-    "mlflow",
     "numpy",
-    "omegaconf",
     "orjson",
     "pandas",
-    "pandera",
+    "polars",
     "psutil",
     "pyarrow",
     "pydantic>=2.0",
@@ -44,7 +37,6 @@ dependencies = [
     "rich",
     "scikit-learn",
     "scipy",
-    "statsmodels",
     "structlog",
     "torch",
     "typer>=0.9",
@@ -55,18 +47,15 @@ datp = "datp.cli:cli_entry"
 
 [project.optional-dependencies]
 test = [
-    "Pillow",
     "pyright",
     "pytest",
+    "pytest-cov",
     "ruff",
-    "typeguard",
+    "statsmodels",
 ]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-
-[tool.setuptools.package-data]
-"datp.conf" = ["*.yaml", "regime/*.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -111,3 +100,11 @@ dev = [
     "pylint>=4.0.6",
     "semgrep>=1.167.0",
 ]
+
+[tool.coverage.run]
+source = ["src/datp"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true

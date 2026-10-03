@@ -9,15 +9,12 @@ from typing import cast
 import numpy as np
 from statsmodels.stats.multitest import multipletests
 
-from datp.attacks.constants import (
-    BOOTSTRAP_CI,
-    BOOTSTRAP_MIN_FINITE,
-    BOOTSTRAP_N,
-    HOLM_ALPHA,
-    SIGN_CONSISTENCY_THRESHOLD,
-)
-from datp.attacks.enums import AttackerObjective
-from datp.statistics.bootstrap import BootstrapResult, bootstrap_ci
+from datp.config import BOOTSTRAP_CI, BOOTSTRAP_MIN_FINITE, BOOTSTRAP_N, SIGN_CONSISTENCY_THRESHOLD
+from datp.enums import AttackerObjective
+from datp.statistics import BootstrapResult, bootstrap_ci
+
+
+HOLM_ALPHA = 0.05
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import math
 from typing import Annotated, NewType, TypeAlias
 
-import enum
-import math
 import numpy as np
 from pydantic import BeforeValidator, Field
 
@@ -28,7 +27,6 @@ SignedInt = Annotated[int, _Concept("signed integer")]
 NonNegativeFloat = Annotated[float, Field(ge=0)]
 PositiveFloat = Annotated[float, Field(gt=0)]
 UnitInterval = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
-OpenUnitInterval = Annotated[float, Field(gt=0.0, lt=1.0, allow_inf_nan=False)]
 
 ClientId = NewType("ClientId", str)
 ClusterId = NewType("ClusterId", str)
@@ -38,8 +36,6 @@ CoverageLabel = NewType("CoverageLabel", str)
 RandomSeed = NewType("RandomSeed", int)
 ContentHash = Annotated[str, _Concept("content hash")]
 SchemaVersion = Annotated[str, _Concept("schema version")]
-ExperimentName = Annotated[str, _Concept("experiment name")]
-TrackingUri = Annotated[str, _Concept("tracking uri")]
 ColumnName = Annotated[str, _Concept("column name")]
 RecordKey = Annotated[str, _Concept("record key")]
 ArtifactName = Annotated[str, _Concept("artifact name")]
@@ -55,19 +51,16 @@ FeatureCount = PositiveInt
 ClusterCount = PositiveInt
 ClusterIndex = NonNegativeInt
 BootstrapCount = PositiveInt
-BinCount = PositiveInt
 IterationCount = PositiveInt
 ByteCount = NonNegativeInt
 Index = NonNegativeInt
 WorkerCount = PositiveInt
 SeedCount = NonNegativeInt
-Patience = NonNegativeInt
 Quantile = PositiveFloat
 SignedCount = SignedInt
 
 PoisonFraction = UnitInterval
 ConfidenceLevel = UnitInterval
-SignificanceLevel = OpenUnitInterval
 LearningRate = PositiveFloat
 DurationSeconds = NonNegativeFloat
 Tolerance = NonNegativeFloat
@@ -91,5 +84,3 @@ FeatureMatrix: TypeAlias = np.ndarray
 ParameterVector: TypeAlias = np.ndarray
 
 ManifestMetricValue = Annotated[float, BeforeValidator(_manifest_metric_input)]
-TrackingNumber: TypeAlias = int | float
-TrackingValue: TypeAlias = str | int | float | bool | enum.Enum | None

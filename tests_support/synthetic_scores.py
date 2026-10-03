@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.attacks.constants import N_MIN
-from datp.core.seeds import SeedPair, SeedRecord, make_seed_rng
-from datp.scoring.manifest import ScoringColumn
+from datp.config import N_MIN
+from datp.core import SeedPair, SeedRecord, make_seed_rng
+from datp.scoring import ScoringColumn
 
 
 @dataclass(frozen=True, slots=True)

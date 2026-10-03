@@ -1,33 +1,102 @@
 from __future__ import annotations
 
-from datp.types import (
-    ClientId,
-    FalsePositiveRate,
-    NarrativeText,
-    RandomSeed,
-    RecordKey,
-    ScoreValue,
-    ScoreVector,
-    SignedCount,
-    Threshold,
-)
-
-
+import csv
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, cast
 
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from datp.config import StyleConfig
+from datp.enums import (
+    MAIN_BODY_POLICIES,
+    FigureName,
+    MetricName,
+    NBaIoTDevice,
+    ReportTerm,
+    ThresholdPolicy,
+)
+from datp.evaluation import EvaluationResult
+from datp.types import (
+    ClassificationScore,
+    ClientId,
+    FalsePositiveRate,
+    NarrativeText,
+    PoisonFraction,
+    Ratio,
+    RecordKey,
+    SampleCount,
+    SchemaVersion,
+    ScoreValue,
+    ScoreVector,
+    SignedCount,
+    Threshold,
+    TruePositiveRate,
+)
 
-from datp.config.models import StyleConfig
-from datp.core.enums import NBaIoTDevice, ThresholdPolicy
-from datp.reporting.constants import NBAIOT_DEVICE_SHORT_LABELS
-from datp.reporting.enums import FigureFileStem
+NBAIOT_DEVICE_SHORT_LABELS: dict[NBaIoTDevice, NarrativeText] = {
+    NBaIoTDevice.DANMINI_DOORBELL: "Danmini DB",
+    NBaIoTDevice.ECOBEE_THERMOSTAT: "Ecobee Tstat",
+    NBaIoTDevice.ENNIO_DOORBELL: "Ennio DB",
+    NBaIoTDevice.PHILIPS_B120N10_BABY_MONITOR: "Philips B120N10",
+    NBaIoTDevice.PROVISION_PT_737E_SECURITY_CAMERA: "Prov. PT-737E",
+    NBaIoTDevice.PROVISION_PT_838_SECURITY_CAMERA: "Prov. PT-838",
+    NBaIoTDevice.SAMSUNG_SNH_1011_N_WEBCAM: "Samsung SNH",
+    NBaIoTDevice.SIMPLEHOME_XCS7_1002_WHT_SECURITY_CAMERA: "SH XCS7-1002",
+    NBaIoTDevice.SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA: "SH XCS7-1003",
+}
+
+
+REPORTING_AUDIT_SCHEMA_VERSION: SchemaVersion = "1"
+
+
+SEED_SELECTION_RULE: NarrativeText = (
+    "training seed whose GLOBAL_THRESHOLD CV(FPR) is the lower median across all training seeds"
+)
+
+
+CLIENT_SELECTION_RULE: NarrativeText = (
+    "clients with the lowest, median and highest GLOBAL_THRESHOLD FPR in the representative seed"
+)
+
+
+POISONING_FIGURE_FRACTION: PoisonFraction = 0.40
+
+
+NOT_CONFIRMATORY_WARNING: NarrativeText = (
+    "Representative seed only; descriptive evidence, not confirmatory."
+)
+
+
+METRIC_DEFINITIONS: dict[MetricName | ReportTerm, NarrativeText] = {
+    MetricName.WORST_BA: "Minimum per-client balanced accuracy, (TPR + TNR) / 2, over eligible clients with complete evaluation.",
+    MetricName.P10_MACRO_F1: "10th percentile of per-client macro-F1 (mean of benign-class and attack-class F1) over eligible clients with complete evaluation.",
+    MetricName.CV_FPR: "Population coefficient of variation (std with ddof=0 divided by mean) of per-client FPR over eligible clients.",
+    MetricName.DELTA_CV_FPR: "CV(FPR) under the poisoned thresholds minus CV(FPR) under the clean thresholds, same fleet and seed.",
+    MetricName.VICTIM_DELTA_TPR: "Victim TPR under the poisoned threshold minus TPR under the clean threshold.",
+    MetricName.VICTIM_DELTA_FPR: "Victim FPR under the poisoned threshold minus FPR under the clean threshold.",
+    MetricName.VICTIM_DELTA_FP: "Victim count of benign test samples above the threshold, poisoned minus clean.",
+    MetricName.VICTIM_DELTA_FN: "Victim count of attack test samples at or below the threshold, poisoned minus clean.",
+    MetricName.NONVICTIM_MEAN_DELTA_TPR: "Mean over eligible non-victim clients of TPR change under the poisoned thresholds.",
+    MetricName.NONVICTIM_WORST_DELTA_TPR: "Most negative per-client TPR change among eligible non-victim clients.",
+    MetricName.NONVICTIM_MEAN_DELTA_FPR: "Mean over eligible non-victim clients of FPR change under the poisoned thresholds.",
+    MetricName.NONVICTIM_WORST_DELTA_FPR: "Most positive per-client FPR change among eligible non-victim clients.",
+    MetricName.NONVICTIM_DELTA_FP_TOTAL: "Total change in false-positive count over eligible non-victim clients.",
+    MetricName.NONVICTIM_DELTA_FN_TOTAL: "Total change in missed-detection count over eligible non-victim clients.",
+    ReportTerm.FIXED_CLUSTER: "CLUSTER_THRESHOLD thresholds where clean cluster assignments stay frozen and per-cluster means are taken over poisoned per-client quantiles.",
+    MetricName.DELTA_TAU_BOUND_UTILIZATION: "Threshold shift divided by the distance from the clean threshold to the extreme victim-local benign calibration score in the attack direction.",
+    MetricName.CAL_DUPLICATE_RATE: "Fraction of calibration entries repeating an earlier value.",
+    ReportTerm.CELL: "One (policy, objective, source, fraction, victim, training seed) row of the bounded sweep; rows sharing a training seed are not independent.",
+    ReportTerm.SEED_AGGREGATE: "Mean over victims of a row metric within one training seed; the inferential unit.",
+}
+
+
+matplotlib.use("Agg")
+
 
 plt.rcParams.update(
     {
@@ -43,6 +112,7 @@ plt.rcParams.update(
         "mathtext.fontset": "stix",
     }
 )
+
 
 _FONT_SIZE_KEY = "font.size"
 
@@ -92,7 +162,6 @@ def generate_figure1(
     per_device_fpr_global: dict[ClientId, FalsePositiveRate],
     per_device_fpr_local: dict[ClientId, FalsePositiveRate],
     output_dir: Path,
-    seed: RandomSeed,
     style: StyleConfig,
 ) -> Path:
     plt.rcParams[_FONT_SIZE_KEY] = style.font_size
@@ -124,7 +193,7 @@ def generate_figure1(
     ax.legend()
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / f"{FigureFileStem.FIGURE_1}{seed}", style.dpi)
+    return _save_figs(fig, output_dir / FigureName.FIGURE_1, style.dpi)
 
 
 def generate_figure2(
@@ -164,7 +233,7 @@ def generate_figure2(
     ax.legend(fontsize=style.font_size - 1)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_2, style.dpi)
+    return _save_figs(fig, output_dir / FigureName.FIGURE_2, style.dpi)
 
 
 def generate_figure3(
@@ -192,7 +261,7 @@ def generate_figure3(
     ax.tick_params(axis="x", labelrotation=30)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_3, style.dpi)
+    return _save_figs(fig, output_dir / FigureName.FIGURE_3, style.dpi)
 
 
 def generate_figure5(
@@ -247,7 +316,7 @@ def generate_figure5(
     cast(_Axes, axes[0][0]).legend(fontsize=style.font_size - 2)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_5, style.dpi)
+    return _save_figs(fig, output_dir / FigureName.FIGURE_5, style.dpi)
 
 
 def generate_figure6(
@@ -288,4 +357,195 @@ def generate_figure6(
         ax.set(ylabel=label)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return _save_figs(fig, output_dir / FigureFileStem.FIGURE_6, style.dpi)
+    return _save_figs(fig, output_dir / FigureName.FIGURE_6, style.dpi)
+
+
+MANDATORY_FOOTNOTE = (
+    "† Eligible clients only. CV is the population standard deviation divided by the mean. "
+    "Worst BA is the minimum per-client balanced accuracy, (TPR + TNR) / 2. "
+    "P10 client Macro-F1 is the 10th percentile of per-client macro-F1, the mean of the benign-class and attack-class F1."
+)
+
+
+def validate_main_body_role(policies: list[ThresholdPolicy]) -> None:
+    for p in policies:
+        if p not in MAIN_BODY_POLICIES:
+            raise ValueError(
+                f"Policy '{p}' not permitted. Allowed: {[p for p in MAIN_BODY_POLICIES]}"
+            )
+
+
+def format_mean_std(mean: ScoreValue, std: ScoreValue, bold: bool = False) -> NarrativeText:
+    if np.isnan(mean):
+        return "---"
+    text = f"{mean:.3f} ± {std:.3f}"
+    return f"\\textbf{{{text}}}" if bold else text
+
+
+@dataclass(frozen=True, slots=True)
+class TableRow:
+
+    policy: ThresholdPolicy
+    cv_fpr_mean: FalsePositiveRate
+    cv_fpr_std: FalsePositiveRate
+    cv_tpr_mean: TruePositiveRate
+    cv_tpr_std: TruePositiveRate
+    worst_ba_mean: ScoreValue
+    worst_ba_std: ScoreValue
+    macro_f1_mean: ClassificationScore
+    macro_f1_std: ClassificationScore
+    eligible_count: SampleCount
+    pending_count: SampleCount
+    coverage_ratio: Ratio
+
+
+@dataclass(slots=True)
+class ResultTable:
+
+    title: NarrativeText
+    style: StyleConfig
+    rows: list[TableRow] = field(default_factory=lambda: list[TableRow]())
+    footnote: NarrativeText = MANDATORY_FOOTNOTE
+
+    def to_latex(self) -> NarrativeText:
+        best_cv_fpr = (
+            min(self.rows, key=lambda r: r.cv_fpr_mean).policy if self.rows else None
+        )
+        best_cv_tpr = (
+            min(self.rows, key=lambda r: r.cv_tpr_mean).policy if self.rows else None
+        )
+        labels = self.style.policy_labels
+
+        rows_tex: list[NarrativeText] = []
+        for r in self.rows:
+            lbl = labels[r.policy]
+            cov = f"{r.coverage_ratio:.2f} ({r.eligible_count}/{r.eligible_count + r.pending_count})"
+            cv_fpr = (
+                format_mean_std(r.cv_fpr_mean, r.cv_fpr_std, r.policy == best_cv_fpr)
+                + f" ({r.eligible_count}/{r.eligible_count + r.pending_count})"
+            )
+            cv_tpr = format_mean_std(
+                r.cv_tpr_mean, r.cv_tpr_std, r.policy == best_cv_tpr
+            )
+            wba = format_mean_std(r.worst_ba_mean, r.worst_ba_std)
+            f1 = format_mean_std(r.macro_f1_mean, r.macro_f1_std)
+            rows_tex.append(f"{lbl} & {cv_fpr} & {cv_tpr} & {wba} & {f1} & {cov} \\\\")
+
+        rows_str = "\n".join(rows_tex)
+
+        return f"""\\begin{{table}}[htbp]
+\\caption{{{self.title}}}
+\\centering
+\\begin{{tabular}}{{l c c c c c}}
+\\toprule
+ThresholdPolicy & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ & Worst BA & P10 client Macro-F1 & Coverage \\\\
+\\midrule
+{rows_str}
+\\bottomrule
+\\end{{tabular}}
+
+\\footnotesize{{{self.footnote}}}
+\\end{{table}}"""
+
+    def to_csv(self, path: Path) -> Path:
+        labels = self.style.policy_labels
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [
+                    "ThresholdPolicy",
+                    "CV(FPR) mean",
+                    "CV(FPR) std",
+                    "CV(TPR) mean",
+                    "CV(TPR) std",
+                    "Worst BA mean",
+                    "Worst BA std",
+                    "P10 client Macro-F1 mean",
+                    "P10 client Macro-F1 std",
+                    "Eligible",
+                    "Pending",
+                    "Coverage",
+                ]
+            )
+            for r in self.rows:
+                writer.writerow(
+                    [
+                        labels[r.policy],
+                        f"{r.cv_fpr_mean:.4f}",
+                        f"{r.cv_fpr_std:.4f}",
+                        f"{r.cv_tpr_mean:.4f}",
+                        f"{r.cv_tpr_std:.4f}",
+                        f"{r.worst_ba_mean:.4f}",
+                        f"{r.worst_ba_std:.4f}",
+                        f"{r.macro_f1_mean:.4f}",
+                        f"{r.macro_f1_std:.4f}",
+                        r.eligible_count,
+                        r.pending_count,
+                        f"{r.coverage_ratio:.4f}",
+                    ]
+                )
+            writer.writerow([f" {self.footnote}"])
+        return path
+
+
+def _mean_std(values: list[ScoreValue]) -> tuple[ScoreValue, ScoreValue]:
+    return float(np.mean(values)), float(np.std(values, ddof=1)) if len(
+        values
+    ) > 1 else 0.0
+
+
+def _build_table_row(
+    policy: ThresholdPolicy, results: list[EvaluationResult]
+) -> TableRow:
+    eligible_count = len(results[0].eligible_ids)
+    pending_count = len(results[0].pending_ids)
+    if any(not np.isfinite(result.coverage_ratio) for result in results):
+        raise ValueError(f"Coverage ratio missing for {policy}.")
+    if any(
+        len(result.eligible_ids) != eligible_count
+        or len(result.pending_ids) != pending_count
+        for result in results
+    ):
+        raise ValueError(f"Coverage count mismatch for {policy}.")
+
+    cv_fpr_mean, cv_fpr_std = _mean_std([r.dispersion.cv_fpr for r in results])
+    cv_tpr_mean, cv_tpr_std = _mean_std([r.dispersion.cv_tpr for r in results])
+    worst_ba_mean, worst_ba_std = _mean_std(
+        [r.dispersion.worst_ba for r in results]
+    )
+    macro_f1_mean, macro_f1_std = _mean_std(
+        [r.dispersion.p10_macro_f1 for r in results]
+    )
+    return TableRow(
+        policy=policy,
+        cv_fpr_mean=cv_fpr_mean,
+        cv_fpr_std=cv_fpr_std,
+        cv_tpr_mean=cv_tpr_mean,
+        cv_tpr_std=cv_tpr_std,
+        worst_ba_mean=worst_ba_mean,
+        worst_ba_std=worst_ba_std,
+        macro_f1_mean=macro_f1_mean,
+        macro_f1_std=macro_f1_std,
+        eligible_count=eligible_count,
+        pending_count=pending_count,
+        coverage_ratio=results[0].coverage_ratio,
+    )
+
+
+def generate_table3(
+    results_by_policy: dict[ThresholdPolicy, list[EvaluationResult]],
+    output_dir: Path,
+    style: StyleConfig,
+) -> Path:
+    validate_main_body_role(list(results_by_policy.keys()))
+    table = ResultTable(title="Table 3: N-BaIoT Main Results", style=style)
+
+    for policy, results in sorted(results_by_policy.items()):
+        table.rows.append(_build_table_row(policy, results))
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stem = output_dir / "table3_nbaiot"
+    stem.with_suffix(".tex").write_text(table.to_latex(), encoding="utf-8")
+    table.to_csv(stem.with_suffix(".csv"))
+    return stem.with_suffix(".tex")

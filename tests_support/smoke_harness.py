@@ -6,44 +6,42 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from datp.attacks.constants import (
+from datp.attacks.injection import (
+    MetricEngineInput,
+    ScoreCollection,
+    ThresholdPairBase,
+    build_score_collection,
+)
+from datp.attacks.metrics import (
+    MetricResult,
+    compute_metrics,
+    compute_mu_flag_threshold,
+)
+from datp.attacks.sweep import (
+    InjectionOutcome,
+    InjectionSpec,
+    inject_single_victim,
+    recompute_pair,
+)
+from datp.config import (
     CLUSTER_K_NBAIOT,
     CLUSTER_MAX_ITER,
     CLUSTER_N_INIT,
     CLUSTER_RANDOM_STATE,
     N_MIN,
     THRESHOLD_QUANTILE,
+    ExperimentStage,
 )
-from datp.attacks.enums import PoisoningSourceStrategy
-from datp.attacks.execution.cell_runner import (
-    InjectionOutcome,
-    InjectionSpec,
-    inject_single_victim,
-    recompute_pair,
-)
-from datp.attacks.metrics.metric_engine import (
-    MetricEngineInput,
-    MetricResult,
-    compute_metrics,
-    compute_mu_flag_threshold,
-)
-from datp.attacks.types import ThresholdPairBase
-from datp.attacks.score_containers import (
-    ScoreCollection,
-    build_score_collection,
-)
-from datp.config.models import ExperimentStage
-from datp.core.enums import ThresholdPolicy
-from datp.core.identity import PolicyRunId, TrainingCellId
-from datp.core.seeds import SeedPair
-from datp.types import ClientId
-from tests_support.synthetic_scores import SyntheticScoreSet
-from datp.thresholding.eligibility import (
+from datp.core import PolicyRunId, SeedPair, TrainingCellId
+from datp.enums import PoisoningSourceStrategy, ThresholdPolicy
+from datp.thresholding import (
     EligibilityResult,
     compute_client_thresholds,
+    compute_cluster,
     compute_tau_global,
 )
-from datp.thresholding.policies import compute_cluster
+from datp.types import ClientId
+from tests_support.synthetic_scores import SyntheticScoreSet
 
 __all__ = [
     "InjectionOutcome",

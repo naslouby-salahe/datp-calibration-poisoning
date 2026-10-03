@@ -1,5 +1,78 @@
 from __future__ import annotations
 
+import csv
+import json
+import math
+import shutil
+from collections import defaultdict
+from collections.abc import Iterable
+from pathlib import Path
+
+import numpy as np
+
+from datp.artifacts import (
+    ArtifactLayout,
+    nbaiot_main_manifest_path,
+    sensitivity_manifest_path,
+    write_json_atomic,
+)
+from datp.attacks.manifests import BoundedSweepResultRow
+from datp.config import DatpConfig, ExperimentStage, write_resolved_config
+from datp.core import ClientThreshold, PolicyRunId, TrainingCellId, get_logger
+from datp.enums import (
+    CONTROLLED_POLICIES,
+    ArtifactDir,
+    ArtifactFile,
+    AttackerObjective,
+    AuditDir,
+    AuditField,
+    AuditStatus,
+    ClientStatus,
+    ComparisonLabel,
+    DatasetID,
+    EvidenceRole,
+    FigureName,
+    HeterogeneityContextResult,
+    MetricName,
+    PackageDir,
+    PathToken,
+    PayloadKey,
+    PoisoningSourceStrategy,
+    RunKind,
+    ScoringStage,
+    SeedScope,
+    SidecarField,
+    ThresholdPolicy,
+    ValidationField,
+)
+from datp.evaluation import (
+    ClientEvaluationRecord,
+    ConfusionCounts,
+    EvaluationResult,
+    build_evaluation_result,
+    recompute_binary_metrics,
+)
+from datp.reporting.figures import (
+    CLIENT_SELECTION_RULE,
+    NOT_CONFIRMATORY_WARNING,
+    POISONING_FIGURE_FRACTION,
+    REPORTING_AUDIT_SCHEMA_VERSION,
+    SEED_SELECTION_RULE,
+    generate_figure1,
+    generate_figure2,
+    generate_figure3,
+    generate_figure5,
+    generate_figure6,
+    generate_table3,
+)
+from datp.reporting.poisoning import (
+    build_poisoning_summaries,
+    build_sensitivity_summaries,
+    load_poisoning_manifest,
+)
+from datp.scoring import ScoreProvider, ScoringColumn
+from datp.statistics import BootstrapField, BootstrapReport, StatsField, bootstrap_ci
+from datp.thresholding import SweepMetrics
 from datp.types import (
     BootstrapCount,
     ClientId,
@@ -15,81 +88,11 @@ from datp.types import (
     Threshold,
     Tolerance,
 )
-
-
-import csv
-import json
-import math
-import shutil
-from collections import defaultdict
-from collections.abc import Iterable
-from pathlib import Path
-
-import numpy as np
-
-from datp.artifacts.io import write_json_atomic
-from datp.artifacts.layout import ArtifactLayout
-from datp.artifacts.names import ArtifactDir, ArtifactFile
-from datp.attacks.enums import AttackerObjective, PoisoningSourceStrategy
-from datp.attacks.manifests.bounded_sweep_manifest import BoundedSweepResultRow
-from datp.checkpointing.enums import EvidenceRole
-from datp.config.models import DatpConfig
-from datp.config.models import ExperimentStage
-from datp.core.enums import (
-    ClientStatus,
-    CONTROLLED_POLICIES,
-    AuditField,
-    MetricName,
-    PayloadKey,
-    PathToken,
-    RunKind,
-    ScoringStage,
-    SeedScope,
-    ThresholdPolicy,
-    ValidationField,
-)
-from datp.core.identity import PolicyRunId, TrainingCellId
-from datp.core.types import (
-    ClientThreshold,
-)
-from datp.data.catalog import DatasetID
-from datp.evaluation.metrics import (
-    ClientEvaluationRecord,
-    ConfusionCounts,
-    EvaluationResult,
-    build_evaluation_result,
-    recompute_binary_metrics,
-)
-from datp.reporting.constants import (
-    CLIENT_SELECTION_RULE,
-    NOT_CONFIRMATORY_WARNING,
-    POISONING_FIGURE_FRACTION,
-    REPORTING_AUDIT_SCHEMA_VERSION,
-    SEED_SELECTION_RULE,
-)
-from datp.reporting.enums import (
-    ComparisonLabel,
-    FigureName,
-    HeterogeneityContextResult,
-    SidecarField,
-)
-from datp.reporting.poisoning import load_poisoning_manifest
-from datp.reporting.figures import (
-    generate_figure1,
-    generate_figure2,
-    generate_figure3,
-    generate_figure5,
-    generate_figure6,
-)
-from datp.reporting.tables import generate_table3
-from datp.scoring.loading import ScoreProvider
-from datp.scoring.manifest import ScoringColumn
-from datp.statistics.bootstrap import BootstrapReport, bootstrap_ci
-from datp.statistics.constants import BootstrapField, StatsField
-from datp.thresholding.metrics_serialization import SweepMetrics
-from datp.validation.enums import AuditStatus
+from datp.validation import AuditOutputPaths, run_results_audit
 
 _REPORTING_SOURCES: set[NarrativeText] = set()
+
+
 _REPRESENTATIVE_SEED_FIGURES: frozenset[NarrativeText] = frozenset(
     {FigureName.FIGURE_1, FigureName.FIGURE_2}
 )
@@ -292,11 +295,8 @@ def _common_eligible_fprs(
     return out
 
 
-def _save_figure_copies(fig_dir: Path, stem: NarrativeText, gen_png: Path) -> list[Path]:
-    png_path, pdf_path = fig_dir / f"{stem}.png", fig_dir / f"{stem}.pdf"
-    shutil.copyfile(gen_png, png_path)
-    shutil.copyfile(gen_png.with_suffix(".pdf"), pdf_path)
-    return [gen_png, png_path, pdf_path]
+def _figure_files(png_path: Path) -> list[Path]:
+    return [png_path, png_path.with_suffix(".pdf")]
 
 
 def _validate_figure_sidecars(fig_dir: Path) -> list[NarrativeText]:
@@ -632,13 +632,12 @@ def _convergence_summary_warnings(
     layout = ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
     warnings: list[NarrativeText] = []
     for s in seeds:
-        c_dir = layout.checkpoint_dir(
+        score_dir = layout.score_cell(
             TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=s)
-        )
-        if (c_dir / ArtifactFile.MODEL_CHECKPOINT).exists():
-            sum_f = c_dir / ArtifactFile.CONVERGENCE_SUMMARY
-            if not sum_f.exists():
-                warnings.append(f"Missing summary {sum_f}")
+        ).score_dir
+        sum_f = score_dir / ArtifactFile.CONVERGENCE_SUMMARY
+        if not sum_f.exists():
+            warnings.append(f"Missing summary {sum_f}")
     return warnings
 
 
@@ -671,10 +670,8 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         fig_dir / f"{FigureName.FIGURE_1}_data.json",
         _figure1_sidecar_data(base_dir, s0g, s0l, ids1, g_fpr, l_fpr),
     )
-    p1 = _save_figure_copies(
-        fig_dir,
-        FigureName.FIGURE_1,
-        generate_figure1(dict(zip(ids1, g_fpr)), dict(zip(ids1, l_fpr)), fig_dir, s0g.run.seed, cfg.reporting.style),
+    p1 = _figure_files(
+        generate_figure1(dict(zip(ids1, g_fpr)), dict(zip(ids1, l_fpr)), fig_dir, cfg.reporting.style)
     )
 
     s0g_fprs = _eligible_fprs(s0g)
@@ -707,10 +704,8 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         fig_dir / f"{FigureName.FIGURE_2}_data.json",
         _figure2_sidecar_data(base_dir, s0g, tau_g, cfg.reporting.figure2_max_points, rep),
     )
-    p2 = _save_figure_copies(
-        fig_dir,
-        FigureName.FIGURE_2,
-        generate_figure2(cal_errs, tau_g, rep, fig_dir, cfg.reporting.style),
+    p2 = _figure_files(
+        generate_figure2(cal_errs, tau_g, rep, fig_dir, cfg.reporting.style)
     )
 
     b_enums = (
@@ -723,10 +718,8 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         fig_dir / f"{FigureName.FIGURE_3}_data.json",
         _figure3_sidecar_data(base_dir, nbaiot, fpr_pol, b_enums, tuple(cfg.experiment.seeds)),
     )
-    p3 = _save_figure_copies(
-        fig_dir,
-        FigureName.FIGURE_3,
-        generate_figure3(fpr_pol, fig_dir, cfg.reporting.style),
+    p3 = _figure_files(
+        generate_figure3(fpr_pol, fig_dir, cfg.reporting.style)
     )
 
     return (sc1, *p1, sc2, *p2, sc3, *p3)
@@ -748,6 +741,7 @@ _FIGURE_5_PANELS: tuple[
         r"Victim $\Delta$FPR",
     ),
 )
+
 
 _FIGURE_6_PANELS: tuple[
     tuple[AttackerObjective, PoisoningSourceStrategy, MetricName, NarrativeText], ...
@@ -837,15 +831,11 @@ def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]
                 sidecar,
             )
         )
-    p5 = _save_figure_copies(
-        fig_dir,
-        FigureName.FIGURE_5,
-        generate_figure5(client_effects, fig_dir, cfg.reporting.style),
+    p5 = _figure_files(
+        generate_figure5(client_effects, fig_dir, cfg.reporting.style)
     )
-    p6 = _save_figure_copies(
-        fig_dir,
-        FigureName.FIGURE_6,
-        generate_figure6(seed_effects, fig_dir, cfg.reporting.style),
+    p6 = _figure_files(
+        generate_figure6(seed_effects, fig_dir, cfg.reporting.style)
     )
     return (*sidecars, *p5, *p6)
 
@@ -911,10 +901,7 @@ def validate_results(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
             {
                 ValidationField.STATUS: AuditStatus.PASS,
                 ValidationField.SOURCE: "canonical per-client confusion-count reconstruction",
-                ValidationField.VALIDATED_STAGES: [
-                    ExperimentStage.NBAIOT_MAIN,
-                    ExperimentStage.SYNTHETIC_SMOKE,
-                ],
+                ValidationField.VALIDATED_STAGES: [ExperimentStage.NBAIOT_MAIN],
                 ValidationField.SEEDS: list(cfg.experiment.seeds),
             },
         ),
@@ -925,12 +912,13 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
     _REPORTING_SOURCES.clear()
     paths: list[Path] = []
     failures: list[NarrativeText] = []
-    for step in (validate_results, build_stats, build_figures, build_tables):
-        try:
-            paths.extend(step(base_dir, cfg))
-        except Exception as exc:
-            failures.append(str(exc))
-            break
+    try:
+        paths.extend(validate_results(base_dir, cfg))
+        paths.extend(build_stats(base_dir, cfg))
+        paths.extend(build_figures(base_dir, cfg))
+        paths.extend(build_tables(base_dir, cfg))
+    except Exception as exc:
+        failures.append(str(exc))
 
     fig_dir = base_dir / ArtifactDir.FIGURES
     failures.extend(_validate_figure_sidecars(fig_dir))
@@ -976,7 +964,7 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         AuditField.MISSING_FIELD_CHECKS: "validate_metrics_payload",
         AuditField.STALE_ARTIFACT_CHECKS: "schema/provenance/sidecar checks",
         AuditField.DESCRIPTIVE_FIGURE_CHECKS: f"representative-seed sidecar validation for {sorted(_REPRESENTATIVE_SEED_FIGURES)}",
-        AuditField.CONVERGENCE_METADATA_CHECKS: "warn if absent alongside model.pt",
+        AuditField.CONVERGENCE_METADATA_CHECKS: "warn if a score cell has no convergence summary",
         AuditField.FIGURE_TABLE_OUTPUT_PATHS: _json_text_values(str(p) for p in paths),
         AuditField.WARNINGS: _json_text_values(warnings),
         AuditField.FAILURES: _json_text_values(failures),
@@ -991,3 +979,54 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
     if failures:
         raise ValueError(f"reporting_audit contains failures: {failures}")
     return tuple(paths)
+
+
+logger = get_logger(__name__)
+
+
+def _reset_package_dir(base_dir: Path, results_dir: Path) -> None:
+    resolved = results_dir.resolve()
+    if resolved == Path.cwd().resolve() or base_dir.resolve().is_relative_to(resolved):
+        raise ValueError(
+            f"Refusing to clear results directory {results_dir}: it contains the run outputs."
+        )
+    shutil.rmtree(results_dir, ignore_errors=True)
+    results_dir.mkdir(parents=True)
+
+
+def _copy_into(source: Path, destination_dir: Path) -> Path:
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    return Path(shutil.copy2(source, destination_dir / source.name))
+
+
+def build_report_package(
+    *, base_dir: Path, results_dir: Path, data_root: Path, cfg: DatpConfig
+) -> tuple[Path, ...]:
+    audit_dir = base_dir / AuditDir.AUDIT
+    audit_outputs: AuditOutputPaths = run_results_audit(
+        base_dir, audit_dir, cfg, data_root
+    )
+    audit_paths = tuple(path for _, path in audit_outputs.items())
+    analysis_paths = (
+        *build_all(base_dir, cfg),
+        *build_poisoning_summaries(base_dir),
+        *build_poisoning_figures(base_dir, cfg),
+        *build_sensitivity_summaries(base_dir),
+    )
+    manifest_paths = (
+        nbaiot_main_manifest_path(base_dir),
+        sensitivity_manifest_path(base_dir),
+    )
+
+    _reset_package_dir(base_dir, results_dir)
+    packaged = [
+        write_resolved_config(cfg, results_dir / PackageDir.CONFIG),
+        *(_copy_into(path, results_dir / PackageDir.AUDIT) for path in audit_paths),
+        *(_copy_into(path, results_dir / PackageDir.MANIFESTS) for path in manifest_paths),
+    ]
+    for path in analysis_paths:
+        packaged.append(
+            _copy_into(path, results_dir / path.relative_to(base_dir).parent)
+        )
+    logger.info("report package written", results_dir=results_dir.as_posix(), file_count=len(packaged))
+    return tuple(packaged)

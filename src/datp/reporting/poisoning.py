@@ -1,20 +1,5 @@
 from __future__ import annotations
 
-from datp.types import (
-    ClientId,
-    JsonRecord,
-    JsonValue,
-    NarrativeText,
-    PoisonFraction,
-    RandomSeed,
-    RecordKey,
-    SampleCount,
-    ScoreValue,
-    SeedCount,
-    SignedCount,
-)
-
-
 import csv
 import json
 import math
@@ -29,9 +14,14 @@ from typing import TypeVar
 import numpy as np
 from scipy.stats import binomtest
 
-from datp.artifacts.names import ArtifactDir
-from datp.artifacts.layout import nbaiot_main_manifest_path, sensitivity_manifest_path
-from datp.attacks.constants import (
+from datp.artifacts import nbaiot_main_manifest_path, sensitivity_manifest_path
+from datp.attacks.manifests import (
+    BoundedSweepManifest,
+    BoundedSweepResultRow,
+    SensitivityManifest,
+)
+from datp.attacks.metrics import materiality_scale
+from datp.config import (
     BOOTSTRAP_CI,
     BOOTSTRAP_MIN_FINITE,
     BOOTSTRAP_N,
@@ -44,26 +34,34 @@ from datp.attacks.constants import (
     SIGN_CONSISTENCY_THRESHOLD,
     VICTIM_MAJORITY_THRESHOLD,
 )
-from datp.attacks.enums import (
+from datp.enums import (
     SYNTHESIZED_DRAWS,
+    AnalysisReportStem,
+    ArtifactDir,
     AttackerObjective,
     ClaimClassification,
+    DatasetID,
+    MetricName,
     PoisoningSourceStrategy,
+    ReportTerm,
     SeedAggregationMethod,
+    ThresholdPolicy,
 )
-from datp.attacks.manifests.bounded_sweep_manifest import (
-    BoundedSweepManifest,
-    BoundedSweepResultRow,
+from datp.reporting.figures import METRIC_DEFINITIONS
+from datp.statistics import bootstrap_ci, iqr, sign_flip_p_value
+from datp.types import (
+    ClientId,
+    JsonRecord,
+    JsonValue,
+    NarrativeText,
+    PoisonFraction,
+    RandomSeed,
+    RecordKey,
+    SampleCount,
+    ScoreValue,
+    SeedCount,
+    SignedCount,
 )
-from datp.attacks.manifests.sensitivity_manifest import SensitivityManifest
-from datp.attacks.metrics.delta_tau import materiality_scale
-from datp.core.enums import MetricName, ThresholdPolicy
-from datp.data.catalog import DatasetID
-from datp.reporting.constants import METRIC_DEFINITIONS
-from datp.reporting.enums import AnalysisReportStem, ReportTerm
-from datp.statistics.aggregates import iqr
-from datp.statistics.bootstrap import bootstrap_ci
-from datp.statistics.permutation import sign_flip_p_value
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Hashable)

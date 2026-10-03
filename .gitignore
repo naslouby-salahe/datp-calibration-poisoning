@@ -136,3 +136,7 @@ reports/
 
 # Local backup of prior outputs/results
 backup_runs/
+
+# local-only architecture tests
+tests/architecture/
+backup_runs_2/
