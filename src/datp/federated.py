@@ -58,6 +58,7 @@ from datp.data import (
     validate_tensor_input,
 )
 from datp.enums import (
+    WorkflowEvent,
     Workflow,
     CheckpointKey,
     ConvergenceColumn,
@@ -729,7 +730,7 @@ def _run_flower_simulation(
     strategy: DatpFedAvg,
     num_clients: SampleCount,
 ) -> None:
-    logger.info("workflow started", workflow=Workflow.FEDERATED_SIMULATION)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.FEDERATED_SIMULATION)
     configure_runtime_env()
     ensure_ray_memory_threshold(cfg.runtime.ray_memory_threshold)
     client_resources = derive_client_resources(cfg.machine)
@@ -760,7 +761,7 @@ def _run_flower_simulation(
             },
         ),
     )
-    logger.info("workflow completed", workflow=Workflow.FEDERATED_SIMULATION)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.FEDERATED_SIMULATION)
 
 
 def _scoring_data(
@@ -804,7 +805,7 @@ def run_fl_training(
     prepared_dir: Path | None = None,
     output_layout: ArtifactLayout | None = None,
 ) -> TrainingResult:
-    logger.info("workflow started", workflow=Workflow.FEDERATED_TRAINING)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.FEDERATED_TRAINING)
     if cfg.stage is None:
         raise ValueError("stage must be set in config")
     stage = cfg.stage
@@ -886,5 +887,5 @@ def run_fl_training(
         score_dir=score_base,
         loss_history=monitor.loss_history,
     )
-    logger.info("workflow completed", workflow=Workflow.FEDERATED_TRAINING)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.FEDERATED_TRAINING)
     return workflow_result

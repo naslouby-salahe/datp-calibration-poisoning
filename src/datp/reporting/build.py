@@ -25,6 +25,7 @@ from datp.config import (
 )
 from datp.core import ClientThreshold, PolicyRunId, TrainingCellId, get_logger
 from datp.enums import (
+    WorkflowEvent,
     Workflow,
     AxisLabel,
     AxisName,
@@ -450,7 +451,7 @@ def _secondary_payload(
 
 
 def build_stats(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.REPORT_STATS)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.REPORT_STATS)
     nbaiot = _load_results(
         base_dir,
         ExperimentStage.NBAIOT_MAIN,
@@ -496,7 +497,7 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
     json_path = write_json_atomic(out_dir / ArtifactFile.BOOTSTRAP_CIS_JSON, payload)
     csv_path = out_dir / ArtifactFile.BOOTSTRAP_CIS_CSV
     _write_bootstrap_csv(csv_path, primary, secondary)
-    logger.info("workflow completed", workflow=Workflow.REPORT_STATS)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.REPORT_STATS)
     return (json_path, csv_path)
 
 
@@ -669,9 +670,7 @@ def _figure3_sidecar_data(
             for s in seeds
         ],
         SidecarField.RUN_IDS: [
-            f"{ExperimentStage.NBAIOT_MAIN}_{b}_seed{s}"
-            for b in [e for e in b_enums]
-            for s in seeds
+            f"{ExperimentStage.NBAIOT_MAIN}_{b}_seed{s}" for b in b_enums for s in seeds
         ],
         SidecarField.SEEDS: list(seeds),
         SidecarField.ALPHAS: [],
@@ -691,7 +690,7 @@ def _figure3_sidecar_data(
         SidecarField.EVIDENCE_ROLE: EvidenceRole.DESCRIPTIVE_WITH_CONFIRMATORY_SIDECAR_DELTA,
         SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS,
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS,
-        SidecarField.POLICIES: [e for e in b_enums],
+        SidecarField.POLICIES: [*b_enums],
         SidecarField.PAIRED_SEED_CV_FPR_DELTA: _json_floats(
             _paired_deltas(
                 nbaiot,
@@ -700,7 +699,7 @@ def _figure3_sidecar_data(
             )
         ),
         SidecarField.SEED_AGGREGATION_POLICY: "eligible-client FPR values pooled across configured seeds after intersection",
-        SidecarField.POLICY_ORDER: [e for e in b_enums],
+        SidecarField.POLICY_ORDER: [*b_enums],
         SidecarField.ELIGIBILITY_POLICY: "eligible-client intersection within each seed",
         SidecarField.AXIS_LABELS: {
             AxisName.X: AxisLabel.THRESHOLD_POLICY,
@@ -739,13 +738,12 @@ def _json_path(path: Path) -> NarrativeText:
 
 def _json_text_values(values: Iterable[NarrativeText]) -> list[JsonValue]:
     output: list[JsonValue] = []
-    for value in values:
-        output.append(value)
+    output.extend(values)
     return output
 
 
 def build_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.REPORT_FIGURES)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.REPORT_FIGURES)
     fig_dir = base_dir / ArtifactDir.FIGURES
     fig_dir.mkdir(parents=True, exist_ok=True)
     nbaiot = _load_results(
@@ -834,7 +832,7 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
     )
 
     workflow_result = (sc1, *p1, sc2, *p2, sc3, *p3)
-    logger.info("workflow completed", workflow=Workflow.REPORT_FIGURES)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.REPORT_FIGURES)
     return workflow_result
 
 
@@ -881,7 +879,7 @@ _FIGURE_6_PANELS: tuple[
 
 
 def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.REPORT_POISONING_FIGURES)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.REPORT_POISONING_FIGURES)
     manifest = load_poisoning_manifest(base_dir)
     fig_dir = base_dir / ArtifactDir.FIGURES
     fig_dir.mkdir(parents=True, exist_ok=True)
@@ -966,7 +964,7 @@ def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]
         )
     )
     workflow_result = (*sidecars, *p5, *p6, *p7)
-    logger.info("workflow completed", workflow=Workflow.REPORT_POISONING_FIGURES)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.REPORT_POISONING_FIGURES)
     return workflow_result
 
 
@@ -1001,7 +999,7 @@ def _panel_metric_value(row: BoundedSweepResultRow, metric: MetricName) -> Score
 
 
 def build_tables(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.REPORT_TABLES)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.REPORT_TABLES)
     t3 = generate_table3(
         _load_results(
             base_dir,
@@ -1014,12 +1012,12 @@ def build_tables(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         cfg.reporting.style,
     )
     workflow_result = (t3, t3.with_suffix(".csv"))
-    logger.info("workflow completed", workflow=Workflow.REPORT_TABLES)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.REPORT_TABLES)
     return workflow_result
 
 
 def validate_results(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.REPORT_VALIDATION)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.REPORT_VALIDATION)
     _load_results(
         base_dir,
         ExperimentStage.NBAIOT_MAIN,
@@ -1038,12 +1036,12 @@ def validate_results(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
             },
         ),
     )
-    logger.info("workflow completed", workflow=Workflow.REPORT_VALIDATION)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.REPORT_VALIDATION)
     return workflow_result
 
 
 def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.REPORT_BASELINE)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.REPORT_BASELINE)
     _REPORTING_SOURCES.clear()
     paths: list[Path] = []
     failures: list[NarrativeText] = []
@@ -1113,7 +1111,7 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
     if failures:
         raise ValueError(f"reporting_audit contains failures: {failures}")
     workflow_result = tuple(paths)
-    logger.info("workflow completed", workflow=Workflow.REPORT_BASELINE)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.REPORT_BASELINE)
     return workflow_result
 
 

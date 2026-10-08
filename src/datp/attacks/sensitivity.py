@@ -386,7 +386,7 @@ def _trust_boundary_rows(
                 - tau_clean,
                 overwrite_reference_shift=reference,
                 buffer_to_overwrite_ratio=shift / reference
-                if reference != 0.0
+                if abs(reference) > 0.0
                 else math.nan,
             )
         )

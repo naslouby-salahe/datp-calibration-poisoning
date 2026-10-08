@@ -227,6 +227,10 @@ class _Figure(Protocol):
     def tight_layout(self) -> None: ...
 
 
+def _apply_font_size(style: StyleConfig) -> None:
+    plt.rcParams["font.size"] = style.font_size
+
+
 def _save_figs(fig: Figure, base_path: Path, dpi: SignedCount) -> Path:
     figure = cast(_Figure, fig)
     figure.savefig(base_path.with_suffix(".png"), dpi=dpi, bbox_inches="tight")
@@ -242,7 +246,7 @@ def generate_figure1(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams["font.size"] = style.font_size
+    _apply_font_size(style)
     devices = sorted(per_device_fpr_global.keys())
     x, width = np.arange(len(devices)), 0.35
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
@@ -281,7 +285,7 @@ def generate_figure2(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams["font.size"] = style.font_size
+    _apply_font_size(style)
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
     ax = cast(_Axes, ax)
     all_vals = np.concatenate([cal_errors[d] for d in device_ids if d in cal_errors])
@@ -320,7 +324,7 @@ def generate_figure3(
     style: StyleConfig,
     seed_count: SeedCount,
 ) -> Path:
-    plt.rcParams["font.size"] = style.font_size
+    _apply_font_size(style)
     fig, ax = plt.subplots(figsize=style.figsize_single_col)
     ax = cast(_Axes, ax)
     policies = sorted(fpr_by_policy.keys())
@@ -351,7 +355,7 @@ def generate_figure5(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams["font.size"] = style.font_size
+    _apply_font_size(style)
     panels = list(client_effects)
     fig, axes = plt.subplots(
         1, len(panels), figsize=style.figsize_double_col, squeeze=False
@@ -406,7 +410,7 @@ def generate_figure6(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams["font.size"] = style.font_size
+    _apply_font_size(style)
     panels = list(seed_effects)
     fig, axes = plt.subplots(
         1, len(panels), figsize=style.figsize_double_col, squeeze=False
@@ -462,7 +466,7 @@ def generate_figure7(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams["font.size"] = style.font_size
+    _apply_font_size(style)
     rows = sorted({(r.source, r.policy) for r in robustness})
     fractions = sorted({r.fraction for r in robustness})
     panels = (
@@ -523,7 +527,7 @@ def validate_main_body_role(policies: list[ThresholdPolicy]) -> None:
     for p in policies:
         if p not in MAIN_BODY_POLICIES:
             raise ValueError(
-                f"Policy '{p}' not permitted. Allowed: {[p for p in MAIN_BODY_POLICIES]}"
+                f"Policy '{p}' not permitted. Allowed: {list(MAIN_BODY_POLICIES)}"
             )
 
 

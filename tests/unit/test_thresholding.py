@@ -128,7 +128,7 @@ def _make_errors(n: int, seed: int = 0) -> np.ndarray:
     return np.random.default_rng(seed).exponential(scale=0.3, size=n).astype(np.float32)
 
 
-@pytest.fixture()
+@pytest.fixture
 def eligible_errors() -> dict[str, np.ndarray]:
     """Fixture to build standard multi-client eligible errors dict."""
     rng = np.random.default_rng(42)
@@ -212,19 +212,21 @@ class TestClusterThresholdKLock:
 
     def test_adaptive_k_rejected(self, eligible_errors: dict[str, np.ndarray]) -> None:
         """Verify that setting k=0 (adaptive clustering) is rejected with ValueError."""
+        cluster_hyperparams = ClusterHyperparams(
+            k=0,
+            n_init=CLUSTER_N_INIT,
+            max_iter=CLUSTER_MAX_ITER,
+            random_state=CLUSTER_RANDOM_STATE,
+            n_min=N_MIN,
+        )
+        run_value = _run()
         with pytest.raises(ValueError, match="locked fixed K"):
             compute_cluster(
                 eligible_errors,
                 0.5,
                 THRESHOLD_QUANTILE,
-                ClusterHyperparams(
-                    k=0,
-                    n_init=CLUSTER_N_INIT,
-                    max_iter=CLUSTER_MAX_ITER,
-                    random_state=CLUSTER_RANDOM_STATE,
-                    n_min=N_MIN,
-                ),
-                _run(),
+                cluster_hyperparams,
+                run_value,
             )
 
     def test_silhouette_scores_only_for_locked_k(
@@ -289,19 +291,21 @@ class TestClusterThresholdFingerprintRobustness:
             "c0": np.full(200, 0.5, dtype=np.float32),
             "c1": np.full(200, 0.5, dtype=np.float32),
         }
+        cluster_hyperparams = ClusterHyperparams(
+            k=CLUSTER_K_NBAIOT,
+            n_init=CLUSTER_N_INIT,
+            max_iter=CLUSTER_MAX_ITER,
+            random_state=CLUSTER_RANDOM_STATE,
+            n_min=N_MIN,
+        )
+        run_value = _run()
         with pytest.raises(ValueError, match="Degenerate fingerprints"):
             compute_cluster(
                 errors,
                 0.5,
                 THRESHOLD_QUANTILE,
-                ClusterHyperparams(
-                    k=CLUSTER_K_NBAIOT,
-                    n_init=CLUSTER_N_INIT,
-                    max_iter=CLUSTER_MAX_ITER,
-                    random_state=CLUSTER_RANDOM_STATE,
-                    n_min=N_MIN,
-                ),
-                _run(),
+                cluster_hyperparams,
+                run_value,
             )
 
     def test_fingerprints_match_canonical_feature_order(self) -> None:
@@ -343,19 +347,21 @@ class TestClusterThresholdFingerprintRobustness:
             .exponential(0.3, size=200)
             .astype(np.float32)
         }
+        cluster_hyperparams = ClusterHyperparams(
+            k=CLUSTER_K_NBAIOT,
+            n_init=CLUSTER_N_INIT,
+            max_iter=CLUSTER_MAX_ITER,
+            random_state=CLUSTER_RANDOM_STATE,
+            n_min=N_MIN,
+        )
+        run_value = _run()
         with pytest.raises(ValueError, match="Cannot cluster"):
             compute_cluster(
                 errors,
                 0.5,
                 THRESHOLD_QUANTILE,
-                ClusterHyperparams(
-                    k=CLUSTER_K_NBAIOT,
-                    n_init=CLUSTER_N_INIT,
-                    max_iter=CLUSTER_MAX_ITER,
-                    random_state=CLUSTER_RANDOM_STATE,
-                    n_min=N_MIN,
-                ),
-                _run(),
+                cluster_hyperparams,
+                run_value,
             )
 
     def test_calibration_pending_uses_tau_global(self) -> None:
@@ -435,7 +441,7 @@ def _make_errors_eligibility(n: int, seed: int = 0) -> np.ndarray:
     return np.random.default_rng(seed).exponential(scale=0.5, size=n).astype(np.float32)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_errors() -> dict[str, np.ndarray]:
     """Fixture to build standard multi-client errors dict with varied sample sizes."""
     return {
@@ -680,7 +686,7 @@ def _make_errors_policies(n: int, seed: int = 0) -> np.ndarray:
     return rng.exponential(scale=0.5, size=n).astype(np.float32)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_errors_policies() -> dict[str, np.ndarray]:
     """Fixture to build standard multi-client errors dict."""
     return {
@@ -861,7 +867,7 @@ class TestClusterThresholdFingerprints:
 class TestClusterThreshold:
     """Tests verifying compute_cluster policy algorithms and properties."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def large_errors(self) -> dict[str, np.ndarray]:
         """Fixture to generate exponential error distributions for larger pool of clients."""
         rng = np.random.default_rng(42)
@@ -873,19 +879,21 @@ class TestClusterThreshold:
     def test_fail_fast_k_elig_lt_2(self) -> None:
         """Verify ValueError is raised if there are fewer than 2 eligible clients to cluster."""
         errors = {"only_one": _make_errors_policies(200, seed=0)}
+        cluster_hyperparams = ClusterHyperparams(
+            k=CLUSTER_K_NBAIOT,
+            n_init=CLUSTER_N_INIT,
+            max_iter=CLUSTER_MAX_ITER,
+            random_state=CLUSTER_RANDOM_STATE,
+            n_min=N_MIN,
+        )
+        run_policies_value = _run_policies(ThresholdPolicy.CLUSTER_THRESHOLD)
         with pytest.raises(ValueError, match="at least 2 eligible clients"):
             compute_cluster(
                 errors,
                 0.5,
                 THRESHOLD_QUANTILE,
-                ClusterHyperparams(
-                    k=CLUSTER_K_NBAIOT,
-                    n_init=CLUSTER_N_INIT,
-                    max_iter=CLUSTER_MAX_ITER,
-                    random_state=CLUSTER_RANDOM_STATE,
-                    n_min=N_MIN,
-                ),
-                _run_policies(ThresholdPolicy.CLUSTER_THRESHOLD),
+                cluster_hyperparams,
+                run_policies_value,
             )
 
     def test_fixed_k3(self, large_errors: dict[str, np.ndarray]) -> None:
@@ -910,19 +918,21 @@ class TestClusterThreshold:
         self, large_errors: dict[str, np.ndarray]
     ) -> None:
         """Verify that adaptive k=0 selection is rejected with ValueError."""
+        cluster_hyperparams = ClusterHyperparams(
+            k=0,
+            n_init=CLUSTER_N_INIT,
+            max_iter=CLUSTER_MAX_ITER,
+            random_state=CLUSTER_RANDOM_STATE,
+            n_min=N_MIN,
+        )
+        run_policies_value = _run_policies(ThresholdPolicy.CLUSTER_THRESHOLD)
         with pytest.raises(ValueError, match="locked fixed K"):
             compute_cluster(
                 large_errors,
                 0.5,
                 THRESHOLD_QUANTILE,
-                ClusterHyperparams(
-                    k=0,
-                    n_init=CLUSTER_N_INIT,
-                    max_iter=CLUSTER_MAX_ITER,
-                    random_state=CLUSTER_RANDOM_STATE,
-                    n_min=N_MIN,
-                ),
-                _run_policies(ThresholdPolicy.CLUSTER_THRESHOLD),
+                cluster_hyperparams,
+                run_policies_value,
             )
 
     def test_pending_get_tau_global_not_cluster(
@@ -1254,8 +1264,9 @@ class TestPercentileThreshold:
 
     def test_empty_array_raises(self) -> None:
         """Verify ValueError is raised if input errors array is empty."""
+        array_value = np.array([])
         with pytest.raises(ValueError, match="empty"):
-            percentile_threshold(np.array([]), q=THRESHOLD_QUANTILE)
+            percentile_threshold(array_value, q=THRESHOLD_QUANTILE)
 
 
 class TestArithmeticMeanThreshold:

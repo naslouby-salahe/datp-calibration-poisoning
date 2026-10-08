@@ -376,9 +376,9 @@ class TestBaseConfig:
         assert BASE_CONFIG.policy is None
         assert BASE_CONFIG.seed is None
 
-    def test_frozen_config_is_immutable(self) -> None:
+    def test_frozen_config_is_immutable(self, monkeypatch: pytest.MonkeyPatch) -> None:
         with pytest.raises((TypeError, ValueError, ValidationError)):
-            BASE_CONFIG.model.input_dim = 999
+            monkeypatch.setattr(BASE_CONFIG.model, "input_dim", 999)
 
     def test_canonical_config_disables_batchnorm(self) -> None:
         assert BASE_CONFIG.model.use_bn is False

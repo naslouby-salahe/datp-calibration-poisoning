@@ -398,7 +398,7 @@ class TestAuditJsonSchema:
 class TestPrepareLoadPathConsistency:
     """Prepared data can be discovered and loaded without path mismatches."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def prepared_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         raw_dir = make_synthetic_raw(tmp_path)
         output_dir = tmp_path / "processed"

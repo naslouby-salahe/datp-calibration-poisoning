@@ -35,6 +35,7 @@ from datp.config import (
     VICTIM_MAJORITY_THRESHOLD,
 )
 from datp.enums import (
+    WorkflowEvent,
     Workflow,
     AnalysisColumn,
     SYNTHESIZED_DRAWS,
@@ -319,7 +320,7 @@ def _claim_key(identity: _SummaryIdentity) -> _ClaimKey:
 
 
 def build_poisoning_summaries(base_dir: Path) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.POISONING_SUMMARIES)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.POISONING_SUMMARIES)
     manifest = load_poisoning_manifest(base_dir)
     analysis_dir = base_dir / ArtifactDir.ANALYSIS
     analysis_dir.mkdir(parents=True, exist_ok=True)
@@ -412,12 +413,12 @@ def build_poisoning_summaries(base_dir: Path) -> tuple[Path, ...]:
         _write_json(analysis_dir / "metric_definitions.json", METRIC_DEFINITIONS)
     )
     workflow_result = tuple(paths)
-    logger.info("workflow completed", workflow=Workflow.POISONING_SUMMARIES)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.POISONING_SUMMARIES)
     return workflow_result
 
 
 def build_sensitivity_summaries(base_dir: Path) -> tuple[Path, ...]:
-    logger.info("workflow started", workflow=Workflow.SENSITIVITY_SUMMARIES)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.SENSITIVITY_SUMMARIES)
     if not (path := sensitivity_manifest_path(base_dir)).exists():
         raise FileNotFoundError(f"Missing sensitivity manifest: {path}")
     manifest = SensitivityManifest.model_validate_json(path.read_text())
@@ -438,7 +439,7 @@ def build_sensitivity_summaries(base_dir: Path) -> tuple[Path, ...]:
     workflow_result = tuple(
         p for stem, recs in outputs for p in _write_records(analysis_dir, stem, recs)
     )
-    logger.info("workflow completed", workflow=Workflow.SENSITIVITY_SUMMARIES)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.SENSITIVITY_SUMMARIES)
     return workflow_result
 
 
@@ -579,8 +580,7 @@ def _draw_variant_summary(manifest: SensitivityManifest) -> list[JsonRecord]:
                 AnalysisColumn.OBJECTIVE: obj,
                 AnalysisColumn.FRACTION: frac,
                 AnalysisColumn.DRAW: draw,
-                AnalysisColumn.SYNTHESIZED_VALUES: draw
-                in {d for d in SYNTHESIZED_DRAWS},
+                AnalysisColumn.SYNTHESIZED_VALUES: draw in SYNTHESIZED_DRAWS,
                 AnalysisColumn.N_ROWS: len(rows),
                 AnalysisColumn.MEAN_REQUESTED_N_REPLACED: mean_of(
                     [r.requested_n_replaced for r in rows]
@@ -595,7 +595,7 @@ def _draw_variant_summary(manifest: SensitivityManifest) -> list[JsonRecord]:
                 AnalysisColumn.MEAN_DELTA_TAU_WITH_REPLACEMENT: base,
                 AnalysisColumn.MEAN_DELTA_TAU_VARIANT: variant,
                 AnalysisColumn.VARIANT_TO_BASELINE_RATIO: variant / base
-                if math.isfinite(base) and base != 0.0
+                if math.isfinite(base) and abs(base) > 0.0
                 else math.nan,
                 AnalysisColumn.MEAN_DUPLICATE_RATE_WITH_REPLACEMENT: _finite_mean(
                     r.duplicate_rate_with_replacement for r in rows
@@ -645,7 +645,7 @@ def _trust_boundary_summary(manifest: SensitivityManifest) -> list[JsonRecord]:
                 ),
                 AnalysisColumn.TRIM_PRIMARY_REDUCTION: 1.0
                 - _finite_mean(r.delta_tau_trim_primary for r in rows) / undefended
-                if math.isfinite(undefended) and undefended != 0.0
+                if math.isfinite(undefended) and abs(undefended) > 0.0
                 else math.nan,
             }
         )
@@ -977,10 +977,11 @@ def _random_instability_summary(
     return [
         _RandomInstabilitySummary(
             identity=_SummaryIdentity(manifest.dataset, pol, obj, src, frac),
-            instability_count=(cnt := _victim_majority_count(rows, True, gate)),
-            unstable=cnt >= gate.sign_consistency,
-            directional_count=(dcnt := _victim_majority_count(rows, False, gate)),
-            directional_unstable=dcnt >= gate.sign_consistency,
+            instability_count=_victim_majority_count(rows, True, gate),
+            unstable=_victim_majority_count(rows, True, gate) >= gate.sign_consistency,
+            directional_count=_victim_majority_count(rows, False, gate),
+            directional_unstable=_victim_majority_count(rows, False, gate)
+            >= gate.sign_consistency,
         )
         for (pol, obj, src, frac), rows in sorted(_group_rows(manifest.results).items())
         if is_random_control(src)
@@ -1473,17 +1474,36 @@ _CLIENT_LEVEL_METRICS: tuple[MetricName, ...] = (
 )
 
 
+def _group_by_victim(
+    rows: list[BoundedSweepResultRow],
+) -> dict[RecordKey, list[BoundedSweepResultRow]]:
+    by_victim: defaultdict[RecordKey, list[BoundedSweepResultRow]] = defaultdict(list)
+    for row in rows:
+        by_victim[row.victim_id].append(row)
+    return dict(by_victim)
+
+
+def _add_client_level_statistics(
+    record: JsonRecord, rows: list[BoundedSweepResultRow]
+) -> None:
+    for metric in _CLIENT_LEVEL_METRICS:
+        values = [
+            value for row in rows if math.isfinite(value := _metric_value(row, metric))
+        ]
+        record[f"{metric}_mean"] = mean_of(values) if values else math.nan
+        record[f"{metric}_std"] = (
+            std_of(values, ddof=1) if len(values) > 1 else math.nan
+        )
+        record[f"{metric}_min"] = min(values) if values else math.nan
+        record[f"{metric}_max"] = max(values) if values else math.nan
+
+
 def _client_level_effects(manifest: BoundedSweepManifest) -> list[JsonRecord]:
     records: list[JsonRecord] = []
     for (pol, obj, src, frac), rows in sorted(
         _group_rows(r for r in manifest.results if r.fraction > 0.0).items()
     ):
-        by_victim: defaultdict[RecordKey, list[BoundedSweepResultRow]] = defaultdict(
-            list
-        )
-        for r in rows:
-            by_victim[r.victim_id].append(r)
-        for victim, v_rows in sorted(by_victim.items()):
+        for victim, v_rows in sorted(_group_by_victim(rows).items()):
             record: JsonRecord = {
                 AnalysisColumn.DATASET: manifest.dataset,
                 AnalysisColumn.POLICY: pol,
@@ -1493,12 +1513,7 @@ def _client_level_effects(manifest: BoundedSweepManifest) -> list[JsonRecord]:
                 AnalysisColumn.VICTIM_ID: victim,
                 AnalysisColumn.N_SEEDS: len({r.training_seed for r in v_rows}),
             }
-            for m in _CLIENT_LEVEL_METRICS:
-                vals = [v for r in v_rows if math.isfinite(v := _metric_value(r, m))]
-                record[f"{m}_mean"] = mean_of(vals) if vals else math.nan
-                record[f"{m}_std"] = std_of(vals, ddof=1) if len(vals) > 1 else math.nan
-                record[f"{m}_min"] = min(vals) if vals else math.nan
-                record[f"{m}_max"] = max(vals) if vals else math.nan
+            _add_client_level_statistics(record, v_rows)
             records.append(record)
     return records
 
@@ -1746,8 +1761,8 @@ def _manifest_summary(manifest: BoundedSweepManifest) -> JsonRecord:
         AnalysisColumn.TRAINING_SEEDS: list(manifest.training_seeds),
         AnalysisColumn.POISONING_SEEDS: list(manifest.poisoning_seeds),
         AnalysisColumn.ANALYSIS_SEEDS: list(manifest.analysis_seeds),
-        AnalysisColumn.POLICIES: [p for p in manifest.policies],
-        AnalysisColumn.SOURCES: [s for s in manifest.sources],
+        AnalysisColumn.POLICIES: [*manifest.policies],
+        AnalysisColumn.SOURCES: [*manifest.sources],
         AnalysisColumn.SOURCE_OBJECTIVE_PAIRS: list(manifest.source_objective_pairs),
         AnalysisColumn.FRACTIONS: list(manifest.fractions),
         AnalysisColumn.N_REPORTING_ROWS: manifest.n_cells,

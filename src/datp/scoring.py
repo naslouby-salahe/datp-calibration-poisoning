@@ -311,6 +311,16 @@ def _score_one_split(params: _SplitScoringParams) -> ScoringRecord:
     )
 
 
+def _stage_data(splits: ClientData, stage: ScoringStage) -> torch.Tensor:
+    match stage.client_data_attr:
+        case ClientDataAttribute.VAL:
+            return splits.val
+        case ClientDataAttribute.TEST_BENIGN:
+            return splits.test_benign
+        case ClientDataAttribute.TEST_ATTACK:
+            return splits.test_attack
+
+
 def score_clients_impl(
     client_data: Mapping[ClientId, ClientData],
     *,
@@ -326,13 +336,7 @@ def score_clients_impl(
         model.eval()
         model_device = next(model.parameters()).device
         for scoring_stage in scoring_stages:
-            data = (
-                splits.val
-                if scoring_stage.client_data_attr is ClientDataAttribute.VAL
-                else splits.test_benign
-                if scoring_stage.client_data_attr is ClientDataAttribute.TEST_BENIGN
-                else splits.test_attack
-            )
+            data = _stage_data(splits, scoring_stage)
             records.append(
                 _score_one_split(
                     _SplitScoringParams(

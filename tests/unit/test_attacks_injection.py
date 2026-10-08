@@ -215,12 +215,13 @@ class TestInfeasibleReservoir:
             tail_mass=0.10,
         )
         assert reservoir.status == ReservoirStatus.INFEASIBLE_DEGENERATE_TAIL
+        rng_value = _rng()
         with pytest.raises(ValueError, match="INFEASIBLE"):
             inject_fixed_budget(
                 clean_cal=c.cal,
                 reservoir=reservoir,
                 fraction=0.20,
-                rng=_rng(),
+                rng=rng_value,
             )
 
 
@@ -230,23 +231,27 @@ class TestInvalidFraction:
     def test_negative_fraction(self) -> None:
         """Verify that negative fractions raise ValueError."""
         c = make_eligible_client()
+        reservoir_value = _reservoir(c.cal)
+        rng_value = _rng()
         with pytest.raises(ValueError, match="fraction"):
             inject_fixed_budget(
                 clean_cal=c.cal,
-                reservoir=_reservoir(c.cal),
+                reservoir=reservoir_value,
                 fraction=-0.1,
-                rng=_rng(),
+                rng=rng_value,
             )
 
     def test_fraction_above_one(self) -> None:
         """Verify that fractions greater than 1.0 raise ValueError."""
         c = make_eligible_client()
+        reservoir_value = _reservoir(c.cal)
+        rng_value = _rng()
         with pytest.raises(ValueError, match="fraction"):
             inject_fixed_budget(
                 clean_cal=c.cal,
-                reservoir=_reservoir(c.cal),
+                reservoir=reservoir_value,
                 fraction=1.5,
-                rng=_rng(),
+                rng=rng_value,
             )
 
 
@@ -471,12 +476,13 @@ class TestWithoutReplacement:
             source=PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             tail_mass=0.10,
         )
+        rng_value = _rng()
         with pytest.raises(ValueError, match="without replacement"):
             inject_fixed_budget(
                 clean_cal=c.cal,
                 reservoir=reservoir,
                 fraction=0.40,
-                rng=_rng(),
+                rng=rng_value,
                 draw=ReservoirDraw.WITHOUT_REPLACEMENT,
             )
 
@@ -528,12 +534,14 @@ class TestInterpolatedTail:
             n_pool=1,
             n_distinct=1,
         )
+        arange_value = np.arange(200.0)
+        rng_value = _rng()
         with pytest.raises(ValueError, match="at least 2"):
             inject_fixed_budget(
-                clean_cal=np.arange(200.0),
+                clean_cal=arange_value,
                 reservoir=reservoir,
                 fraction=0.10,
-                rng=_rng(),
+                rng=rng_value,
                 draw=ReservoirDraw.INTERPOLATED_TAIL,
             )
 
@@ -951,8 +959,9 @@ def test_matrix_target_scope_is_always_single_client() -> None:
 def test_matrix_missing_seed_raises_keyerror() -> None:
     """Verify that passing an incomplete training seeds mapping raises KeyError."""
     incomplete = {0: _VICTIMS}
+    bounded_config_value = _bounded_config()
     with pytest.raises(KeyError):
-        enumerate_bounded_sweep_matrix(incomplete, _bounded_config())
+        enumerate_bounded_sweep_matrix(incomplete, bounded_config_value)
 
 
 class TestNoInplaceMutation:

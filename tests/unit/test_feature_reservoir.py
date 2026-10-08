@@ -101,6 +101,7 @@ def test_injection_rejects_invalid_input(
     tail: float,
     message: str,
 ) -> None:
+    default_rng_value = np.random.default_rng(1)
     with pytest.raises(ValueError, match=message):
         inject_feature_reservoir(
             clean_cal=clean,
@@ -108,19 +109,23 @@ def test_injection_rejects_invalid_input(
             feature_row_ids=ids,
             fraction=fraction,
             tail_fraction=tail,
-            rng=np.random.default_rng(1),
+            rng=default_rng_value,
         )
 
 
 def test_injection_rejects_tail_that_cannot_fill_budget() -> None:
+    arange_value = np.arange(10, dtype=np.float64)
+    arange_value_2 = np.arange(5, dtype=np.float64)
+    arange_value_3 = np.arange(5)
+    default_rng_value = np.random.default_rng(1)
     with pytest.raises(ValueError, match="only 1 distinct rows"):
         inject_feature_reservoir(
-            clean_cal=np.arange(10, dtype=np.float64),
-            benign_reservoir_scores=np.arange(5, dtype=np.float64),
-            feature_row_ids=np.arange(5),
+            clean_cal=arange_value,
+            benign_reservoir_scores=arange_value_2,
+            feature_row_ids=arange_value_3,
             fraction=0.5,
             tail_fraction=0.2,
-            rng=np.random.default_rng(1),
+            rng=default_rng_value,
         )
 
 
@@ -190,10 +195,11 @@ def test_load_train_feature_reservoirs_scores_processed_rows(
 
 
 def test_load_train_feature_reservoirs_requires_checkpoint(tmp_path: Path) -> None:
+    simple_namespace = SimpleNamespace(eligible_ids=())
     with pytest.raises(FileNotFoundError, match="Missing federated model checkpoint"):
         load_train_feature_reservoirs(
             tmp_path / "outputs",
-            {0: SimpleNamespace(eligible_ids=())},
+            {0: simple_namespace},
             data_root=tmp_path,
             donor_scope=FeatureDonorScope.CROSS_DEVICE,
         )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 import dataclasses
 import math
 import subprocess
@@ -497,7 +498,7 @@ class TestBinaryRankingMetrics:
 
     def test_is_frozen_dataclass(self) -> None:
         m = BinaryRankingMetrics(auroc=0.9, pr_auc=0.8)
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             setattr(m, "auroc", 0.5)
 
     def test_construct_with_values(self) -> None:

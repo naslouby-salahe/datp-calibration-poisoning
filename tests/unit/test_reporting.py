@@ -191,8 +191,9 @@ def _payload(
 
 
 def test_reporting_loader_recomputes_and_rejects_bad_saved_cv_fpr() -> None:
+    payload_value = _payload(cv_fpr=0.25)
     with pytest.raises(ValueError, match="Metric schema mismatch"):
-        _evaluation_from_payload(_payload(cv_fpr=0.25), metric_tol=1e-9)
+        _evaluation_from_payload(payload_value, metric_tol=1e-9)
 
 
 def test_reporting_loader_rejects_denominator_mismatch() -> None:
@@ -651,16 +652,16 @@ def test_five_seed_manifest_is_rejected() -> None:
         )
         for seed in range(5)
     )
+    payload = _manifest(rows).model_dump()
+    payload.update(
+        {
+            "training_seeds": tuple(range(5)),
+            "poisoning_seeds": tuple(range(100, 105)),
+            "analysis_seeds": tuple(range(300, 305)),
+            "mu_flag_threshold_by_training_seed": dict.fromkeys(range(5), 0.01),
+        }
+    )
     with pytest.raises(ValidationError, match="0..19"):
-        payload = _manifest(rows).model_dump()
-        payload.update(
-            {
-                "training_seeds": tuple(range(5)),
-                "poisoning_seeds": tuple(range(100, 105)),
-                "analysis_seeds": tuple(range(300, 305)),
-                "mu_flag_threshold_by_training_seed": dict.fromkeys(range(5), 0.01),
-            }
-        )
         BoundedSweepManifest.model_validate(payload)
 
 

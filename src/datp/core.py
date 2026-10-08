@@ -192,7 +192,12 @@ def set_seeds(seed: RandomSeed) -> None:
 
 
 class SeedRecord(FrozenModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        arbitrary_types_allowed=True,
+        revalidate_instances="never",
+    )
     pair: SeedPair
     client_idx: Index
     scope_idx: Index

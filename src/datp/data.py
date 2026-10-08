@@ -17,6 +17,7 @@ from datp.artifacts import write_json_atomic
 from datp.config import ExperimentStage
 from datp.core import get_logger, hash_file, utc_timestamp
 from datp.enums import (
+    WorkflowEvent,
     Workflow,
     DatasetDisplayName,
     ErrorScope,
@@ -414,7 +415,7 @@ def audit_partitions(
     output_dir: Path,
     n_min: SampleCount,
 ) -> PartitionAudit:
-    logger.info("workflow started", workflow=Workflow.PARTITION_AUDIT)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.PARTITION_AUDIT)
     output_dir = Path(output_dir)
     clients = {
         client_id: AuditClient(
@@ -460,7 +461,7 @@ def audit_partitions(
         evaluation_incomplete=summary.evaluation_incomplete_count,
     )
     workflow_result = audit_model
-    logger.info("workflow completed", workflow=Workflow.PARTITION_AUDIT)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.PARTITION_AUDIT)
     return workflow_result
 
 
@@ -732,7 +733,7 @@ def prepare_nbaiot(
     *,
     test_balance_policy: NBaIoTBalancePolicy,
 ) -> dict[ClientId, PartitionResult]:
-    logger.info("workflow started", workflow=Workflow.DATA_PREPARATION)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.DATA_PREPARATION)
     raw_dir, output_dir = Path(raw_dir), Path(output_dir)
     if not raw_dir.is_dir():
         raise FileNotFoundError(
@@ -777,5 +778,5 @@ def prepare_nbaiot(
         manifest_path=output_dir / ArtifactFile.MANIFEST,
     )
     workflow_result = results
-    logger.info("workflow completed", workflow=Workflow.DATA_PREPARATION)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.DATA_PREPARATION)
     return workflow_result

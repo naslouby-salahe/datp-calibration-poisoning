@@ -216,7 +216,7 @@ class TestSchemaAuditFeatureCountMismatch:
             run_schema_audit(file_path, expected_feature_count=10)
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_df() -> pl.DataFrame:
     return pl.DataFrame({"feature_a": [1.0, 2.0, 3.0], "feature_b": [4.0, 5.0, 6.0]})
 
@@ -380,7 +380,7 @@ class TestDatasetSpecHelper:
             dataset_spec("not_an_enum")  # type: ignore[arg-type]
 
 
-@pytest.fixture()
+@pytest.fixture
 def raw_tree(tmp_path):
     base = tmp_path / "raw"
     base.mkdir()
@@ -455,8 +455,9 @@ class TestVerifyManifestHashes:
             manifest_path=mpath,
         )
         files[0].write_bytes(b"MUTATED CONTENT")
+        load_value = PartitionManifest.load(mpath)
         with pytest.raises(RuntimeError, match=r"\[data\.manifests\].*hash mismatch"):
-            PartitionManifest.load(mpath).verify_hashes(base)
+            load_value.verify_hashes(base)
 
     def test_hash_verification_fails_on_missing_file(self, tmp_path, raw_tree):
         base, files = raw_tree
@@ -471,8 +472,9 @@ class TestVerifyManifestHashes:
             manifest_path=mpath,
         )
         files[1].unlink()
+        load_value = PartitionManifest.load(mpath)
         with pytest.raises(RuntimeError, match=r"\[data\.manifests\].*not found"):
-            PartitionManifest.load(mpath).verify_hashes(base)
+            load_value.verify_hashes(base)
 
 
 def _write_json(path, data):
@@ -686,7 +688,7 @@ class TestFitScaler:
         df = pl.DataFrame(schema={"a": pl.Float64, "b": pl.Float64})
         scaler = fit_scaler(df)
 
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
             _ = scaler.mean_
 
 

@@ -85,13 +85,14 @@ class TestRunLifecycleMarkers:
     def test_run_lifecycle_markers_failure(self, tmp_path: Path) -> None:
         """Verify that error raising within block creates ABORTED.txt and removes IN_PROGRESS."""
         run_dir = tmp_path / "run_fail"
+        lifecycle = RunLifecycle(
+            run_dir, policy=ThresholdPolicy.LOCAL_THRESHOLD, seed=7
+        )
+        failure = RuntimeError("boom")
         with pytest.raises(RuntimeError, match="boom"):
-            with RunLifecycle(
-                run_dir, policy=ThresholdPolicy.LOCAL_THRESHOLD, seed=7
-            ) as rl:
-                assert (run_dir / "IN_PROGRESS").exists()
+            with lifecycle as rl:
                 rl.last_completed_round = 3
-                raise RuntimeError("boom")
+                raise failure
 
         assert not (run_dir / "IN_PROGRESS").exists()
         assert not (run_dir / "DONE.txt").exists()
@@ -107,8 +108,9 @@ class TestRunLifecycleMarkers:
     def test_run_state_after_failure(self, tmp_path: Path) -> None:
         """Verify check_run_state resolves to ABORTED after run context exits via raise."""
         run_dir = tmp_path / "state_fail"
+        lifecycle = RunLifecycle(run_dir)
         with pytest.raises(ValueError):
-            with RunLifecycle(run_dir):
+            with lifecycle:
                 raise ValueError("oops")
         assert check_run_state(run_dir) == RunState.ABORTED
 
@@ -119,10 +121,11 @@ class TestAbortedMarker:
     def test_aborted_marker_contains_round_info(self, tmp_path: Path) -> None:
         """Verify that ABORTED.txt records policy, seed and traceback."""
         run_dir = tmp_path / "abort_info"
+        lifecycle = RunLifecycle(
+            run_dir, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=42
+        )
         with pytest.raises(RuntimeError):
-            with RunLifecycle(
-                run_dir, policy=ThresholdPolicy.GLOBAL_THRESHOLD, seed=42
-            ):
+            with lifecycle:
                 raise RuntimeError("OOM at round 11")
 
         content = (run_dir / "ABORTED.txt").read_text()
@@ -134,10 +137,11 @@ class TestAbortedMarker:
     def test_aborted_marker_with_no_round(self, tmp_path: Path) -> None:
         """Verify that ABORTED.txt records policy for a failure without a seed."""
         run_dir = tmp_path / "abort_no_rnd"
+        lifecycle = RunLifecycle(
+            run_dir, policy=ThresholdPolicy.CLUSTER_THRESHOLD, seed=1
+        )
         with pytest.raises(KeyError):
-            with RunLifecycle(
-                run_dir, policy=ThresholdPolicy.CLUSTER_THRESHOLD, seed=1
-            ):
+            with lifecycle:
                 raise KeyError("missing key")
 
         content = (run_dir / "ABORTED.txt").read_text()

@@ -193,7 +193,9 @@ class TestHashModelState:
         )
 
     def test_hash_is_deterministic(self) -> None:
-        assert hash_model_state(self._model()) == hash_model_state(self._model())
+        first = hash_model_state(self._model())
+        second = hash_model_state(self._model())
+        assert first == second
 
     def test_hash_changes_with_weights(self) -> None:
         model = self._model()

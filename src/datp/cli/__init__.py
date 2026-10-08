@@ -72,7 +72,7 @@ class _SummaryRow:
 @dataclass(slots=True)
 class _StatusReport:
     stage_reports: dict[ExperimentStage, _StageReport] = field(
-        default_factory=lambda: dict[ExperimentStage, _StageReport]()
+        default_factory=lambda: {}
     )
 
     def summary_rows(self) -> list[_SummaryRow]:

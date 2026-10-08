@@ -231,6 +231,11 @@ class ControlGate(enum.StrEnum):
     ABSOLUTE = "absolute"
 
 
+class WorkflowEvent(enum.StrEnum):
+    STARTED = "workflow started"
+    COMPLETED = "workflow completed"
+
+
 class AxisName(enum.StrEnum):
     X = "x"
     Y = "y"

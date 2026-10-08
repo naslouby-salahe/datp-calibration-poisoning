@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 import torch
 
 from datp.config import ExperimentStage
@@ -1118,7 +1119,9 @@ class TestSha256Bytes:
     def test_deterministic(self) -> None:
         """Verify that hashing identical bytes yields the identical hash string."""
         payload = b"hello world"
-        assert sha256_bytes(payload) == sha256_bytes(payload)
+        first = sha256_bytes(payload)
+        second = sha256_bytes(payload)
+        assert first == second
 
     def test_different_content_different_hash(self) -> None:
         """Ensure distinct byte contents result in different hashes."""
@@ -1137,7 +1140,9 @@ class TestHashFile:
         """Verify file hashing is deterministic for identical file contents."""
         f = tmp_path / "data.bin"
         f.write_bytes(b"deterministic content")
-        assert hash_file(f) == hash_file(f)
+        first = hash_file(f)
+        second = hash_file(f)
+        assert first == second
 
     def test_different_content_different_hash(self, tmp_path: Path) -> None:
         """Ensure files with different contents yield different hash strings."""
@@ -1174,7 +1179,9 @@ class TestHashJsonable:
     def test_deterministic(self) -> None:
         """Verify jsonable hashing is deterministic for identical structured payloads."""
         payload = {"a": 1, "b": [2, 3]}
-        assert hash_jsonable(payload) == hash_jsonable(payload)
+        first = hash_jsonable(payload)
+        second = hash_jsonable(payload)
+        assert first == second
 
     def test_sort_key_independent(self) -> None:
         """Ensure hashing is independent of key order for dictionary inputs."""
@@ -1211,7 +1218,9 @@ class TestSourceHash:
         """Ensure source hash is deterministic for a constant set of file paths."""
         f = tmp_path / "src.py"
         f.write_text("print(1)")
-        assert source_hash([f]) == source_hash([f])
+        first = source_hash([f])
+        second = source_hash([f])
+        assert first == second
 
     def test_different_content_different_hash(self, tmp_path: Path) -> None:
         """Verify modifying source file content alters the computed source hash."""
@@ -1246,7 +1255,9 @@ class TestArrayHash:
     def test_deterministic(self) -> None:
         """Verify array hashing is deterministic for a constant NumPy array."""
         arr = np.array([1.0, 2.0, 3.0])
-        assert array_hash(arr) == array_hash(arr)
+        first = array_hash(arr)
+        second = array_hash(arr)
+        assert first == second
 
     def test_different_content_different_hash(self) -> None:
         """Ensure distinct array content changes the array hash."""
@@ -1321,7 +1332,7 @@ class TestSeedRecord:
         record = _seed_record(
             training_seed=0, poisoning_seed=100, client_idx=0, scope_idx=0
         )
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError, match="frozen"):
             setattr(record, "training_seed", 99)
 
     def test_entropy_is_tuple_of_four(self) -> None:

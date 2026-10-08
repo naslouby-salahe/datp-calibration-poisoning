@@ -286,12 +286,16 @@ def test_manifest_rejects_unpaired_seed_pools() -> None:
 
 def test_manifest_rejects_five_seed_pools() -> None:
     """Verify validation fails if seed pools contain fewer than 10 required items."""
+    tuple_value = tuple(range(5))
+    tuple_value_2 = tuple(range(100, 105))
+    tuple_value_3 = tuple(range(300, 305))
+    fromkeys_value = dict.fromkeys(range(5), 0.005)
     with pytest.raises(ValidationError, match="0..19"):
         _manifest(
-            training_seeds=tuple(range(5)),
-            poisoning_seeds=tuple(range(100, 105)),
-            analysis_seeds=tuple(range(300, 305)),
-            mu_flag_threshold_by_training_seed=dict.fromkeys(range(5), 0.005),
+            training_seeds=tuple_value,
+            poisoning_seeds=tuple_value_2,
+            analysis_seeds=tuple_value_3,
+            mu_flag_threshold_by_training_seed=fromkeys_value,
         )
 
 

@@ -88,6 +88,7 @@ from datp.core import (
 )
 from datp.data import processed_root
 from datp.enums import (
+    WorkflowEvent,
     Workflow,
     CheckpointKey,
     AttackerObjective,
@@ -813,7 +814,7 @@ def load_train_feature_reservoirs(
     dict[RandomSeed, dict[ClientId, ScoreVector]],
     dict[RandomSeed, dict[ClientId, np.ndarray]],
 ]:
-    logger.info("workflow started", workflow=Workflow.FEATURE_RESERVOIR_LOAD)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.FEATURE_RESERVOIR_LOAD)
     feature_root = processed_root(DatasetID.NBAIOT, base_dir=data_root)
     score_by_seed: dict[RandomSeed, dict[ClientId, ScoreVector]] = {}
     row_ids_by_seed: dict[RandomSeed, dict[ClientId, np.ndarray]] = {}
@@ -880,7 +881,7 @@ def load_train_feature_reservoirs(
         score_by_seed[seed] = scores_for_clients
         row_ids_by_seed[seed] = row_ids_for_clients
     workflow_result = score_by_seed, row_ids_by_seed
-    logger.info("workflow completed", workflow=Workflow.FEATURE_RESERVOIR_LOAD)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.FEATURE_RESERVOIR_LOAD)
     return workflow_result
 
 

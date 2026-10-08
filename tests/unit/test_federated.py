@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 import inspect
 import json
 import os
@@ -245,37 +246,46 @@ class TestDatpClientShapeValidation:
     def test_rejects_1d_train_data(self) -> None:
         """Verify ValueError is raised if training data tensor is 1-D."""
         model = _make_ae()
+        randn_value = torch.randn(16)
+        randn_value_2 = torch.randn(8, 4)
+        mock_cfg_value = _mock_cfg()
         with pytest.raises(ValueError, match="train_data must be 2-D"):
             DatpClient(
                 cid="c0",
                 model=model,
-                train_data=torch.randn(16),
-                cal_data=torch.randn(8, 4),
-                cfg=_mock_cfg(),
+                train_data=randn_value,
+                cal_data=randn_value_2,
+                cfg=mock_cfg_value,
             )
 
     def test_rejects_3d_cal_data(self) -> None:
         """Verify ValueError is raised if calibration data tensor is 3-D."""
         model = _make_ae()
+        randn_value = torch.randn(16, 4)
+        randn_value_2 = torch.randn(8, 4, 2)
+        mock_cfg_value = _mock_cfg()
         with pytest.raises(ValueError, match="cal_data must be 2-D"):
             DatpClient(
                 cid="c1",
                 model=model,
-                train_data=torch.randn(16, 4),
-                cal_data=torch.randn(8, 4, 2),
-                cfg=_mock_cfg(),
+                train_data=randn_value,
+                cal_data=randn_value_2,
+                cfg=mock_cfg_value,
             )
 
     def test_rejects_empty_train_data(self) -> None:
         """Verify ValueError is raised if training data tensor is empty."""
         model = _make_ae()
+        empty_value = torch.empty(0, 4)
+        randn_value = torch.randn(8, 4)
+        mock_cfg_value = _mock_cfg()
         with pytest.raises(ValueError, match="train_data must be non-empty"):
             DatpClient(
                 cid="c0",
                 model=model,
-                train_data=torch.empty(0, 4),
-                cal_data=torch.randn(8, 4),
-                cfg=_mock_cfg(),
+                train_data=empty_value,
+                cal_data=randn_value,
+                cfg=mock_cfg_value,
             )
 
     def test_rejects_nan_train_data(self) -> None:
@@ -283,13 +293,15 @@ class TestDatpClientShapeValidation:
         model = _make_ae()
         data = torch.randn(16, 4)
         data[0, 0] = float("nan")
+        randn_value = torch.randn(8, 4)
+        mock_cfg_value = _mock_cfg()
         with pytest.raises(ValueError, match="non-finite"):
             DatpClient(
                 cid="c0",
                 model=model,
                 train_data=data,
-                cal_data=torch.randn(8, 4),
-                cfg=_mock_cfg(),
+                cal_data=randn_value,
+                cfg=mock_cfg_value,
             )
 
 
@@ -620,8 +632,9 @@ class TestFiniteLossValidation:
             relative_threshold=0.03,
             window=4,
         )
+        float_value = float("nan")
         with pytest.raises(ValueError, match="Non-finite loss"):
-            monitor.record(float("nan"))
+            monitor.record(float_value)
 
     def test_inf_loss_raises(self) -> None:
         """Verify record raises ValueError if input loss is positive infinity."""
@@ -631,8 +644,9 @@ class TestFiniteLossValidation:
             relative_threshold=0.03,
             window=4,
         )
+        float_value = float("inf")
         with pytest.raises(ValueError, match="Non-finite loss"):
-            monitor.record(float("inf"))
+            monitor.record(float_value)
 
     def test_negative_inf_loss_raises(self) -> None:
         """Verify record raises ValueError if input loss is negative infinity."""
@@ -642,8 +656,9 @@ class TestFiniteLossValidation:
             relative_threshold=0.03,
             window=4,
         )
+        float_value = float("-inf")
         with pytest.raises(ValueError, match="Non-finite loss"):
-            monitor.record(float("-inf"))
+            monitor.record(float_value)
 
 
 class TestStrategyMonitorFromConfig:
@@ -1278,8 +1293,9 @@ class TestLoadSingleClientTrainingData:
     def test_missing_cal_raises(self, tmp_path: Path) -> None:
         """Ensure FileNotFoundError is raised if calibration split is missing."""
         _write_client_splits(tmp_path, splits=(Split.TRAIN,))
+        device_value = torch.device(DeviceType.CPU)
         with pytest.raises(FileNotFoundError):
-            load_single_client_training_data(tmp_path, torch.device(DeviceType.CPU))
+            load_single_client_training_data(tmp_path, device_value)
 
 
 class TestLoadClientData:
@@ -1337,10 +1353,9 @@ class TestLoadClientData:
         df = pl.DataFrame({})
         write_artifact(df, split_path(client_dir, Split.TRAIN))
 
+        device_value = torch.device(DeviceType.CPU)
         with pytest.raises(ValueError, match="0 columns"):
-            load_client_data(
-                tmp_path, device=torch.device(DeviceType.CPU), splits=TRAINING_SPLITS
-            )
+            load_client_data(tmp_path, device=device_value, splits=TRAINING_SPLITS)
 
     def test_device_is_respected(self, tmp_path: Path) -> None:
         """Verify tensors are loaded onto the requested PyTorch device."""
@@ -1578,18 +1593,19 @@ class TestPreparedDirUpfrontValidation:
             "datp.federated.discover_client_dirs",
             return_value=[tmp_path / "client_a", tmp_path / "client_b"],
         ):
+            client_factory_config = ClientFactoryConfig(
+                client_ids=client_ids,
+                cfg=cfg,
+                device=torch.device(DeviceType.CPU),
+                prepared_dir=tmp_path,
+                seed=0,
+            )
             with pytest.raises(
                 FileNotFoundError, match="Prepared directories missing"
             ) as exc_info:
                 make_client_fn(
                     client_data,
-                    ClientFactoryConfig(
-                        client_ids=client_ids,
-                        cfg=cfg,
-                        device=torch.device(DeviceType.CPU),
-                        prepared_dir=tmp_path,
-                        seed=0,
-                    ),
+                    client_factory_config,
                 )
             assert "client_missing" in str(exc_info.value)
 
@@ -2023,12 +2039,14 @@ class TestRunFlTrainingValidation:
             run_fl_training(cfg, {}, 0, base_dir=tmp_path)
 
     def test_raises_without_output_location(self) -> None:
+        make_fl_cfg_value = make_fl_cfg()
         with pytest.raises(ValueError, match="base_dir or output_layout"):
-            run_fl_training(make_fl_cfg(), {}, 0)
+            run_fl_training(make_fl_cfg_value, {}, 0)
 
     def test_raises_without_any_client_source(self, tmp_path: Path) -> None:
+        make_fl_cfg_value = make_fl_cfg()
         with pytest.raises(ValueError, match="No non-empty client_data"):
-            run_fl_training(make_fl_cfg(), {}, 0, base_dir=tmp_path)
+            run_fl_training(make_fl_cfg_value, {}, 0, base_dir=tmp_path)
 
     def test_saves_final_model_checkpoint(self, tmp_path: Path) -> None:
         cfg = make_fl_cfg()
@@ -2076,7 +2094,7 @@ class TestTrainingResult:
             score_dir=tmp_path,
             loss_history=[],
         )
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             setattr(r, "seed", 99)
 
 
@@ -2229,8 +2247,9 @@ class TestFullParticipationDiagnostics:
         """Ensure strategy raises error detailing client evaluate process exceptions."""
         strategy = _make_strategy()
 
+        runtime_error = RuntimeError("client process died")
         with pytest.raises(RuntimeError) as exc:
-            strategy.aggregate_evaluate(4, [], [RuntimeError("client process died")])
+            strategy.aggregate_evaluate(4, [], [runtime_error])
 
         message = str(exc.value)
         assert "evaluate" in message
@@ -2246,20 +2265,21 @@ class TestValidateTensorInput:
 
     def test_1d_raises(self) -> None:
         """Verify ValueError is raised if the input tensor is 1-D."""
+        randn_value = torch.randn(10)
         with pytest.raises(ValueError, match="must be 2-D"):
-            validate_tensor_input(torch.randn(10), FederatedTensorLabel.TRAIN, "c0")
+            validate_tensor_input(randn_value, FederatedTensorLabel.TRAIN, "c0")
 
     def test_3d_raises(self) -> None:
         """Verify ValueError is raised if the input tensor is 3-D."""
+        randn_value = torch.randn(2, 3, 4)
         with pytest.raises(ValueError, match="must be 2-D"):
-            validate_tensor_input(
-                torch.randn(2, 3, 4), FederatedTensorLabel.TRAIN, "c0"
-            )
+            validate_tensor_input(randn_value, FederatedTensorLabel.TRAIN, "c0")
 
     def test_empty_raises(self) -> None:
         """Verify ValueError is raised if the input tensor is empty."""
+        empty_value = torch.empty(0, 4)
         with pytest.raises(ValueError, match="non-empty"):
-            validate_tensor_input(torch.empty(0, 4), FederatedTensorLabel.TRAIN, "c0")
+            validate_tensor_input(empty_value, FederatedTensorLabel.TRAIN, "c0")
 
     def test_nan_raises(self) -> None:
         """Verify ValueError is raised if the input tensor contains NaN values."""
@@ -2283,9 +2303,10 @@ class TestValidateTensorInput:
 
     def test_wrong_expected_dim_raises(self) -> None:
         """Verify ValueError is raised if the column dimension mismatches the expected value."""
+        randn_value = torch.randn(10, 4)
         with pytest.raises(ValueError, match="expected dimension"):
             validate_tensor_input(
-                torch.randn(10, 4), FederatedTensorLabel.TRAIN, "c0", expected_dim=5
+                randn_value, FederatedTensorLabel.TRAIN, "c0", expected_dim=5
             )
 
 

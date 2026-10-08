@@ -42,7 +42,8 @@ def test_canonical_path() -> None:
     assert parts[-1].startswith("seed_")
 
     sp = layout_a.score_cell(_score_cell(ExperimentStage.NBAIOT_MAIN, 0)).score_dir
-    assert "global_threshold" not in sp.parts and "local_threshold" not in sp.parts
+    assert "global_threshold" not in sp.parts
+    assert "local_threshold" not in sp.parts
 
     rp_check = layout_a.policy_run(
         _run(ExperimentStage.NBAIOT_MAIN, ThresholdPolicy.GLOBAL_THRESHOLD, 42)

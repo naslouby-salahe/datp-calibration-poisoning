@@ -48,6 +48,7 @@ from datp.data import (
     split_path,
 )
 from datp.enums import (
+    WorkflowEvent,
     Workflow,
     ErrorScope,
     CONTROLLED_POLICIES,
@@ -537,7 +538,7 @@ def run_sweep(
     data_root: Path | None = None,
     workers: WorkerCount = BASE_CONFIG.runtime.sweep_workers,
 ) -> SweepResult:
-    logger.info("workflow started", workflow=Workflow.BASELINE_SWEEP)
+    logger.info(WorkflowEvent.STARTED, workflow=Workflow.BASELINE_SWEEP)
     t_start = time.monotonic()
     print_step(SweepStep.BUILD_MATRIX, detail="")
     cells = build_experiment_matrix()
@@ -598,7 +599,7 @@ def run_sweep(
     total_elapsed = time.monotonic() - t_start
     print_sweep_summary(result, total_elapsed)
     workflow_result = result
-    logger.info("workflow completed", workflow=Workflow.BASELINE_SWEEP)
+    logger.info(WorkflowEvent.COMPLETED, workflow=Workflow.BASELINE_SWEEP)
     return workflow_result
 
 
