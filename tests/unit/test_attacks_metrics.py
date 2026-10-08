@@ -91,6 +91,20 @@ def test_moved_client_counts_all_affected_clients() -> None:
     assert n_reassigned(_CLEAN, moved) == 3
 
 
+def test_singleton_change_is_invariant_to_cluster_ids() -> None:
+    """Splitting a client into a singleton changes membership, whatever its label."""
+    split = {
+        ClientId("a"): ClusterId("7"),
+        ClientId("b"): ClusterId("9"),
+        ClientId("c"): ClusterId("5"),
+        ClientId("d"): ClusterId("5"),
+        ClientId("e"): ClusterId("3"),
+    }
+    assert cluster_size_of(_CLEAN, ClientId("a")) == 2
+    assert cluster_size_of(split, ClientId("a")) == 1
+    assert n_reassigned(_CLEAN, split) == 2
+
+
 def test_scale_base_prefers_iqr() -> None:
     """A positive IQR is the base when available."""
     cal = np.arange(100, dtype=np.float64)

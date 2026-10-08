@@ -1456,6 +1456,8 @@ def _downstream_extended_summary(
                 ),
                 AnalysisColumn.DATASET: manifest.dataset,
                 AnalysisColumn.POLICY: pol,
+                AnalysisColumn.OBJECTIVE: obj,
+                AnalysisColumn.SOURCE: src,
                 AnalysisColumn.FRACTION: frac,
                 AnalysisColumn.SUMMARY_METRIC: m,
             }

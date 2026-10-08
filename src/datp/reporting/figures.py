@@ -60,6 +60,25 @@ NBAIOT_DEVICE_SHORT_LABELS: dict[NBaIoTDevice, NarrativeText] = {
     NBaIoTDevice.SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA: "SH XCS7-1003",
 }
 
+FIGURE5_DEVICE_LABELS: dict[NBaIoTDevice, NarrativeText] = {
+    NBaIoTDevice.DANMINI_DOORBELL: "Danmini",
+    NBaIoTDevice.ECOBEE_THERMOSTAT: "Ecobee",
+    NBaIoTDevice.ENNIO_DOORBELL: "Ennio",
+    NBaIoTDevice.PHILIPS_B120N10_BABY_MONITOR: "Philips",
+    NBaIoTDevice.PROVISION_PT_737E_SECURITY_CAMERA: "Prov 737E",
+    NBaIoTDevice.PROVISION_PT_838_SECURITY_CAMERA: "Prov 838",
+    NBaIoTDevice.SAMSUNG_SNH_1011_N_WEBCAM: "Samsung",
+    NBaIoTDevice.SIMPLEHOME_XCS7_1002_WHT_SECURITY_CAMERA: "SH 1002",
+    NBaIoTDevice.SIMPLEHOME_XCS7_1003_WHT_SECURITY_CAMERA: "SH 1003",
+}
+
+
+POLICY_SHORT_LABELS: dict[ThresholdPolicy, NarrativeText] = {
+    ThresholdPolicy.GLOBAL_THRESHOLD: "Global",
+    ThresholdPolicy.LOCAL_THRESHOLD: "Local",
+    ThresholdPolicy.CLUSTER_THRESHOLD: "Cluster",
+}
+
 
 SOURCE_LABELS: dict[PoisoningSourceStrategy, NarrativeText] = {
     PoisoningSourceStrategy.RANDOM_BENIGN: "random benign",
@@ -358,7 +377,7 @@ def generate_figure5(
     _apply_font_size(style)
     panels = list(client_effects)
     fig, axes = plt.subplots(
-        1, len(panels), figsize=style.figsize_double_col, squeeze=False
+        1, len(panels), figsize=(style.figsize_double_col[0], 3.6), squeeze=False
     )
     for raw_ax, label in zip(axes[0], panels):
         ax = cast(_Axes, raw_ax)
@@ -388,17 +407,17 @@ def generate_figure5(
                 capsize=2,
                 linewidth=1.0,
                 color=style.policy_colors[pol],
-                label=style.policy_labels[pol],
+                label=POLICY_SHORT_LABELS[pol],
             )
         ax.axhline(0.0, color="black", linewidth=0.6)
         ax.set_xticks(np.arange(len(victims)))
         ax.set_xticklabels(
-            [NBAIOT_DEVICE_SHORT_LABELS[NBaIoTDevice(v)] for v in victims],
-            rotation=60,
+            [FIGURE5_DEVICE_LABELS[NBaIoTDevice(v)] for v in victims],
+            rotation=55,
             ha="right",
-            fontsize=style.font_size - 2,
+            fontsize=style.font_size - 1,
         )
-        ax.set(ylabel=label)
+        ax.set(ylabel=f"{label} (fraction)")
     cast(_Axes, axes[0][0]).legend(fontsize=style.font_size - 2)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,6 @@
+scope,comparison,mean_delta,ci_lower,ci_upper,excludes_zero
+primary_endpoint,global_vs_local,0.5951137701770051,0.563240305992609,0.6281263452053913,True
+secondary_nbaiot,global_vs_cluster,0.2967908956971598,0.24067042647346906,0.3461831297656477,True
+secondary_nbaiot,cluster_vs_local,0.2983228744798452,0.2393948009070837,0.36612788011896535,True
+secondary_nbaiot_additional,global_vs_local,0.5951137701770051,0.563240305992609,0.6281263452053913,True
+secondary_nbaiot_additional,global_vs_cluster,0.2967908956971598,0.24067042647346906,0.3461831297656477,True

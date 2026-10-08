@@ -1,0 +1,191 @@
+[
+  {
+    "policy": "cluster_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.4533333333333333,
+    "share_full_vulnerability_absolute_control_gate": 0.4177777777777778
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 0.88,
+    "share_full_vulnerability_absolute_control_gate": 0.8444444444444444
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 0.7866666666666666,
+    "share_full_vulnerability_absolute_control_gate": 0.6177777777777778
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.9866666666666667,
+    "share_full_vulnerability_absolute_control_gate": 0.9511111111111111
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 1.0,
+    "share_full_vulnerability_absolute_control_gate": 0.8977777777777778
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 1.0,
+    "share_full_vulnerability_absolute_control_gate": 0.8666666666666667
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.5333333333333333,
+    "share_full_vulnerability_absolute_control_gate": 0.2
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 0.72,
+    "share_full_vulnerability_absolute_control_gate": 0.08
+  },
+  {
+    "policy": "cluster_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 0.96,
+    "share_full_vulnerability_absolute_control_gate": 0.04
+  },
+  {
+    "policy": "global_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.3466666666666667,
+    "share_full_vulnerability_absolute_control_gate": 0.3466666666666667
+  },
+  {
+    "policy": "global_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 0.56,
+    "share_full_vulnerability_absolute_control_gate": 0.56
+  },
+  {
+    "policy": "global_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 0.8,
+    "share_full_vulnerability_absolute_control_gate": 0.8
+  },
+  {
+    "policy": "global_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.9333333333333333,
+    "share_full_vulnerability_absolute_control_gate": 0.9333333333333333
+  },
+  {
+    "policy": "global_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 0.9866666666666667,
+    "share_full_vulnerability_absolute_control_gate": 0.9866666666666667
+  },
+  {
+    "policy": "global_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 1.0,
+    "share_full_vulnerability_absolute_control_gate": 1.0
+  },
+  {
+    "policy": "global_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.3466666666666667,
+    "share_full_vulnerability_absolute_control_gate": 0.16
+  },
+  {
+    "policy": "global_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 0.7333333333333333,
+    "share_full_vulnerability_absolute_control_gate": 0.32
+  },
+  {
+    "policy": "global_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 0.9066666666666666,
+    "share_full_vulnerability_absolute_control_gate": 0.32
+  },
+  {
+    "policy": "local_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.9066666666666666,
+    "share_full_vulnerability_absolute_control_gate": 0.6711111111111111
+  },
+  {
+    "policy": "local_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 1.0,
+    "share_full_vulnerability_absolute_control_gate": 0.72
+  },
+  {
+    "policy": "local_threshold",
+    "source": "low_score_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 1.0,
+    "share_full_vulnerability_absolute_control_gate": 0.5644444444444444
+  },
+  {
+    "policy": "local_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 1.0,
+    "share_full_vulnerability_absolute_control_gate": 0.8
+  },
+  {
+    "policy": "local_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 0.9866666666666667,
+    "share_full_vulnerability_absolute_control_gate": 0.6933333333333334
+  },
+  {
+    "policy": "local_threshold",
+    "source": "high_score_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 0.9733333333333334,
+    "share_full_vulnerability_absolute_control_gate": 0.64
+  },
+  {
+    "policy": "local_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.1,
+    "share_full_vulnerability": 0.96,
+    "share_full_vulnerability_absolute_control_gate": 0.22666666666666666
+  },
+  {
+    "policy": "local_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.2,
+    "share_full_vulnerability": 0.9733333333333334,
+    "share_full_vulnerability_absolute_control_gate": 0.14666666666666667
+  },
+  {
+    "policy": "local_threshold",
+    "source": "high_score_train_feature_benign",
+    "fraction": 0.4,
+    "share_full_vulnerability": 0.8666666666666667,
+    "share_full_vulnerability_absolute_control_gate": 0.013333333333333334
+  }
+]

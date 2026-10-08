@@ -1,0 +1,5 @@
+ThresholdPolicy,CV(FPR) mean,CV(FPR) std,CV(TPR) mean,CV(TPR) std,Worst BA mean,Worst BA std,P10 client Macro-F1 mean,P10 client Macro-F1 std,Eligible,Pending,Coverage
+CLUSTER_THRESHOLD,0.6225,0.1278,0.2950,0.0302,0.6575,0.0037,0.3220,0.0462,9,0,1.0000
+GLOBAL_THRESHOLD,0.9193,0.0292,0.2545,0.0242,0.6577,0.0070,0.3977,0.0518,9,0,1.0000
+LOCAL_THRESHOLD,0.3242,0.0581,0.2796,0.0671,0.6726,0.0591,0.3606,0.1349,9,0,1.0000
+" † Eligible clients only. CV is the population standard deviation divided by the mean. Worst BA is the minimum per-client balanced accuracy, (TPR + TNR) / 2. P10 client Macro-F1 is the 10th percentile of per-client macro-F1, the mean of the benign-class and attack-class F1."

@@ -680,6 +680,25 @@ def test_new_summaries_and_definitions_are_written(built) -> None:
     assert "worst_ba" in definitions
 
 
+def test_downstream_extended_rows_identify_their_source_and_objective(built) -> None:
+    rows = _load(built, "downstream_extended")
+    assert rows
+    for row in rows:
+        assert row["source"]
+        assert row["objective"]
+    identities = {
+        (
+            row["policy"],
+            row["fraction"],
+            row["summary_metric"],
+            row["source"],
+            row["objective"],
+        )
+        for row in rows
+    }
+    assert len(identities) == len(rows)
+
+
 def test_gate2_records_are_objective_matched_and_carry_distributions(built) -> None:
     data = _load(built, "directional_excess_over_random")
     assert data

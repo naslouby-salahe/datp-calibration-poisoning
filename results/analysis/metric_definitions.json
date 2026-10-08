@@ -1,0 +1,21 @@
+{
+  "worst_ba": "Minimum per-client balanced accuracy, (TPR + TNR) / 2, over eligible clients with complete evaluation.",
+  "p10_macro_f1": "10th percentile of per-client macro-F1 (mean of benign-class and attack-class F1) over eligible clients with complete evaluation.",
+  "cv_fpr": "Population coefficient of variation (std with ddof=0 divided by mean) of per-client FPR over eligible clients.",
+  "delta_cv_fpr": "CV(FPR) under the poisoned thresholds minus CV(FPR) under the clean thresholds, same fleet and seed.",
+  "victim_delta_tpr": "Victim TPR under the poisoned threshold minus TPR under the clean threshold.",
+  "victim_delta_fpr": "Victim FPR under the poisoned threshold minus FPR under the clean threshold.",
+  "victim_delta_fp": "Victim count of benign test samples above the threshold, poisoned minus clean.",
+  "victim_delta_fn": "Victim count of attack test samples at or below the threshold, poisoned minus clean.",
+  "nonvictim_mean_delta_tpr": "Mean over eligible non-victim clients of TPR change under the poisoned thresholds.",
+  "nonvictim_worst_delta_tpr": "Most negative per-client TPR change among eligible non-victim clients.",
+  "nonvictim_mean_delta_fpr": "Mean over eligible non-victim clients of FPR change under the poisoned thresholds.",
+  "nonvictim_worst_delta_fpr": "Most positive per-client FPR change among eligible non-victim clients.",
+  "nonvictim_delta_fp_total": "Total change in false-positive count over eligible non-victim clients.",
+  "nonvictim_delta_fn_total": "Total change in missed-detection count over eligible non-victim clients.",
+  "fixed_cluster": "CLUSTER_THRESHOLD thresholds where clean cluster assignments stay frozen and per-cluster means are taken over poisoned per-client quantiles.",
+  "delta_tau_bound_utilization": "Threshold shift divided by the distance from the clean threshold to the extreme victim-local benign calibration score in the attack direction.",
+  "cal_duplicate_rate": "Fraction of calibration entries repeating an earlier value.",
+  "cell": "One (policy, objective, source, fraction, victim, training seed) row of the bounded sweep; rows sharing a training seed are not independent.",
+  "seed_aggregate": "Mean over victims of a row metric within one training seed; the inferential unit."
+}

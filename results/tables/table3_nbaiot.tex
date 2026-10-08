@@ -1,0 +1,15 @@
+\begin{table}[htbp]
+\caption{Table 3: N-BaIoT Main Results}
+\centering
+\begin{tabular}{l c c c c c}
+\toprule
+ThresholdPolicy & CV(FPR)$\dagger$ & CV(TPR)$\dagger$ & Worst BA & P10 client Macro-F1 & Coverage \\
+\midrule
+CLUSTER_THRESHOLD & 0.622 ± 0.128 (9/9) & 0.295 ± 0.030 & 0.657 ± 0.004 & 0.322 ± 0.046 & 1.00 (9/9) \\
+GLOBAL_THRESHOLD & 0.919 ± 0.029 (9/9) & \textbf{0.255 ± 0.024} & 0.658 ± 0.007 & 0.398 ± 0.052 & 1.00 (9/9) \\
+LOCAL_THRESHOLD & \textbf{0.324 ± 0.058} (9/9) & 0.280 ± 0.067 & 0.673 ± 0.059 & 0.361 ± 0.135 & 1.00 (9/9) \\
+\bottomrule
+\end{tabular}
+
+\footnotesize{† Eligible clients only. CV is the population standard deviation divided by the mean. Worst BA is the minimum per-client balanced accuracy, (TPR + TNR) / 2. P10 client Macro-F1 is the 10th percentile of per-client macro-F1, the mean of the benign-class and attack-class F1.}
+\end{table}
