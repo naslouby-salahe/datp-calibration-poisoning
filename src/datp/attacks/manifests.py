@@ -148,6 +148,8 @@ class BoundedSweepResultRow(BaseModel):
     delta_tau_bound_utilization: ManifestMetricValue
 
     n_replaced: SampleCount
+    reservoir_draw: ReservoirDraw = ReservoirDraw.WITH_REPLACEMENT
+    donor_feature_unique_fraction: ManifestMetricValue | None = None
     cal_duplicate_rate_clean: ManifestMetricValue
     cal_duplicate_rate_poisoned: ManifestMetricValue
 
@@ -208,13 +210,13 @@ class BoundedSweepManifest(BaseModel):
     @model_validator(mode="after")
     def _check_consistency(self) -> BoundedSweepManifest:
         if self.training_seeds != TRAINING_SEEDS:
-            raise ValueError("bounded-sweep reporting requires training seeds 0..9")
+            raise ValueError("bounded-sweep reporting requires training seeds 0..19")
         if self.poisoning_seeds != POISONING_SEEDS:
             raise ValueError(
-                "bounded-sweep reporting requires poisoning seeds 100..109"
+                "bounded-sweep reporting requires poisoning seeds 100..119"
             )
         if self.analysis_seeds != ANALYSIS_SEEDS:
-            raise ValueError("bounded-sweep reporting requires analysis seeds 300..309")
+            raise ValueError("bounded-sweep reporting requires analysis seeds 300..319")
 
         if len(self.training_seeds) != len(self.poisoning_seeds):
             raise ValueError("training_seeds and poisoning_seeds must be paired 1:1")

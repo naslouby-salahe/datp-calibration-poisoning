@@ -35,13 +35,13 @@ class TestSeedPools:
 
     def test_default_values(self) -> None:
         pools = SeedPools()
-        assert pools.training == tuple(range(10))
-        assert pools.poisoning == tuple(range(100, 110))
-        assert pools.analysis == tuple(range(300, 310))
+        assert pools.training == tuple(range(20))
+        assert pools.poisoning == tuple(range(100, 120))
+        assert pools.analysis == tuple(range(300, 320))
         assert pools.split == 0
 
     def test_len_returns_training_length(self) -> None:
-        assert len(SeedPools()) == 10
+        assert len(SeedPools()) == 20
 
     def test_mismatched_pool_lengths_raise(self) -> None:
         with pytest.raises(ValidationError, match="same length"):
@@ -103,6 +103,8 @@ def _valid_config(**overrides: Any) -> CalibrationPoisoningConfig:
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+            PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN,
+            PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN,
         ),
         "knowledge": PoisoningKnowledge.GRAY_BOX_SCORE_ACCESS,
         "target_scope": PoisoningTargetScope.SINGLE_CLIENT,
@@ -145,8 +147,8 @@ class TestConfigValid:
 
     def test_default_seeds_are_locked_pools(self) -> None:
         cfg = _valid_config()
-        assert cfg.seeds.training == tuple(range(10))
-        assert cfg.seeds.poisoning == tuple(range(100, 110))
+        assert cfg.seeds.training == tuple(range(20))
+        assert cfg.seeds.poisoning == tuple(range(100, 120))
 
     def test_default_cluster_locked_values(self) -> None:
         cfg = _valid_config()
@@ -180,12 +182,14 @@ class TestForBoundedSweep:
             ThresholdPolicy.CLUSTER_THRESHOLD,
         }
 
-    def test_has_exactly_three_bounded_sources(self) -> None:
+    def test_has_exactly_configured_bounded_sources(self) -> None:
         cfg = CalibrationPoisoningConfig.for_bounded_sweep()
         assert set(cfg.sources) == {
             PoisoningSourceStrategy.RANDOM_BENIGN,
             PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
             PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+            PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN,
+            PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN,
         }
 
     def test_fractions_are_locked_bounded_grid(self) -> None:
@@ -195,8 +199,8 @@ class TestForBoundedSweep:
 
     def test_seed_pools_are_locked(self) -> None:
         cfg = CalibrationPoisoningConfig.for_bounded_sweep()
-        assert cfg.seeds.training == tuple(range(10))
-        assert cfg.seeds.poisoning == tuple(range(100, 110))
+        assert cfg.seeds.training == tuple(range(20))
+        assert cfg.seeds.poisoning == tuple(range(100, 120))
 
     def test_scale_is_bounded(self) -> None:
         cfg = CalibrationPoisoningConfig.for_bounded_sweep()
@@ -251,11 +255,11 @@ class TestConfigFractionValidation:
         assert 0.40 in cfg.fractions
 
     def test_fraction_above_one_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="within"):
+        with pytest.raises(ValidationError, match="less than or equal to 1"):
             _valid_config(fractions=(0.0, 1.1))
 
     def test_negative_fraction_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="within"):
+        with pytest.raises(ValidationError, match="greater than or equal to 0"):
             _valid_config(fractions=(-0.1, 0.10))
 
     def test_empty_fractions_rejected(self) -> None:

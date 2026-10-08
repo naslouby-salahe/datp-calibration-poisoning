@@ -60,7 +60,7 @@ class TestPlan:
     def test_plan_reports_cells_per_victim(self) -> None:
         result = _runner.invoke(app, ["plan"])
 
-        assert "480" in result.output
+        assert "1440" in result.output
 
 
 class TestDispatch:
@@ -80,10 +80,10 @@ class TestDispatch:
     def test_poison_writes_the_bounded_sweep_manifest(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        seen: list[Path] = []
+        seen: list[dict[str, Path]] = []
 
-        def write(base_dir: Path) -> Path:
-            seen.append(base_dir)
+        def write(base_dir: Path, *, data_root: Path) -> Path:
+            seen.append({"base_dir": base_dir, "data_root": data_root})
             return base_dir / "nbaiot_main_manifest.json"
 
         monkeypatch.setattr(commands, "write_nbaiot_main_manifest", write)
@@ -91,15 +91,15 @@ class TestDispatch:
         result = _runner.invoke(app, ["poison"])
 
         assert result.exit_code == CliExitCode.SUCCESS
-        assert seen == [OUTPUTS_DIR]
+        assert seen == [{"base_dir": OUTPUTS_DIR, "data_root": DATA_ROOT}]
 
     def test_sensitivity_writes_the_sensitivity_manifest(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        seen: list[Path] = []
+        seen: list[dict[str, Path]] = []
 
-        def write(base_dir: Path) -> Path:
-            seen.append(base_dir)
+        def write(base_dir: Path, *, data_root: Path) -> Path:
+            seen.append({"base_dir": base_dir, "data_root": data_root})
             return base_dir / "sensitivity_manifest.json"
 
         monkeypatch.setattr(commands, "write_sensitivity_manifest", write)
@@ -107,7 +107,7 @@ class TestDispatch:
         result = _runner.invoke(app, ["sensitivity"])
 
         assert result.exit_code == CliExitCode.SUCCESS
-        assert seen == [OUTPUTS_DIR]
+        assert seen == [{"base_dir": OUTPUTS_DIR, "data_root": DATA_ROOT}]
 
     def test_status_prints_the_status_table(
         self, monkeypatch: pytest.MonkeyPatch
@@ -129,7 +129,7 @@ class TestReport:
 
         def package(**kwargs: Path) -> tuple[Path, ...]:
             seen.append({key: value for key, value in kwargs.items() if key != "cfg"})
-            return (RESULTS_PACKAGE_DIR / "audit" / "audit_summary.md",)
+            return (RESULTS_PACKAGE_DIR / "tables" / "table3_nbaiot.csv",)
 
         monkeypatch.setattr(commands, "build_report_package", package)
 
@@ -140,10 +140,9 @@ class TestReport:
             {
                 "base_dir": OUTPUTS_DIR,
                 "results_dir": RESULTS_PACKAGE_DIR,
-                "data_root": DATA_ROOT,
             }
         ]
-        assert "audit_summary.md" in result.output
+        assert "table3_nbaiot.csv" in result.output
 
     def test_report_failure_exits_with_error(
         self, monkeypatch: pytest.MonkeyPatch
@@ -184,11 +183,13 @@ def test_cli_entry_logs_start_and_success(monkeypatch: pytest.MonkeyPatch) -> No
     recorder = _LogRecorder()
     monkeypatch.setattr(cli_module, "logger", recorder)
     monkeypatch.setattr(cli_module, "configure_logging", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(cli_module, "app", lambda: None)
+    monkeypatch.setattr(cli_module, "app", lambda: sys.exit(0))
     monkeypatch.setattr(sys, "argv", ["datp", "plan"])
 
-    cli_module.cli_entry()
+    with pytest.raises(SystemExit) as exit_info:
+        cli_module.cli_entry()
 
+    assert exit_info.value.code == 0
     assert [event for _, event, _ in recorder.events] == [
         "CLI invocation started",
         "CLI invocation completed",
@@ -216,10 +217,10 @@ def test_cli_entry_logs_failure_and_preserves_exception(
     assert recorder.events[-1][0] == "exception"
 
 
-_TOTAL_CELLS = 30
+_TOTAL_CELLS = 60
 
 
-_NBAIOT_MAIN_CELLS = 30
+_NBAIOT_MAIN_CELLS = 60
 
 
 class TestAllMissingFreshDir:

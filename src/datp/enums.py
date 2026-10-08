@@ -1,11 +1,258 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
+
+from datp.types import NarrativeText
 
 
 class DatasetID(enum.StrEnum):
     NBAIOT = "nbaiot"
+
+
+class DatasetDisplayName(enum.StrEnum):
+    NBAIOT = "N-BaIoT"
+
+
+class AnalysisColumn(enum.StrEnum):
+    ANALYSIS_SEEDS = "analysis_seeds"
+    ARTIFACT_PROVENANCE = "artifact_provenance"
+    BOOTSTRAP_CI_LOWER = "bootstrap_ci_lower"
+    BOOTSTRAP_CI_UPPER = "bootstrap_ci_upper"
+    BOOTSTRAP_MEAN = "bootstrap_mean"
+    BOOTSTRAP_N_SEED_AGGREGATES = "bootstrap_n_seed_aggregates"
+    CELLS = "cells"
+    CLAIM_BEARING = "claim_bearing"
+    CLAIM_CLASS = "claim_class"
+    CLAIM_CLASS_ABSOLUTE = "claim_class_absolute"
+    CLUSTER_CHURN = "cluster_churn"
+    CLUSTER_FIXED_GATE1_PASS = "cluster_fixed_gate1_pass"
+    CODE_COMMIT = "code_commit"
+    CONFIG_HASH = "config_hash"
+    CONTROL_OBJECTIVE = "control_objective"
+    CONTROL_SOURCE = "control_source"
+    DATASET = "dataset"
+    DIRECTIONAL_EXCESS_SEED_SUPPORT = "directional_excess_seed_support"
+    DRAW = "draw"
+    EXACT_BINOMIAL_P = "exact_binomial_p"
+    EXACT_SUPPORT_COUNT = "exact_support_count"
+    EXACT_SUPPORT_N = "exact_support_n"
+    EXPECTED_SIGN_SEED_SUPPORT = "expected_sign_seed_support"
+    FIXED_DELTA_CV_FPR = "fixed_delta_cv_fpr"
+    FIXED_NONVICTIM_DELTA_FPR = "fixed_nonvictim_delta_fpr"
+    FIXED_NONVICTIM_DELTA_TPR = "fixed_nonvictim_delta_tpr"
+    FIXED_VICTIM_DELTA_FPR = "fixed_victim_delta_fpr"
+    FIXED_VICTIM_DELTA_TAU = "fixed_victim_delta_tau"
+    FIXED_VICTIM_DELTA_TPR = "fixed_victim_delta_tpr"
+    FRACTION = "fraction"
+    FRACTIONS = "fractions"
+    FROZEN_SCALER_EFFECT = "frozen_scaler_effect"
+    FULL_BUDGET_FEASIBLE_RATE = "full_budget_feasible_rate"
+    GATE1_PASS = "gate1_pass"
+    GATE2_PASS = "gate2_pass"
+    GATE3_METRIC_PASS = "gate3_metric_pass"
+    GATE3_PASS = "gate3_pass"
+    IQR_DELTA_TAU = "iqr_delta_tau"
+    IQR_FLOOR_FACTOR = "iqr_floor_factor"
+    K = "k"
+    LEAVE_ONE_VICTIM_OUT_MAX = "leave_one_victim_out_max"
+    LEAVE_ONE_VICTIM_OUT_MEDIAN = "leave_one_victim_out_median"
+    LEAVE_ONE_VICTIM_OUT_MIN = "leave_one_victim_out_min"
+    MATERIAL_SIGNED_RATE = "material_signed_rate"
+    MATERIALITY_FACTOR = "materiality_factor"
+    MAX_BOUND_UTILIZATION = "max_bound_utilization"
+    MAX_N_REASSIGNED = "max_n_reassigned"
+    MEAN_BOUND_UTILIZATION = "mean_bound_utilization"
+    MEAN_BUFFER_TO_OVERWRITE_RATIO = "mean_buffer_to_overwrite_ratio"
+    MEAN_DELTA_TAU = "mean_delta_tau"
+    MEAN_DELTA_TAU_TRIM_APPENDIX = "mean_delta_tau_trim_appendix"
+    MEAN_DELTA_TAU_TRIM_PRIMARY = "mean_delta_tau_trim_primary"
+    MEAN_DELTA_TAU_UNDEFENDED = "mean_delta_tau_undefended"
+    MEAN_DELTA_TAU_VARIANT = "mean_delta_tau_variant"
+    MEAN_DELTA_TAU_WITH_REPLACEMENT = "mean_delta_tau_with_replacement"
+    MEAN_DIRECTIONAL_EXCESS = "mean_directional_excess"
+    MEAN_DUPLICATE_RATE_CLEAN = "mean_duplicate_rate_clean"
+    MEAN_DUPLICATE_RATE_POISONED = "mean_duplicate_rate_poisoned"
+    MEAN_DUPLICATE_RATE_VARIANT = "mean_duplicate_rate_variant"
+    MEAN_DUPLICATE_RATE_WITH_REPLACEMENT = "mean_duplicate_rate_with_replacement"
+    MEAN_EFFECT = "mean_effect"
+    MEAN_EFFECTIVE_N_REPLACED = "mean_effective_n_replaced"
+    MEAN_FIXED_VICTIM_DELTA_TAU = "mean_fixed_victim_delta_tau"
+    MEAN_INIT_SD_VICTIM_DELTA_TAU = "mean_init_sd_victim_delta_tau"
+    MEAN_N_REASSIGNED = "mean_n_reassigned"
+    MEAN_N_REPLACED = "mean_n_replaced"
+    MEAN_OVERWRITE_REFERENCE_SHIFT = "mean_overwrite_reference_shift"
+    MEAN_POOL_SIZE = "mean_pool_size"
+    MEAN_REQUESTED_N_REPLACED = "mean_requested_n_replaced"
+    MEAN_RESIDUAL_VS_CLEAN_TRIM_APPENDIX = "mean_residual_vs_clean_trim_appendix"
+    MEAN_RESIDUAL_VS_CLEAN_TRIM_PRIMARY = "mean_residual_vs_clean_trim_primary"
+    MEAN_SCORE_SCALE_CV_CLEAN = "mean_score_scale_cv_clean"
+    MEAN_SILHOUETTE_CLEAN = "mean_silhouette_clean"
+    MEAN_SILHOUETTE_POISONED = "mean_silhouette_poisoned"
+    MEAN_TAU_LOCAL_CV_CLEAN = "mean_tau_local_cv_clean"
+    MEAN_TAU_LOCAL_MAX_MIN_RATIO_CLEAN = "mean_tau_local_max_min_ratio_clean"
+    MEAN_VICTIM_DELTA_TAU = "mean_victim_delta_tau"
+    MEAN_VICTIM_SIZE_CLEAN = "mean_victim_size_clean"
+    MEAN_VICTIM_SIZE_POISONED = "mean_victim_size_poisoned"
+    MEDIAN_DELTA_TAU = "median_delta_tau"
+    MEDIAN_DIRECTIONAL_EXCESS = "median_directional_excess"
+    MEDIAN_HARM = "median_harm"
+    METRIC = "metric"
+    MODAL_SIZES_CLEAN = "modal_sizes_clean"
+    MODAL_SIZES_POISONED = "modal_sizes_poisoned"
+    N_CALIBRATION_INSTABILITY = "n_calibration_instability"
+    N_CHANGED_VS_DEFAULT = "n_changed_vs_default"
+    N_EXCLUSIONS = "n_exclusions"
+    N_FULL_VULNERABILITY = "n_full_vulnerability"
+    N_GROUPS = "n_groups"
+    N_INIT = "n_init"
+    N_MECHANISM_ONLY = "n_mechanism_only"
+    N_NULL_OR_CONDITIONAL = "n_null_or_conditional"
+    N_REPORTING_ROWS = "n_reporting_rows"
+    N_ROWS = "n_rows"
+    N_SEEDS = "n_seeds"
+    N_SEEDS_NEGATIVE = "n_seeds_negative"
+    NON_VICTIM_EFFECT = "non_victim_effect"
+    NORMALIZED_GLOBAL_CV_FPR_CLEAN = "normalized_global_cv_fpr_clean"
+    NORMALIZED_GLOBAL_CV_FPR_POISONED = "normalized_global_cv_fpr_poisoned"
+    NORMALIZED_GLOBAL_VICTIM_DELTA_FPR = "normalized_global_victim_delta_fpr"
+    NORMALIZED_GLOBAL_VICTIM_DELTA_TAU = "normalized_global_victim_delta_tau"
+    OBJECTIVE = "objective"
+    PER_SEED_DIRECTIONAL_EXCESS = "per_seed_directional_excess"
+    PER_SEED_VALUES = "per_seed_values"
+    PERMUTATION_P = "permutation_p"
+    POISONING_SEEDS = "poisoning_seeds"
+    POLICIES = "policies"
+    POLICY = "policy"
+    RANDOM_CONTROL_DIRECTIONAL_COUNT = "random_control_directional_count"
+    RANDOM_CONTROL_INSTABILITY_COUNT = "random_control_instability_count"
+    RANDOM_CONTROL_UNSTABLE = "random_control_unstable"
+    RANDOM_CONTROL_UNSTABLE_DIRECTIONAL = "random_control_unstable_directional"
+    RAW_GLOBAL_CV_FPR_CLEAN = "raw_global_cv_fpr_clean"
+    RAW_GLOBAL_CV_FPR_POISONED = "raw_global_cv_fpr_poisoned"
+    RAW_GLOBAL_VICTIM_DELTA_FPR = "raw_global_victim_delta_fpr"
+    RAW_GLOBAL_VICTIM_DELTA_TAU = "raw_global_victim_delta_tau"
+    REASSIGNMENT_RATE = "reassignment_rate"
+    RECOMPUTED_DELTA_CV_FPR = "recomputed_delta_cv_fpr"
+    RECOMPUTED_NONVICTIM_DELTA_FPR = "recomputed_nonvictim_delta_fpr"
+    RECOMPUTED_NONVICTIM_DELTA_TPR = "recomputed_nonvictim_delta_tpr"
+    RECOMPUTED_VICTIM_DELTA_FPR = "recomputed_victim_delta_fpr"
+    RECOMPUTED_VICTIM_DELTA_TAU = "recomputed_victim_delta_tau"
+    RECOMPUTED_VICTIM_DELTA_TPR = "recomputed_victim_delta_tpr"
+    REFIT_MINUS_FROZEN_SCALER = "refit_minus_frozen_scaler"
+    REPORTING_ROW_COUNT_SEMANTICS = "reporting_row_count_semantics"
+    SCHEMA_VERSION = "schema_version"
+    SEED_SIGN_COUNT = "seed_sign_count"
+    SHARE_FULL_VULNERABILITY = "share_full_vulnerability"
+    SHARE_FULL_VULNERABILITY_ABSOLUTE_CONTROL_GATE = (
+        "share_full_vulnerability_absolute_control_gate"
+    )
+    SIGN_CONSISTENCY = "sign_consistency"
+    SIGN_STABLE_EXCLUSIONS = "sign_stable_exclusions"
+    SOURCE = "source"
+    SOURCE_OBJECTIVE_PAIRS = "source_objective_pairs"
+    SOURCES = "sources"
+    SPILLOVER_COUNT = "spillover_count"
+    STAGE = "stage"
+    SUMMARY_METRIC = "summary_metric"
+    SYNTHESIZED_VALUES = "synthesized_values"
+    TRAINING_SEEDS = "training_seeds"
+    TRIM_PRIMARY_REDUCTION = "trim_primary_reduction"
+    VARIANT_TO_BASELINE_RATIO = "variant_to_baseline_ratio"
+    VICTIM_EFFECT = "victim_effect"
+    VICTIM_ID = "victim_id"
+    VICTIM_MAJORITY = "victim_majority"
+    VICTIM_MAJORITY_COUNT = "victim_majority_count"
+    VICTIM_SINGLETON_CLEAN_RATE = "victim_singleton_clean_rate"
+    VICTIM_SINGLETON_POISONED_RATE = "victim_singleton_poisoned_rate"
+
+
+class CheckpointKey(enum.StrEnum):
+    STATE_DICT = "state_dict"
+    MODEL_CONFIG = "model_config"
+
+
+class ConvergenceColumn(enum.StrEnum):
+    ROUND = "round"
+    FEDAVG_WEIGHTED_BENIGN_VAL_LOSS = "fedavg_weighted_benign_val_loss"
+
+
+class ServerMetricKey(enum.StrEnum):
+    WEIGHTED_VAL_LOSS = "weighted_val_loss"
+
+
+class EnvironmentVariable(enum.StrEnum):
+    CUBLAS_WORKSPACE_CONFIG = "CUBLAS_WORKSPACE_CONFIG"
+    RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO = "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"
+    RAY_MEMORY_USAGE_THRESHOLD = "RAY_memory_usage_threshold"
+
+
+class AxisLabel(enum.StrEnum):
+    DEVICE = "Device"
+    FPR = "FPR"
+    ECDF = "ECDF"
+    RECONSTRUCTION_ERROR = "Reconstruction Error"
+    THRESHOLD_POLICY = "ThresholdPolicy"
+
+
+class TableColumn(enum.StrEnum):
+    CV_FPR_MEAN = "CV(FPR) mean"
+    CV_FPR_STD = "CV(FPR) std"
+    CV_TPR_MEAN = "CV(TPR) mean"
+    CV_TPR_STD = "CV(TPR) std"
+    WORST_BA_MEAN = "Worst BA mean"
+    WORST_BA_STD = "Worst BA std"
+    P10_MACRO_F1_MEAN = "P10 client Macro-F1 mean"
+    P10_MACRO_F1_STD = "P10 client Macro-F1 std"
+    ELIGIBLE = "Eligible"
+    PENDING = "Pending"
+    COVERAGE = "Coverage"
+
+
+class Workflow(enum.StrEnum):
+    REPORT_STATS = "report.stats"
+    REPORT_FIGURES = "report.figures"
+    REPORT_POISONING_FIGURES = "report.poisoning_figures"
+    REPORT_TABLES = "report.tables"
+    REPORT_VALIDATION = "report.validation"
+    REPORT_BASELINE = "report.baseline"
+    POISONING_SUMMARIES = "report.poisoning_summaries"
+    SENSITIVITY_SUMMARIES = "report.sensitivity_summaries"
+    FEATURE_RESERVOIR_LOAD = "poisoning.feature_reservoir_load"
+    FEDERATED_SIMULATION = "federated.simulation"
+    FEDERATED_TRAINING = "federated.training"
+    DATA_PREPARATION = "data.preparation"
+    PARTITION_AUDIT = "data.partition_audit"
+    BASELINE_SWEEP = "baseline.sweep"
+
+
+class ControlGate(enum.StrEnum):
+    DIRECTIONAL = "directional"
+    ABSOLUTE = "absolute"
+
+
+class AxisName(enum.StrEnum):
+    X = "x"
+    Y = "y"
+
+
+class ErrorScope(enum.StrEnum):
+    CONFIG = "config"
+    DATA_SCALING = "data.scaling"
+    DATA_ARTIFACTS = "data.artifacts"
+    DATA_STORAGE = "data.storage"
+    MODELING_AUTOENCODER = "modeling.autoencoder"
+    EVALUATION_METRICS = "evaluation.metrics"
+    PREPARE_DATA = "experiments.stages.prepare_data"
+    DATA_MANIFESTS = "data.manifests"
+    DATA_AUDIT = "data.audit"
+    DATA_NBAIOT = "data.nbaiot"
+    SCORING_MANIFEST = "scoring.manifest"
+    THRESHOLDS = "thresholding.thresholds"
+    THRESHOLD_POLICIES = "thresholding.policies"
+    THRESHOLD_DERIVATION = "thresholding.derivation"
+    SCORING_GENERATION = "scoring.generation"
+    SCORING_LOADING = "scoring.loading"
 
 
 class NBaIoTDevice(enum.StrEnum):
@@ -117,10 +364,6 @@ class ProvenanceSentinel(enum.StrEnum):
     MISSING_MANIFEST_HASH = "MISSING_MANIFEST_HASH"
 
 
-class PayloadValidationErrorType(enum.StrEnum):
-    MISSING = "missing"
-
-
 class Activation(enum.StrEnum):
     RELU = "relu"
     LEAKY_RELU = "leaky_relu"
@@ -217,12 +460,6 @@ class MetricName(enum.StrEnum):
     RECALL = "recall"
 
 
-class NormalizationScope(enum.StrEnum):
-    GLOBAL = "global"
-    PER_CLIENT = "per_client"
-    PER_CLIENT_ZSCORE = "per_client_zscore"
-
-
 class PayloadKey(enum.StrEnum):
     CLIENT_ID = "client_id"
     PER_CLIENT = "per_client"
@@ -254,7 +491,6 @@ class PayloadKey(enum.StrEnum):
     THRESHOLD_STRATEGY_NAME = "threshold_strategy_name"
     AGGREGATE_METRICS = "aggregate_metrics"
     PROVENANCE = "provenance"
-    NORMALIZATION_SCOPE = "normalization_scope"
     CONFIG_IDENTITY = "config_identity"
     SPLIT_MANIFEST_IDENTITY = "split_manifest_identity"
     MODEL_IDENTITY = "model_identity"
@@ -263,13 +499,6 @@ class PayloadKey(enum.StrEnum):
     THRESHOLD_CODE_VERSION = "threshold_code_version"
     PACKAGE_VERSION = "package_version"
     GENERATED_AT_UTC = "generated_at_utc"
-
-
-class ConfusionKey(enum.StrEnum):
-    TP = "tp"
-    FP = "fp"
-    TN = "tn"
-    FN = "fn"
 
 
 class AuditField(enum.StrEnum):
@@ -364,9 +593,16 @@ class PoisoningSourceStrategy(enum.StrEnum):
     RANDOM_BENIGN = "random_benign"
     HIGH_SCORE_BENIGN = "high_score_benign"
     LOW_SCORE_BENIGN = "low_score_benign"
+    RANDOM_TRAIN_FEATURE_BENIGN = "random_train_feature_benign"
+    HIGH_SCORE_TRAIN_FEATURE_BENIGN = "high_score_train_feature_benign"
     LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY = (
         "low_score_targeted_removal_diagnostic_only"
     )
+
+
+class FeatureDonorScope(enum.StrEnum):
+    OWN_DEVICE = "own_device"
+    CROSS_DEVICE = "cross_device"
 
 
 class CalibrationInjectionRule(enum.StrEnum):
@@ -436,6 +672,10 @@ def objective_for_source(
     match source:
         case PoisoningSourceStrategy.HIGH_SCORE_BENIGN:
             return AttackerObjective.THRESHOLD_RAISE
+        case PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN:
+            return AttackerObjective.THRESHOLD_RAISE
+        case PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN:
+            return AttackerObjective.THRESHOLD_RAISE
         case (
             PoisoningSourceStrategy.LOW_SCORE_BENIGN
             | PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY
@@ -443,6 +683,35 @@ def objective_for_source(
             return AttackerObjective.THRESHOLD_LOWER
         case _:
             return None
+
+
+def control_source_for(
+    source: PoisoningSourceStrategy,
+) -> PoisoningSourceStrategy | None:
+    match source:
+        case (
+            PoisoningSourceStrategy.HIGH_SCORE_BENIGN
+            | PoisoningSourceStrategy.LOW_SCORE_BENIGN
+        ):
+            return PoisoningSourceStrategy.RANDOM_BENIGN
+        case PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN:
+            return PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN
+        case _:
+            return None
+
+
+def is_random_control(source: PoisoningSourceStrategy) -> bool:
+    return source in {
+        PoisoningSourceStrategy.RANDOM_BENIGN,
+        PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN,
+    }
+
+
+def is_train_feature_source(source: PoisoningSourceStrategy) -> bool:
+    return source in {
+        PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN,
+        PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN,
+    }
 
 
 def is_diagnostic_source(source: PoisoningSourceStrategy) -> bool:
@@ -457,8 +726,6 @@ class FederatedRoundStage(enum.StrEnum):
 class ConvergenceStatus(enum.StrEnum):
     CONVERGED = "converged"
     NOT_CONVERGED = "not_converged"
-    UNKNOWN = "unknown"
-    MISSING_SUMMARY = "MISSING_SUMMARY"
 
 
 class ConvergenceSummaryKey(enum.StrEnum):
@@ -476,133 +743,10 @@ class ConvergenceSummaryKey(enum.StrEnum):
 class AuditStatus(enum.StrEnum):
     PASS = "PASS"
     FAIL = "FAIL"
-    MISSING = "MISSING"
-    PARTIAL = "PARTIAL"
-    BLOCKED_PENDING_RUN = "BLOCKED_PENDING_RUN"
-    WARNING = "WARNING"
-
-
-class InvariantField(enum.StrEnum):
-    SPLIT_HASH = "split_hash"
-    SCORING_CODE_HASH = "scoring_code_hash"
-    METRICS_CODE_HASH = "metrics_code_hash"
-    MODEL_OR_ENCODER_HASH = "model_hash_or_encoder_hash"
-    RECONSTRUCTION_ERROR_ARRAYS = "reconstruction_error_arrays"
-
-
-class WarningCode(enum.StrEnum):
-    GLOBAL_NOT_POOLED_PERCENTILE = "GLOBAL_NOT_POOLED_PERCENTILE"
-    LOCAL_UTILITY_TRADEOFF = "LOCAL_UTILITY_TRADEOFF"
-    CLUSTER_DIAGNOSTICS_INCOMPLETE = "CLUSTER_DIAGNOSTICS_INCOMPLETE"
-    FIXED_OPERATING_POINT_METRICS_PENDING = "FIXED_OPERATING_POINT_METRICS_PENDING"
-    FLAT_CV_TPR_SUSPICIOUS = "FLAT_CV_TPR_SUSPICIOUS"
-    MISSING_CONVERGENCE_CURVES = "MISSING_CONVERGENCE_CURVES"
-    MISSING_CONFUSION_MATRIX = "MISSING_CONFUSION_MATRIX"
-    MISSING_PARTITION_MANIFEST = "MISSING_PARTITION_MANIFEST"
-    NAKED_CV_FPR = "NAKED_CV_FPR"
-    PRIMARY_DELTA_INCOMPLETE = "PRIMARY_DELTA_INCOMPLETE"
-    NO_COMPLETED_RESULTS = "NO_COMPLETED_RESULTS"
-    SCHEMA_VERSION_MISMATCH = "SCHEMA_VERSION_MISMATCH"
-    THRESHOLD_RECONSTRUCTION_FAILED = "THRESHOLD_RECONSTRUCTION_FAILED"
-    WORST_CLIENT_STABLE = "WORST_CLIENT_STABLE"
-    WORST_CLIENT_VARIES = "WORST_CLIENT_VARIES"
-
-
-class AuditSeverity(enum.StrEnum):
-    INFO = "INFO"
-    WARNING = "WARNING"
-    FAIL = "FAIL"
-    BLOCKED_PENDING_RUN = "BLOCKED_PENDING_RUN"
-
-
-class DenominatorStatus(enum.StrEnum):
-    PASS = "PASS"
-    FAIL = "FAIL"
-    EXCLUDED_EVALUATION_INCOMPLETE = "EXCLUDED_EVALUATION_INCOMPLETE"
-    BLOCKED_PENDING_RUN = "BLOCKED_PENDING_RUN"
-
-
-class WorstDirection(enum.StrEnum):
-    MAX_IS_WORST = "max_is_worst"
-    MIN_IS_WORST = "min_is_worst"
-
-
-WORST_CLIENT_DIRECTIONS: Mapping[MetricName, WorstDirection] = {
-    MetricName.FPR: WorstDirection.MAX_IS_WORST,
-    MetricName.TPR: WorstDirection.MIN_IS_WORST,
-    MetricName.MACRO_F1: WorstDirection.MIN_IS_WORST,
-    MetricName.BALANCED_ACCURACY: WorstDirection.MIN_IS_WORST,
-}
 
 
 class AuditDir(enum.StrEnum):
-    AUDIT = "audit"
     DATA_AUDIT = "data_audit"
-
-
-class AuditArtifact(enum.StrEnum):
-    POLICY_INVARIANTS = "policy_invariants.json"
-    RUN_MANIFEST = "run_manifest.csv"
-    SEED_DELTAS = "seed_deltas.csv"
-    PER_CLIENT_METRICS = "per_client_metrics.csv"
-    PER_ATTACK_METRICS = "per_attack_metrics.csv"
-    THRESHOLD_VALUES = "threshold_values.csv"
-    RECONSTRUCTION_ERROR_SUMMARY = "reconstruction_error_summary.csv"
-    CLUSTER_ASSIGNMENTS = "cluster_assignments.csv"
-    DATASET_PARTITION_AUDIT = "dataset_partition_audit.json"
-    CONVERGENCE_AUDIT = "convergence_audit.csv"
-    METRIC_DENOMINATOR_AUDIT = "metric_denominator_audit.csv"
-    FPR_COMPANION_METRICS = "fpr_companion_metrics.csv"
-    WORST_CLIENT_TRACKING = "worst_client_tracking.csv"
-    CLUSTER_STABILITY = "cluster_stability.csv"
-    METRIC_RECOMPUTATION_AUDIT = "metric_recomputation_audit.csv"
-    WARNINGS = "warnings.md"
-    AUDIT_SUMMARY = "audit_summary.md"
-
-
-class AuditSchemaVersion(enum.StrEnum):
-    V1_0 = "1.0"
-
-
-class AttackLabel(enum.StrEnum):
-    BINARY_ATTACK = "binary_attack"
-
-
-class RemediationCommand(enum.StrEnum):
-    RUN_BASELINE = "datp baseline"
-    REPORT = "datp report"
-
-
-class CoverageFallback(enum.StrEnum):
-    DEFAULT = "0/0"
-
-
-class ValidationThreshold(float, enum.Enum):
-    FLAT_CV_TPR_EPSILON = 1e-6
-
-
-class ValidationCountThreshold(int, enum.Enum):
-    WORST_CLIENT_STABLE_MIN_SEEDS = 3
-
-
-class AuditOutputName(enum.StrEnum):
-    POLICY_INVARIANTS = "policy_invariants"
-    RUN_MANIFEST = "run_manifest"
-    SEED_DELTAS = "seed_deltas"
-    PER_CLIENT_METRICS = "per_client_metrics"
-    PER_ATTACK_METRICS = "per_attack_metrics"
-    THRESHOLD_VALUES = "threshold_values"
-    RECONSTRUCTION_ERROR_SUMMARY = "reconstruction_error_summary"
-    CLUSTER_ASSIGNMENTS = "cluster_assignments"
-    DATASET_PARTITION_AUDIT = "dataset_partition_audit"
-    CONVERGENCE_AUDIT = "convergence_audit"
-    METRIC_DENOMINATOR_AUDIT = "metric_denominator_audit"
-    METRIC_RECOMPUTATION_AUDIT = "metric_recomputation_audit"
-    FPR_COMPANION_METRICS = "fpr_companion_metrics"
-    WORST_CLIENT_TRACKING = "worst_client_tracking"
-    CLUSTER_STABILITY = "cluster_stability"
-    WARNINGS = "warnings"
-    AUDIT_SUMMARY = "audit_summary"
 
 
 class FigureName(enum.StrEnum):
@@ -611,6 +755,7 @@ class FigureName(enum.StrEnum):
     FIGURE_3 = "figure_3"
     FIGURE_5 = "figure_5"
     FIGURE_6 = "figure_6"
+    FIGURE_7 = "figure_7"
 
 
 class ReportTerm(enum.StrEnum):
@@ -633,6 +778,7 @@ class AnalysisReportStem(enum.StrEnum):
     CLUSTER_STABILITY_SUMMARY = "cluster_stability_summary"
     DUPLICATE_AND_BOUND_SUMMARY = "duplicate_and_bound_summary"
     GATE_SENSITIVITY = "gate_sensitivity"
+    CLAIM_ROBUSTNESS = "claim_robustness"
     CLUSTER_STABILITY_SENSITIVITY = "cluster_stability_sensitivity"
     SCALE_NORMALIZATION_SUMMARY = "scale_normalization_summary"
     DRAW_VARIANT_SUMMARY = "draw_variant_summary"
@@ -695,7 +841,6 @@ class EvidenceRole(enum.StrEnum):
 
 class PackageDir(enum.StrEnum):
     CONFIG = "config"
-    AUDIT = "audit"
     MANIFESTS = "manifests"
 
 
@@ -704,6 +849,7 @@ class ArtifactDir(enum.StrEnum):
     RESULTS = "results"
     CALIBRATION_POISONING = "conference_calibration_poisoning"
     SCORES = "scores"
+    MODELS = "models"
     LOGS = "logs"
     WORKER_LOGS = "workers"
     ANALYSIS = "analysis"
@@ -732,7 +878,7 @@ class CliCommand(enum.StrEnum):
     REPORT = "report"
 
     @classmethod
-    def resolve(cls, arguments: Sequence[str]) -> "CliCommand | None":
+    def resolve(cls, arguments: Sequence[NarrativeText]) -> "CliCommand | None":
         for command in cls:
             if arguments[:1] == [command]:
                 return command

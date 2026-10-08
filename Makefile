@@ -35,6 +35,10 @@ check: ## Run ruff (lint + format), pyright, and Semgrep (no tests).
 test: ## Run unit and integration tests; fails below 90% coverage.
 	$(PYTEST) tests/unit tests/integration --cov --tb=short -q
 
+.PHONY: architecture
+architecture: ## Run the architecture enforcement suite (local-only; see .gitignore).
+	$(PYTEST) tests/architecture --tb=short -q
+
 # ---------------------------------------------------------------------------
 # datp-cp workflow — run targets in order
 # ---------------------------------------------------------------------------

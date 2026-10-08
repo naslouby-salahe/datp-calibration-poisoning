@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import enum
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from itertools import product
 
 import numpy as np
-from numpy.typing import NDArray
+from scipy import stats as sp_stats
+from sklearn.metrics import average_precision_score, roc_auc_score, silhouette_score
 
 from datp.config import PERMUTATION_MAX_EXACT_SEEDS
 from datp.types import (
     BootstrapCount,
+    ClassificationScore,
+    FeatureMatrix,
     ConfidenceLevel,
     Index,
     IntervalBound,
@@ -25,8 +28,6 @@ from datp.types import (
     SignedCount,
     SignedDelta,
 )
-
-EXTREME_PERCENTILE = 95
 
 
 class BootstrapField(enum.StrEnum):
@@ -56,22 +57,91 @@ class StatsField(enum.StrEnum):
     NOTE = "note"
 
 
+def mean_of(values: Sequence[float] | ScoreVector) -> ScoreValue:
+    return float(np.mean(values))
+
+
+def nanmean_of(values: Sequence[float] | ScoreVector) -> ScoreValue:
+    return float(np.nanmean(values))
+
+
+def median_of(values: Sequence[float] | ScoreVector) -> ScoreValue:
+    return float(np.median(values))
+
+
+def std_of(values: Sequence[float] | ScoreVector, ddof: SignedCount = 0) -> ScoreValue:
+    return float(np.std(values, ddof=ddof))
+
+
+def percentile_of(
+    values: Sequence[float] | ScoreVector, percentile: ScoreValue
+) -> ScoreValue:
+    return float(np.percentile(values, percentile))
+
+
+def min_of(values: Sequence[float] | ScoreVector) -> ScoreValue:
+    return float(np.min(values))
+
+
+def max_of(values: Sequence[float] | ScoreVector) -> ScoreValue:
+    return float(np.max(values))
+
+
+def floats_of(values: Sequence[float] | ScoreVector) -> list[ScoreValue]:
+    return [float(value) for value in values]
+
+
+def ints_of(values: Sequence[int] | ScoreVector) -> list[SampleCount]:
+    return [int(value) for value in values]
+
+
+def skewness_of(values: ScoreVector) -> ScoreValue:
+    return float(sp_stats.skew(values))
+
+
+def silhouette_of(
+    features: FeatureMatrix, labels: ScoreVector, random_state: RandomSeed
+) -> ClassificationScore:
+    return float(silhouette_score(features, labels, random_state=random_state))
+
+
+def roc_auc_of(labels: ScoreVector, scores: ScoreVector) -> ScoreValue:
+    return float(roc_auc_score(labels, scores))
+
+
+def average_precision_of(labels: ScoreVector, scores: ScoreVector) -> ScoreValue:
+    return float(average_precision_score(labels, scores))
+
+
+def binomial_greater_p_value(
+    successes: SampleCount, trials: SampleCount, probability: Probability = 0.5
+) -> Probability:
+    return float(
+        sp_stats.binomtest(
+            successes, trials, p=probability, alternative="greater"
+        ).pvalue
+    )
+
+
+def count_of(mask: Sequence[bool] | ScoreVector) -> SampleCount:
+    return int(np.sum(mask))
+
+
 def cv(arr: ScoreVector, ddof: SignedCount = 0) -> ScoreValue:
     a = np.asarray(arr, dtype=np.float64)
     if a.size < 2:
         return math.nan
-    m = float(a.mean())
+    m = mean_of(a)
     if not m:
         return math.nan
-    return float(a.std(ddof=ddof) / m)
+    return std_of(a, ddof=ddof) / m
 
 
 def iqr(arr: ScoreVector) -> ScoreValue:
     a = np.asarray(arr, dtype=np.float64)
     if a.size < 2:
         return math.nan
-    p25, p75 = np.percentile(a, [25.0, 75.0])
-    return float(p75 - p25)
+    return percentile_of(a, 75.0) - percentile_of(a, 25.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,11 +167,11 @@ def compute_fpr_fleet_stats(fpr_arr: ScoreVector) -> FprFleetStats:
     worst_idx = int(np.argmax(arr))
     return FprFleetStats(
         cv=cv(arr),
-        mean=float(arr.mean()),
-        std=float(arr.std(ddof=1)) if n >= 2 else math.nan,
+        mean=mean_of(arr),
+        std=std_of(arr, ddof=1) if n >= 2 else math.nan,
         iqr=iqr(arr),
-        max_min_gap=float(arr.max() - arr.min()),
-        worst_value=float(arr[worst_idx]),
+        max_min_gap=max_of(arr) - min_of(arr),
+        worst_value=arr[worst_idx].item(),
         worst_index=worst_idx,
         n=n,
     )
@@ -141,7 +211,7 @@ def _validate_deltas(deltas: ScoreVector) -> ScoreVector:
     if values.size == 0:
         raise ValueError("bootstrap_ci: deltas array is empty")
     if not np.isfinite(values).all():
-        bad_count = int(np.sum(~np.isfinite(values)))
+        bad_count = count_of(~np.isfinite(values))
         raise ValueError(
             f"bootstrap_ci: deltas contains {bad_count} non-finite value(s); "
             "resolve undefined CV(FPR) values before computing bootstrap CI"
@@ -171,9 +241,9 @@ def bootstrap_ci(
     boot_means = _bootstrap_means(values, n_bootstrap, seed)
 
     alpha = 1.0 - ci
-    ci_lower = float(np.percentile(boot_means, 100 * alpha / 2))
-    ci_upper = float(np.percentile(boot_means, 100 * (1 - alpha / 2)))
-    mean_delta = float(values.mean())
+    ci_lower = percentile_of(boot_means, 100 * alpha / 2)
+    ci_upper = percentile_of(boot_means, 100 * (1 - alpha / 2))
+    mean_delta = mean_of(values)
     excludes_zero = (ci_lower > 0.0) or (ci_upper < 0.0)
 
     return BootstrapResult(
@@ -196,10 +266,23 @@ def sign_flip_p_value(values: ScoreVector) -> Probability:
         raise ValueError(
             f"exact sign-flip test supports at most {PERMUTATION_MAX_EXACT_SEEDS} seeds; got {n}"
         )
-    signs: NDArray[np.float64] = np.array(
-        list(product((-1.0, 1.0), repeat=n)), dtype=np.float64
-    )
-    means = np.abs((signs * arr).mean(axis=1))
-    observed = abs(float(arr.mean()))
-    extreme: NDArray[np.bool_] = means >= observed - 1e-15
-    return float(np.count_nonzero(extreme) / extreme.size)
+    observed = abs(mean_of(arr))
+    if observed <= 1e-15:
+        return 1.0
+
+    threshold = n * (observed - 1e-15)
+    split = n // 2
+    left_sums = _signed_subset_sums(arr[:split])
+    right_sums = np.sort(_signed_subset_sums(arr[split:]))
+    low = np.searchsorted(right_sums, -threshold - left_sums, side="right")
+    high = np.searchsorted(right_sums, threshold - left_sums, side="left")
+    extreme_count = int(np.sum(low + right_sums.size - high))
+    return extreme_count / (1 << n)
+
+
+def _signed_subset_sums(values: ScoreVector) -> ScoreVector:
+    n = values.size
+    masks = np.arange(1 << n, dtype=np.int64)
+    bits = np.arange(n, dtype=np.int64)
+    signs = 2 * ((masks[:, None] >> bits) & 1) - 1
+    return signs @ values

@@ -48,6 +48,8 @@ from datp.data import (
     split_path,
 )
 from datp.enums import (
+    Workflow,
+    ErrorScope,
     CONTROLLED_POLICIES,
     ArtifactDir,
     ArtifactFile,
@@ -75,7 +77,6 @@ from datp.thresholding import (
     results_exist,
 )
 from datp.types import (
-    ArtifactName,
     ClientId,
     ContentHash,
     DurationSeconds,
@@ -166,7 +167,7 @@ _STATUS_SYMBOLS = {
 }
 
 
-def print_sweep_banner(cell_count: SampleCount, base_dir: ArtifactName) -> None:
+def print_sweep_banner(cell_count: SampleCount, base_dir: Path) -> None:
     lines = [
         f"Stage: [cyan]NBAIOT_MAIN[/cyan] Cells: [cyan]{cell_count}[/cyan]",
         f"Output: [dim]{base_dir}[/dim]",
@@ -209,7 +210,7 @@ def print_sweep_summary(result: SweepResult, elapsed_s: DurationSeconds) -> None
     table = Table(title="Sweep Summary", border_style="green")
     table.add_column("Metric", style="bold")
     table.add_column("Value")
-    table.add_row("Total", str(result.total))
+    table.add_row("Total", f"{result.total}")
     table.add_row("Completed", f"[green]{result.completed}[/green]")
     table.add_row("Skipped", f"[dim]{result.skipped}[/dim]")
     failed_style = "red" if result.failed > 0 else ""
@@ -217,16 +218,13 @@ def print_sweep_summary(result: SweepResult, elapsed_s: DurationSeconds) -> None
         "Failed",
         f"[{failed_style}]{result.failed}[/{failed_style}]"
         if failed_style
-        else str(result.failed),
+        else f"{result.failed}",
     )
     table.add_row("Duration", f"{elapsed_s:.1f}s")
     console.print(table)
 
 
 logger = get_logger(__name__)
-
-
-_MODULE = "experiments.stages.prepare_data"
 
 
 _REQUIRED_CLIENT_ARTIFACTS = tuple(filename_for_split(s) for s in Split) + (
@@ -255,7 +253,7 @@ def ensure_prepared_data(request: PreparedDataRequest) -> Path:
         "processed data missing; running preparation",
         stage=request.stage,
         seed=request.seed,
-        prepared_dir=str(prepared_dir),
+        prepared_dir=prepared_dir,
     )
     _prepare(request)
     _verify_existing_prepared_data(request, prepared_dir, manifest_file)
@@ -295,14 +293,14 @@ def _verify_existing_prepared_data(
         "processed data verified; reusing",
         stage=request.stage,
         seed=request.seed,
-        prepared_dir=str(prepared_dir),
+        prepared_dir=prepared_dir,
     )
 
 
 def _verify_client_artifacts(prepared_dir: Path, feature_count: FeatureCount) -> None:
     if not prepared_dir.is_dir():
         raise RuntimeError(
-            f"[{_MODULE}] Prepared directory missing. Expected: {prepared_dir}. Got: not found."
+            f"[{ErrorScope.PREPARE_DATA}] Prepared directory missing. Expected: {prepared_dir}. Got: not found."
         )
 
     client_dirs = sorted(
@@ -312,7 +310,7 @@ def _verify_client_artifacts(prepared_dir: Path, feature_count: FeatureCount) ->
     )
     if not client_dirs:
         raise RuntimeError(
-            f"[{_MODULE}] Prepared clients missing. Expected: at least one client directory. Got: 0."
+            f"[{ErrorScope.PREPARE_DATA}] Prepared clients missing. Expected: at least one client directory. Got: 0."
         )
 
     for client_dir in client_dirs:
@@ -323,14 +321,14 @@ def _verify_client_artifacts(prepared_dir: Path, feature_count: FeatureCount) ->
         ]
         if missing:
             raise RuntimeError(
-                f"[{_MODULE}] Prepared client {client_dir.name} incomplete. "
+                f"[{ErrorScope.PREPARE_DATA}] Prepared client {client_dir.name} incomplete. "
                 f"Expected: {', '.join(_REQUIRED_CLIENT_ARTIFACTS)}. "
                 f"Got missing: {', '.join(missing)}."
             )
         scaler = load_scaler(client_dir / ArtifactFile.SCALER)
         if scaler.n_features_in_ != feature_count:
             raise RuntimeError(
-                f"[{_MODULE}] Scaler feature count mismatch for {client_dir.name}: "
+                f"[{ErrorScope.PREPARE_DATA}] Scaler feature count mismatch for {client_dir.name}: "
                 f"expected {feature_count}, got {scaler.n_features_in_}."
             )
         for split in Split:
@@ -344,9 +342,21 @@ def ensure_trained_scores(request: PipelineRequest) -> ScoringManifest:
         .score_cell(key)
         .score_dir
     )
+    checkpoint_path = ArtifactLayout(
+        base_dir=request.base_dir, stage=key.stage
+    ).model_checkpoint(key)
+    if not checkpoint_path.is_file():
+        _run_fl_training(request, key.label())
+        return validate_scoring_manifest(score_base)
     try:
         manifest = validate_scoring_manifest(score_base)
-    except (FileNotFoundError, ValueError):
+    except (FileNotFoundError, ValueError) as exc:
+        logger.warning(
+            "score manifest invalid, retraining",
+            stage=key.stage,
+            seed=key.seed,
+            error=exc,
+        )
         _run_fl_training(request, key.label())
         return validate_scoring_manifest(score_base)
     logger.info("scores exist, skipping training", stage=key.stage, seed=key.seed)
@@ -465,7 +475,7 @@ def evaluate_policy(
             )
         )
         write_json_atomic(res_dir / ArtifactFile.METRICS, metrics)
-        logger.info("results written", path=str(res_dir / ArtifactFile.METRICS))
+        logger.info("results written", path=res_dir / ArtifactFile.METRICS)
 
         return metrics
 
@@ -527,18 +537,19 @@ def run_sweep(
     data_root: Path | None = None,
     workers: WorkerCount = BASE_CONFIG.runtime.sweep_workers,
 ) -> SweepResult:
+    logger.info("workflow started", workflow=Workflow.BASELINE_SWEEP)
     t_start = time.monotonic()
     print_step(SweepStep.BUILD_MATRIX, detail="")
     cells = build_experiment_matrix()
     result = SweepResult(total=len(cells))
-    print_sweep_banner(len(cells), str(base_dir))
+    print_sweep_banner(len(cells), base_dir)
 
     print_step(SweepStep.VALIDATE_MATRIX, detail="")
     errors, pre_composed_configs = validate_sweep(cells)
 
     if errors:
         for err in errors:
-            logger.error("pre-validation failure", error=str(err))
+            logger.error("pre-validation failure", error=err)
         raise SystemExit(f"Sweep blocked: {len(errors)} config validation error(s)")
 
     groups: dict[TrainingCellId, list[PolicyRunId]] = defaultdict(list)
@@ -586,7 +597,9 @@ def run_sweep(
                 result.failed += partial.failed
     total_elapsed = time.monotonic() - t_start
     print_sweep_summary(result, total_elapsed)
-    return result
+    workflow_result = result
+    logger.info("workflow completed", workflow=Workflow.BASELINE_SWEEP)
+    return workflow_result
 
 
 def _is_done(cell: PolicyRunId, base_dir: Path) -> bool:
@@ -610,7 +623,14 @@ def _process_group(
     data_root: Path,
 ) -> None:
     print_group_header(key.stage, key.seed, len(group_cells), group_idx, total_groups)
-    pending_cells = [c for c in group_cells if not _is_done(c, base_dir)]
+    checkpoint_missing = (
+        not ArtifactLayout(base_dir=base_dir, stage=key.stage)
+        .model_checkpoint(key)
+        .is_file()
+    )
+    pending_cells = [
+        c for c in group_cells if checkpoint_missing or not _is_done(c, base_dir)
+    ]
 
     if not pending_cells:
         for cell in group_cells:
@@ -624,7 +644,7 @@ def _process_group(
 
     pending_fl: list[PolicyRunId] = []
     for cell in group_cells:
-        if _is_done(cell, base_dir):
+        if _is_done(cell, base_dir) and not checkpoint_missing:
             _account_skip(cell, result)
         else:
             pending_fl.append(cell)

@@ -1151,7 +1151,7 @@ class TestFixedAssignmentAndTransitions:
             )
 
     def test_hyperparams_change_cluster_count(self) -> None:
-        from datp.attacks.metrics import ClusterHyperparams
+        from datp.thresholding import ClusterHyperparams
 
         col = _make_collection_cluster_threshold_recompute()
         pois_cal, _ = _make_poisoned_cal(col)

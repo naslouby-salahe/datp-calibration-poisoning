@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
@@ -14,8 +15,10 @@ from datp.attacks.manifests import (
     ProvenanceRecord,
 )
 from datp.attacks.sweep import (
+    InjectionSpec,
     SweepCellConfig,
     clean_cell_metrics,
+    inject_single_victim,
     lock_mu_flag_threshold,
     run_sweep_cell,
 )
@@ -25,6 +28,7 @@ from datp.enums import (
     ManifestProvenanceSource,
     PoisoningSourceStrategy,
     PoisoningTargetScope,
+    ReservoirDraw,
     SplitSemantics,
     ThresholdPolicy,
 )
@@ -112,6 +116,30 @@ def test_run_sweep_cell_high_source_raises_threshold():
     )
     delta = result.poisoned_metrics.delta_tau[victim_id].delta_tau
     assert delta > 0.0
+
+
+def test_feature_source_uses_unique_train_rows_without_replacement() -> None:
+    collection = _make_collection()
+    victim = collection.eligibility.eligible_ids[0]
+    feature_scores = np.linspace(0.0, 1.0, 200, dtype=np.float64)
+    feature_ids = np.arange(feature_scores.size, dtype=np.int64)
+
+    outcome = inject_single_victim(
+        collection,
+        victim_id=victim,
+        spec=InjectionSpec(
+            source=PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN,
+            fraction=0.1,
+            seed_pair=SeedPair(training_seed=0, poisoning_seed=100),
+            objective=AttackerObjective.THRESHOLD_RAISE,
+        ),
+        feature_reservoir_scores=feature_scores,
+        feature_row_ids=feature_ids,
+    )
+
+    assert outcome.reservoir_draw is ReservoirDraw.WITHOUT_REPLACEMENT
+    assert outcome.donor_feature_unique_fraction == 1.0
+    assert outcome.injection.n_replaced > 0
 
 
 def test_run_sweep_cell_uses_passed_mu_flag_not_recomputed():
@@ -207,14 +235,14 @@ def _manifest(**overrides: Any) -> BoundedSweepManifest:
         "sources": (PoisoningSourceStrategy.RANDOM_BENIGN,),
         "source_objective_pairs": ("random_benign+threshold_raise",),
         "fractions": (0.0,),
-        "training_seeds": tuple(range(10)),
-        "poisoning_seeds": tuple(range(100, 110)),
-        "analysis_seeds": tuple(range(300, 310)),
+        "training_seeds": tuple(range(20)),
+        "poisoning_seeds": tuple(range(100, 120)),
+        "analysis_seeds": tuple(range(300, 320)),
         "config_hash": "config-hash",
         "artifact_provenance": ArtifactProvenance(
             source=ManifestProvenanceSource.NBAIOT_MAIN_SWEEP
         ),
-        "mu_flag_threshold_by_training_seed": dict.fromkeys(range(10), 0.005),
+        "mu_flag_threshold_by_training_seed": dict.fromkeys(range(20), 0.005),
         "n_cells": 1,
         "results": (_row(),),
     }
@@ -258,7 +286,7 @@ def test_manifest_rejects_unpaired_seed_pools() -> None:
 
 def test_manifest_rejects_five_seed_pools() -> None:
     """Verify validation fails if seed pools contain fewer than 10 required items."""
-    with pytest.raises(ValidationError, match="0..9"):
+    with pytest.raises(ValidationError, match="0..19"):
         _manifest(
             training_seeds=tuple(range(5)),
             poisoning_seeds=tuple(range(100, 105)),

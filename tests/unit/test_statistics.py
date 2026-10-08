@@ -31,7 +31,7 @@ def test_empty_is_nan() -> None:
 def test_too_many_seeds_is_rejected() -> None:
     """Exact enumeration refuses large seed counts."""
     with pytest.raises(ValueError, match="at most"):
-        sign_flip_p_value(np.ones(20))
+        sign_flip_p_value(np.ones(21))
 
 
 class TestCV:

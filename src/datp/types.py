@@ -32,7 +32,6 @@ ClientId = NewType("ClientId", str)
 ClusterId = NewType("ClusterId", str)
 RunId = NewType("RunId", str)
 RepositoryName = NewType("RepositoryName", str)
-CoverageLabel = NewType("CoverageLabel", str)
 RandomSeed = NewType("RandomSeed", int)
 ContentHash = Annotated[str, _Concept("content hash")]
 SchemaVersion = Annotated[str, _Concept("schema version")]
@@ -40,6 +39,7 @@ ColumnName = Annotated[str, _Concept("column name")]
 RecordKey = Annotated[str, _Concept("record key")]
 ArtifactName = Annotated[str, _Concept("artifact name")]
 NarrativeText = Annotated[str, _Concept("narrative text")]
+ColorName = Annotated[str, _Concept("color name")]
 
 SampleCount = NonNegativeInt
 ClientCount = NonNegativeInt

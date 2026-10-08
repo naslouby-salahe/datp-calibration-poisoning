@@ -92,7 +92,7 @@ def _write_valid_manifest(
                     "path": str(path),
                     "row_count": 50,
                     "columns": ["reconstruction_error"],
-                    "dtypes": {"reconstruction_error": "Float32"},
+                    "dtypes": [{"column": "reconstruction_error", "dtype": "Float32"}],
                     "score_min": 0.1,
                     "score_max": 1.0,
                     "score_nan_count": 0,

@@ -536,12 +536,12 @@ def test_invariant_8_two_layer_bootstrap_on_seed_aggregates(collection):
             direction=AttackerObjective.THRESHOLD_RAISE,
         )
     )
-    assert len(result.seed_aggregates) == len(POISONING_SEEDS) == 10
-    assert result.bootstrap_ci.n_seeds == 10
-    assert len(eligible) * len(POISONING_SEEDS) == 90
+    assert len(result.seed_aggregates) == len(POISONING_SEEDS) == 20
+    assert result.bootstrap_ci.n_seeds == 20
+    assert len(eligible) * len(POISONING_SEEDS) == 180
     assert result.n_feasible_victims == len(eligible)
 
-    assert result.sign_test.n_total == 10
+    assert result.sign_test.n_total == 20
 
 
 def test_invariant_10_auroc_invariant(collection):

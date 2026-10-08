@@ -2,21 +2,24 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
-from pydantic_core import ErrorDetails
-from scipy import stats as sp_stats
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 from datp.artifacts import ArtifactLayout
-from datp.config import ExperimentStage
+from datp.config import (
+    CLUSTER_K_NBAIOT,
+    CLUSTER_MAX_ITER,
+    CLUSTER_N_INIT,
+    CLUSTER_RANDOM_STATE,
+    N_MIN,
+    ExperimentStage,
+)
 from datp.core import (
     ClientFingerprint,
     ClientThreshold,
@@ -34,13 +37,12 @@ from datp.core import (
     utc_timestamp,
 )
 from datp.enums import (
+    ErrorScope,
     POLICY_THRESHOLD_SOURCE,
     THRESHOLD_AGGREGATION_BY_POLICY,
     ClientStatus,
     DatasetID,
     MetricName,
-    PayloadKey,
-    PayloadValidationErrorType,
     ProvenanceSentinel,
     RunKind,
     ThresholdAggregationMethod,
@@ -61,7 +63,6 @@ from datp.types import (
     FeatureMatrix,
     Index,
     IterationCount,
-    JsonRecord,
     NarrativeText,
     Quantile,
     RandomSeed,
@@ -76,33 +77,38 @@ from datp.types import (
     TrueNegativeRate,
     TruePositiveRate,
 )
+from datp.statistics import (
+    floats_of,
+    mean_of,
+    percentile_of,
+    silhouette_of,
+    skewness_of,
+    std_of,
+)
 
 if TYPE_CHECKING:
     from datp.config import ThresholdConfig
 
 
-_MODULE = "thresholding.thresholds"
-
-
 def percentile_threshold(errors: ScoreVector, q: Quantile) -> Threshold:
     if errors.size == 0:
         raise ValueError(
-            f"[{_MODULE}] Cannot compute percentile. Expected: non-empty array. Got: empty array."
+            f"[{ErrorScope.THRESHOLDS}] Cannot compute percentile. Expected: non-empty array. Got: empty array."
         )
     if q < 0.0 or q > 100.0:
         raise ValueError(
-            f"[{_MODULE}] Invalid percentile. Expected: 0 <= q <= 100. Got: {q}."
+            f"[{ErrorScope.THRESHOLDS}] Invalid percentile. Expected: 0 <= q <= 100. Got: {q}."
         )
-    return float(np.percentile(errors, q))
+    return percentile_of(errors, q)
 
 
 def arithmetic_mean_threshold(tau_list: list[Threshold] | ScoreVector) -> Threshold:
     arr = np.asarray(tau_list, dtype=np.float64)
     if arr.size == 0:
         raise ValueError(
-            f"[{_MODULE}] Cannot compute mean. Expected: non-empty threshold list. Got: empty list."
+            f"[{ErrorScope.THRESHOLDS}] Cannot compute mean. Expected: non-empty threshold list. Got: empty list."
         )
-    return float(arr.mean())
+    return mean_of(arr)
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,9 +277,6 @@ def build_threshold_result(
 logger = get_logger(__name__)
 
 
-_MODULE_policies = "thresholding.policies"
-
-
 _MIN_CLUSTER_ELIGIBLE = 2
 
 
@@ -360,15 +363,11 @@ def compute_fingerprints(
     fingerprints: dict[ClientId, FeatureMatrix] = {}
     for cid in eligible:
         errors = np.asarray(client_errors[cid], dtype=np.float64)
-        mean_error = float(np.mean(errors))
-        std_error = float(np.std(errors, ddof=1)) if errors.size >= 2 else 0.0
-        raw_skew = (
-            float(sp_stats.skew(errors))
-            if errors.size >= 2 and std_error > 0.0
-            else 0.0
-        )
+        mean_error = mean_of(errors)
+        std_error = std_of(errors, ddof=1) if errors.size >= 2 else 0.0
+        raw_skew = skewness_of(errors) if errors.size >= 2 and std_error > 0.0 else 0.0
         skew_error = raw_skew if np.isfinite(raw_skew) else 0.0
-        p95_error = float(np.percentile(errors, q))
+        p95_error = percentile_of(errors, q)
         fingerprints[cid] = np.array(
             [mean_error, std_error, skew_error, p95_error],
             dtype=np.float64,
@@ -379,12 +378,12 @@ def compute_fingerprints(
 def _validate_fingerprint_matrix(fingerprint_matrix: FeatureMatrix) -> None:
     if not np.isfinite(fingerprint_matrix).all():
         raise ValueError(
-            f"[{_MODULE_policies}] Invalid fingerprint values. Expected: finite mean/std/skew/p95. Got: NaN or inf."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Invalid fingerprint values. Expected: finite mean/std/skew/p95. Got: NaN or inf."
         )
     unique_rows = np.unique(fingerprint_matrix, axis=0)
     if unique_rows.shape[0] < 2:
         raise ValueError(
-            f"[{_MODULE_policies}] Degenerate fingerprints: all eligible clients have identical fingerprints. Expected: at least 2 distinct eligible fingerprints. Got: {unique_rows.shape[0]}."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Degenerate fingerprints: all eligible clients have identical fingerprints. Expected: at least 2 distinct eligible fingerprints. Got: {unique_rows.shape[0]}."
         )
 
 
@@ -400,7 +399,7 @@ def scaled_fingerprints(
     fingerprint_scaled = StandardScaler().fit_transform(fingerprint_matrix)
     if not np.isfinite(fingerprint_scaled).all():
         raise ValueError(
-            f"[{_MODULE_policies}] Invalid scaled fingerprints. Expected: finite values after scaling. Got: NaN or inf."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Invalid scaled fingerprints. Expected: finite values after scaling. Got: NaN or inf."
         )
     return fingerprints, fingerprint_scaled
 
@@ -427,7 +426,7 @@ def silhouette_scores_by_k(
         n_labels = len(set(labels))
         if n_labels < 2 or n_labels >= x_scaled.shape[0]:
             continue
-        score = float(silhouette_score(x_scaled, labels, random_state=random_state))
+        score = silhouette_of(x_scaled, labels, random_state)
         if not np.isfinite(score):
             continue
         logger.info("CLUSTER silhouette", k=k, score=score)
@@ -443,16 +442,16 @@ def select_cluster_k(
 ) -> tuple[ClusterCount, ScoreValue]:
     if cluster_k <= 0:
         raise ValueError(
-            f"[{_MODULE_policies}] Invalid cluster k. Expected: locked fixed K > 0. Got: {cluster_k}."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Invalid cluster k. Expected: locked fixed K > 0. Got: {cluster_k}."
         )
     if cluster_k >= eligible_count:
         raise ValueError(
-            f"[{_MODULE_policies}] Invalid cluster k. Expected: 2 <= k < eligible_count ({eligible_count}). Got: {cluster_k}."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Invalid cluster k. Expected: 2 <= k < eligible_count ({eligible_count}). Got: {cluster_k}."
         )
     silhouette = silhouette_scores.get(cluster_k)
     if silhouette is None:
         raise ValueError(
-            f"[{_MODULE_policies}] Cluster k has no valid silhouette score. Expected: non-degenerate clustering. Got: {cluster_k}."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Cluster k has no valid silhouette score. Expected: non-degenerate clustering. Got: {cluster_k}."
         )
     return cluster_k, silhouette
 
@@ -483,9 +482,7 @@ def final_silhouette(
 ) -> ClassificationScore:
     if len(set(labels)) <= 1:
         return 0.0
-    return float(
-        silhouette_score(fingerprint_scaled, labels, random_state=random_state)
-    )
+    return silhouette_of(fingerprint_scaled, labels, random_state)
 
 
 def cluster_assignments(
@@ -547,6 +544,10 @@ def build_cluster_metadata(metadata_input: ClusterMetadataInput) -> ClusterMetad
         client_cluster=metadata_input.client_cluster,
         tau_per_cluster=metadata_input.tau_per_cluster,
     )
+    fingerprint_values = {
+        cid: floats_of(metadata_input.fingerprints[cid])
+        for cid in metadata_input.eligible_ids
+    }
     return ClusterMetadata(
         k=metadata_input.k,
         cluster_info=info,
@@ -558,10 +559,10 @@ def build_cluster_metadata(metadata_input: ClusterMetadataInput) -> ClusterMetad
         fingerprints=tuple(
             ClientFingerprint(
                 client_id=ClientId(cid),
-                mean=float(metadata_input.fingerprints[cid][0]),
-                std=float(metadata_input.fingerprints[cid][1]),
-                skewness=float(metadata_input.fingerprints[cid][2]),
-                p95=float(metadata_input.fingerprints[cid][3]),
+                mean=fingerprint_values[cid][0],
+                std=fingerprint_values[cid][1],
+                skewness=fingerprint_values[cid][2],
+                p95=fingerprint_values[cid][3],
             )
             for cid in metadata_input.eligible_ids
         ),
@@ -635,17 +636,22 @@ def _compute_cluster_thresholds(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class ClusterHyperparams:
+    k: ClusterCount = CLUSTER_K_NBAIOT
+    n_init: IterationCount = CLUSTER_N_INIT
+    max_iter: IterationCount = CLUSTER_MAX_ITER
+    random_state: RandomSeed = CLUSTER_RANDOM_STATE
+    n_min: SampleCount = N_MIN
+
+
 _CLUSTER_CACHE_LIMIT = 256
 _CLUSTER_CACHE: dict[
     tuple[
         tuple[tuple[ClientId, ContentHash], ...],
-        SampleCount,
         Threshold,
         Quantile,
-        RandomSeed,
-        ClusterCount,
-        IterationCount,
-        IterationCount,
+        ClusterHyperparams,
         PolicyRunId,
     ],
     ThresholdResult,
@@ -654,39 +660,31 @@ _CLUSTER_CACHE: dict[
 
 def compute_cluster(
     client_errors: dict[ClientId, ScoreVector],
-    n_min: SampleCount,
     tau_global: Threshold,
     q: Quantile,
-    random_state: RandomSeed,
-    cluster_k: ClusterCount,
-    n_init: IterationCount,
-    max_iter: IterationCount,
+    params: ClusterHyperparams,
     run: PolicyRunId,
 ) -> ThresholdResult:
-    if cluster_k <= 0:
+    if params.k <= 0:
         raise ValueError(
-            f"[{_MODULE_policies}] Invalid cluster k. Expected: locked fixed K > 0. Got: {cluster_k}."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Invalid cluster k. Expected: locked fixed K > 0. Got: {params.k}."
         )
     cache_key = (
         tuple(
             sorted((cid, array_hash(errors)) for cid, errors in client_errors.items())
         ),
-        n_min,
         tau_global,
         q,
-        random_state,
-        cluster_k,
-        n_init,
-        max_iter,
+        params,
         run,
     )
     if (cached := _CLUSTER_CACHE.get(cache_key)) is not None:
         return cached
-    eligibility = identify_eligible(client_errors, n_min=n_min)
+    eligibility = identify_eligible(client_errors, n_min=params.n_min)
 
     if len(eligibility.eligible_ids) < _MIN_CLUSTER_ELIGIBLE:
         raise ValueError(
-            f"[{_MODULE_policies}] Cannot cluster. Expected: at least {_MIN_CLUSTER_ELIGIBLE} eligible clients. Got: {len(eligibility.eligible_ids)}."
+            f"[{ErrorScope.THRESHOLD_POLICIES}] Cannot cluster. Expected: at least {_MIN_CLUSTER_ELIGIBLE} eligible clients. Got: {len(eligibility.eligible_ids)}."
         )
 
     result = _compute_cluster_thresholds(
@@ -694,10 +692,10 @@ def compute_cluster(
             client_errors=client_errors,
             eligibility=eligibility,
             q=q,
-            random_state=random_state,
-            cluster_k=cluster_k,
-            n_init=n_init,
-            max_iter=max_iter,
+            random_state=params.random_state,
+            cluster_k=params.k,
+            n_init=params.n_init,
+            max_iter=params.max_iter,
         )
     )
 
@@ -712,9 +710,6 @@ def compute_cluster(
         _CLUSTER_CACHE.clear()
     _CLUSTER_CACHE[cache_key] = threshold_result
     return threshold_result
-
-
-_MODULE_derivation = "thresholding.derivation"
 
 
 @dataclass(frozen=True, slots=True)
@@ -752,18 +747,20 @@ def derive_threshold(inputs: ThresholdDerivation) -> ThresholdResult:
     if inputs.policy is ThresholdPolicy.CLUSTER_THRESHOLD:
         return compute_cluster(
             inputs.client_errors,
-            inputs.n_min,
             inputs.tau_global,
-            q=inputs.q,
-            random_state=RandomSeed(inputs.threshold_cfg.cluster_random_state),
-            cluster_k=inputs.threshold_cfg.cluster_k_nbaiot,
-            n_init=inputs.threshold_cfg.cluster_n_init,
-            max_iter=inputs.threshold_cfg.cluster_max_iter,
-            run=run,
+            inputs.q,
+            ClusterHyperparams(
+                k=inputs.threshold_cfg.cluster_k_nbaiot,
+                n_init=inputs.threshold_cfg.cluster_n_init,
+                max_iter=inputs.threshold_cfg.cluster_max_iter,
+                random_state=RandomSeed(inputs.threshold_cfg.cluster_random_state),
+                n_min=inputs.n_min,
+            ),
+            run,
         )
 
     raise ValueError(
-        f"[{_MODULE_derivation}] Unknown policy for threshold derivation. Expected: GLOBAL_THRESHOLD/LOCAL_THRESHOLD/CLUSTER_THRESHOLD. Got: {inputs.policy!r}."
+        f"[{ErrorScope.THRESHOLD_DERIVATION}] Unknown policy for threshold derivation. Expected: GLOBAL_THRESHOLD/LOCAL_THRESHOLD/CLUSTER_THRESHOLD. Got: {inputs.policy!r}."
     )
 
 
@@ -930,7 +927,7 @@ def _validate_provenance(provenance: MetricsProvenance) -> None:
         provenance.model_identity,
         provenance.score_artifact_identity,
     )
-    if any(value.startswith("MISSING_") for value in identities):
+    if any(value == ProvenanceSentinel.MISSING_MANIFEST_HASH for value in identities):
         raise ValueError("provenance contains an unresolved MISSING_* identity")
 
 
@@ -1048,58 +1045,9 @@ def results_exist(
     if not path.is_file() or path.stat().st_size == 0:
         return False
 
-    with suppress(ValidationError):
-        SweepMetrics.model_validate_json(path.read_text())
-        return True
-    return False
-
-
-def _client_id_from_payload(payload: JsonRecord, row_index: Index) -> ClientId | None:
-    rows = payload.get(PayloadKey.PER_CLIENT)
-    if isinstance(rows, Sequence) and not isinstance(rows, str | bytes):
-        if row_index < len(rows):
-            row = rows[row_index]
-            if isinstance(row, dict):
-                client_id = row.get(PayloadKey.CLIENT_ID)
-            else:
-                return None
-            if isinstance(client_id, str):
-                return ClientId(client_id)
-    return None
-
-
-def _validation_message(
-    payload: JsonRecord, error: ErrorDetails, module: NarrativeText
-) -> NarrativeText:
-    location = error["loc"]
-    parts = tuple(str(part) for part in location)
-    message = error["msg"]
-    if error["type"] == PayloadValidationErrorType.MISSING:
-        if (
-            parts
-            and parts[0] == PayloadKey.PER_CLIENT
-            and len(location) > 1
-            and isinstance(location[1], int)
-        ):
-            client_id = _client_id_from_payload(payload, location[1])
-            field = ".".join(parts[2:])
-            client_label = client_id if client_id is not None else f"row {location[1]}"
-            return f"[{module}] MISSING per-client fields for {client_label}: {field}"
-        if parts and parts[0] == PayloadKey.PROVENANCE:
-            field = ".".join(parts)
-            return f"[{module}] MISSING metrics fields: {field}"
-        field = ", ".join(parts)
-        return f"[{module}] MISSING metrics fields: {field}"
-    return f"[{module}] INVALID metrics payload at {'.'.join(parts)}: {message}"
-
-
-def validate_metrics_payload(
-    payload: JsonRecord, *, module: NarrativeText
-) -> list[NarrativeText]:
     try:
-        SweepMetrics.model_validate(payload)
-    except ValidationError as error:
-        return [
-            _validation_message(payload, detail, module) for detail in error.errors()
-        ]
-    return []
+        SweepMetrics.model_validate_json(path.read_text())
+    except ValidationError as exc:
+        logger.warning("metrics file failed validation", path=path, error=exc)
+        return False
+    return True

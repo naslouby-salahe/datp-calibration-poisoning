@@ -856,7 +856,7 @@ class TestDirectionalEffects:
 _VICTIMS: tuple[str, ...] = ("c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8")
 
 
-_VICTIMS_BY_SEED: dict[int, tuple[str, ...]] = dict.fromkeys(tuple(range(10)), _VICTIMS)
+_VICTIMS_BY_SEED: dict[int, tuple[str, ...]] = dict.fromkeys(tuple(range(20)), _VICTIMS)
 
 
 def _bounded_config() -> CalibrationPoisoningConfig:
@@ -864,10 +864,10 @@ def _bounded_config() -> CalibrationPoisoningConfig:
     return CalibrationPoisoningConfig.for_bounded_sweep()
 
 
-def test_matrix_size_is_exactly_4320() -> None:
-    """Verify that the default bounded sweep matrix contains exactly 4,320 evaluation cells."""
+def test_matrix_size_matches_the_configured_grid() -> None:
+    """Verify that the default bounded sweep matrix has its configured cell count."""
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
-    assert len(cells) == 10 * 9 * 3 * 4 * 4
+    assert len(cells) == 20 * 9 * 3 * 6 * 4
 
 
 def test_matrix_policies_are_exactly_default_three() -> None:
@@ -892,17 +892,19 @@ def test_matrix_fractions_are_exactly_locked_grid() -> None:
     assert sorted({c.fraction for c in cells}) == pytest.approx([0.0, 0.10, 0.20, 0.40])
 
 
-def test_matrix_sources_are_exactly_bounded_three() -> None:
-    """Verify that sources sweep covers the three core client strategies."""
+def test_matrix_sources_are_exactly_bounded_five() -> None:
+    """Verify that the sweep covers score and feature-row source strategies."""
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
     assert {c.source for c in cells} == {
         PoisoningSourceStrategy.RANDOM_BENIGN,
         PoisoningSourceStrategy.HIGH_SCORE_BENIGN,
         PoisoningSourceStrategy.LOW_SCORE_BENIGN,
+        PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN,
+        PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN,
     }
 
 
-def test_matrix_source_objective_pairs_are_exactly_main_four() -> None:
+def test_matrix_source_objective_pairs_match_the_configured_pairs() -> None:
     """Verify that the sweep combines sources and objectives according to design rules."""
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
     assert {(c.source, c.objective) for c in cells} == {
@@ -922,14 +924,22 @@ def test_matrix_source_objective_pairs_are_exactly_main_four() -> None:
             PoisoningSourceStrategy.LOW_SCORE_BENIGN,
             AttackerObjective.THRESHOLD_LOWER,
         ),
+        (
+            PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN,
+            AttackerObjective.THRESHOLD_RAISE,
+        ),
+        (
+            PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN,
+            AttackerObjective.THRESHOLD_RAISE,
+        ),
     }
 
 
-def test_matrix_seed_pairs_are_exactly_the_locked_ten() -> None:
+def test_matrix_seed_pairs_are_exactly_the_locked_twenty() -> None:
     """Verify that training and poisoning seed combinations map exactly to range indices."""
     cells = enumerate_bounded_sweep_matrix(_VICTIMS_BY_SEED, _bounded_config())
     pairs = {(c.training_seed, c.poisoning_seed) for c in cells}
-    assert pairs == {(seed, seed + 100) for seed in range(10)}
+    assert pairs == {(seed, seed + 100) for seed in range(20)}
 
 
 def test_matrix_target_scope_is_always_single_client() -> None:
@@ -1200,6 +1210,8 @@ class TestCanonicalEnumVocabulary:
             "RANDOM_BENIGN": "random_benign",
             "HIGH_SCORE_BENIGN": "high_score_benign",
             "LOW_SCORE_BENIGN": "low_score_benign",
+            "RANDOM_TRAIN_FEATURE_BENIGN": "random_train_feature_benign",
+            "HIGH_SCORE_TRAIN_FEATURE_BENIGN": "high_score_train_feature_benign",
             "LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY": (
                 "low_score_targeted_removal_diagnostic_only"
             ),
@@ -1251,7 +1263,7 @@ class TestMainSweepConstants:
 
     def test_main_sources_exclude_diagnostic(self) -> None:
         """Verify that main sweep sources exclude diagnostic-only strategies."""
-        assert len(NBAIOT_MAIN_SWEEP_SOURCES) == 3
+        assert len(NBAIOT_MAIN_SWEEP_SOURCES) == 5
         assert all("diagnostic" not in s.value for s in NBAIOT_MAIN_SWEEP_SOURCES)
 
     def test_main_fraction_grid(self) -> None:

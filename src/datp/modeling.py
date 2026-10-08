@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from datp.enums import ErrorScope
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from datp.enums import Activation
-from datp.types import FeatureCount, SignedCount
+from datp.types import FeatureCount
 
 _ACTIVATION_CLASSES: dict[Activation, type[nn.Module]] = {
     Activation.RELU: nn.ReLU,
@@ -20,7 +21,7 @@ class Autoencoder(nn.Module):
     def __init__(
         self,
         input_dim: FeatureCount,
-        hidden_dims: list[SignedCount],
+        hidden_dims: list[FeatureCount],
         activation: Activation,
         use_bn: bool,
     ) -> None:
@@ -31,7 +32,7 @@ class Autoencoder(nn.Module):
             raise ValueError(f"Unknown activation: {activation!r}")
 
         act_cls = _ACTIVATION_CLASSES[activation]
-        dims: list[int] = [input_dim, *hidden_dims]
+        dims: list[FeatureCount] = [input_dim, *hidden_dims]
 
         enc: list[nn.Module] = []
         for i in range(len(dims) - 1):
@@ -66,5 +67,5 @@ def validate_model_on_cuda(model: nn.Module) -> None:
     for name, param in model.named_parameters():
         if not param.is_cuda:
             raise RuntimeError(
-                f"[modeling.autoencoder] Parameter '{name}' is on {param.device}, not CUDA."
+                f"[{ErrorScope.MODELING_AUTOENCODER}] Parameter '{name}' is on {param.device}, not CUDA."
             )

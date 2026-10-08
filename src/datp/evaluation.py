@@ -6,18 +6,27 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from sklearn.metrics import average_precision_score, roc_auc_score
 
 from datp.config import ExperimentStage
 from datp.core import ClientThreshold, PolicyRunId, TrainingCellId
 from datp.data import dataset_for_stage
 from datp.enums import (
+    ErrorScope,
     ClientStatus,
     DatasetID,
     ThresholdPolicy,
 )
 from datp.scoring import ScoreProvider
-from datp.statistics import compute_fpr_fleet_stats, cv, iqr
+from datp.statistics import (
+    average_precision_of,
+    compute_fpr_fleet_stats,
+    count_of,
+    cv,
+    iqr,
+    min_of,
+    percentile_of,
+    roc_auc_of,
+)
 from datp.types import (
     ClassificationScore,
     ClientCount,
@@ -135,8 +144,8 @@ def compute_binary_ranking_metrics(
     labels = np.concatenate([np.zeros(benign_scores.size), np.ones(attack_scores.size)])
     scores = np.concatenate([benign_scores, attack_scores])
     return BinaryRankingMetrics(
-        float(roc_auc_score(labels, scores)),
-        float(average_precision_score(labels, scores)),
+        roc_auc_of(labels, scores),
+        average_precision_of(labels, scores),
     )
 
 
@@ -151,8 +160,8 @@ def compute_client_record(
         np.asarray(scores_attack, dtype=np.float64),
     )
     n_benign, n_attack = benign.size, attack.size
-    fp = int(np.sum(benign > client_threshold.threshold))
-    tp = int(np.sum(attack > client_threshold.threshold))
+    fp = count_of(benign > client_threshold.threshold)
+    tp = count_of(attack > client_threshold.threshold)
     tn, fn = n_benign - fp, n_attack - tp
     return ClientEvaluationRecord(
         client_id,
@@ -179,7 +188,7 @@ def aggregate_dispersion(
     if np.isnan(fpr_arr).any():
         bad_ids = [c.client_id for c in eligible_clients if math.isnan(c.metrics.fpr)]
         raise ValueError(
-            f"[evaluation.metrics] Undefined eligible-client FPR. Expected: at least one benign test row. Got: {', '.join(bad_ids)}."
+            f"[{ErrorScope.EVALUATION_METRICS}] Undefined eligible-client FPR. Expected: at least one benign test row. Got: {', '.join(bad_ids)}."
         )
 
     complete_clients = [
@@ -225,8 +234,8 @@ def aggregate_dispersion(
         worst_id,
         fpr_arr.size,
         len(clients),
-        float(ba_arr.min()) if ba_arr.size else math.nan,
-        float(np.percentile(f1_arr, 10)) if f1_arr.size else math.nan,
+        min_of(ba_arr) if ba_arr.size else math.nan,
+        percentile_of(f1_arr, 10) if f1_arr.size else math.nan,
     )
 
 
@@ -248,17 +257,17 @@ def build_evaluation_result(
     client_ids = [cr.client_id for cr in clients]
     if len(client_ids) != len(set(client_ids)):
         raise ValueError(
-            f"[evaluation.metrics] Duplicate client metrics. Expected: unique client_id. Got: {client_ids}."
+            f"[{ErrorScope.EVALUATION_METRICS}] Duplicate client metrics. Expected: unique client_id. Got: {client_ids}."
         )
 
     if unknown := (set(eligible_ids) | set(pending_ids)) - set(client_ids):
         raise ValueError(
-            f"[evaluation.metrics] Eligibility references unknown clients. Expected: IDs present in clients. Got: {sorted(unknown)}."
+            f"[{ErrorScope.EVALUATION_METRICS}] Eligibility references unknown clients. Expected: IDs present in clients. Got: {sorted(unknown)}."
         )
 
     if overlap := set(eligible_ids) & set(pending_ids):
         raise ValueError(
-            f"[evaluation.metrics] Client has mixed eligibility status. Expected: disjoint IDs. Got: {sorted(overlap)}."
+            f"[{ErrorScope.EVALUATION_METRICS}] Client has mixed eligibility status. Expected: disjoint IDs. Got: {sorted(overlap)}."
         )
 
     incomplete = () if incomplete_ids is None else incomplete_ids

@@ -10,7 +10,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+from pathlib import Path, PurePath
 from threading import Event, Lock
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -24,6 +24,7 @@ from structlog.stdlib import get_logger as get_logger
 
 from datp.config import ExperimentStage
 from datp.enums import (
+    EnvironmentVariable,
     ArtifactFile,
     ClientStatus,
     DeviceType,
@@ -101,12 +102,6 @@ class ClusterMetadata:
     silhouette_scores: tuple[ClusterCountSilhouetteScore, ...]
     k: ClusterCount
 
-    def fingerprint_for(self, client_id: ClientId) -> ClientFingerprint:
-        for fingerprint in self.fingerprints:
-            if fingerprint.client_id == client_id:
-                return fingerprint
-        raise KeyError(client_id)
-
 
 @dataclass(frozen=True, slots=True)
 class ClientThreshold:
@@ -172,11 +167,11 @@ class PolicyRunId:
 
 
 class _TorchSeedApi(Protocol):
-    def manual_seed(self, seed: int) -> torch.Generator: ...
+    def manual_seed(self, seed: RandomSeed) -> torch.Generator: ...
 
 
 # Ensure deterministic cuBLAS operations by fixing the workspace size.
-os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+os.environ.setdefault(EnvironmentVariable.CUBLAS_WORKSPACE_CONFIG, ":4096:8")
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,14 +265,15 @@ def git_commit() -> NarrativeText:
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-    except (subprocess.CalledProcessError, OSError):
+    except (subprocess.CalledProcessError, OSError) as exc:
+        get_logger(__name__).warning("git commit unavailable", error=exc)
         return "GIT_UNAVAILABLE"
 
 
 def source_hash(paths: list[Path]) -> ContentHash:
     digest = hashlib.sha256()
     for path in paths:
-        digest.update(str(path).encode("utf-8"))
+        digest.update(path.as_posix().encode("utf-8"))
         digest.update(hash_file(path).encode("utf-8"))
     return digest.hexdigest()
 
@@ -303,8 +299,22 @@ _SETUP_DONE = Event()
 _SETUP_LOCK = Lock()
 
 
+class _PathRenderer:
+    def __call__(
+        self,
+        _logger: structlog.types.WrappedLogger,
+        _method: NarrativeText,
+        event_dict: structlog.types.EventDict,
+    ) -> structlog.types.EventDict:
+        return {
+            key: value.as_posix() if isinstance(value, PurePath) else value
+            for key, value in event_dict.items()
+        }
+
+
 def _structlog_shared_processors() -> list[structlog.types.Processor]:
     return [
+        _PathRenderer(),
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,

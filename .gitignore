@@ -141,3 +141,8 @@ backup_runs/
 tests/architecture/
 backup_runs_2/
 backup_runs_3/
+
+# Local backup of current experiment outputs
+backup_runs_4/
+backup_runs_5/
+work/

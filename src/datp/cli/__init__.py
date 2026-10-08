@@ -112,10 +112,10 @@ class _StatusReport:
             style = "bold" if row.scope is StatusScope.OVERALL else ""
             table.add_row(
                 f"[{style}]{row.scope}[/{style}]" if style else row.scope,
-                str(row.complete),
-                str(row.missing),
-                str(row.aborted),
-                str(row.total),
+                f"{row.complete}",
+                f"{row.missing}",
+                f"{row.aborted}",
+                f"{row.total}",
             )
 
         return table
@@ -195,13 +195,13 @@ def plan() -> None:
 
 def poison() -> None:
     """Run the bounded calibration-poisoning sweep and write its manifest."""
-    out_path = write_nbaiot_main_manifest(OUTPUTS_DIR)
+    out_path = write_nbaiot_main_manifest(OUTPUTS_DIR, data_root=DATA_ROOT)
     console.print(f"[bold green]Wrote bounded-sweep manifest:[/bold green] {out_path}")
 
 
 def sensitivity() -> None:
     """Run the sensitivity analyses and write their manifest."""
-    out_path = write_sensitivity_manifest(OUTPUTS_DIR)
+    out_path = write_sensitivity_manifest(OUTPUTS_DIR, data_root=DATA_ROOT)
     console.print(f"[bold green]Wrote sensitivity manifest:[/bold green] {out_path}")
 
 
@@ -216,7 +216,6 @@ def report() -> None:
         paths = build_report_package(
             base_dir=OUTPUTS_DIR,
             results_dir=RESULTS_PACKAGE_DIR,
-            data_root=DATA_ROOT,
             cfg=BASE_CONFIG,
         )
     except (FileNotFoundError, ValueError) as exc:
@@ -271,4 +270,3 @@ def cli_entry() -> None:
     except Exception:
         logger.exception("CLI invocation failed", command=command)
         raise
-    logger.info("CLI invocation completed", command=command)

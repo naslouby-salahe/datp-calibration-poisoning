@@ -156,7 +156,7 @@ class ClientScoresById(Mapping[ClientId, ClientScores]):
         return len(self._clients)
 
     def __bool__(self) -> bool:
-        return bool(self._clients)
+        return len(self._clients) > 0
 
     def __getitem__(self, client_id: ClientId) -> ClientScores:
         return self._map[client_id]
@@ -471,13 +471,22 @@ def assert_bounded_scale_requires_single_client(
         )
 
 
+def is_valid_source_objective_pair(
+    source: PoisoningSourceStrategy,
+    objective: AttackerObjective,
+) -> bool:
+    expected = objective_for_source(source)
+    return expected is None or objective == expected
+
+
 def assert_valid_source_objective_pair(
     source: PoisoningSourceStrategy,
     objective: AttackerObjective,
 ) -> None:
-    if (expected := objective_for_source(source)) is not None and objective != expected:
+    if not is_valid_source_objective_pair(source, objective):
         raise GuardrailError(
-            f"Source {source!r} requires objective {expected!r}; got {objective!r}."
+            f"Source {source!r} requires objective "
+            f"{objective_for_source(source)!r}; got {objective!r}."
         )
 
 
@@ -500,16 +509,6 @@ class SweepCellSpec:
         return self.seed_pair.poisoning_seed
 
 
-def _is_valid_pair(
-    source: PoisoningSourceStrategy, objective: AttackerObjective
-) -> bool:
-    try:
-        assert_valid_source_objective_pair(source, objective)
-        return True
-    except ValueError:
-        return False
-
-
 def _enumerate_single_victim_matrix(
     victims_by_training_seed: Mapping[RandomSeed, Sequence[ClientId]],
     config: CalibrationPoisoningConfig,
@@ -518,7 +517,7 @@ def _enumerate_single_victim_matrix(
         (source, objective)
         for source in config.sources
         for objective in config.objectives
-        if _is_valid_pair(source, objective)
+        if is_valid_source_objective_pair(source, objective)
     )
     cells: list[SweepCellSpec] = []
     for t_seed, p_seed in zip(

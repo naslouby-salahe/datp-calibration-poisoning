@@ -2030,6 +2030,41 @@ class TestRunFlTrainingValidation:
         with pytest.raises(ValueError, match="No non-empty client_data"):
             run_fl_training(make_fl_cfg(), {}, 0, base_dir=tmp_path)
 
+    def test_saves_final_model_checkpoint(self, tmp_path: Path) -> None:
+        cfg = make_fl_cfg()
+        model = Autoencoder(
+            cfg.model.input_dim,
+            cfg.model.encoder_dims,
+            cfg.model.activation,
+            cfg.model.use_bn,
+        )
+        monitor = MagicMock(num_recorded=1, converged_round=None)
+        strategy = MagicMock(
+            latest_parameters=[], convergence_monitor=monitor, stopped=False
+        )
+        data = {"c0": _client_data_simulation()}
+        with (
+            patch("datp.federated._client_ids", return_value=("c0",)),
+            patch("datp.federated.resolve_device", return_value=torch.device("cpu")),
+            patch("datp.federated.set_seeds"),
+            patch("datp.federated.build_model", return_value=model),
+            patch("datp.federated.DatpFedAvg", return_value=strategy),
+            patch("datp.federated.make_client_fn"),
+            patch("datp.federated._run_flower_simulation"),
+            patch("datp.federated.set_parameters"),
+            patch("datp.federated._scoring_data", return_value=data),
+            patch("datp.federated.score_clients"),
+            patch("datp.federated.save_convergence_artifacts"),
+        ):
+            run_fl_training(cfg, data, 0, base_dir=tmp_path)
+
+        checkpoint = ArtifactLayout(base_dir=tmp_path, stage=_STAGE).model_checkpoint(
+            TrainingCellId(stage=_STAGE, seed=0)
+        )
+        saved = torch.load(checkpoint, map_location="cpu", weights_only=True)
+        assert saved["model_config"] == cfg.model.model_dump(mode="json")
+        assert set(saved["state_dict"]) == set(model.state_dict())
+
 
 class TestTrainingResult:
     def test_is_frozen(self, tmp_path: Path) -> None:

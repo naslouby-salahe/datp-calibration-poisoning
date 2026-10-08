@@ -21,15 +21,10 @@ from datp.attacks.injection import (
     ThresholdPairBase,
 )
 from datp.config import (
-    CLUSTER_K_NBAIOT,
-    CLUSTER_MAX_ITER,
-    CLUSTER_N_INIT,
-    CLUSTER_RANDOM_STATE,
     EPS_NUM,
     IQR_FLOOR_FACTOR,
     MATERIALITY_FACTOR,
     MU_FLAG_DIVISOR,
-    N_MIN,
     ExperimentStage,
 )
 from datp.core import (
@@ -45,11 +40,21 @@ from datp.evaluation import (
     compute_binary_ranking_metrics,
     recompute_binary_metrics,
 )
-from datp.statistics import compute_fpr_fleet_stats, iqr
+from datp.statistics import (
+    compute_fpr_fleet_stats,
+    count_of,
+    ints_of,
+    iqr,
+    max_of,
+    mean_of,
+    median_of,
+    min_of,
+)
 from datp.thresholding import (
     CalibrationErrorSet,
     ClientCalibrationErrors,
     ClientThresholdsCollection,
+    ClusterHyperparams,
     EligibilityResult,
     compute_client_thresholds,
     compute_cluster,
@@ -59,12 +64,10 @@ from datp.thresholding import (
 from datp.types import (
     ClassificationScore,
     ClientId,
-    ClusterCount,
     ClusterId,
     ClusterIndex,
     FalsePositiveRate,
     FeatureMatrix,
-    IterationCount,
     NarrativeText,
     PoisonFraction,
     Quantile,
@@ -130,7 +133,7 @@ def compute_fleet_fpr(
     eligible = list(collection.eligible_ids)
 
     client_fprs = [
-        (cid, float(np.mean(tb > pair.thresholds_pois[cid])))
+        (cid, mean_of(tb > pair.thresholds_pois[cid]))
         for cid in eligible
         if (tb := collection.clients[cid].test_benign).size > 0
     ]
@@ -154,8 +157,10 @@ def compute_fleet_fpr(
         coverage_ratio=collection.coverage_ratio,
         n_eligible=len(eligible),
         n_total=len(collection.clients),
-        mu_flag_triggered=bool(
-            n_valid and mu_flag_threshold is not None and stats.mean < mu_flag_threshold
+        mu_flag_triggered=(
+            n_valid > 0
+            and mu_flag_threshold is not None
+            and stats.mean < mu_flag_threshold
         ),
     )
 
@@ -178,14 +183,14 @@ def per_client_scale_base(clean_cal: ScoreVector, iqr: ScoreValue) -> ScoreValue
     if iqr > 0.0:
         return iqr
 
-    mad = float(np.median(np.abs(clean_cal - np.median(clean_cal))))
+    mad = median_of(np.abs(clean_cal - np.median(clean_cal)))
     if mad > 0.0:
         return mad
 
     diffs = np.diff(np.unique(clean_cal))
     pos_diffs = diffs[diffs > 0.0]
     if pos_diffs.size > 0:
-        return float(pos_diffs.min())
+        return min_of(pos_diffs)
 
     return math.nan
 
@@ -214,7 +219,7 @@ def compute_delta_tau(
         iqrs.append(iqr_val)
         bases[cid] = per_client_scale_base(clean_cal, iqr_val)
 
-    iqr_median = float(np.median(iqrs)) if iqrs else 0.0
+    iqr_median = median_of(iqrs) if iqrs else 0.0
     result: dict[ClientId, DeltaTauEntry] = {}
 
     for cid in collection.eligible_ids:
@@ -362,7 +367,7 @@ def _has_downstream_degradation(
 def _fpr(test_benign: ScoreVector, threshold: Threshold) -> FalsePositiveRate:
     if test_benign.size == 0:
         return math.nan
-    return float(np.mean(test_benign > threshold))
+    return mean_of(test_benign > threshold)
 
 
 def duplicate_rate(values: ScoreVector) -> ScoreValue:
@@ -377,10 +382,10 @@ def tau_bound_utilization(
     objective: AttackerObjective,
 ) -> Threshold:
     if objective == AttackerObjective.THRESHOLD_RAISE:
-        reachable = float(clean_cal.max()) - tau_clean
+        reachable = max_of(clean_cal) - tau_clean
         shift = tau_pois - tau_clean
     else:
-        reachable = tau_clean - float(clean_cal.min())
+        reachable = tau_clean - min_of(clean_cal)
         shift = tau_clean - tau_pois
     return shift / reachable if reachable > 0.0 else math.nan
 
@@ -425,7 +430,7 @@ class NonVictimDownstreamMetrics:
 
 
 def _counts(scores: ScoreVector, threshold: Threshold) -> SignedCount:
-    return int(np.sum(scores > threshold))
+    return count_of(scores > threshold)
 
 
 def compute_victim_downstream_metrics(
@@ -476,7 +481,7 @@ def compute_victim_downstream_metrics(
 
 def _finite_mean(values: Iterable[ScoreValue]) -> ScoreValue:
     finite = [v for v in values if math.isfinite(v)]
-    return float(np.mean(finite)) if finite else math.nan
+    return mean_of(finite) if finite else math.nan
 
 
 def aggregate_non_victim_metrics(
@@ -625,16 +630,6 @@ def compute_local_pair(
 
 
 @dataclass(frozen=True, slots=True)
-class ClusterHyperparams:
-    k: ClusterCount = CLUSTER_K_NBAIOT
-    n_init: IterationCount = CLUSTER_N_INIT
-    max_iter: IterationCount = CLUSTER_MAX_ITER
-    random_state: RandomSeed = CLUSTER_RANDOM_STATE
-    n_min: SampleCount = N_MIN
-    seed: RandomSeed = RandomSeed(0)
-
-
-@dataclass(frozen=True, slots=True)
 class ClusterDecompEntry:
     client_id: ClientId
     tau_clean: Threshold
@@ -691,32 +686,12 @@ def compute_cluster_pair(
 
     run_id = PolicyRunId(
         cell=TrainingCellId(
-            stage=ExperimentStage.NBAIOT_MAIN, seed=RandomSeed(params.seed)
+            stage=ExperimentStage.NBAIOT_MAIN, seed=RandomSeed(params.random_state)
         ),
         policy=ThresholdPolicy.CLUSTER_THRESHOLD,
     )
-    clean_res = compute_cluster(
-        clean_cal,
-        n_min=params.n_min,
-        tau_global=tau_global_clean,
-        q=q,
-        random_state=params.random_state,
-        cluster_k=params.k,
-        n_init=params.n_init,
-        max_iter=params.max_iter,
-        run=run_id,
-    )
-    pois_res = compute_cluster(
-        pois_cal,
-        n_min=params.n_min,
-        tau_global=tau_global_pois,
-        q=q,
-        random_state=params.random_state,
-        cluster_k=params.k,
-        n_init=params.n_init,
-        max_iter=params.max_iter,
-        run=run_id,
-    )
+    clean_res = compute_cluster(clean_cal, tau_global_clean, q, params, run_id)
+    pois_res = compute_cluster(pois_cal, tau_global_pois, q, params, run_id)
     eff_clean = _resolved_thresholds(clean_res)
     eff_pois = _resolved_thresholds(pois_res)
 
@@ -798,7 +773,7 @@ def _frozen_scaler_assignments(
     ).fit_predict(
         StandardScaler().fit(clean_fingerprints).transform(poisoned_fingerprints)
     )
-    return {client_id: int(label) for client_id, label in zip(eligible_ids, labels)}
+    return dict(zip(eligible_ids, ints_of(labels)))
 
 
 _ClusterAssignment = TypeVar("_ClusterAssignment", ClusterId, ClusterIndex)
@@ -812,7 +787,7 @@ def _aggregate_thresholds_by_assignment(
     for client_id, label in assignments.items():
         groups.setdefault(label, []).append(client_id)
     averages = {
-        label: float(np.mean([thresholds[client_id] for client_id in members]))
+        label: mean_of([thresholds[client_id] for client_id in members])
         for label, members in groups.items()
     }
     return {client_id: averages[label] for client_id, label in assignments.items()}

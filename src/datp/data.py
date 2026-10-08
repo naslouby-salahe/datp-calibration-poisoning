@@ -17,6 +17,9 @@ from datp.artifacts import write_json_atomic
 from datp.config import ExperimentStage
 from datp.core import get_logger, hash_file, utc_timestamp
 from datp.enums import (
+    Workflow,
+    DatasetDisplayName,
+    ErrorScope,
     ArtifactFile,
     AuditDir,
     ClientStatus,
@@ -32,7 +35,6 @@ from datp.types import (
     ColumnName,
     ContentHash,
     FeatureCount,
-    JsonValue,
     NarrativeText,
     RandomSeed,
     Ratio,
@@ -203,7 +205,7 @@ def save_scaler(scaler: StandardScaler, path: Path) -> None:
 
 def load_scaler(path: Path) -> StandardScaler:
     if not path.exists():
-        raise FileNotFoundError(f"[data.scaling] {path} not found.")
+        raise FileNotFoundError(f"[{ErrorScope.DATA_SCALING}] {path} not found.")
     return joblib.load(path)
 
 
@@ -223,14 +225,14 @@ def write_client_splits(
         write_artifact(df, client_dir / filename_for_split(split))
         if df.width != spec.feature_count:
             raise ValueError(
-                f"[data.artifacts] Feature count mismatch. Expected: {spec.feature_count}. Got: {df.width}."
+                f"[{ErrorScope.DATA_ARTIFACTS}] Feature count mismatch. Expected: {spec.feature_count}. Got: {df.width}."
             )
 
     if scaler:
         save_scaler(scaler, client_dir / ArtifactFile.SCALER)
-
-
-MANIFEST_MODULE = "data.manifests"
+    logger.debug(
+        "client splits written", client_dir=client_dir, split_count=len(splits)
+    )
 
 
 logger = get_logger(__name__)
@@ -241,12 +243,16 @@ class ManifestMetadata(BaseModel):
     n_features: FeatureCount
     n_devices: SampleCount | None = None
     n_clients: SampleCount | None = None
+    dataset_display_name: DatasetDisplayName | None = None
+    split_indices: (
+        dict[ClientId, dict[SplitPolicyRole, tuple[SignedCount, SignedCount]]] | None
+    ) = None
 
     @model_validator(mode="after")
     def check_client_count(self) -> "ManifestMetadata":
         if self.n_devices is None and self.n_clients is None:
             raise ValueError(
-                f"[{MANIFEST_MODULE}] metadata missing client count. Expected: n_devices or n_clients. Got: None."
+                f"[{ErrorScope.DATA_MANIFESTS}] metadata missing client count. Expected: n_devices or n_clients. Got: None."
             )
         return self
 
@@ -261,12 +267,14 @@ class PartitionManifest(BaseModel):
     @classmethod
     def load(cls, path: Path) -> "PartitionManifest":
         if not path.exists():
-            raise RuntimeError(f"[{MANIFEST_MODULE}] Manifest file {path} not found.")
+            raise RuntimeError(
+                f"[{ErrorScope.DATA_MANIFESTS}] Manifest file {path} not found."
+            )
         try:
             return cls.model_validate_json(path.read_bytes())
         except (ValueError, TypeError) as exc:
             raise RuntimeError(
-                f"[{MANIFEST_MODULE}] Malformed manifest JSON. Expected: valid JSON matching schema. Got: parse error ({exc})."
+                f"[{ErrorScope.DATA_MANIFESTS}] Malformed manifest JSON. Expected: valid JSON matching schema. Got: parse error ({exc})."
             ) from exc
 
     def write(self, path: Path) -> None:
@@ -274,19 +282,19 @@ class PartitionManifest(BaseModel):
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(self.model_dump_json(indent=2))
         tmp.rename(path)
-        logger.info("manifest written", path=str(path))
+        logger.info("manifest written", path=path)
 
     def verify_hashes(self, raw_base_dir: Path) -> None:
         for rel_path_str, expected_hash in self.file_hashes.items():
             fpath = raw_base_dir / rel_path_str
             if not fpath.exists():
                 raise RuntimeError(
-                    f"[{MANIFEST_MODULE}] Raw file {rel_path_str} not found."
+                    f"[{ErrorScope.DATA_MANIFESTS}] Raw file {rel_path_str} not found."
                 )
             actual_hash = hash_file(fpath)
             if actual_hash != expected_hash:
                 raise RuntimeError(
-                    f"[{MANIFEST_MODULE}] Raw file hash mismatch for {rel_path_str}. Expected: {expected_hash}. Got: {actual_hash}."
+                    f"[{ErrorScope.DATA_MANIFESTS}] Raw file hash mismatch for {rel_path_str}. Expected: {expected_hash}. Got: {actual_hash}."
                 )
         logger.info(
             "partition manifest hash verification passed", n_files=len(self.file_hashes)
@@ -298,27 +306,27 @@ def create_manifest(
     dataset: DatasetID,
     raw_files: list[Path],
     raw_base_dir: Path,
-    metadata: JsonValue,
+    metadata: ManifestMetadata,
     manifest_path: Path,
 ) -> PartitionManifest:
     manifest = PartitionManifest(
         dataset=dataset,
         created=utc_timestamp(),
         file_hashes={
-            str(p.relative_to(raw_base_dir)): hash_file(p) for p in sorted(raw_files)
+            p.relative_to(raw_base_dir).as_posix(): hash_file(p)
+            for p in sorted(raw_files)
         },
-        metadata=metadata
-        if isinstance(metadata, ManifestMetadata)
-        else ManifestMetadata.model_validate(metadata),
+        metadata=metadata,
     )
     manifest.write(manifest_path)
+    logger.debug("partition manifest created", path=manifest_path)
     return manifest
 
 
 def _check_extension(path: Path) -> None:
     if path.suffix != PathToken.PARQUET_EXT:
         raise ValueError(
-            f"[data.storage] Invalid extension. Expected: ending in .parquet. Got: ending in {path.suffix}."
+            f"[{ErrorScope.DATA_STORAGE}] Invalid extension. Expected: ending in .parquet. Got: ending in {path.suffix}."
         )
 
 
@@ -337,14 +345,11 @@ def read_artifact(path: Path) -> pl.DataFrame:
 
 def assert_no_csv_artifacts(directory: Path) -> None:
     if csv_files := sorted(directory.rglob(PathToken.CSV_GLOB)):
-        listing = "\n ".join(str(f) for f in csv_files[:10])
+        listing = "\n ".join(f.as_posix() for f in csv_files[:10])
         extra = f"\n ... and {len(csv_files) - 10} more" if len(csv_files) > 10 else ""
         raise RuntimeError(
-            f"[data.storage] CSV files found in {directory} — Parquet only.\n {listing}{extra}"
+            f"[{ErrorScope.DATA_STORAGE}] CSV files found in {directory} — Parquet only.\n {listing}{extra}"
         )
-
-
-_AUDIT_MODULE = "data.audit"
 
 
 class AuditClient(BaseModel):
@@ -381,24 +386,24 @@ class PartitionAudit(BaseModel):
     def validate_summary(self) -> "PartitionAudit":
         if self.n_clients != len(self.clients):
             raise ValueError(
-                f"[{_AUDIT_MODULE}] n_clients mismatch. Expected: {len(self.clients)}. Got: {self.n_clients}."
+                f"[{ErrorScope.DATA_AUDIT}] n_clients mismatch. Expected: {len(self.clients)}. Got: {self.n_clients}."
             )
 
         cal_pending = sum(c.calibration_pending for c in self.clients.values())
         if self.summary.calibration_pending_count != cal_pending:
             raise ValueError(
-                f"[{_AUDIT_MODULE}] calibration_pending_count mismatch. Expected: {cal_pending}. Got: {self.summary.calibration_pending_count}."
+                f"[{ErrorScope.DATA_AUDIT}] calibration_pending_count mismatch. Expected: {cal_pending}. Got: {self.summary.calibration_pending_count}."
             )
 
         eval_incomplete = sum(c.evaluation_incomplete for c in self.clients.values())
         if self.summary.evaluation_incomplete_count != eval_incomplete:
             raise ValueError(
-                f"[{_AUDIT_MODULE}] evaluation_incomplete_count mismatch. Expected: {eval_incomplete}. Got: {self.summary.evaluation_incomplete_count}."
+                f"[{ErrorScope.DATA_AUDIT}] evaluation_incomplete_count mismatch. Expected: {eval_incomplete}. Got: {self.summary.evaluation_incomplete_count}."
             )
 
         if self.summary.all_above_n_min != (cal_pending == 0):
             raise ValueError(
-                f"[{_AUDIT_MODULE}] all_above_n_min mismatch. Expected: {cal_pending == 0}. Got: {self.summary.all_above_n_min}."
+                f"[{ErrorScope.DATA_AUDIT}] all_above_n_min mismatch. Expected: {cal_pending == 0}. Got: {self.summary.all_above_n_min}."
             )
         return self
 
@@ -409,6 +414,7 @@ def audit_partitions(
     output_dir: Path,
     n_min: SampleCount,
 ) -> PartitionAudit:
+    logger.info("workflow started", workflow=Workflow.PARTITION_AUDIT)
     output_dir = Path(output_dir)
     clients = {
         client_id: AuditClient(
@@ -448,36 +454,32 @@ def audit_partitions(
 
     logger.info(
         "audit written",
-        path=str(audit_path),
+        path=audit_path,
         n_clients=len(clients),
         calibration_pending=summary.calibration_pending_count,
         evaluation_incomplete=summary.evaluation_incomplete_count,
     )
-    return audit_model
+    workflow_result = audit_model
+    logger.info("workflow completed", workflow=Workflow.PARTITION_AUDIT)
+    return workflow_result
 
 
 def run_schema_audit(file_path: Path, expected_feature_count: FeatureCount) -> None:
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(
-            f"[{_AUDIT_MODULE}] Schema audit target {file_path} not found."
+            f"[{ErrorScope.DATA_AUDIT}] Schema audit target {file_path} not found."
         )
     if file_path.suffix.lower() != PathToken.PARQUET_EXT:
         raise ValueError(
-            f"[{_AUDIT_MODULE}] Unsupported file format. Expected: .parquet. Got: {file_path.suffix.lower()}."
+            f"[{ErrorScope.DATA_AUDIT}] Unsupported file format. Expected: .parquet. Got: {file_path.suffix.lower()}."
         )
 
     actual_count = len(pl.read_parquet_schema(file_path))
     if actual_count != expected_feature_count:
         raise ValueError(
-            f"[{_AUDIT_MODULE}] Feature count mismatch for {file_path}. Expected: {expected_feature_count}. Got: {actual_count}."
+            f"[{ErrorScope.DATA_AUDIT}] Feature count mismatch for {file_path}. Expected: {expected_feature_count}. Got: {actual_count}."
         )
-
-
-_NBAIOT_DISPLAY_NAME = "N-BaIoT"
-
-
-FEATURE_COUNT: FeatureCount = 115
 
 
 DEVICE_DIRS: tuple[NBaIoTDevice, ...] = (
@@ -523,15 +525,12 @@ SPLIT_RATIOS: dict[SplitPolicyRole, Ratio] = {
 NBAIOT_SPEC = DatasetSpec(
     id=DatasetID.NBAIOT,
     processed_slug=DatasetID.NBAIOT,
-    feature_count=FEATURE_COUNT,
-    raw_root_slug=_NBAIOT_DISPLAY_NAME,
+    feature_count=115,
+    raw_root_slug=DatasetDisplayName.NBAIOT,
     family_map=DEVICE_FAMILY_MAP,
     device_ids=DEVICE_DIRS,
     attack_family_dirs=ATTACK_FAMILY_DIRS,
 )
-
-
-_NBAIOT_MODULE = "data.nbaiot"
 
 
 def _raw_nbaiot_files(raw_dir: Path) -> list[Path]:
@@ -576,6 +575,9 @@ def _load_attack_csvs(device_dir: Path) -> tuple[pl.DataFrame, list[NarrativeTex
             attack_classes.append(f"{family.replace('_attacks', '')}_{csv_file.stem}")
 
     df = pl.concat(attack_frames) if attack_frames else pl.DataFrame()
+    logger.debug(
+        "attack csv files loaded", device_dir=device_dir, file_count=len(attack_frames)
+    )
     return df, sorted(set(attack_classes))
 
 
@@ -602,6 +604,33 @@ def _scale_device_splits(
     )
 
 
+def _slice_split(
+    frame: pl.DataFrame, bounds: tuple[SignedCount, SignedCount]
+) -> pl.DataFrame:
+    return frame.slice(bounds[0], bounds[1] - bounds[0])
+
+
+def _balance_test_benign(
+    device_id: NBaIoTDevice,
+    test_benign: pl.DataFrame,
+    test_attack: pl.DataFrame,
+    policy: NBaIoTBalancePolicy,
+    seed: RandomSeed,
+) -> pl.DataFrame:
+    if policy is NBaIoTBalancePolicy.NATURAL_DISTRIBUTION:
+        return test_benign
+    if policy is not NBaIoTBalancePolicy.BALANCED:
+        raise ValueError(f"Unsupported test balance policy: {policy!r}")
+    if not 0 < len(test_attack) < len(test_benign):
+        return test_benign
+    logger.info(
+        "balanced-test sensitivity: subsampled benign test",
+        device=device_id,
+        n=len(test_attack),
+    )
+    return test_benign.sample(n=len(test_attack), seed=seed, with_replacement=False)
+
+
 def _prepare_device(
     device_id: NBaIoTDevice,
     raw_dir: Path,
@@ -614,7 +643,7 @@ def _prepare_device(
     device_raw = raw_dir / device_id
     benign_csv = device_raw / ArtifactFile.BENIGN_TRAFFIC
     if not benign_csv.exists():
-        raise FileNotFoundError(f"[{_NBAIOT_MODULE}] {benign_csv} not found.")
+        raise FileNotFoundError(f"[{ErrorScope.DATA_NBAIOT}] {benign_csv} not found.")
 
     benign_df = pl.read_csv(benign_csv)
     n_benign = len(benign_df)
@@ -628,28 +657,22 @@ def _prepare_device(
     attack_df_raw, attack_classes = _load_attack_csvs(device_raw)
     splits = _compute_split_indices(n_benign)
 
-    train_df = benign_df.slice(
-        splits[SplitPolicyRole.TRAIN][0],
-        splits[SplitPolicyRole.TRAIN][1] - splits[SplitPolicyRole.TRAIN][0],
-    )
-    cal_df = benign_df.slice(
-        splits[SplitPolicyRole.CAL][0],
-        splits[SplitPolicyRole.CAL][1] - splits[SplitPolicyRole.CAL][0],
-    )
-    test_benign_df = benign_df.slice(
-        splits[SplitPolicyRole.TEST_BENIGN][0],
-        splits[SplitPolicyRole.TEST_BENIGN][1] - splits[SplitPolicyRole.TEST_BENIGN][0],
-    )
+    train_df = _slice_split(benign_df, splits[SplitPolicyRole.TRAIN])
+    cal_df = _slice_split(benign_df, splits[SplitPolicyRole.CAL])
+    test_benign_df = _slice_split(benign_df, splits[SplitPolicyRole.TEST_BENIGN])
 
     calibration_pending = len(cal_df) < n_min
-    logger.warning(
-        "device flagged as Calibration-Pending",
-        device=device_id,
-        cal_count=len(cal_df),
-        n_min=n_min,
-    ) if calibration_pending else logger.info(
-        "device eligible", device=device_id, cal_count=len(cal_df), n_min=n_min
-    )
+    if calibration_pending:
+        logger.warning(
+            "device flagged as Calibration-Pending",
+            device=device_id,
+            cal_count=len(cal_df),
+            n_min=n_min,
+        )
+    else:
+        logger.info(
+            "device eligible", device=device_id, cal_count=len(cal_df), n_min=n_min
+        )
 
     train_scaled, cal_scaled, test_benign_scaled, test_attack_scaled, scaler = (
         _scale_device_splits(
@@ -661,18 +684,9 @@ def _prepare_device(
         )
     )
 
-    if test_balance_policy is NBaIoTBalancePolicy.BALANCED:
-        if 0 < len(test_attack_scaled) < len(test_benign_scaled):
-            logger.info(
-                "balanced-test sensitivity: subsampled benign test",
-                device=device_id,
-                n=len(test_attack_scaled),
-            )
-            test_benign_scaled = test_benign_scaled.sample(
-                n=len(test_attack_scaled), seed=seed, with_replacement=False
-            )
-    elif test_balance_policy is not NBaIoTBalancePolicy.NATURAL_DISTRIBUTION:
-        raise ValueError(f"Unsupported test balance policy: {test_balance_policy!r}")
+    test_benign_scaled = _balance_test_benign(
+        device_id, test_benign_scaled, test_attack_scaled, test_balance_policy, seed
+    )
 
     write_client_splits(
         client_dir=output_dir / device_id,
@@ -718,10 +732,11 @@ def prepare_nbaiot(
     *,
     test_balance_policy: NBaIoTBalancePolicy,
 ) -> dict[ClientId, PartitionResult]:
+    logger.info("workflow started", workflow=Workflow.DATA_PREPARATION)
     raw_dir, output_dir = Path(raw_dir), Path(output_dir)
     if not raw_dir.is_dir():
         raise FileNotFoundError(
-            f"[{_NBAIOT_MODULE}] Raw N-BaIoT directory {raw_dir} not found."
+            f"[{ErrorScope.DATA_NBAIOT}] Raw N-BaIoT directory {raw_dir} not found."
         )
 
     results = {
@@ -749,16 +764,18 @@ def prepare_nbaiot(
         dataset=NBAIOT_SPEC.id,
         raw_files=_raw_nbaiot_files(raw_dir),
         raw_base_dir=raw_dir,
-        metadata={
-            "dataset_display_name": _NBAIOT_DISPLAY_NAME,
-            "n_devices": len(results),
-            "n_features": FEATURE_COUNT,
-            "split_indices": {
-                dev: {k: list(v) for k, v in res.split_indices.items()}
+        metadata=ManifestMetadata(
+            dataset_display_name=DatasetDisplayName.NBAIOT,
+            n_devices=len(results),
+            n_features=NBAIOT_SPEC.feature_count,
+            split_indices={
+                dev: res.split_indices
                 for dev, res in results.items()
                 if res.split_indices
             },
-        },
+        ),
         manifest_path=output_dir / ArtifactFile.MANIFEST,
     )
-    return results
+    workflow_result = results
+    logger.info("workflow completed", workflow=Workflow.DATA_PREPARATION)
+    return workflow_result

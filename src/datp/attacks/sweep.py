@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
+import polars as pl
+import torch
 from joblib import Parallel, delayed
 
 from datp.artifacts import ArtifactLayout, nbaiot_main_manifest_path
@@ -31,6 +34,7 @@ from datp.attacks.injection import (
     inject_disjoint_reservoir,
     inject_fixed_budget,
 )
+from datp.attacks.feature_reservoir import inject_feature_reservoir, score_feature_rows
 from datp.attacks.manifests import (
     ArtifactProvenance,
     BoundedSweepManifest,
@@ -38,10 +42,14 @@ from datp.attacks.manifests import (
     ProvenanceRecord,
 )
 from datp.attacks.metrics import (
+    BlastRadiusRecord,
     ClusterThresholdPair,
     DeltaTauEntry,
     FleetFprMetrics,
     MetricResult,
+    NonVictimDownstreamMetrics,
+    SpilloverRecord,
+    VictimDownstreamMetrics,
     cluster_size_of,
     cluster_sizes,
     compute_auroc_records,
@@ -61,11 +69,13 @@ from datp.attacks.metrics import (
     tau_bound_utilization,
 )
 from datp.config import (
+    FEATURE_TAIL_MASS,
     N_MIN,
     TAIL_MASS,
     THRESHOLD_QUANTILE,
     CalibrationPoisoningConfig,
     ExperimentStage,
+    ModelConfig,
 )
 from datp.core import (
     REPOSITORY_NAME,
@@ -76,17 +86,31 @@ from datp.core import (
     hash_jsonable,
     make_seed_rng,
 )
+from datp.data import processed_root
 from datp.enums import (
+    Workflow,
+    CheckpointKey,
     AttackerObjective,
+    DatasetID,
+    FeatureDonorScope,
     ManifestProvenanceSource,
     PoisoningSourceStrategy,
     ReservoirDraw,
+    ReservoirStatus,
     ScoringStage,
     ThresholdPolicy,
+    is_train_feature_source,
     is_diagnostic_source,
 )
-from datp.scoring import load_main_cal_errors, load_parquets_from_dir
+from datp.modeling import Autoencoder
+from datp.scoring import (
+    hash_model_state,
+    load_main_cal_errors,
+    load_parquets_from_dir,
+    validate_scoring_manifest,
+)
 from datp.types import (
+    Ratio,
     ClientId,
     Index,
     ManifestMetricValue,
@@ -133,6 +157,8 @@ class InjectionOutcome:
     poisoned_cal_set: PoisonedCalibrationSet
     reservoir: ReservoirResult
     injection: InjectionResult
+    reservoir_draw: ReservoirDraw
+    donor_feature_unique_fraction: Ratio | None
 
 
 def _build_poisoned_clients(
@@ -147,7 +173,13 @@ def _build_poisoned_clients(
 
 
 def inject_single_victim(
-    collection: ScoreCollection, *, victim_id: ClientId, spec: InjectionSpec
+    collection: ScoreCollection,
+    *,
+    victim_id: ClientId,
+    spec: InjectionSpec,
+    feature_reservoir_scores: ScoreVector | None = None,
+    feature_row_ids: np.ndarray | None = None,
+    feature_tail_mass: PoisonFraction = FEATURE_TAIL_MASS,
 ) -> InjectionOutcome:
     v_clean = collection.clients[victim_id].cal
     clean_snapshot = v_clean.copy()
@@ -166,7 +198,39 @@ def inject_single_victim(
         ),
         child_index=cell_child_index(spec.source, spec.objective, spec.fraction),
     )
-    if spec.draw == ReservoirDraw.DISJOINT_RESERVOIR:
+    donor_feature_unique_fraction: Ratio | None = None
+    reservoir_draw = spec.draw
+    if is_train_feature_source(spec.source):
+        if feature_reservoir_scores is None or feature_row_ids is None:
+            raise ValueError(
+                f"Source {spec.source!r} requires scores from the victim's "
+                "separate benign training-feature reservoir."
+            )
+        tail_fraction = (
+            feature_tail_mass
+            if spec.source is PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN
+            else 1.0
+        )
+        feature_outcome = inject_feature_reservoir(
+            clean_cal=v_clean,
+            benign_reservoir_scores=feature_reservoir_scores,
+            feature_row_ids=feature_row_ids,
+            fraction=spec.fraction,
+            tail_fraction=tail_fraction,
+            rng=rng,
+        )
+        inj = feature_outcome.injection
+        reservoir_draw = ReservoirDraw.WITHOUT_REPLACEMENT
+        donor_feature_unique_fraction = feature_outcome.donor_feature_unique_fraction
+        pool = feature_reservoir_scores[feature_outcome.candidate_indices]
+        res = ReservoirResult(
+            pool=pool,
+            status=ReservoirStatus.FEASIBLE,
+            source=spec.source,
+            n_pool=pool.size,
+            n_distinct=len(np.unique(pool)),
+        )
+    elif spec.draw == ReservoirDraw.DISJOINT_RESERVOIR:
         inj, res = inject_disjoint_reservoir(
             clean_cal=v_clean,
             source=spec.source,
@@ -194,6 +258,8 @@ def inject_single_victim(
         ),
         reservoir=res,
         injection=inj,
+        reservoir_draw=reservoir_draw,
+        donor_feature_unique_fraction=donor_feature_unique_fraction,
     )
 
 
@@ -245,6 +311,9 @@ class SweepCellConfig:
     collection: ScoreCollection
     mu_flag_threshold: Threshold
     auroc_set: AurocSet | None = None
+    feature_reservoir_scores: Mapping[ClientId, ScoreVector] | None = None
+    feature_row_ids: Mapping[ClientId, np.ndarray] | None = None
+    feature_tail_mass: PoisonFraction = FEATURE_TAIL_MASS
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +323,8 @@ class SweepCellResult:
     poisoned_metrics: MetricResult
     victim_cal_poisoned: ScoreVector
     n_replaced: SampleCount
+    reservoir_draw: ReservoirDraw
+    donor_feature_unique_fraction: Ratio | None
 
 
 def _cell_injection_and_metrics(
@@ -272,6 +343,17 @@ def _cell_injection_and_metrics(
             seed_pair=spec.seed_pair,
             objective=spec.objective,
         ),
+        feature_reservoir_scores=(
+            config.feature_reservoir_scores.get(spec.victim_id)
+            if config.feature_reservoir_scores is not None
+            else None
+        ),
+        feature_row_ids=(
+            config.feature_row_ids.get(spec.victim_id)
+            if config.feature_row_ids is not None
+            else None
+        ),
+        feature_tail_mass=config.feature_tail_mass,
     )
     pair = recompute_pair(config.collection, outcome.poisoned_cal_set, spec.policy)
     metrics = compute_metrics(
@@ -309,6 +391,8 @@ def run_sweep_cell(
         poisoned_metrics=poisoned_metrics,
         victim_cal_poisoned=outcome.poisoned_cal_set[spec.victim_id].cal,
         n_replaced=outcome.injection.n_replaced,
+        reservoir_draw=outcome.reservoir_draw,
+        donor_feature_unique_fraction=outcome.donor_feature_unique_fraction,
     )
 
 
@@ -452,14 +536,72 @@ def _rows_for_group(
     specs: tuple[SweepCellSpec, ...],
     mu_flag_threshold: Threshold,
     auroc_set: AurocSet,
+    feature_reservoir_scores: Mapping[ClientId, ScoreVector] | None = None,
+    feature_row_ids: Mapping[ClientId, np.ndarray] | None = None,
+    feature_tail_mass: PoisonFraction = FEATURE_TAIL_MASS,
 ) -> list[BoundedSweepResultRow]:
     config = SweepCellConfig(
         collection=collection,
         mu_flag_threshold=mu_flag_threshold,
         auroc_set=auroc_set,
+        feature_reservoir_scores=feature_reservoir_scores,
+        feature_row_ids=feature_row_ids,
+        feature_tail_mass=feature_tail_mass,
     )
     clean_metrics = clean_cell_metrics(specs[0], config)
     return [_row_for_cell(collection, spec, config, clean_metrics) for spec in specs]
+
+
+@dataclass(frozen=True, slots=True)
+class _CellEvidence:
+    res: SweepCellResult
+    entry: DeltaTauEntry
+    blast: BlastRadiusRecord
+    spill: SpilloverRecord
+    cf: FleetFprMetrics
+    pf: FleetFprMetrics
+    victim_scores: ClientScores
+    ds: VictimDownstreamMetrics
+    nv: NonVictimDownstreamMetrics
+    cluster: _ClusterMetrics
+
+
+def _cell_evidence(
+    collection: ScoreCollection,
+    spec: SweepCellSpec,
+    config: SweepCellConfig,
+    clean_metrics: MetricResult,
+) -> _CellEvidence:
+    res = run_sweep_cell(spec, config=config, clean_metrics=clean_metrics)
+    entry = res.poisoned_metrics.delta_tau[spec.victim_id]
+    cf, pf = res.clean_metrics.fleet_fpr, res.poisoned_metrics.fleet_fpr
+    return _CellEvidence(
+        res=res,
+        entry=entry,
+        blast=compute_blast_radius(res.poisoned_metrics, victim_id=spec.victim_id),
+        spill=compute_spillover(
+            res.poisoned_metrics,
+            collection=collection,
+            victim_id=spec.victim_id,
+            objective=spec.objective,
+        ),
+        cf=cf,
+        pf=pf,
+        victim_scores=collection.clients[spec.victim_id],
+        ds=compute_victim_downstream_metrics(
+            clean_threshold=entry.tau_clean,
+            poisoned_threshold=entry.tau_pois,
+            client_scores=collection.clients[spec.victim_id],
+        ),
+        nv=compute_non_victim_downstream(
+            thresholds=_threshold_pairs(res.poisoned_metrics.delta_tau),
+            scores_by_client=_scores_by_client(collection),
+            victim_id=spec.victim_id,
+        ),
+        cluster=_cluster_fields(
+            collection, res.thresholds_under_poisoning, cf, spec.victim_id
+        ),
+    )
 
 
 def _row_for_cell(
@@ -468,32 +610,7 @@ def _row_for_cell(
     config: SweepCellConfig,
     clean_metrics: MetricResult,
 ) -> BoundedSweepResultRow:
-    res = run_sweep_cell(spec, config=config, clean_metrics=clean_metrics)
-    entry = res.poisoned_metrics.delta_tau[spec.victim_id]
-    blast = compute_blast_radius(res.poisoned_metrics, victim_id=spec.victim_id)
-    spill = compute_spillover(
-        res.poisoned_metrics,
-        collection=collection,
-        victim_id=spec.victim_id,
-        objective=spec.objective,
-    )
-    cf, pf = res.clean_metrics.fleet_fpr, res.poisoned_metrics.fleet_fpr
-    victim_scores = collection.clients[spec.victim_id]
-    ds = compute_victim_downstream_metrics(
-        clean_threshold=entry.tau_clean,
-        poisoned_threshold=entry.tau_pois,
-        client_scores=victim_scores,
-    )
-    nv = compute_non_victim_downstream(
-        thresholds=_threshold_pairs(res.poisoned_metrics.delta_tau),
-        scores_by_client=_scores_by_client(collection),
-        victim_id=spec.victim_id,
-    )
-
-    cluster = _cluster_fields(
-        collection, res.thresholds_under_poisoning, cf, spec.victim_id
-    )
-
+    ev = _cell_evidence(collection, spec, config, clean_metrics)
     return BoundedSweepResultRow(
         policy=spec.policy,
         source=spec.source,
@@ -508,96 +625,98 @@ def _row_for_cell(
             client_idx=collection.client_index(spec.victim_id),
             scope_idx=0,
         ),
-        delta_tau=entry.delta_tau,
-        delta_tau_rel=entry.delta_tau_rel,
-        is_victim_significant=entry.is_significant,
-        cv_fpr_clean=cf.cv_fpr,
-        cv_fpr_poisoned=pf.cv_fpr,
-        delta_cv_fpr=pf.cv_fpr - cf.cv_fpr,
-        mean_fpr_clean=cf.mean_fpr,
-        mean_fpr_poisoned=pf.mean_fpr,
-        delta_mean_fpr=pf.mean_fpr - cf.mean_fpr,
-        iqr_fpr_clean=cf.iqr_fpr,
-        iqr_fpr_poisoned=pf.iqr_fpr,
-        delta_iqr_fpr=pf.iqr_fpr - cf.iqr_fpr,
-        max_min_fpr_clean=cf.max_min_fpr_gap,
-        max_min_fpr_poisoned=pf.max_min_fpr_gap,
-        delta_max_min_fpr=pf.max_min_fpr_gap - cf.max_min_fpr_gap,
-        worst_client_fpr_clean=cf.worst_client_fpr,
-        worst_client_fpr_poisoned=pf.worst_client_fpr,
-        delta_worst_client_fpr=pf.worst_client_fpr - cf.worst_client_fpr,
-        coverage_ratio=pf.coverage_ratio,
-        n_eligible=pf.n_eligible,
-        mu_flag_triggered=pf.mu_flag_triggered,
-        auroc_invariant=_auroc_invariant(res),
-        blast_fraction=blast.blast_fraction,
-        n_blast_significant=blast.n_significant,
-        n_spillover=spill.n_spillover,
-        n_non_victims=spill.n_non_victims,
-        victim_tpr_clean=ds.tpr_clean,
-        victim_tpr_poisoned=ds.tpr_poisoned,
-        victim_delta_tpr=ds.delta_tpr,
-        victim_ba_clean=ds.ba_clean,
-        victim_ba_poisoned=ds.ba_poisoned,
-        victim_delta_ba=ds.delta_ba,
-        victim_macro_f1_clean=ds.macro_f1_clean,
-        victim_macro_f1_poisoned=ds.macro_f1_poisoned,
-        victim_delta_macro_f1=ds.delta_macro_f1,
-        cluster_delta_tau_agg=cluster.delta_tau_agg,
-        cluster_delta_tau_churn=cluster.delta_tau_churn,
-        cluster_delta_tau_frozen_scaler=cluster.delta_tau_frozen_scaler,
-        cluster_delta_tau_normalization_gap=cluster.delta_tau_normalization_gap,
-        cluster_victim_effect=cluster.victim_effect,
-        cluster_non_victim_effect=cluster.non_victim_effect,
-        victim_fpr_clean=ds.fpr_clean,
-        victim_fpr_poisoned=ds.fpr_poisoned,
-        victim_delta_fpr=ds.delta_fpr,
-        victim_fp_clean=ds.fp_clean,
-        victim_fp_poisoned=ds.fp_poisoned,
-        victim_fn_clean=ds.fn_clean,
-        victim_fn_poisoned=ds.fn_poisoned,
-        victim_n_test_benign=ds.n_test_benign,
-        victim_n_test_attack=ds.n_test_attack,
-        nonvictim_mean_tpr_clean=nv.mean_tpr_clean,
-        nonvictim_mean_tpr_poisoned=nv.mean_tpr_poisoned,
-        nonvictim_mean_delta_tpr=nv.mean_delta_tpr,
-        nonvictim_worst_delta_tpr=nv.worst_delta_tpr,
-        nonvictim_mean_fpr_clean=nv.mean_fpr_clean,
-        nonvictim_mean_fpr_poisoned=nv.mean_fpr_poisoned,
-        nonvictim_mean_delta_fpr=nv.mean_delta_fpr,
-        nonvictim_worst_delta_fpr=nv.worst_delta_fpr,
-        nonvictim_mean_delta_ba=nv.mean_delta_ba,
-        nonvictim_mean_delta_macro_f1=nv.mean_delta_macro_f1,
-        nonvictim_delta_fp_total=nv.delta_fp_total,
-        nonvictim_delta_fn_total=nv.delta_fn_total,
-        victim_delta_tau_scale_base=entry.scale_base,
-        iqr_median_clean=entry.iqr_median,
+        delta_tau=ev.entry.delta_tau,
+        delta_tau_rel=ev.entry.delta_tau_rel,
+        is_victim_significant=ev.entry.is_significant,
+        cv_fpr_clean=ev.cf.cv_fpr,
+        cv_fpr_poisoned=ev.pf.cv_fpr,
+        delta_cv_fpr=ev.pf.cv_fpr - ev.cf.cv_fpr,
+        mean_fpr_clean=ev.cf.mean_fpr,
+        mean_fpr_poisoned=ev.pf.mean_fpr,
+        delta_mean_fpr=ev.pf.mean_fpr - ev.cf.mean_fpr,
+        iqr_fpr_clean=ev.cf.iqr_fpr,
+        iqr_fpr_poisoned=ev.pf.iqr_fpr,
+        delta_iqr_fpr=ev.pf.iqr_fpr - ev.cf.iqr_fpr,
+        max_min_fpr_clean=ev.cf.max_min_fpr_gap,
+        max_min_fpr_poisoned=ev.pf.max_min_fpr_gap,
+        delta_max_min_fpr=ev.pf.max_min_fpr_gap - ev.cf.max_min_fpr_gap,
+        worst_client_fpr_clean=ev.cf.worst_client_fpr,
+        worst_client_fpr_poisoned=ev.pf.worst_client_fpr,
+        delta_worst_client_fpr=ev.pf.worst_client_fpr - ev.cf.worst_client_fpr,
+        coverage_ratio=ev.pf.coverage_ratio,
+        n_eligible=ev.pf.n_eligible,
+        mu_flag_triggered=ev.pf.mu_flag_triggered,
+        auroc_invariant=_auroc_invariant(ev.res),
+        blast_fraction=ev.blast.blast_fraction,
+        n_blast_significant=ev.blast.n_significant,
+        n_spillover=ev.spill.n_spillover,
+        n_non_victims=ev.spill.n_non_victims,
+        victim_tpr_clean=ev.ds.tpr_clean,
+        victim_tpr_poisoned=ev.ds.tpr_poisoned,
+        victim_delta_tpr=ev.ds.delta_tpr,
+        victim_ba_clean=ev.ds.ba_clean,
+        victim_ba_poisoned=ev.ds.ba_poisoned,
+        victim_delta_ba=ev.ds.delta_ba,
+        victim_macro_f1_clean=ev.ds.macro_f1_clean,
+        victim_macro_f1_poisoned=ev.ds.macro_f1_poisoned,
+        victim_delta_macro_f1=ev.ds.delta_macro_f1,
+        cluster_delta_tau_agg=ev.cluster.delta_tau_agg,
+        cluster_delta_tau_churn=ev.cluster.delta_tau_churn,
+        cluster_delta_tau_frozen_scaler=ev.cluster.delta_tau_frozen_scaler,
+        cluster_delta_tau_normalization_gap=ev.cluster.delta_tau_normalization_gap,
+        cluster_victim_effect=ev.cluster.victim_effect,
+        cluster_non_victim_effect=ev.cluster.non_victim_effect,
+        victim_fpr_clean=ev.ds.fpr_clean,
+        victim_fpr_poisoned=ev.ds.fpr_poisoned,
+        victim_delta_fpr=ev.ds.delta_fpr,
+        victim_fp_clean=ev.ds.fp_clean,
+        victim_fp_poisoned=ev.ds.fp_poisoned,
+        victim_fn_clean=ev.ds.fn_clean,
+        victim_fn_poisoned=ev.ds.fn_poisoned,
+        victim_n_test_benign=ev.ds.n_test_benign,
+        victim_n_test_attack=ev.ds.n_test_attack,
+        nonvictim_mean_tpr_clean=ev.nv.mean_tpr_clean,
+        nonvictim_mean_tpr_poisoned=ev.nv.mean_tpr_poisoned,
+        nonvictim_mean_delta_tpr=ev.nv.mean_delta_tpr,
+        nonvictim_worst_delta_tpr=ev.nv.worst_delta_tpr,
+        nonvictim_mean_fpr_clean=ev.nv.mean_fpr_clean,
+        nonvictim_mean_fpr_poisoned=ev.nv.mean_fpr_poisoned,
+        nonvictim_mean_delta_fpr=ev.nv.mean_delta_fpr,
+        nonvictim_worst_delta_fpr=ev.nv.worst_delta_fpr,
+        nonvictim_mean_delta_ba=ev.nv.mean_delta_ba,
+        nonvictim_mean_delta_macro_f1=ev.nv.mean_delta_macro_f1,
+        nonvictim_delta_fp_total=ev.nv.delta_fp_total,
+        nonvictim_delta_fn_total=ev.nv.delta_fn_total,
+        victim_delta_tau_scale_base=ev.entry.scale_base,
+        iqr_median_clean=ev.entry.iqr_median,
         delta_tau_bound_utilization=tau_bound_utilization(
-            clean_cal=victim_scores.cal,
-            tau_clean=entry.tau_clean,
-            tau_pois=entry.tau_pois,
+            clean_cal=ev.victim_scores.cal,
+            tau_clean=ev.entry.tau_clean,
+            tau_pois=ev.entry.tau_pois,
             objective=spec.objective,
         ),
-        n_replaced=res.n_replaced,
-        cal_duplicate_rate_clean=duplicate_rate(victim_scores.cal),
-        cal_duplicate_rate_poisoned=duplicate_rate(res.victim_cal_poisoned),
-        cluster_sizes_clean=cluster.sizes_clean,
-        cluster_sizes_poisoned=cluster.sizes_poisoned,
-        cluster_victim_size_clean=cluster.victim_size_clean,
-        cluster_victim_size_poisoned=cluster.victim_size_poisoned,
-        cluster_n_reassigned=cluster.n_reassigned,
-        cluster_silhouette_clean=cluster.silhouette_clean,
-        cluster_silhouette_poisoned=cluster.silhouette_poisoned,
-        fixed_cluster_victim_delta_tau=cluster.fixed_assignment.victim_delta_tau,
-        fixed_cluster_victim_delta_tpr=cluster.fixed_assignment.victim_delta_tpr,
-        fixed_cluster_victim_delta_fpr=cluster.fixed_assignment.victim_delta_fpr,
-        fixed_cluster_delta_cv_fpr=cluster.fixed_assignment.delta_cv_fpr,
-        fixed_cluster_delta_mean_fpr=cluster.fixed_assignment.delta_mean_fpr,
+        n_replaced=ev.res.n_replaced,
+        reservoir_draw=ev.res.reservoir_draw,
+        donor_feature_unique_fraction=ev.res.donor_feature_unique_fraction,
+        cal_duplicate_rate_clean=duplicate_rate(ev.victim_scores.cal),
+        cal_duplicate_rate_poisoned=duplicate_rate(ev.res.victim_cal_poisoned),
+        cluster_sizes_clean=ev.cluster.sizes_clean,
+        cluster_sizes_poisoned=ev.cluster.sizes_poisoned,
+        cluster_victim_size_clean=ev.cluster.victim_size_clean,
+        cluster_victim_size_poisoned=ev.cluster.victim_size_poisoned,
+        cluster_n_reassigned=ev.cluster.n_reassigned,
+        cluster_silhouette_clean=ev.cluster.silhouette_clean,
+        cluster_silhouette_poisoned=ev.cluster.silhouette_poisoned,
+        fixed_cluster_victim_delta_tau=ev.cluster.fixed_assignment.victim_delta_tau,
+        fixed_cluster_victim_delta_tpr=ev.cluster.fixed_assignment.victim_delta_tpr,
+        fixed_cluster_victim_delta_fpr=ev.cluster.fixed_assignment.victim_delta_fpr,
+        fixed_cluster_delta_cv_fpr=ev.cluster.fixed_assignment.delta_cv_fpr,
+        fixed_cluster_delta_mean_fpr=ev.cluster.fixed_assignment.delta_mean_fpr,
         fixed_cluster_nonvictim_mean_delta_tpr=(
-            cluster.fixed_assignment.nonvictim_mean_delta_tpr
+            ev.cluster.fixed_assignment.nonvictim_mean_delta_tpr
         ),
         fixed_cluster_nonvictim_mean_delta_fpr=(
-            cluster.fixed_assignment.nonvictim_mean_delta_fpr
+            ev.cluster.fixed_assignment.nonvictim_mean_delta_fpr
         ),
     )
 
@@ -657,8 +776,119 @@ def _seed_statics(collection: ScoreCollection) -> tuple[Threshold, AurocSet]:
     return lock_mu_flag_threshold(collection), compute_auroc_records(collection)
 
 
+def _read_train_features(feature_root: Path, client_id: ClientId) -> np.ndarray:
+    train_path = feature_root / client_id / "train.parquet"
+    if not train_path.is_file():
+        raise FileNotFoundError(f"Missing benign training feature split: {train_path}")
+    return pl.read_parquet(train_path).to_numpy().astype(np.float32, copy=False)
+
+
+def _global_row_ids(
+    features_by_client: Mapping[ClientId, np.ndarray],
+) -> dict[ClientId, np.ndarray]:
+    if not features_by_client:
+        return {}
+    _, inverse = np.unique(
+        np.concatenate(list(features_by_client.values())),
+        axis=0,
+        return_inverse=True,
+    )
+    inverse = inverse.reshape(-1).astype(np.int64, copy=False)
+    bounds = np.cumsum([0, *(len(f) for f in features_by_client.values())])
+    return {
+        client_id: inverse[start:stop]
+        for client_id, start, stop in zip(
+            features_by_client, bounds[:-1], bounds[1:], strict=True
+        )
+    }
+
+
+def load_train_feature_reservoirs(
+    base_dir: Path,
+    collections: Mapping[RandomSeed, ScoreCollection],
+    *,
+    data_root: Path = Path("."),
+    donor_scope: FeatureDonorScope,
+) -> tuple[
+    dict[RandomSeed, dict[ClientId, ScoreVector]],
+    dict[RandomSeed, dict[ClientId, np.ndarray]],
+]:
+    logger.info("workflow started", workflow=Workflow.FEATURE_RESERVOIR_LOAD)
+    feature_root = processed_root(DatasetID.NBAIOT, base_dir=data_root)
+    score_by_seed: dict[RandomSeed, dict[ClientId, ScoreVector]] = {}
+    row_ids_by_seed: dict[RandomSeed, dict[ClientId, np.ndarray]] = {}
+    layout = ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
+    client_ids = next(iter(collections.values())).eligible_ids
+    features_by_client = {
+        client_id: _read_train_features(feature_root, client_id)
+        for client_id in client_ids
+    }
+    row_ids_by_client = _global_row_ids(features_by_client)
+
+    for seed, collection in collections.items():
+        cell = TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed)
+        checkpoint_path = layout.model_checkpoint(cell)
+        if not checkpoint_path.is_file():
+            raise FileNotFoundError(
+                f"Missing federated model checkpoint {checkpoint_path}. "
+                "Rerun the baseline with the current code before running the sweep."
+            )
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+        model_config = ModelConfig.model_validate(
+            checkpoint[CheckpointKey.MODEL_CONFIG]
+        )
+        model = Autoencoder(
+            input_dim=model_config.input_dim,
+            hidden_dims=model_config.encoder_dims,
+            activation=model_config.activation,
+            use_bn=model_config.use_bn,
+        )
+        model.load_state_dict(checkpoint[CheckpointKey.STATE_DICT])
+        model.eval()
+
+        score_dir = layout.score_cell(cell).score_dir
+        manifest = validate_scoring_manifest(score_dir)
+        if hash_model_state(model) != manifest.model_hash:
+            raise ValueError(
+                f"Checkpoint {checkpoint_path} does not match its score manifest."
+            )
+
+        own_scores: dict[ClientId, ScoreVector] = {}
+        for client_id in collection.eligible_ids:
+            features = features_by_client[client_id]
+            if features.shape[1] != model_config.input_dim:
+                raise ValueError(
+                    f"Feature dimension mismatch for {client_id}: expected "
+                    f"{model_config.input_dim}, got {features.shape[1]}"
+                )
+            own_scores[client_id] = score_feature_rows(model, features)
+        scores_for_clients: dict[ClientId, ScoreVector] = {}
+        row_ids_for_clients: dict[ClientId, np.ndarray] = {}
+        for client_id in collection.eligible_ids:
+            donors = (
+                (client_id,)
+                if donor_scope is FeatureDonorScope.OWN_DEVICE
+                else tuple(c for c in collection.eligible_ids if c != client_id)
+            )
+            scores_for_clients[client_id] = np.concatenate(
+                [own_scores[c] for c in donors]
+            )
+            row_ids_for_clients[client_id] = np.concatenate(
+                [row_ids_by_client[c] for c in donors]
+            )
+
+        score_by_seed[seed] = scores_for_clients
+        row_ids_by_seed[seed] = row_ids_for_clients
+    workflow_result = score_by_seed, row_ids_by_seed
+    logger.info("workflow completed", workflow=Workflow.FEATURE_RESERVOIR_LOAD)
+    return workflow_result
+
+
 def run_nbaiot_main(
-    base_dir: Path, config: CalibrationPoisoningConfig
+    base_dir: Path,
+    config: CalibrationPoisoningConfig,
+    *,
+    data_root: Path = Path("."),
 ) -> BoundedSweepManifest:
     logger.info(
         "bounded sweep started",
@@ -668,6 +898,15 @@ def run_nbaiot_main(
         analysis_seed_count=len(config.seeds.analysis),
     )
     collections = load_seed_collections(base_dir, config)
+    feature_scores_by_seed: dict[RandomSeed, dict[ClientId, ScoreVector]] = {}
+    feature_row_ids_by_seed: dict[RandomSeed, dict[ClientId, np.ndarray]] = {}
+    if any(is_train_feature_source(source) for source in config.sources):
+        feature_scores_by_seed, feature_row_ids_by_seed = load_train_feature_reservoirs(
+            base_dir,
+            collections,
+            data_root=data_root,
+            donor_scope=config.feature_donor_scope,
+        )
     mu_flag_by_seed: dict[RandomSeed, Threshold] = {}
     auroc_by_seed: dict[RandomSeed, AurocSet] = {}
     victims_by_seed: dict[RandomSeed, tuple[ClientId, ...]] = {}
@@ -691,7 +930,7 @@ def run_nbaiot_main(
     )
 
     groups: dict[
-        tuple[RandomSeed, RandomSeed, ThresholdPolicy, ClientId], list[int]
+        tuple[RandomSeed, RandomSeed, ThresholdPolicy, ClientId], list[Index]
     ] = defaultdict(list)
     for index, spec in enumerate(cells):
         groups[
@@ -704,6 +943,9 @@ def run_nbaiot_main(
                 tuple(cells[i] for i in indices),
                 mu_flag_by_seed[key[0]],
                 auroc_by_seed[key[0]],
+                feature_scores_by_seed.get(key[0]),
+                feature_row_ids_by_seed.get(key[0]),
+                config.feature_tail_mass,
             )
             for key, indices in groups.items()
         )
@@ -741,12 +983,14 @@ def run_nbaiot_main(
     return manifest
 
 
-def write_nbaiot_main_manifest(base_dir: Path) -> Path:
+def write_nbaiot_main_manifest(base_dir: Path, data_root: Path = Path(".")) -> Path:
     out_path = nbaiot_main_manifest_path(base_dir)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         run_nbaiot_main(
-            base_dir, CalibrationPoisoningConfig.for_bounded_sweep()
+            base_dir,
+            CalibrationPoisoningConfig.for_bounded_sweep(),
+            data_root=data_root,
         ).model_dump_json(indent=2)
     )
     logger.info("bounded sweep manifest written", path=out_path)

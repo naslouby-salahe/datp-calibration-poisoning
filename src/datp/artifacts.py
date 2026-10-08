@@ -8,7 +8,6 @@ from pathlib import Path
 from types import TracebackType
 
 import orjson
-import pandas as pd
 from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 
@@ -22,7 +21,7 @@ from datp.enums import (
     ScoringStage,
     ThresholdPolicy,
 )
-from datp.types import ClientId, JsonValue, RandomSeed
+from datp.types import ClientId, JsonValue, RandomSeed, RecordKey
 
 OUTPUTS_DIR: Path = Path(ArtifactDir.OUTPUTS)
 
@@ -76,6 +75,9 @@ class ArtifactLayout:
             manifest_path=score_dir / ArtifactFile.SCORING_MANIFEST,
         )
 
+    def model_checkpoint(self, cell: TrainingCellId) -> Path:
+        return self._root(ArtifactDir.MODELS) / f"{seed_segment(cell.seed)}.pt"
+
     def score_file(
         self, cell: TrainingCellId, stage: ScoringStage, client_id: ClientId
     ) -> Path:
@@ -101,7 +103,7 @@ def write_json_atomic(
     data: JsonValue
     | BaseModel
     | Sequence[BaseModel]
-    | Mapping[str, JsonValue | BaseModel | Sequence[BaseModel]],
+    | Mapping[RecordKey, JsonValue | BaseModel | Sequence[BaseModel]],
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(f"{path.suffix}.tmp")
@@ -116,14 +118,8 @@ def write_json_atomic(
         )
     )
     tmp.replace(path)
+    logger.debug("artifact written", path=path)
     return path
-
-
-def write_csv(path: Path, records: Sequence[BaseModel]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(f"{path.suffix}.tmp")
-    pd.DataFrame([to_jsonable_python(r) for r in records]).to_csv(tmp, index=False)
-    tmp.replace(path)
 
 
 logger = get_logger(__name__)
@@ -181,6 +177,6 @@ class RunLifecycle:
             with contextlib.suppress(Exception):
                 logger.error(
                     "artifacts.abort_marker_write_failed",
-                    run_dir=str(self.run_dir),
-                    error=str(e),
+                    run_dir=self.run_dir,
+                    error=e,
                 )

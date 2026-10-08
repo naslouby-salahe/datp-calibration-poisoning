@@ -31,6 +31,9 @@ from datp.core import (
 )
 from datp.data import Split
 from datp.enums import (
+    PoisoningSourceStrategy,
+    control_source_for,
+    is_random_control,
     CONTROLLED_POLICIES,
     THRESHOLD_AGGREGATION_BY_POLICY,
     ArtifactDir,
@@ -38,7 +41,6 @@ from datp.enums import (
     DatasetID,
     EvidenceRole,
     FigureName,
-    NormalizationScope,
     ProvenanceSentinel,
     ScoringStage,
     SeedScope,
@@ -82,39 +84,6 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("federated.py", "SimClientConfig", "client_extra_kwargs"),
         ("federated.py", "SimClientConfig", "encoder_only"),
         ("federated.py", "SimClientConfig", "score_after"),
-        ("validation.py", "CellPanel", "cv_fpr"),
-        ("validation.py", "CellPanel", "cv_tpr"),
-        ("validation.py", "CellPanel", "macro_f1_mean"),
-        ("validation.py", "CellPanel", "macro_f1_p10"),
-        ("validation.py", "CellPanel", "auroc_mean"),
-        ("validation.py", "CellPanel", "pr_auc_mean"),
-        ("validation.py", "CellPanel", "mean_fpr"),
-        ("validation.py", "CellPanel", "std_fpr"),
-        ("validation.py", "CellPanel", "iqr_fpr"),
-        ("validation.py", "CellPanel", "worst_client_fpr"),
-        ("validation.py", "CellPanel", "worst_client_tpr"),
-        ("validation.py", "CellPanel", "worst_client_macro_f1"),
-        ("validation.py", "CellPanel", "worst_client_balanced_accuracy"),
-        ("validation.py", "CellPanel", "convergence_round"),
-        ("validation.py", "CellPanel", "tau_global"),
-        ("validation.py", "CellPanel", "coverage_ratio"),
-        ("validation.py", "AuditAccumulator", "manifest_records"),
-        ("validation.py", "AuditAccumulator", "client_records"),
-        ("validation.py", "AuditAccumulator", "attack_records"),
-        ("validation.py", "AuditAccumulator", "threshold_records"),
-        ("validation.py", "AuditAccumulator", "recon_records"),
-        ("validation.py", "AuditAccumulator", "denominator_records"),
-        ("validation.py", "AuditAccumulator", "convergence_records"),
-        ("validation.py", "AuditAccumulator", "cluster_records"),
-        ("validation.py", "AuditAccumulator", "companion_records"),
-        ("validation.py", "AuditAccumulator", "worst_client_records"),
-        ("validation.py", "AuditAccumulator", "partition_audits"),
-        ("validation.py", "AuditAccumulator", "invariant_inputs"),
-        ("validation.py", "AuditAccumulator", "score_hashes_by_cell"),
-        ("validation.py", "AuditAccumulator", "recomputation_records"),
-        ("validation.py", "AuditAccumulator", "cell_panel"),
-        ("validation.py", "AuditAccumulator", "warnings"),
-        ("validation.py", "AuditAccumulator", "missing_confusion_warned"),
         ("experiments.py", "SweepResult", "total"),
         ("experiments.py", "SweepResult", "completed"),
         ("experiments.py", "SweepResult", "skipped"),
@@ -136,6 +105,10 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/injection.py", "MetricEngineInput", "mu_flag_threshold"),
         ("attacks/injection.py", "MetricEngineInput", "auroc_set"),
         ("attacks/sweep.py", "SweepCellConfig", "auroc_set"),
+        # Optional inputs let score-only sweeps construct the config unchanged.
+        ("attacks/sweep.py", "SweepCellConfig", "feature_reservoir_scores"),
+        ("attacks/sweep.py", "SweepCellConfig", "feature_row_ids"),
+        ("attacks/sweep.py", "SweepCellConfig", "feature_tail_mass"),
         ("attacks/sweep.py", "SweepCellConfig", "scope_idx"),
         ("attacks/sweep.py", "SweepCellConfig", "q"),
         ("attacks/sweep.py", "SweepCellConfig", "cluster_seed"),
@@ -143,34 +116,29 @@ _DEFAULTS_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset(
         ("attacks/sweep.py", "InjectionSpec", "tail_mass"),
         ("attacks/sweep.py", "InjectionSpec", "draw"),
         (
-            "attacks/metrics.py",
+            "thresholding.py",
             "ClusterHyperparams",
             "k",
         ),
         (
-            "attacks/metrics.py",
+            "thresholding.py",
             "ClusterHyperparams",
             "n_init",
         ),
         (
-            "attacks/metrics.py",
+            "thresholding.py",
             "ClusterHyperparams",
             "max_iter",
         ),
         (
-            "attacks/metrics.py",
+            "thresholding.py",
             "ClusterHyperparams",
             "random_state",
         ),
         (
-            "attacks/metrics.py",
+            "thresholding.py",
             "ClusterHyperparams",
             "n_min",
-        ),
-        (
-            "attacks/metrics.py",
-            "ClusterHyperparams",
-            "seed",
         ),
         ("attacks/metrics/inference.py", "BootstrapConfig", "ci"),
         ("attacks/metrics/inference.py", "BootstrapConfig", "n_bootstrap"),
@@ -416,15 +384,6 @@ class TestSplitEnum:
         }
 
 
-class TestNormalizationScopeEnum:
-    """Tests for validating normalization scope enum values."""
-
-    def test_normalization_scope_values(self) -> None:
-        """Verify global and per-client normalization scope values."""
-        assert NormalizationScope.GLOBAL == "global"
-        assert NormalizationScope.PER_CLIENT == "per_client"
-
-
 class TestScoringStageEnum:
     """Tests for validating scoring stage enum values."""
 
@@ -493,7 +452,7 @@ class TestFigureName:
 
     def test_six_figures_defined(self) -> None:
         """Verify exactly six figures are defined in the enum."""
-        assert len(FigureName) == 5
+        assert len(FigureName) == 6
 
     def test_figure_values(self) -> None:
         """Verify FigureName mapping values match standard identifiers."""
@@ -502,6 +461,7 @@ class TestFigureName:
         assert FigureName.FIGURE_3 == "figure_3"
         assert FigureName.FIGURE_5 == "figure_5"
         assert FigureName.FIGURE_6 == "figure_6"
+        assert FigureName.FIGURE_7 == "figure_7"
 
     def test_is_str_compatible(self) -> None:
         """Ensure all FigureName members are string-compatible."""
@@ -1481,8 +1441,8 @@ class TestMakeRng:
 
     def test_all_seed_pairs_produce_distinct_sequences(self) -> None:
         """Confirm that paired seed-sequence generation is globally distinct."""
-        training_seeds = tuple(range(10))
-        poisoning_seeds = tuple(range(100, 110))
+        training_seeds = tuple(range(20))
+        poisoning_seeds = tuple(range(100, 120))
         sequences = []
         for ts, ps in zip(training_seeds, poisoning_seeds):
             rng = make_seed_rng(
@@ -1535,3 +1495,22 @@ def test_set_seeds_sets_matmul_precision() -> None:
     """Verify set_seeds configures float32 matmul precision to high."""
     set_seeds(0)
     assert torch.get_float32_matmul_precision() == "high"
+
+
+class TestControlSources:
+    """Each attack source is paired with the random control drawn from its own pool."""
+
+    def test_attack_sources_map_to_matched_controls(self) -> None:
+        assert (
+            control_source_for(PoisoningSourceStrategy.HIGH_SCORE_BENIGN)
+            is PoisoningSourceStrategy.RANDOM_BENIGN
+        )
+        assert (
+            control_source_for(PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN)
+            is PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN
+        )
+        assert control_source_for(PoisoningSourceStrategy.RANDOM_BENIGN) is None
+
+    def test_random_controls_are_not_attack_sources(self) -> None:
+        assert is_random_control(PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN)
+        assert not is_random_control(PoisoningSourceStrategy.LOW_SCORE_BENIGN)

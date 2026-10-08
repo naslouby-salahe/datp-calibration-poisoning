@@ -5,7 +5,7 @@ import json
 import math
 import shutil
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -17,14 +17,22 @@ from datp.artifacts import (
     write_json_atomic,
 )
 from datp.attacks.manifests import BoundedSweepResultRow
-from datp.config import DatpConfig, ExperimentStage, write_resolved_config
+from datp.config import (
+    POISONING_FIGURE_FRACTION,
+    DatpConfig,
+    ExperimentStage,
+    write_resolved_config,
+)
 from datp.core import ClientThreshold, PolicyRunId, TrainingCellId, get_logger
 from datp.enums import (
+    Workflow,
+    AxisLabel,
+    AxisName,
+    AnalysisColumn,
     CONTROLLED_POLICIES,
     ArtifactDir,
     ArtifactFile,
     AttackerObjective,
-    AuditDir,
     AuditField,
     AuditStatus,
     ClientStatus,
@@ -55,7 +63,7 @@ from datp.evaluation import (
 from datp.reporting.figures import (
     CLIENT_SELECTION_RULE,
     NOT_CONFIRMATORY_WARNING,
-    POISONING_FIGURE_FRACTION,
+    REPRESENTATIVE_SEED_PHRASE,
     REPORTING_AUDIT_SCHEMA_VERSION,
     SEED_SELECTION_RULE,
     generate_figure1,
@@ -63,17 +71,28 @@ from datp.reporting.figures import (
     generate_figure3,
     generate_figure5,
     generate_figure6,
+    generate_figure7,
     generate_table3,
 )
 from datp.reporting.poisoning import (
     build_poisoning_summaries,
     build_sensitivity_summaries,
+    claim_robustness_cells,
     load_poisoning_manifest,
 )
 from datp.scoring import ScoreProvider, ScoringColumn
-from datp.statistics import BootstrapField, BootstrapReport, StatsField, bootstrap_ci
+from datp.statistics import (
+    BootstrapField,
+    BootstrapReport,
+    StatsField,
+    bootstrap_ci,
+    floats_of,
+    mean_of,
+    nanmean_of,
+)
 from datp.thresholding import SweepMetrics
 from datp.types import (
+    RecordKey,
     BootstrapCount,
     ClientId,
     FalsePositiveRate,
@@ -88,7 +107,6 @@ from datp.types import (
     Threshold,
     Tolerance,
 )
-from datp.validation import AuditOutputPaths, run_results_audit
 
 _REPORTING_SOURCES: set[NarrativeText] = set()
 
@@ -278,7 +296,7 @@ def _bootstrap_payload(
     return BootstrapReport(
         result=bootstrap_ci(deltas, n_bootstrap=n_bootstrap, ci=ci, seed=seed),
         confidence_level=ci,
-        per_seed_deltas=tuple(float(value) for value in deltas),
+        per_seed_deltas=tuple(floats_of(deltas)),
     )
 
 
@@ -333,8 +351,11 @@ def _validate_figure_sidecars(fig_dir: Path) -> list[NarrativeText]:
             failures.append(f"{fig} sidecar missing {SidecarField.EVIDENCE_ROLE}")
         if not data.get(SidecarField.NOT_CONFIRMATORY_WARNING):
             failures.append(f"{fig} missing {SidecarField.NOT_CONFIRMATORY_WARNING}")
-        if "representative seed" not in data.get(SidecarField.TITLE, "").lower():
-            failures.append(f"{fig} title does not include 'representative seed'")
+        if REPRESENTATIVE_SEED_PHRASE not in data.get(SidecarField.TITLE, "").lower():
+            failures.append(
+                f"{fig} title does not include '{REPRESENTATIVE_SEED_PHRASE}'"
+            )
+    logger.debug("figure sidecars validated", failure_count=len(failures))
     return failures
 
 
@@ -344,11 +365,7 @@ def _check_heterogeneity_context(
     p_thresh: ScoreValue,
 ) -> JsonRecord:
     g_mean = (
-        float(
-            np.mean(
-                [r.dispersion.cv_fpr for r in nbaiot[ThresholdPolicy.GLOBAL_THRESHOLD]]
-            )
-        )
+        mean_of([r.dispersion.cv_fpr for r in nbaiot[ThresholdPolicy.GLOBAL_THRESHOLD]])
         if nbaiot.get(ThresholdPolicy.GLOBAL_THRESHOLD)
         else math.nan
     )
@@ -366,7 +383,74 @@ def _check_heterogeneity_context(
     }
 
 
+def _paired_report(
+    results: dict[ThresholdPolicy, list[EvaluationResult]],
+    left: ThresholdPolicy,
+    right: ThresholdPolicy,
+    cfg: DatpConfig,
+) -> BootstrapReport:
+    return _bootstrap_payload(
+        _paired_deltas(results, left, right),
+        cfg.statistics.n_bootstrap,
+        cfg.statistics.ci_level,
+        cfg.statistics.bootstrap_seed,
+    )
+
+
+def _write_bootstrap_csv(
+    path: Path,
+    primary: BootstrapReport,
+    secondary: dict[StatsField, dict[ComparisonLabel, BootstrapReport]],
+) -> None:
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, lineterminator="\n")
+        writer.writerow(
+            [
+                BootstrapField.SCOPE,
+                BootstrapField.COMPARISON,
+                BootstrapField.MEAN_DELTA,
+                BootstrapField.CI_LOWER,
+                BootstrapField.CI_UPPER,
+                BootstrapField.EXCLUDES_ZERO,
+            ]
+        )
+        rows = [
+            (StatsField.PRIMARY_ENDPOINT, ComparisonLabel.GLOBAL_VS_LOCAL, primary),
+            *(
+                (scope, comparison, summary)
+                for scope, comparisons in secondary.items()
+                for comparison, summary in comparisons.items()
+            ),
+        ]
+        for scope, comparison, summary in rows:
+            writer.writerow(
+                [
+                    scope,
+                    comparison,
+                    summary.result.mean_delta,
+                    summary.result.ci_lower,
+                    summary.result.ci_upper,
+                    summary.result.excludes_zero,
+                ]
+            )
+    logger.debug("bootstrap csv written", path=path, row_count=len(rows))
+
+
+def _secondary_payload(
+    secondary: dict[StatsField, dict[ComparisonLabel, BootstrapReport]],
+) -> dict[RecordKey, JsonValue]:
+    payload: dict[RecordKey, JsonValue] = {}
+    for scope, comparisons in secondary.items():
+        comparison_payload: dict[RecordKey, JsonValue] = {}
+        for comparison, summary in comparisons.items():
+            report: BootstrapReport = summary
+            comparison_payload[comparison] = report.to_payload()
+        payload[scope] = comparison_payload
+    return payload
+
+
 def build_stats(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
+    logger.info("workflow started", workflow=Workflow.REPORT_STATS)
     nbaiot = _load_results(
         base_dir,
         ExperimentStage.NBAIOT_MAIN,
@@ -374,70 +458,29 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         tuple(cfg.experiment.seeds),
         cfg.reporting.metric_tol,
     )
-    primary: BootstrapReport = _bootstrap_payload(
-        _paired_deltas(
-            nbaiot,
-            ThresholdPolicy.GLOBAL_THRESHOLD,
-            ThresholdPolicy.LOCAL_THRESHOLD,
-        ),
-        cfg.statistics.n_bootstrap,
-        cfg.statistics.ci_level,
-        cfg.statistics.bootstrap_seed,
-    )
+    global_policy = ThresholdPolicy.GLOBAL_THRESHOLD
+    local_policy = ThresholdPolicy.LOCAL_THRESHOLD
+    cluster_policy = ThresholdPolicy.CLUSTER_THRESHOLD
+    primary = _paired_report(nbaiot, global_policy, local_policy, cfg)
     secondary: dict[StatsField, dict[ComparisonLabel, BootstrapReport]] = {
         StatsField.SECONDARY_NBAIOT: {
-            ComparisonLabel.GLOBAL_VS_CLUSTER: _bootstrap_payload(
-                _paired_deltas(
-                    nbaiot,
-                    ThresholdPolicy.GLOBAL_THRESHOLD,
-                    ThresholdPolicy.CLUSTER_THRESHOLD,
-                ),
-                cfg.statistics.n_bootstrap,
-                cfg.statistics.ci_level,
-                cfg.statistics.bootstrap_seed,
+            ComparisonLabel.GLOBAL_VS_CLUSTER: _paired_report(
+                nbaiot, global_policy, cluster_policy, cfg
             ),
-            ComparisonLabel.CLUSTER_VS_LOCAL: _bootstrap_payload(
-                _paired_deltas(
-                    nbaiot,
-                    ThresholdPolicy.CLUSTER_THRESHOLD,
-                    ThresholdPolicy.LOCAL_THRESHOLD,
-                ),
-                cfg.statistics.n_bootstrap,
-                cfg.statistics.ci_level,
-                cfg.statistics.bootstrap_seed,
+            ComparisonLabel.CLUSTER_VS_LOCAL: _paired_report(
+                nbaiot, cluster_policy, local_policy, cfg
             ),
         },
         StatsField.SECONDARY_NBAIOT_ADDITIONAL: {
-            ComparisonLabel.GLOBAL_VS_LOCAL: _bootstrap_payload(
-                _paired_deltas(
-                    nbaiot,
-                    ThresholdPolicy.GLOBAL_THRESHOLD,
-                    ThresholdPolicy.LOCAL_THRESHOLD,
-                ),
-                cfg.statistics.n_bootstrap,
-                cfg.statistics.ci_level,
-                cfg.statistics.bootstrap_seed,
+            ComparisonLabel.GLOBAL_VS_LOCAL: _paired_report(
+                nbaiot, global_policy, local_policy, cfg
             ),
-            ComparisonLabel.GLOBAL_VS_CLUSTER: _bootstrap_payload(
-                _paired_deltas(
-                    nbaiot,
-                    ThresholdPolicy.GLOBAL_THRESHOLD,
-                    ThresholdPolicy.CLUSTER_THRESHOLD,
-                ),
-                cfg.statistics.n_bootstrap,
-                cfg.statistics.ci_level,
-                cfg.statistics.bootstrap_seed,
+            ComparisonLabel.GLOBAL_VS_CLUSTER: _paired_report(
+                nbaiot, global_policy, cluster_policy, cfg
             ),
         },
     }
-    secondary_payload: dict[str, JsonValue] = {}
-    for scope, comparisons in secondary.items():
-        comparison_payload: dict[str, JsonValue] = {}
-        for comparison, summary in comparisons.items():
-            summary_report: BootstrapReport = summary
-            comparison_payload[comparison.value] = summary_report.to_payload()
-        secondary_payload[scope.value] = comparison_payload
-
+    secondary_payload = _secondary_payload(secondary)
     payload: JsonRecord = {
         StatsField.PRIMARY_ENDPOINT: {
             StatsField.CONDITION: "Primary endpoint",
@@ -452,40 +495,8 @@ def build_stats(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = write_json_atomic(out_dir / ArtifactFile.BOOTSTRAP_CIS_JSON, payload)
     csv_path = out_dir / ArtifactFile.BOOTSTRAP_CIS_CSV
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f, lineterminator="\n")
-        writer.writerow(
-            [
-                BootstrapField.SCOPE,
-                BootstrapField.COMPARISON,
-                BootstrapField.MEAN_DELTA,
-                BootstrapField.CI_LOWER,
-                BootstrapField.CI_UPPER,
-                BootstrapField.EXCLUDES_ZERO,
-            ]
-        )
-        writer.writerow(
-            [
-                StatsField.PRIMARY_ENDPOINT,
-                ComparisonLabel.GLOBAL_VS_LOCAL,
-                primary.result.mean_delta,
-                primary.result.ci_lower,
-                primary.result.ci_upper,
-                primary.result.excludes_zero,
-            ]
-        )
-        for scope, comparisons in secondary.items():
-            for comp, summary in comparisons.items():
-                writer.writerow(
-                    [
-                        scope,
-                        comp,
-                        summary.result.mean_delta,
-                        summary.result.ci_lower,
-                        summary.result.ci_upper,
-                        summary.result.excludes_zero,
-                    ]
-                )
+    _write_bootstrap_csv(csv_path, primary, secondary)
+    logger.info("workflow completed", workflow=Workflow.REPORT_STATS)
     return (json_path, csv_path)
 
 
@@ -505,7 +516,7 @@ def _figure1_sidecar_data(
         SidecarField.SEED: s0g.run.seed,
         SidecarField.SEEDS: [s0g.run.seed],
         SidecarField.SOURCE_METRICS_FILES: [
-            str(
+            _json_path(
                 _result_path(
                     base_dir,
                     ExperimentStage.NBAIOT_MAIN,
@@ -513,7 +524,7 @@ def _figure1_sidecar_data(
                     s0g.run.seed,
                 )
             ),
-            str(
+            _json_path(
                 _result_path(
                     base_dir,
                     ExperimentStage.NBAIOT_MAIN,
@@ -554,14 +565,17 @@ def _figure1_sidecar_data(
             ThresholdPolicy.LOCAL_THRESHOLD,
         ],
         SidecarField.ELIGIBILITY_POLICY: "eligible-client intersection",
-        SidecarField.AXIS_LABELS: {"x": "Device", "y": "FPR"},
+        SidecarField.AXIS_LABELS: {
+            AxisName.X: AxisLabel.DEVICE,
+            AxisName.Y: AxisLabel.FPR,
+        },
         SidecarField.CLIENTS: [
             {
                 SidecarField.CLIENT_ID: cid,
-                ThresholdPolicy.GLOBAL_THRESHOLD: float(gv),
-                ThresholdPolicy.LOCAL_THRESHOLD: float(lv),
+                ThresholdPolicy.GLOBAL_THRESHOLD: gv,
+                ThresholdPolicy.LOCAL_THRESHOLD: lv,
             }
-            for cid, gv, lv in zip(ids1, g_fpr, l_fpr)
+            for cid, gv, lv in zip(ids1, floats_of(g_fpr), floats_of(l_fpr))
         ],
     }
 
@@ -583,7 +597,7 @@ def _figure2_sidecar_data(
         SidecarField.SEED: s0g.run.seed,
         SidecarField.SEEDS: [s0g.run.seed],
         SidecarField.SOURCE_METRICS_FILES: [
-            str(
+            _json_path(
                 _result_path(
                     base_dir,
                     ExperimentStage.NBAIOT_MAIN,
@@ -593,7 +607,7 @@ def _figure2_sidecar_data(
             )
         ],
         SidecarField.SOURCE_SCORE_MANIFESTS: [
-            str(
+            _json_path(
                 ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
                 .score_cell(
                     TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=s0g.run.seed)
@@ -626,7 +640,10 @@ def _figure2_sidecar_data(
         SidecarField.POLICIES: [ThresholdPolicy.GLOBAL_THRESHOLD],
         SidecarField.POLICY_ORDER: [ThresholdPolicy.GLOBAL_THRESHOLD],
         SidecarField.ELIGIBILITY_POLICY: f"selected eligible clients from GLOBAL_THRESHOLD seed {s0g.run.seed}",
-        SidecarField.AXIS_LABELS: {"x": "Reconstruction Error", "y": "Density"},
+        SidecarField.AXIS_LABELS: {
+            AxisName.X: AxisLabel.RECONSTRUCTION_ERROR,
+            AxisName.Y: "Density",
+        },
         SidecarField.TAU_GLOBAL: tau_g,
         SidecarField.CLIENT_IDS: client_ids,
         SidecarField.CLIENT_SELECTION_RULE: CLIENT_SELECTION_RULE,
@@ -647,7 +664,7 @@ def _figure3_sidecar_data(
         SidecarField.DATASET: DatasetID.NBAIOT,
         SidecarField.STAGE: ExperimentStage.NBAIOT_MAIN,
         SidecarField.SOURCE_METRICS_FILES: [
-            str(_result_path(base_dir, ExperimentStage.NBAIOT_MAIN, b, s))
+            _json_path(_result_path(base_dir, ExperimentStage.NBAIOT_MAIN, b, s))
             for b in b_enums
             for s in seeds
         ],
@@ -675,20 +692,22 @@ def _figure3_sidecar_data(
         SidecarField.SEED_SCOPE: SeedScope.ALL_SEEDS,
         SidecarField.VALIDATION_STATUS: AuditStatus.PASS,
         SidecarField.POLICIES: [e for e in b_enums],
-        SidecarField.PAIRED_SEED_CV_FPR_DELTA: [
-            float(x)
-            for x in _paired_deltas(
+        SidecarField.PAIRED_SEED_CV_FPR_DELTA: _json_floats(
+            _paired_deltas(
                 nbaiot,
                 ThresholdPolicy.GLOBAL_THRESHOLD,
                 ThresholdPolicy.LOCAL_THRESHOLD,
             )
-        ],
+        ),
         SidecarField.SEED_AGGREGATION_POLICY: "eligible-client FPR values pooled across configured seeds after intersection",
         SidecarField.POLICY_ORDER: [e for e in b_enums],
         SidecarField.ELIGIBILITY_POLICY: "eligible-client intersection within each seed",
-        SidecarField.AXIS_LABELS: {"x": "ThresholdPolicy", "y": "FPR"},
+        SidecarField.AXIS_LABELS: {
+            AxisName.X: AxisLabel.THRESHOLD_POLICY,
+            AxisName.Y: AxisLabel.FPR,
+        },
         SidecarField.VALUES: {
-            pol: [[float(x) for x in arr] for arr in arrays]
+            pol: [_json_floats(arr) for arr in arrays]
             for pol, arrays in fpr_pol.items()
         },
     }
@@ -709,7 +728,16 @@ def _convergence_summary_warnings(
     return warnings
 
 
-def _json_text_values(values: Iterable[str]) -> list[JsonValue]:
+def _json_floats(values: Sequence[float] | ScoreVector) -> list[JsonValue]:
+    converted: list[JsonValue] = list(floats_of(values))
+    return converted
+
+
+def _json_path(path: Path) -> NarrativeText:
+    return path.as_posix()
+
+
+def _json_text_values(values: Iterable[NarrativeText]) -> list[JsonValue]:
     output: list[JsonValue] = []
     for value in values:
         output.append(value)
@@ -717,6 +745,7 @@ def _json_text_values(values: Iterable[str]) -> list[JsonValue]:
 
 
 def build_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
+    logger.info("workflow started", workflow=Workflow.REPORT_FIGURES)
     fig_dir = base_dir / ArtifactDir.FIGURES
     fig_dir.mkdir(parents=True, exist_ok=True)
     nbaiot = _load_results(
@@ -798,9 +827,15 @@ def build_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
             base_dir, nbaiot, fpr_pol, b_enums, tuple(cfg.experiment.seeds)
         ),
     )
-    p3 = _figure_files(generate_figure3(fpr_pol, fig_dir, cfg.reporting.style))
+    p3 = _figure_files(
+        generate_figure3(
+            fpr_pol, fig_dir, cfg.reporting.style, len(cfg.experiment.seeds)
+        )
+    )
 
-    return (sc1, *p1, sc2, *p2, sc3, *p3)
+    workflow_result = (sc1, *p1, sc2, *p2, sc3, *p3)
+    logger.info("workflow completed", workflow=Workflow.REPORT_FIGURES)
+    return workflow_result
 
 
 _FIGURE_5_PANELS: tuple[
@@ -846,6 +881,7 @@ _FIGURE_6_PANELS: tuple[
 
 
 def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
+    logger.info("workflow started", workflow=Workflow.REPORT_POISONING_FIGURES)
     manifest = load_poisoning_manifest(base_dir)
     fig_dir = base_dir / ArtifactDir.FIGURES
     fig_dir.mkdir(parents=True, exist_ok=True)
@@ -871,11 +907,12 @@ def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]
         for obj, src, metric, label in _FIGURE_6_PANELS
     }
 
+    robustness = claim_robustness_cells(manifest)
     sidecars: list[Path] = []
     figure5_values: JsonValue = {
         panel: {
             policy: {
-                client_id: [float(value) for value in values]
+                client_id: _json_floats(values)
                 for client_id, values in by_client.items()
             }
             for policy, by_client in policies.items()
@@ -883,15 +920,25 @@ def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]
         for panel, policies in client_effects.items()
     }
     figure6_values: JsonValue = {
-        panel: {
-            policy: [float(value) for value in values]
-            for policy, values in policies.items()
-        }
+        panel: {policy: _json_floats(values) for policy, values in policies.items()}
         for panel, policies in seed_effects.items()
+    }
+    figure7_values: JsonValue = {
+        AnalysisColumn.CELLS: [
+            {
+                AnalysisColumn.SOURCE: c.source,
+                AnalysisColumn.POLICY: c.policy,
+                AnalysisColumn.FRACTION: c.fraction,
+                AnalysisColumn.SHARE_FULL_VULNERABILITY: c.primary,
+                AnalysisColumn.SHARE_FULL_VULNERABILITY_ABSOLUTE_CONTROL_GATE: c.absolute,
+            }
+            for c in robustness
+        ]
     }
     for name, data in (
         (FigureName.FIGURE_5, figure5_values),
         (FigureName.FIGURE_6, figure6_values),
+        (FigureName.FIGURE_7, figure7_values),
     ):
         sidecar: JsonRecord = {
             SidecarField.FIGURE: name,
@@ -911,7 +958,16 @@ def build_poisoning_figures(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]
         )
     p5 = _figure_files(generate_figure5(client_effects, fig_dir, cfg.reporting.style))
     p6 = _figure_files(generate_figure6(seed_effects, fig_dir, cfg.reporting.style))
-    return (*sidecars, *p5, *p6)
+    p7 = _figure_files(
+        generate_figure7(
+            robustness,
+            fig_dir,
+            cfg.reporting.style,
+        )
+    )
+    workflow_result = (*sidecars, *p5, *p6, *p7)
+    logger.info("workflow completed", workflow=Workflow.REPORT_POISONING_FIGURES)
+    return workflow_result
 
 
 def _per_victim_seed_values(
@@ -929,7 +985,7 @@ def _seed_means(
     by_seed: dict[RandomSeed, list[ScoreValue]] = defaultdict(list)
     for r in rows:
         by_seed[r.training_seed].append(_panel_metric_value(r, metric))
-    return [float(np.nanmean(v)) for _, v in sorted(by_seed.items())]
+    return [nanmean_of(v) for _, v in sorted(by_seed.items())]
 
 
 def _panel_metric_value(row: BoundedSweepResultRow, metric: MetricName) -> ScoreValue:
@@ -945,6 +1001,7 @@ def _panel_metric_value(row: BoundedSweepResultRow, metric: MetricName) -> Score
 
 
 def build_tables(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
+    logger.info("workflow started", workflow=Workflow.REPORT_TABLES)
     t3 = generate_table3(
         _load_results(
             base_dir,
@@ -956,10 +1013,13 @@ def build_tables(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         base_dir / ArtifactDir.TABLES,
         cfg.reporting.style,
     )
-    return (t3, t3.with_suffix(".csv"))
+    workflow_result = (t3, t3.with_suffix(".csv"))
+    logger.info("workflow completed", workflow=Workflow.REPORT_TABLES)
+    return workflow_result
 
 
 def validate_results(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
+    logger.info("workflow started", workflow=Workflow.REPORT_VALIDATION)
     _load_results(
         base_dir,
         ExperimentStage.NBAIOT_MAIN,
@@ -967,7 +1027,7 @@ def validate_results(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         tuple(cfg.experiment.seeds),
         cfg.reporting.metric_tol,
     )
-    return (
+    workflow_result = (
         write_json_atomic(
             base_dir / ArtifactDir.ANALYSIS / ArtifactFile.METRICS_SCHEMA_VALIDATION,
             {
@@ -978,9 +1038,12 @@ def validate_results(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
             },
         ),
     )
+    logger.info("workflow completed", workflow=Workflow.REPORT_VALIDATION)
+    return workflow_result
 
 
 def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
+    logger.info("workflow started", workflow=Workflow.REPORT_BASELINE)
     _REPORTING_SOURCES.clear()
     paths: list[Path] = []
     failures: list[NarrativeText] = []
@@ -999,20 +1062,20 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
     audit: JsonRecord = {
         AuditField.SCHEMA_VERSION: REPORTING_AUDIT_SCHEMA_VERSION,
         AuditField.GENERATED_TABLES: _json_text_values(
-            str(p)
+            _json_path(p)
             for p in paths
             if p.suffix in {PathToken.TEX_EXT, PathToken.CSV_EXT}
             and ArtifactDir.TABLES in p.parts
         ),
         AuditField.GENERATED_FIGURES: _json_text_values(
-            str(p)
+            _json_path(p)
             for p in paths
             if p.suffix in {PathToken.PDF_EXT, PathToken.PNG_EXT, PathToken.JSON_EXT}
             and ArtifactDir.FIGURES in p.parts
         ),
         AuditField.SOURCE_METRICS_FILES: _json_text_values(sorted(_REPORTING_SOURCES)),
         AuditField.SOURCE_SCORE_MANIFESTS: _json_text_values(
-            str(
+            _json_path(
                 ArtifactLayout(base_dir=base_dir, stage=ExperimentStage.NBAIOT_MAIN)
                 .score_cell(
                     TrainingCellId(
@@ -1030,11 +1093,13 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
         else AuditStatus.PASS,
         AuditField.RECOMPUTATION_CHECKS: "canonical confusion-matrix recomputation during load",
         AuditField.COVERAGE_CHECKS: "explicit eligible_ids/pending_ids/eval_incomplete_ids required",
-        AuditField.MISSING_FIELD_CHECKS: "validate_metrics_payload",
+        AuditField.MISSING_FIELD_CHECKS: "SweepMetrics.model_validate",
         AuditField.STALE_ARTIFACT_CHECKS: "schema/provenance/sidecar checks",
         AuditField.DESCRIPTIVE_FIGURE_CHECKS: f"representative-seed sidecar validation for {sorted(_REPRESENTATIVE_SEED_FIGURES)}",
         AuditField.CONVERGENCE_METADATA_CHECKS: "warn if a score cell has no convergence summary",
-        AuditField.FIGURE_TABLE_OUTPUT_PATHS: _json_text_values(str(p) for p in paths),
+        AuditField.FIGURE_TABLE_OUTPUT_PATHS: _json_text_values(
+            _json_path(p) for p in paths
+        ),
         AuditField.WARNINGS: _json_text_values(warnings),
         AuditField.FAILURES: _json_text_values(failures),
     }
@@ -1047,7 +1112,9 @@ def build_all(base_dir: Path, cfg: DatpConfig) -> tuple[Path, ...]:
 
     if failures:
         raise ValueError(f"reporting_audit contains failures: {failures}")
-    return tuple(paths)
+    workflow_result = tuple(paths)
+    logger.info("workflow completed", workflow=Workflow.REPORT_BASELINE)
+    return workflow_result
 
 
 logger = get_logger(__name__)
@@ -1069,13 +1136,9 @@ def _copy_into(source: Path, destination_dir: Path) -> Path:
 
 
 def build_report_package(
-    *, base_dir: Path, results_dir: Path, data_root: Path, cfg: DatpConfig
+    *, base_dir: Path, results_dir: Path, cfg: DatpConfig
 ) -> tuple[Path, ...]:
-    audit_dir = base_dir / AuditDir.AUDIT
-    audit_outputs: AuditOutputPaths = run_results_audit(
-        base_dir, audit_dir, cfg, data_root
-    )
-    audit_paths = tuple(path for _, path in audit_outputs.items())
+    logger.info("report package started", base_dir=base_dir, results_dir=results_dir)
     analysis_paths = (
         *build_all(base_dir, cfg),
         *build_poisoning_summaries(base_dir),
@@ -1090,7 +1153,6 @@ def build_report_package(
     _reset_package_dir(base_dir, results_dir)
     packaged = [
         write_resolved_config(cfg, results_dir / PackageDir.CONFIG),
-        *(_copy_into(path, results_dir / PackageDir.AUDIT) for path in audit_paths),
         *(
             _copy_into(path, results_dir / PackageDir.MANIFESTS)
             for path in manifest_paths

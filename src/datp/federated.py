@@ -21,6 +21,8 @@ import torch
 import torch.nn as nn
 from flwr.client import Client, ClientApp, NumPyClient
 from flwr.common import (
+    Config,
+    Metrics,
     Context,
     EvaluateIns,
     EvaluateRes,
@@ -28,7 +30,6 @@ from flwr.common import (
     FitRes,
     NDArrays,
     Parameters,
-    Scalar,
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
@@ -37,7 +38,8 @@ from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.serverapp_components import ServerAppComponents
 from flwr.server.strategy import FedAvg
-from flwr.simulation.run_simulation import BackendConfig, run_simulation
+from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
+from flwr.simulation.run_simulation import run_simulation
 
 from datp import configure_runtime_env
 from datp.artifacts import ArtifactLayout
@@ -56,6 +58,11 @@ from datp.data import (
     validate_tensor_input,
 )
 from datp.enums import (
+    Workflow,
+    CheckpointKey,
+    ConvergenceColumn,
+    ServerMetricKey,
+    EnvironmentVariable,
     ArtifactFile,
     ConvergenceStatus,
     ConvergenceSummaryKey,
@@ -190,7 +197,10 @@ def save_convergence_artifacts(
     summary_path = out_dir / ArtifactFile.CONVERGENCE_SUMMARY
     df = pd.DataFrame(
         [
-            {"round": i, "fedavg_weighted_benign_val_loss": loss}
+            {
+                ConvergenceColumn.ROUND: i,
+                ConvergenceColumn.FEDAVG_WEIGHTED_BENIGN_VAL_LOSS: loss,
+            }
             for i, loss in enumerate(loss_history, start=1)
         ]
     )
@@ -219,6 +229,7 @@ def save_convergence_artifacts(
     )
     curve_tmp.rename(curve_path)
     summary_tmp.rename(summary_path)
+    logger.debug("convergence artifacts written", out_dir=out_dir)
 
 
 TRAINING_SPLITS: tuple[Split, ...] = (Split.TRAIN, Split.CAL)
@@ -304,7 +315,7 @@ def load_client_data(
 
 class _Loss(Protocol):
     def backward(self) -> None: ...
-    def item(self) -> float: ...
+    def item(self) -> ScoreValue: ...
 
 
 class _Optimizer(Protocol):
@@ -383,12 +394,12 @@ class DatpClient(NumPyClient):
         self._batch_size = cfg.machine.batch_size_train
         self._lr = cfg.model.lr
 
-    def get_parameters(self, config: dict[str, Scalar]) -> NDArrays:
+    def get_parameters(self, config: Config) -> NDArrays:
         return get_parameters(self.model)
 
     def fit(
-        self, parameters: NDArrays, config: dict[str, Scalar]
-    ) -> tuple[NDArrays, SampleCount, dict[str, Scalar]]:
+        self, parameters: NDArrays, config: Config
+    ) -> tuple[NDArrays, SampleCount, Metrics]:
         set_parameters(self.model, parameters)
         self.model.train()
         last_loss = train_local(
@@ -408,8 +419,8 @@ class DatpClient(NumPyClient):
         )
 
     def evaluate(
-        self, parameters: NDArrays, config: dict[str, Scalar]
-    ) -> tuple[float, SampleCount, dict[str, Scalar]]:
+        self, parameters: NDArrays, config: Config
+    ) -> tuple[ScoreValue, SampleCount, Metrics]:
         set_parameters(self.model, parameters)
         loss = evaluate_benign(self.model, self.cal_data)
         return (
@@ -521,7 +532,6 @@ def make_client_fn(
     return _inline_client_fn
 
 
-_RAY_MEMORY_ENV_KEY = "RAY_memory_usage_threshold"
 _BYTES_PER_MIB = 1024**2
 
 
@@ -531,16 +541,20 @@ class ClientResources(TypedDict):
 
 
 def ensure_ray_memory_threshold(threshold: Threshold) -> None:
-    current = os.environ.get(_RAY_MEMORY_ENV_KEY)
+    current = os.environ.get(EnvironmentVariable.RAY_MEMORY_USAGE_THRESHOLD)
     if current is None:
-        os.environ[_RAY_MEMORY_ENV_KEY] = str(threshold)
+        os.environ[EnvironmentVariable.RAY_MEMORY_USAGE_THRESHOLD] = str(threshold)
         return
     try:
         val = float(current)
     except ValueError as exc:
-        raise RuntimeError(f"{_RAY_MEMORY_ENV_KEY} invalid float: {current}") from exc
+        raise RuntimeError(
+            f"{EnvironmentVariable.RAY_MEMORY_USAGE_THRESHOLD} invalid float: {current}"
+        ) from exc
     if val > threshold:
-        raise RuntimeError(f"{_RAY_MEMORY_ENV_KEY} too high: {val} > {threshold}")
+        raise RuntimeError(
+            f"{EnvironmentVariable.RAY_MEMORY_USAGE_THRESHOLD} too high: {val} > {threshold}"
+        )
 
 
 def _available_ram_mib() -> ByteCount:
@@ -573,11 +587,13 @@ def derive_client_resources(machine: MachineConfig) -> ClientResources:
 
     num_cpus_per_actor = max(1, math.ceil(cpu_count / max_concurrent))
     num_gpus = machine.ray_num_gpus_per_client if machine.require_cuda else 0.0
-    return {"num_cpus": float(num_cpus_per_actor), "num_gpus": num_gpus}
+    return ClientResources(num_cpus=float(num_cpus_per_actor), num_gpus=num_gpus)
 
 
-def _client_order(result: tuple[ClientProxy, FitRes | EvaluateRes]) -> str:
-    return str(result[1].metrics[ClientMetricKey.CLIENT_ID])
+def _client_order(
+    result: tuple[ClientProxy, FitRes | EvaluateRes],
+) -> ClientId:
+    return ClientId(str(result[1].metrics[ClientMetricKey.CLIENT_ID]))
 
 
 class DatpFedAvg(FedAvg):
@@ -638,7 +654,7 @@ class DatpFedAvg(FedAvg):
         server_round: RoundIndex,
         results: list[tuple[ClientProxy, FitRes]],
         failures: list[tuple[ClientProxy, FitRes] | BaseException],
-    ) -> tuple[Parameters | None, dict[str, Scalar]]:
+    ) -> tuple[Parameters | None, Metrics]:
         self._raise_if_failures(FederatedRoundStage.FIT, server_round, failures)
         aggregated = super().aggregate_fit(
             server_round, sorted(results, key=_client_order), failures
@@ -676,7 +692,7 @@ class DatpFedAvg(FedAvg):
         server_round: RoundIndex,
         results: list[tuple[ClientProxy, EvaluateRes]],
         failures: list[tuple[ClientProxy, EvaluateRes] | BaseException],
-    ) -> tuple[ScoreValue | None, dict[str, Scalar]]:
+    ) -> tuple[ScoreValue | None, Metrics]:
         self._raise_if_failures(FederatedRoundStage.EVALUATE, server_round, failures)
         if not results:
             return None, {}
@@ -694,7 +710,7 @@ class DatpFedAvg(FedAvg):
         if self._monitor.should_stop(server_round):
             self._stopped = True
 
-        return weighted_loss, {"weighted_val_loss": weighted_loss}
+        return weighted_loss, {ServerMetricKey.WEIGHTED_VAL_LOSS: weighted_loss}
 
 
 @dataclass(frozen=True, slots=True)
@@ -713,6 +729,7 @@ def _run_flower_simulation(
     strategy: DatpFedAvg,
     num_clients: SampleCount,
 ) -> None:
+    logger.info("workflow started", workflow=Workflow.FEDERATED_SIMULATION)
     configure_runtime_env()
     ensure_ray_memory_threshold(cfg.runtime.ray_memory_threshold)
     client_resources = derive_client_resources(cfg.machine)
@@ -743,6 +760,7 @@ def _run_flower_simulation(
             },
         ),
     )
+    logger.info("workflow completed", workflow=Workflow.FEDERATED_SIMULATION)
 
 
 def _scoring_data(
@@ -786,6 +804,7 @@ def run_fl_training(
     prepared_dir: Path | None = None,
     output_layout: ArtifactLayout | None = None,
 ) -> TrainingResult:
+    logger.info("workflow started", workflow=Workflow.FEDERATED_TRAINING)
     if cfg.stage is None:
         raise ValueError("stage must be set in config")
     stage = cfg.stage
@@ -828,6 +847,26 @@ def run_fl_training(
         raise RuntimeError("Final aggregated parameters unavailable")
     set_parameters(model, strategy.latest_parameters)
 
+    model_layout = output_layout or ArtifactLayout(
+        base_dir=base_dir if base_dir is not None else Path("."), stage=stage
+    )
+    checkpoint_path = model_layout.model_checkpoint(
+        TrainingCellId(stage=stage, seed=seed)
+    )
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint_tmp = checkpoint_path.with_suffix(f"{checkpoint_path.suffix}.tmp")
+    torch.save(
+        {
+            CheckpointKey.STATE_DICT.value: {
+                name: tensor.detach().cpu()
+                for name, tensor in model.state_dict().items()
+            },
+            CheckpointKey.MODEL_CONFIG.value: cfg.model.model_dump(mode="json"),
+        },
+        checkpoint_tmp,
+    )
+    checkpoint_tmp.replace(checkpoint_path)
+
     score_clients(
         model=model,
         client_data=_scoring_data(client_data, prepared_dir, cfg.model.input_dim),
@@ -839,7 +878,7 @@ def run_fl_training(
     )
     save_convergence_artifacts(score_base, monitor, cfg.federation.convergence)
 
-    return TrainingResult(
+    workflow_result = TrainingResult(
         stage=stage,
         seed=seed,
         converged_round=converged_round,
@@ -847,3 +886,5 @@ def run_fl_training(
         score_dir=score_base,
         loss_history=monitor.loss_history,
     )
+    logger.info("workflow completed", workflow=Workflow.FEDERATED_TRAINING)
+    return workflow_result

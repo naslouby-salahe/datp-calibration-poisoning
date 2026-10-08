@@ -8,20 +8,29 @@ from typing import Literal, Protocol, cast
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 from numpy.typing import NDArray
 
 from datp.config import StyleConfig
+from datp.core import get_logger
 from datp.enums import (
+    ControlGate,
+    AxisLabel,
+    TableColumn,
+    AxisName,
     MAIN_BODY_POLICIES,
     FigureName,
     MetricName,
     NBaIoTDevice,
+    PoisoningSourceStrategy,
     ReportTerm,
     ThresholdPolicy,
 )
 from datp.evaluation import EvaluationResult
 from datp.types import (
+    SeedCount,
+    ColorName,
     ClassificationScore,
     ClientId,
     FalsePositiveRate,
@@ -37,6 +46,7 @@ from datp.types import (
     Threshold,
     TruePositiveRate,
 )
+from datp.statistics import mean_of, nanmean_of, percentile_of, std_of
 
 NBAIOT_DEVICE_SHORT_LABELS: dict[NBaIoTDevice, NarrativeText] = {
     NBaIoTDevice.DANMINI_DOORBELL: "Danmini DB",
@@ -51,16 +61,26 @@ NBAIOT_DEVICE_SHORT_LABELS: dict[NBaIoTDevice, NarrativeText] = {
 }
 
 
+SOURCE_LABELS: dict[PoisoningSourceStrategy, NarrativeText] = {
+    PoisoningSourceStrategy.RANDOM_BENIGN: "random benign",
+    PoisoningSourceStrategy.HIGH_SCORE_BENIGN: "high score benign",
+    PoisoningSourceStrategy.LOW_SCORE_BENIGN: "low score benign",
+    PoisoningSourceStrategy.RANDOM_TRAIN_FEATURE_BENIGN: "random train feature benign",
+    PoisoningSourceStrategy.HIGH_SCORE_TRAIN_FEATURE_BENIGN: "high score train feature benign",
+    PoisoningSourceStrategy.LOW_SCORE_TARGETED_REMOVAL_DIAGNOSTIC_ONLY: "low score targeted removal",
+}
+
+
 REPORTING_AUDIT_SCHEMA_VERSION: SchemaVersion = "1"
+
+
+REPRESENTATIVE_SEED_PHRASE: NarrativeText = "representative seed"
 
 
 SEED_SELECTION_RULE: NarrativeText = "training seed whose GLOBAL_THRESHOLD CV(FPR) is the lower median across all training seeds"
 
 
 CLIENT_SELECTION_RULE: NarrativeText = "clients with the lowest, median and highest GLOBAL_THRESHOLD FPR in the representative seed"
-
-
-POISONING_FIGURE_FRACTION: PoisonFraction = 0.40
 
 
 NOT_CONFIRMATORY_WARNING: NarrativeText = (
@@ -110,11 +130,11 @@ plt.rcParams.update(
 )
 
 
-_FONT_SIZE_KEY = "font.size"
+logger = get_logger(__name__)
 
 
 class _Patch(Protocol):
-    def set_facecolor(self, color: str) -> None: ...
+    def set_facecolor(self, color: ColorName) -> None: ...
     def set_alpha(self, alpha: float) -> None: ...
 
 
@@ -129,65 +149,90 @@ class _Axes(Protocol):
         height: Sequence[float],
         width: float,
         *,
-        label: str,
-        color: str,
+        label: NarrativeText,
+        color: ColorName,
     ) -> None: ...
-    def set(self, **kwargs: str) -> None: ...
+    def set(self, **kwargs: NarrativeText) -> None: ...
     def set_xticks(
-        self, ticks: NDArray[np.generic], labels: Sequence[str] | None = None
+        self, ticks: NDArray[np.generic], labels: Sequence[NarrativeText] | None = None
     ) -> None: ...
     def set_xticklabels(
-        self, labels: Sequence[str], **kwargs: str | float | int
+        self, labels: Sequence[NarrativeText], **kwargs: NarrativeText | float | int
     ) -> None: ...
-    def legend(self, **kwargs: str | float | int) -> None: ...
+    def legend(self, **kwargs: NarrativeText | float | int) -> None: ...
     def plot(
         self,
         x: NDArray[np.generic],
         y: NDArray[np.generic],
-        **kwargs: str | float | int,
+        **kwargs: NarrativeText | float | int,
     ) -> None: ...
-    def axvline(self, x: float, **kwargs: str | float | int) -> None: ...
+    def axvline(self, x: float, **kwargs: NarrativeText | float | int) -> None: ...
     def boxplot(
-        self, data: Sequence[NDArray[np.generic]], **kwargs: bool | Sequence[str]
+        self,
+        data: Sequence[NDArray[np.generic]],
+        **kwargs: bool | Sequence[NarrativeText],
     ) -> _BoxplotOutput: ...
-    def tick_params(self, *, axis: str, **kwargs: str | float | int) -> None: ...
+    def tick_params(
+        self, *, axis: AxisName, **kwargs: NarrativeText | float | int
+    ) -> None: ...
     def fill_between(
         self,
         x: NDArray[np.generic],
         y1: NDArray[np.generic],
         y2: NDArray[np.generic],
-        **kwargs: str | float | int,
+        **kwargs: NarrativeText | float | int,
     ) -> None: ...
     def errorbar(
         self,
         x: Sequence[float],
         y: Sequence[float],
-        **kwargs: str | float | int | Sequence[Sequence[float]],
+        **kwargs: NarrativeText | float | int | Sequence[Sequence[float]],
     ) -> None: ...
-    def axhline(self, y: float, **kwargs: str | float | int) -> None: ...
+    def axhline(self, y: float, **kwargs: NarrativeText | float | int) -> None: ...
     def scatter(
         self,
         x: NDArray[np.generic],
         y: NDArray[np.generic],
-        **kwargs: str | float | int,
+        **kwargs: NarrativeText | float | int,
     ) -> None: ...
     def hlines(
-        self, y: float, xmin: float, xmax: float, **kwargs: str | float | int
+        self, y: float, xmin: float, xmax: float, **kwargs: NarrativeText | float | int
+    ) -> None: ...
+    def imshow(
+        self, data: NDArray[np.float64], **kwargs: NarrativeText | float
+    ) -> None: ...
+    def text(
+        self, x: float, y: float, s: NarrativeText, **kwargs: NarrativeText | float
+    ) -> None: ...
+    def set_yticks(self, ticks: NDArray[np.generic]) -> None: ...
+    def set_yticklabels(
+        self, labels: Sequence[NarrativeText], **kwargs: NarrativeText | float | int
+    ) -> None: ...
+    def set_title(
+        self, label: NarrativeText, **kwargs: NarrativeText | float | int
+    ) -> None: ...
+    def set_xlabel(
+        self, xlabel: NarrativeText, **kwargs: NarrativeText | float | int
     ) -> None: ...
 
 
 class _Figure(Protocol):
     def savefig(
-        self, fname: Path, *, dpi: int | None = None, bbox_inches: str | None = None
+        self,
+        fname: Path,
+        *,
+        dpi: SignedCount | None = None,
+        bbox_inches: Literal["tight"] | None = None,
     ) -> None: ...
     def tight_layout(self) -> None: ...
 
 
-def _save_figs(fig: plt.Figure, base_path: Path, dpi: SignedCount) -> Path:
+def _save_figs(fig: Figure, base_path: Path, dpi: SignedCount) -> Path:
     figure = cast(_Figure, fig)
     figure.savefig(base_path.with_suffix(".png"), dpi=dpi, bbox_inches="tight")
     figure.savefig(base_path.with_suffix(".pdf"), bbox_inches="tight")
     plt.close(fig)
+    logger.debug("figure written", path=base_path.with_suffix(".png"))
     return base_path.with_suffix(".png")
 
 
@@ -197,7 +242,7 @@ def generate_figure1(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams["font.size"] = style.font_size
     devices = sorted(per_device_fpr_global.keys())
     x, width = np.arange(len(devices)), 0.35
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
@@ -215,7 +260,7 @@ def generate_figure1(
             color=style.policy_colors[pol],
         )
 
-    ax.set(xlabel="Device", ylabel="FPR")
+    ax.set(xlabel=AxisLabel.DEVICE, ylabel=AxisLabel.FPR)
     ax.set_xticks(x)
     ax.set_xticklabels(
         [NBAIOT_DEVICE_SHORT_LABELS[NBaIoTDevice(d)] for d in devices],
@@ -236,11 +281,11 @@ def generate_figure2(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams["font.size"] = style.font_size
     fig, ax = plt.subplots(figsize=style.figsize_double_col)
     ax = cast(_Axes, ax)
     all_vals = np.concatenate([cal_errors[d] for d in device_ids if d in cal_errors])
-    x_clip = float(np.percentile(all_vals, 99))
+    x_clip = percentile_of(all_vals, 99)
 
     for dev_id in device_ids:
         if dev_id not in cal_errors:
@@ -262,7 +307,7 @@ def generate_figure2(
         linewidth=1.2,
         label="GLOBAL_THRESHOLD client-averaged threshold",
     )
-    ax.set(xlabel="Reconstruction Error", ylabel="ECDF")
+    ax.set(xlabel=AxisLabel.RECONSTRUCTION_ERROR, ylabel=AxisLabel.ECDF)
     ax.legend(fontsize=style.font_size - 1)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -273,8 +318,9 @@ def generate_figure3(
     fpr_by_policy: dict[ThresholdPolicy, list[ScoreVector]],
     output_dir: Path,
     style: StyleConfig,
+    seed_count: SeedCount,
 ) -> Path:
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams["font.size"] = style.font_size
     fig, ax = plt.subplots(figsize=style.figsize_single_col)
     ax = cast(_Axes, ax)
     policies = sorted(fpr_by_policy.keys())
@@ -289,9 +335,10 @@ def generate_figure3(
         patch.set_alpha(0.6)
 
     ax.set(
-        ylabel="FPR", title="Per-client FPR Distribution (eligible clients, 10 seeds)"
+        ylabel=AxisLabel.FPR,
+        title=f"Per-client FPR Distribution (eligible clients, {seed_count} seeds)",
     )
-    ax.tick_params(axis="x", labelrotation=30)
+    ax.tick_params(axis=AxisName.X, labelrotation=30)
     fig.tight_layout()
     output_dir.mkdir(parents=True, exist_ok=True)
     return _save_figs(fig, output_dir / FigureName.FIGURE_3, style.dpi)
@@ -304,7 +351,7 @@ def generate_figure5(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams["font.size"] = style.font_size
     panels = list(client_effects)
     fig, axes = plt.subplots(
         1, len(panels), figsize=style.figsize_double_col, squeeze=False
@@ -325,9 +372,9 @@ def generate_figure5(
                 if not vals:
                     continue
                 xs.append(j + (i - (len(policies) - 1) / 2) * width)
-                means.append(float(np.mean(vals)))
-                lows.append(float(np.mean(vals)) - min(vals))
-                highs.append(max(vals) - float(np.mean(vals)))
+                means.append(mean_of(vals))
+                lows.append(mean_of(vals) - min(vals))
+                highs.append(max(vals) - mean_of(vals))
             ax.errorbar(
                 xs,
                 means,
@@ -359,7 +406,7 @@ def generate_figure6(
     output_dir: Path,
     style: StyleConfig,
 ) -> Path:
-    plt.rcParams[_FONT_SIZE_KEY] = style.font_size
+    plt.rcParams["font.size"] = style.font_size
     panels = list(seed_effects)
     fig, axes = plt.subplots(
         1, len(panels), figsize=style.figsize_double_col, squeeze=False
@@ -378,9 +425,7 @@ def generate_figure6(
                 color=style.policy_colors[pol],
                 alpha=0.8,
             )
-            ax.hlines(
-                float(np.nanmean(vals)), i - 0.3, i + 0.3, color="black", linewidth=1.2
-            )
+            ax.hlines(nanmean_of(vals), i - 0.3, i + 0.3, color="black", linewidth=1.2)
         ax.axhline(0.0, color="black", linewidth=0.6, linestyle=":")
         ax.set_xticks(np.arange(len(policies)))
         ax.set_xticklabels(
@@ -395,7 +440,79 @@ def generate_figure6(
     return _save_figs(fig, output_dir / FigureName.FIGURE_6, style.dpi)
 
 
-MANDATORY_FOOTNOTE = (
+@dataclass(frozen=True, slots=True)
+class RobustnessCell:
+    source: PoisoningSourceStrategy
+    policy: ThresholdPolicy
+    fraction: PoisonFraction
+    primary: ScoreValue
+    absolute: ScoreValue
+
+
+def _share(cell: RobustnessCell, gate: ControlGate) -> ScoreValue:
+    match gate:
+        case ControlGate.DIRECTIONAL:
+            return cell.primary
+        case ControlGate.ABSOLUTE:
+            return cell.absolute
+
+
+def generate_figure7(
+    robustness: Sequence[RobustnessCell],
+    output_dir: Path,
+    style: StyleConfig,
+) -> Path:
+    plt.rcParams["font.size"] = style.font_size
+    rows = sorted({(r.source, r.policy) for r in robustness})
+    fractions = sorted({r.fraction for r in robustness})
+    panels = (
+        (
+            ControlGate.DIRECTIONAL,
+            "Directional control gate (primary)\nshare of gate settings: full vulnerability",
+        ),
+        (
+            ControlGate.ABSOLUTE,
+            "Absolute control gate (conservative)\nshare of gate settings: full vulnerability",
+        ),
+    )
+    fig, axes = plt.subplots(
+        1, len(panels), figsize=style.figsize_double_col, squeeze=False, sharey=True
+    )
+    lookup = {(r.source, r.policy, r.fraction): r for r in robustness}
+    for raw_ax, (gate, title) in zip(axes[0], panels):
+        ax = cast(_Axes, raw_ax)
+        grid = np.array(
+            [
+                [_share(lookup[(src, pol, frac)], gate) for frac in fractions]
+                for src, pol in rows
+            ]
+        )
+        ax.imshow(grid, vmin=0.0, vmax=1.0, cmap="Blues", aspect="auto")
+        for i in range(grid.shape[0]):
+            for j in range(grid.shape[1]):
+                ax.text(
+                    j,
+                    i,
+                    f"{grid[i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=style.font_size - 2,
+                    color="white" if grid[i, j] > 0.6 else "black",
+                )
+        ax.set_xticks(np.arange(len(fractions)))
+        ax.set_xticklabels([f"{f:.0%}" for f in fractions])
+        ax.set_xlabel("Poisoned fraction")
+        ax.set_title(title, fontsize=style.font_size)
+        ax.set_yticks(np.arange(len(rows)))
+        ax.set_yticklabels(
+            [f"{SOURCE_LABELS[src]} / {style.policy_labels[pol]}" for src, pol in rows],
+            fontsize=style.font_size - 2,
+        )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return _save_figs(fig, output_dir / FigureName.FIGURE_7, style.dpi)
+
+
+MANDATORY_FOOTNOTE: NarrativeText = (
     "† Eligible clients only. CV is the population standard deviation divided by the mean. "
     "Worst BA is the minimum per-client balanced accuracy, (TPR + TNR) / 2. "
     "P10 client Macro-F1 is the 10th percentile of per-client macro-F1, the mean of the benign-class and attack-class F1."
@@ -487,22 +604,7 @@ ThresholdPolicy & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ & Worst BA & P10 client 
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, lineterminator="\n")
-            writer.writerow(
-                [
-                    "ThresholdPolicy",
-                    "CV(FPR) mean",
-                    "CV(FPR) std",
-                    "CV(TPR) mean",
-                    "CV(TPR) std",
-                    "Worst BA mean",
-                    "Worst BA std",
-                    "P10 client Macro-F1 mean",
-                    "P10 client Macro-F1 std",
-                    "Eligible",
-                    "Pending",
-                    "Coverage",
-                ]
-            )
+            writer.writerow([AxisLabel.THRESHOLD_POLICY, *tuple(TableColumn)])
             for r in self.rows:
                 writer.writerow(
                     [
@@ -521,13 +623,12 @@ ThresholdPolicy & CV(FPR)$\\dagger$ & CV(TPR)$\\dagger$ & Worst BA & P10 client 
                     ]
                 )
             writer.writerow([f" {self.footnote}"])
+        logger.debug("table csv written", path=path, row_count=len(self.rows))
         return path
 
 
 def _mean_std(values: list[ScoreValue]) -> tuple[ScoreValue, ScoreValue]:
-    return float(np.mean(values)), float(np.std(values, ddof=1)) if len(
-        values
-    ) > 1 else 0.0
+    return mean_of(values), std_of(values, ddof=1) if len(values) > 1 else 0.0
 
 
 def _build_table_row(
@@ -581,4 +682,5 @@ def generate_table3(
     stem = output_dir / "table3_nbaiot"
     stem.with_suffix(".tex").write_text(table.to_latex(), encoding="utf-8")
     table.to_csv(stem.with_suffix(".csv"))
+    logger.debug("table written", path=stem.with_suffix(".tex"))
     return stem.with_suffix(".tex")

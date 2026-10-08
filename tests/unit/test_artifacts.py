@@ -3,20 +3,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pandas as pd
 import pytest
-from pydantic import BaseModel, ConfigDict
 
 from datp.artifacts import (
     ArtifactLayout,
     RunLifecycle,
     check_run_state,
-    write_csv,
     write_json_atomic,
 )
 from datp.config import ExperimentStage
 from datp.core import PolicyRunId, TrainingCellId
 from datp.enums import (
+    ProvenanceSentinel,
     ArtifactDir,
     ArtifactFile,
     RunState,
@@ -206,68 +204,6 @@ def test_no_zero_byte_placeholders(tmp_path: Path) -> None:
         assert not (run_dir / "mlflow_run.json").exists()
 
 
-class _FakeRecord(BaseModel):
-    """Mock Pydantic model for CSV writing tests."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-    name: str
-    value: int
-
-
-class TestWriteCsv:
-    """Tests verifying CSV serialization and formatting functions."""
-
-    def test_writes_valid_csv(self, tmp_path: Path) -> None:
-        """Verify that write_csv serializes Pydantic records with correct header fields."""
-        records = [_FakeRecord(name="a", value=1), _FakeRecord(name="b", value=2)]
-        path = tmp_path / "out.csv"
-        write_csv(path, records)
-
-        assert path.exists()
-        df = pd.read_csv(path)
-        assert list(df.columns) == ["name", "value"]
-        assert df.to_dict("records") == [
-            {"name": "a", "value": 1},
-            {"name": "b", "value": 2},
-        ]
-
-    def test_atomic_rename_no_tmp_remains(self, tmp_path: Path) -> None:
-        """Verify that no temp csv files remain in target folders after write_csv."""
-        records = [_FakeRecord(name="x", value=99)]
-        path = tmp_path / "data.csv"
-        write_csv(path, records)
-
-        assert path.exists()
-        assert not (tmp_path / "data.csv.tmp").exists()
-
-    def test_no_placeholder_before_write(self, tmp_path: Path) -> None:
-        """Verify that output files do not exist before write_csv runs."""
-        path = tmp_path / "out.csv"
-        assert not path.exists()
-        assert not (tmp_path / "out.csv.tmp").exists()
-
-    def test_overwrites_previous(self, tmp_path: Path) -> None:
-        """Verify that write_csv successfully overwrites existing CSV files."""
-        path = tmp_path / "out.csv"
-        write_csv(path, [_FakeRecord(name="old", value=1)])
-        write_csv(path, [_FakeRecord(name="new", value=2)])
-
-        df = pd.read_csv(path)
-        assert df.to_dict("records") == [{"name": "new", "value": 2}]
-
-    def test_empty_records_does_not_crash(self, tmp_path: Path) -> None:
-        """Verify that passing an empty list to write_csv runs successfully."""
-        path = tmp_path / "empty.csv"
-        write_csv(path, [])
-        assert path.exists()
-
-    def test_creates_parent_directories(self, tmp_path: Path) -> None:
-        """Verify that write_csv creates intermediate parent directories automatically."""
-        path = tmp_path / "deep" / "nested" / "out.csv"
-        write_csv(path, [_FakeRecord(name="d", value=1)])
-        assert path.exists()
-
-
 _OUTPUTS = Path(ArtifactDir.OUTPUTS)
 
 
@@ -417,7 +353,9 @@ class TestResultsExist:
         rdir = tmp_path / "results" / "nbaiot_main" / "global_threshold" / "seed_42"
         rdir.mkdir(parents=True)
         payload = valid_metrics_dict()
-        payload["provenance"]["score_artifact_identity"] = "MISSING_SCORE_HASH"
+        payload["provenance"]["score_artifact_identity"] = (
+            ProvenanceSentinel.MISSING_MANIFEST_HASH
+        )
         (rdir / "metrics.json").write_text(json.dumps(payload))
 
         assert (

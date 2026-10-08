@@ -35,6 +35,7 @@ from datp.config import (
 from datp.core import PolicyRunId, SeedPair, TrainingCellId
 from datp.enums import PoisoningSourceStrategy, ThresholdPolicy
 from datp.thresholding import (
+    ClusterHyperparams,
     EligibilityResult,
     compute_client_thresholds,
     compute_cluster,
@@ -219,14 +220,16 @@ def cluster_count(
     )
     result = compute_cluster(
         typed_cal_dict,
-        n_min=n_min,
-        tau_global=compute_tau_global(taus),
-        q=q,
-        random_state=random_state,
-        cluster_k=k,
-        n_init=n_init,
-        max_iter=max_iter,
-        run=run,
+        compute_tau_global(taus),
+        q,
+        ClusterHyperparams(
+            k=k,
+            n_init=n_init,
+            max_iter=max_iter,
+            random_state=random_state,
+            n_min=n_min,
+        ),
+        run,
     )
     if result.cluster is None:
         raise RuntimeError("cluster metadata must be set after CLUSTER_THRESHOLD run")

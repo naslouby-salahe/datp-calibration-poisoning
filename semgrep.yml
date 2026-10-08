@@ -26,3 +26,14 @@ rules:
       include:
         - /src/datp/**/*.py
     pattern: print(...)
+
+  - id: datp.no-any
+    languages: [python]
+    severity: ERROR
+    message: Model the value with a domain type instead of Any.
+    paths:
+      include:
+        - /src/datp/**/*.py
+    pattern-either:
+      - pattern: typing.Any
+      - pattern: from typing import Any

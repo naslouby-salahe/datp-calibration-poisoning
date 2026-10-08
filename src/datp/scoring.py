@@ -9,13 +9,14 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import torch
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import BaseModel, ValidationError
 
 from datp.artifacts import ArtifactLayout, write_json_atomic
 from datp.config import ExperimentStage
 from datp.core import TrainingCellId, get_logger, git_commit, hash_file, utc_timestamp
 from datp.data import ClientData, write_artifact
 from datp.enums import (
+    ErrorScope,
     SCORING_STAGES,
     ArtifactFile,
     ClientDataAttribute,
@@ -29,7 +30,6 @@ from datp.types import (
     BatchSize,
     ClientId,
     ContentHash,
-    JsonValue,
     NarrativeText,
     RandomSeed,
     SampleCount,
@@ -37,8 +37,7 @@ from datp.types import (
     ScoreValue,
     ScoreVector,
 )
-
-_MODULE = "scoring.manifest"
+from datp.statistics import count_of, max_of, min_of
 
 
 class ScoringColumn(enum.StrEnum):
@@ -75,15 +74,6 @@ class ScoringRecord(BaseModel):
     score_nan_count: SampleCount
     file_hash: ContentHash
 
-    @field_validator("dtypes", mode="before")
-    @classmethod
-    def _parse_dtypes(cls, value: JsonValue) -> JsonValue:
-        if isinstance(value, dict):
-            return [
-                {"column": column, "dtype": dtype} for column, dtype in value.items()
-            ]
-        return value
-
 
 class ScoringManifest(BaseModel):
     dataset: DatasetID
@@ -101,31 +91,6 @@ class ScoringManifest(BaseModel):
     records: tuple[ScoringRecord, ...]
     completion_status: ScoringManifestStatus
     generated_at_utc: NarrativeText | None = None
-
-
-class ScoringManifestAuditRecord(BaseModel):
-    model_config = ConfigDict(extra="ignore", frozen=True)
-
-    client_id: ClientId
-    split: ScoringStage
-
-
-class ScoringManifestAuditView(BaseModel):
-    model_config = ConfigDict(extra="ignore", frozen=True)
-
-    dataset: DatasetID | None = None
-    stage: ExperimentStage | None = None
-    seed: RandomSeed | None = None
-    model_hash: ContentHash | ScoringManifestSentinel = (
-        ScoringManifestSentinel.NOT_PROVIDED
-    )
-    expected_client_ids: tuple[ClientId, ...] = ()
-    expected_splits: tuple[ScoringStage, ...] = ()
-    actual_client_ids: tuple[ClientId, ...] = ()
-    actual_splits: tuple[ScoringStage, ...] = ()
-    score_column_name: ScoringColumn = ScoringColumn.RECONSTRUCTION_ERROR
-    records: tuple[ScoringManifestAuditRecord, ...] = ()
-    completion_status: ScoringManifestStatus | None = None
 
 
 class ScoringManifestContext(BaseModel):
@@ -150,7 +115,7 @@ def resolve_within_score_base(score_base: Path, candidate: Path) -> Path:
     )
     if not resolved_candidate.is_relative_to(resolved_base):
         raise ValueError(
-            f"[{_MODULE}] Path escapes scoring directory. Expected: {resolved_base}. Got: {resolved_candidate}."
+            f"[{ErrorScope.SCORING_MANIFEST}] Path escapes scoring directory. Expected: {resolved_base}. Got: {resolved_candidate}."
         )
     return resolved_candidate
 
@@ -174,10 +139,13 @@ def check_manifest_coverage(
         try:
             resolved_path = resolve_within_score_base(score_base, record_path)
         except ValueError:
-            invalid_files.append(str(record_path))
+            logger.warning(
+                "scoring record path escapes score directory", path=record_path
+            )
+            invalid_files.append(record_path.as_posix())
             continue
         if not resolved_path.exists():
-            missing_files.append(str(record_path))
+            missing_files.append(record_path.as_posix())
 
     return ScoringManifestCoverage(
         missing_pairs=missing_pairs,
@@ -191,7 +159,7 @@ def validate_scoring_manifest(score_base: Path) -> ScoringManifest:
     manifest_path = score_base / ArtifactFile.SCORING_MANIFEST
     if not manifest_path.exists():
         raise FileNotFoundError(
-            f"[{_MODULE}] Scoring manifest missing. Expected: {manifest_path}. Got: missing file."
+            f"[{ErrorScope.SCORING_MANIFEST}] Scoring manifest missing. Expected: {manifest_path}. Got: missing file."
         )
 
     try:
@@ -202,7 +170,7 @@ def validate_scoring_manifest(score_base: Path) -> ScoringManifest:
             for item in error.errors()
         ):
             raise ValueError(
-                f"[{_MODULE}] Scoring manifest incomplete. Expected: completion_status={ScoringManifestStatus.COMPLETE}. Got: invalid status."
+                f"[{ErrorScope.SCORING_MANIFEST}] Scoring manifest incomplete. Expected: completion_status={ScoringManifestStatus.COMPLETE}. Got: invalid status."
             ) from error
         raise
     coverage = check_manifest_coverage(manifest, score_base)
@@ -213,15 +181,17 @@ def validate_scoring_manifest(score_base: Path) -> ScoringManifest:
         or coverage.invalid_files
     ):
         raise ValueError(
-            f"[{_MODULE}] Scoring manifest incomplete. Expected: complete manifest with all expected score files. Got: status={manifest.completion_status}, missing={coverage.missing_pairs}, missing_files={coverage.missing_files}, invalid_files={coverage.invalid_files}."
+            f"[{ErrorScope.SCORING_MANIFEST}] Scoring manifest incomplete. Expected: complete manifest with all expected score files. Got: status={manifest.completion_status}, missing={coverage.missing_pairs}, missing_files={coverage.missing_files}, invalid_files={coverage.invalid_files}."
         )
+    logger.debug(
+        "scoring manifest validated",
+        score_base=score_base,
+        record_count=len(manifest.records),
+    )
     return manifest
 
 
 logger = get_logger(__name__)
-
-
-_MODULE_generation = "scoring.generation"
 
 
 def hash_model_state(model: Autoencoder) -> ContentHash:
@@ -258,7 +228,7 @@ def _score_output_path(
     filename = f"{client_id}{PathToken.PARQUET_EXT}"
     if Path(filename).name != filename:
         raise ValueError(
-            f"[{_MODULE_generation}] Invalid client id for score artifact path. Expected: client id without path separators. Got: {client_id}."
+            f"[{ErrorScope.SCORING_GENERATION}] Invalid client id for score artifact path. Expected: client id without path separators. Got: {client_id}."
         )
     out_path = score_base / stage / filename
     resolve_within_score_base(score_base, out_path)
@@ -275,8 +245,8 @@ def _score_record(
 ) -> ScoringRecord:
     finite = errors[np.isfinite(errors)]
     record_path = (
-        str(path.relative_to(score_base)) if score_base is not None else str(path)
-    )
+        path.relative_to(score_base) if score_base is not None else path
+    ).as_posix()
     return ScoringRecord(
         client_id=client_id,
         split=stage,
@@ -288,9 +258,9 @@ def _score_record(
                 column=ScoringColumn.RECONSTRUCTION_ERROR, dtype="Float32"
             ),
         ),
-        score_min=float(finite.min()) if finite.size else None,
-        score_max=float(finite.max()) if finite.size else None,
-        score_nan_count=int(np.isnan(errors).sum()),
+        score_min=min_of(finite) if finite.size else None,
+        score_max=max_of(finite) if finite.size else None,
+        score_nan_count=count_of(np.isnan(errors)),
         file_hash=hash_file(path),
     )
 
@@ -328,7 +298,7 @@ def _score_one_split(params: _SplitScoringParams) -> ScoringRecord:
     logger.debug(
         "wrote scores",
         n_scores=len(errors),
-        path=str(out_path),
+        path=out_path,
         client=params.client_id,
         stage=params.stage,
     )
@@ -409,6 +379,7 @@ def write_scoring_manifest_and_sentinel(
     sentinel = score_base / ArtifactFile.SCORING_SENTINEL
     sentinel.parent.mkdir(parents=True, exist_ok=True)
     sentinel.write_text(f"Scoring complete: {len(client_ids)} clients.\n")
+    logger.debug("scoring manifest and sentinel written", score_base=score_base)
 
 
 def score_clients(
@@ -422,9 +393,7 @@ def score_clients(
     scoring_batch_size: BatchSize,
 ) -> None:
     model.eval()
-    logger.info(
-        "scoring clients", n_clients=len(client_data), score_base=str(score_base)
-    )
+    logger.info("scoring clients", n_clients=len(client_data), score_base=score_base)
     records = score_clients_impl(
         client_data,
         score_base=score_base,
@@ -442,10 +411,7 @@ def score_clients(
             model_hash=hash_model_state(model),
         ),
     )
-    logger.info("scoring complete", score_base=str(score_base))
-
-
-_MODULE_loading = "scoring.loading"
+    logger.info("scoring complete", score_base=score_base)
 
 
 def read_score_column(path: Path) -> ScoreVector:
@@ -463,7 +429,7 @@ def load_parquets_from_dir(
 ) -> dict[ClientId, ScoreVector]:
     if not directory.is_dir():
         raise FileNotFoundError(
-            f"[{_MODULE_loading}] score directory {directory} not found."
+            f"[{ErrorScope.SCORING_LOADING}] score directory {directory} not found."
         )
 
     parquets = {
@@ -472,9 +438,12 @@ def load_parquets_from_dir(
     }
     if not allow_empty and not parquets:
         raise FileNotFoundError(
-            f"[{_MODULE_loading}] No parquet score artifacts at {directory}. Expected: at least one .parquet score artifact. Got: none."
+            f"[{ErrorScope.SCORING_LOADING}] No parquet score artifacts at {directory}. Expected: at least one .parquet score artifact. Got: none."
         )
 
+    logger.debug(
+        "score parquet files loaded", directory=directory, file_count=len(parquets)
+    )
     return parquets
 
 
@@ -486,20 +455,27 @@ def load_main_cal_errors(
     calibration_dir = layout.score_cell(cell).score_dir / ScoringStage.CAL
     if not calibration_dir.is_dir():
         raise FileNotFoundError(
-            f"[{_MODULE_loading}] score directory {calibration_dir} not found."
+            f"[{ErrorScope.SCORING_LOADING}] score directory {calibration_dir} not found."
         )
     score_files = sorted(calibration_dir.glob(PathToken.PARQUET_GLOB))
     if not score_files:
         raise FileNotFoundError(
-            f"[{_MODULE_loading}] No parquet score artifacts at {calibration_dir}. Expected: at least one .parquet score artifact. Got: none."
+            f"[{ErrorScope.SCORING_LOADING}] No parquet score artifacts at {calibration_dir}. Expected: at least one .parquet score artifact. Got: none."
         )
-    return {
+    cal_errors = {
         client_id: read_score_column(
             layout.score_file(cell, ScoringStage.CAL, client_id)
         )
         for score_file in score_files
         if (client_id := ClientId(score_file.stem))
     }
+    logger.debug(
+        "calibration scores loaded",
+        stage=stage,
+        seed=seed,
+        client_count=len(cal_errors),
+    )
+    return cal_errors
 
 
 class ScoreProvider:
@@ -510,7 +486,7 @@ class ScoreProvider:
         path = self.score_root / stage / f"{client_id}{PathToken.PARQUET_EXT}"
         if not path.exists():
             raise FileNotFoundError(
-                f"[{_MODULE_loading}] Missing {stage} score artifact for client '{client_id}'. Expected: {path}. Got: absent."
+                f"[{ErrorScope.SCORING_LOADING}] Missing {stage} score artifact for client '{client_id}'. Expected: {path}. Got: absent."
             )
         return read_score_column(path)
 
@@ -524,10 +500,10 @@ def validate_score_artifact(path: Path) -> None:
     schema = pl.read_parquet_schema(path)
     if list(schema.keys()) != [ScoringColumn.RECONSTRUCTION_ERROR]:
         raise ValueError(
-            f"[{_MODULE_loading}] Schema mismatch at {path}. Expected: columns: [{ScoringColumn.RECONSTRUCTION_ERROR}]. Got: columns: {list(schema.keys())}."
+            f"[{ErrorScope.SCORING_LOADING}] Schema mismatch at {path}. Expected: columns: [{ScoringColumn.RECONSTRUCTION_ERROR}]. Got: columns: {list(schema.keys())}."
         )
 
     if not schema[ScoringColumn.RECONSTRUCTION_ERROR].is_float():
         raise TypeError(
-            f"[{_MODULE_loading}] Column '{ScoringColumn.RECONSTRUCTION_ERROR}' has non-floating type. Expected: floating. Got: {schema[ScoringColumn.RECONSTRUCTION_ERROR]}."
+            f"[{ErrorScope.SCORING_LOADING}] Column '{ScoringColumn.RECONSTRUCTION_ERROR}' has non-floating type. Expected: floating. Got: {schema[ScoringColumn.RECONSTRUCTION_ERROR]}."
         )

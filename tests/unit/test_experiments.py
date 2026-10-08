@@ -267,14 +267,22 @@ class TestEnsureTrainedScores:
 
     @staticmethod
     def _request(tmp_path: Path, seed: int) -> PipelineRequest:
+        from datp.artifacts import ArtifactLayout
+
         (tmp_path / "prepared").mkdir(parents=True, exist_ok=True)
-        return PipelineRequest(
+        request = PipelineRequest(
             key=TrainingCellId(stage=ExperimentStage.NBAIOT_MAIN, seed=seed),
             policy=ThresholdPolicy.GLOBAL_THRESHOLD,
             cfg=MagicMock(),
             base_dir=tmp_path,
             prepared_dir=tmp_path / "prepared",
         )
+        checkpoint = ArtifactLayout(
+            base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN
+        ).model_checkpoint(request.key)
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint.touch()
+        return request
 
     def test_skips_training_when_scores_exist(self, tmp_path: Path) -> None:
         manifest = MagicMock(model_hash="model-hash")
@@ -288,6 +296,28 @@ class TestEnsureTrainedScores:
             result = ensure_trained_scores(self._request(tmp_path, 5))
 
         run_fl.assert_not_called()
+        assert result is manifest
+
+    def test_trains_when_model_checkpoint_is_missing(self, tmp_path: Path) -> None:
+        from datp.artifacts import ArtifactLayout
+
+        request = self._request(tmp_path, 7)
+        checkpoint = ArtifactLayout(
+            base_dir=tmp_path, stage=ExperimentStage.NBAIOT_MAIN
+        ).model_checkpoint(request.key)
+        checkpoint.unlink()
+        manifest = MagicMock(model_hash="model-hash")
+        with (
+            patch(
+                "datp.experiments.validate_scoring_manifest",
+                return_value=manifest,
+            ),
+            patch("datp.federated.load_client_data", return_value={"c1": object()}),
+            patch("datp.federated.run_fl_training") as run_fl,
+        ):
+            result = ensure_trained_scores(request)
+
+        run_fl.assert_called_once()
         assert result is manifest
 
     @pytest.mark.parametrize(
@@ -473,7 +503,7 @@ class TestSweepStep:
         assert SweepStep.INIT_SCORE_PROVIDER == "init_score_provider"
 
 
-_TOTAL_CELLS = 30
+_TOTAL_CELLS = 60
 
 
 class TestBuildExperimentMatrix:
@@ -495,11 +525,11 @@ class TestBuildExperimentMatrix:
         cells = build_experiment_matrix()
         assert all(isinstance(c, PolicyRunId) for c in cells)
 
-    def test_each_policy_has_ten_seeds(self):
+    def test_each_policy_has_twenty_seeds(self):
         cells = build_experiment_matrix()
         for policy in CONTROLLED_POLICIES:
             policy_cells = [c for c in cells if c.policy == policy]
-            assert len(policy_cells) == 10
+            assert len(policy_cells) == 20
 
 
 class TestValidateSweep:
@@ -616,9 +646,9 @@ class TestParallelSweep:
         (pool,) = _InlinePool.instances
         assert pool.max_workers == 3
         assert pool.mp_context.get_start_method() == "spawn"
-        assert groups == list(range(1, 11))
+        assert groups == list(range(1, 21))
         assert result.completed == _TOTAL_CELLS
-        assert result.skipped == 10
+        assert result.skipped == 20
         assert result.failed == 0
         log_dir = configure.call_args.args[1]
         assert log_dir.parent == tmp_path / "logs" / "workers"
@@ -634,7 +664,7 @@ class TestParallelSweep:
         ):
             run_sweep(base_dir=tmp_path, workers=64)
 
-        assert _InlinePool.instances[0].max_workers == 10
+        assert _InlinePool.instances[0].max_workers == 20
 
 
 class TestRunSweep:
@@ -669,6 +699,11 @@ class TestRunSweep:
         metrics_path.write_text(
             json.dumps(valid_metrics_dict("global_threshold", "nbaiot_main", 0))
         )
+        checkpoint_path = ArtifactLayout(
+            base_dir=tmp_path, stage=_STAGE
+        ).model_checkpoint(run.cell)
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.touch()
 
         _fail = RuntimeError("no data — mocked for unit test")
         with (

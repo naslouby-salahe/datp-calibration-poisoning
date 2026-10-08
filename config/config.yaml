@@ -37,7 +37,7 @@ threshold:
   cluster_random_state: 42
 
 experiment:
-  seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
 
 statistics:
   n_bootstrap: 10000
@@ -48,30 +48,40 @@ statistics:
 
 poisoning:
   policies: [global_threshold, local_threshold, cluster_threshold]
-  sources: [random_benign, high_score_benign, low_score_benign]
+  sources:
+    - random_benign
+    - high_score_benign
+    - low_score_benign
+    - random_train_feature_benign
+    - high_score_train_feature_benign
   objectives: [threshold_raise, threshold_lower]
   source_objective_pairs:
     - [random_benign, threshold_raise]
     - [random_benign, threshold_lower]
     - [high_score_benign, threshold_raise]
     - [low_score_benign, threshold_lower]
+    - [random_train_feature_benign, threshold_raise]
+    - [high_score_train_feature_benign, threshold_raise]
   fractions: [0.0, 0.1, 0.2, 0.4]
-  poisoning_seeds: [100, 101, 102, 103, 104, 105, 106, 107, 108, 109]
-  analysis_seeds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309]
+  poisoning_seeds: [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119]
+  analysis_seeds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319]
   tail_mass: 0.1
+  feature_tail_mass: 0.2
+  figure_fraction: 0.4
+  feature_donor_scope: cross_device
   materiality_factor: 0.1
   trim_fraction_primary: 0.05
   trim_fraction_appendix: 0.1
   mu_flag_divisor: 8.0
   victim_majority_threshold: 5
   iqr_floor_factor: 0.01
-  sign_consistency_threshold: 8  # at least 8/10 seed aggregates in the expected direction
+  sign_consistency_threshold: 16  # at least 16/20 seed aggregates in the expected direction
   scale_normalization_statistic_quantile: 50.0
-  permutation_max_exact_seeds: 16
+  permutation_max_exact_seeds: 20
   eps_num: 1.0e-12
 
 sensitivity:
-  sign_consistency_grid: [6, 7, 8, 9, 10]
+  sign_consistency_grid: [12, 14, 16, 18, 20]
   victim_majority_grid: [3, 4, 5, 6, 7]
   materiality_grid: [0.05, 0.1, 0.2]
   iqr_floor_grid: [0.005, 0.01, 0.02]

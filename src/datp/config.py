@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, cast
 
@@ -16,11 +15,13 @@ from pydantic import (
 )
 
 from datp.enums import (
+    ErrorScope,
     CONTROLLED_POLICIES,
     Activation,
     ArtifactFile,
     AttackerObjective,
     CalibrationInjectionRule,
+    FeatureDonorScope,
     LogLevel,
     NBaIoTBalancePolicy,
     PoisoningDefense,
@@ -167,6 +168,9 @@ class PoisoningParams(StrictModel):
     poisoning_seeds: tuple[RandomSeed, ...]
     analysis_seeds: tuple[RandomSeed, ...]
     tail_mass: PoisonFraction
+    feature_tail_mass: PoisonFraction
+    figure_fraction: PoisonFraction
+    feature_donor_scope: FeatureDonorScope
     materiality_factor: ScoreValue
     trim_fraction_primary: PoisonFraction
     trim_fraction_appendix: PoisonFraction
@@ -261,8 +265,11 @@ CLUSTER_RANDOM_STATE: RandomSeed = RandomSeed(
 )
 N_MIN: SampleCount = BASE_CONFIG.threshold.n_min
 TAIL_MASS: PoisonFraction = _POISONING.tail_mass
+FEATURE_TAIL_MASS: PoisonFraction = _POISONING.feature_tail_mass
+FEATURE_DONOR_SCOPE: FeatureDonorScope = _POISONING.feature_donor_scope
+POISONING_FIGURE_FRACTION: PoisonFraction = _POISONING.figure_fraction
 MATERIALITY_FACTOR: ScoreValue = _POISONING.materiality_factor
-THRESHOLD_QUANTILE: Threshold = float(BASE_CONFIG.threshold.q)
+THRESHOLD_QUANTILE: Threshold = BASE_CONFIG.threshold.q
 TRIM_FRACTION_PRIMARY: PoisonFraction = _POISONING.trim_fraction_primary
 TRIM_FRACTION_APPENDIX: PoisonFraction = _POISONING.trim_fraction_appendix
 CLUSTER_K_NBAIOT: ClusterCount = BASE_CONFIG.threshold.cluster_k_nbaiot
@@ -358,6 +365,8 @@ class CalibrationPoisoningConfig(StrictModel):
     n_min: SampleCount = Field(default=N_MIN, gt=0)
     cluster: ClusterConfig = ClusterConfig()
     tail_mass: PoisonFraction = Field(default=TAIL_MASS, gt=0.0, le=1.0)
+    feature_tail_mass: PoisonFraction = Field(default=FEATURE_TAIL_MASS, gt=0.0, le=1.0)
+    feature_donor_scope: FeatureDonorScope = FEATURE_DONOR_SCOPE
     mu_flag_threshold: Threshold | None = None
 
     @field_validator("policies")
@@ -386,19 +395,6 @@ class CalibrationPoisoningConfig(StrictModel):
         if not v:
             raise ValueError("Objectives must not be empty")
         return v
-
-    @field_validator("fractions", mode="before")
-    @classmethod
-    def validate_fractions(cls, v: object) -> object:
-        if isinstance(v, (str, bytes)) or not isinstance(v, Sequence):
-            return v
-        fractions = cast(Sequence[object], v)
-        if any(
-            isinstance(item, (int, float)) and not (0.0 <= item <= 1.0)
-            for item in fractions
-        ):
-            raise ValueError("Fractions must be within [0.0, 1.0]")
-        return fractions
 
     @field_validator("fractions")
     @classmethod
@@ -441,7 +437,7 @@ def run_config(
 ) -> DatpConfig:
     if policy not in CONTROLLED_POLICIES:
         raise ConfigError(
-            f"[config] {policy} invalid for {stage}. Expected: {sorted(CONTROLLED_POLICIES)}."
+            f"[{ErrorScope.CONFIG}] {policy} invalid for {stage}. Expected: {sorted(CONTROLLED_POLICIES)}."
         )
     return BASE_CONFIG.model_copy(
         update={"stage": stage, "policy": policy, "seed": seed}

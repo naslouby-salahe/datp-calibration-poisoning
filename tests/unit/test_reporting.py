@@ -33,10 +33,9 @@ from datp.core import (
 )
 from datp.enums import (
     ArtifactDir,
+    ClaimClassification,
     AttackerObjective,
-    AuditDir,
     ClientStatus,
-    ConfusionKey,
     DatasetID,
     EvidenceRole,
     FigureName,
@@ -73,11 +72,11 @@ from datp.reporting.figures import (
     generate_table3,
 )
 from datp.reporting.poisoning import (
+    _classify_claim,
     build_poisoning_summaries,
     build_sensitivity_summaries,
 )
 from datp.thresholding import SweepMetrics
-from datp.validation import AuditOutputPaths
 from tests.fixtures import extended_row_fields
 
 
@@ -97,10 +96,10 @@ def _payload(
             MetricName.BALANCED_ACCURACY.value: 1.0,
             MetricName.MACRO_F1.value: 1.0,
             "confusion_matrix": {
-                ConfusionKey.TP.value: 10,
-                ConfusionKey.FP.value: 0,
-                ConfusionKey.TN.value: 10,
-                ConfusionKey.FN.value: 0,
+                "tp": 10,
+                "fp": 0,
+                "tn": 10,
+                "fn": 0,
             },
             "n_benign": 10,
             "n_attack": 10,
@@ -120,10 +119,10 @@ def _payload(
             MetricName.BALANCED_ACCURACY.value: 1.0,
             MetricName.MACRO_F1.value: 1.0,
             "confusion_matrix": {
-                ConfusionKey.TP.value: 10,
-                ConfusionKey.FP.value: 0,
-                ConfusionKey.TN.value: 10,
-                ConfusionKey.FN.value: 0,
+                "tp": 10,
+                "fp": 0,
+                "tn": 10,
+                "fn": 0,
             },
             "n_benign": 10,
             "n_attack": 10,
@@ -319,7 +318,6 @@ def _touch(path: Path, text: str = "x") -> Path:
 @pytest.fixture
 def outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     base_dir = tmp_path / "outputs"
-    audit_file = _touch(base_dir / AuditDir.AUDIT / "audit_summary.md")
     table = _touch(base_dir / ArtifactDir.TABLES / "table3_nbaiot.csv")
     figure = _touch(base_dir / ArtifactDir.FIGURES / "figure_1.pdf")
     analysis = _touch(base_dir / ArtifactDir.ANALYSIS / "bootstrap_cis.csv")
@@ -328,11 +326,6 @@ def outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _touch(sensitivity_manifest_path(base_dir), "{}")
     _touch(base_dir / ArtifactDir.FIGURES / "stray_figure1_seed1.png")
 
-    monkeypatch.setattr(
-        package,
-        "run_results_audit",
-        lambda *_args: AuditOutputPaths((("audit_summary", audit_file),)),
-    )
     monkeypatch.setattr(package, "build_all", lambda *_args: (table, figure))
     monkeypatch.setattr(
         package, "build_poisoning_summaries", lambda *_args: (analysis,)
@@ -346,7 +339,7 @@ def outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _build(outputs: Path, results_dir: Path) -> tuple[Path, ...]:
     return package.build_report_package(
-        base_dir=outputs, results_dir=results_dir, data_root=Path("."), cfg=BASE_CONFIG
+        base_dir=outputs, results_dir=results_dir, cfg=BASE_CONFIG
     )
 
 
@@ -357,7 +350,6 @@ def test_package_groups_every_report_output(outputs: Path, tmp_path: Path) -> No
 
     assert {path.relative_to(results_dir).as_posix() for path in paths} == {
         f"{PackageDir.CONFIG}/resolved_config.yaml",
-        f"{PackageDir.AUDIT}/audit_summary.md",
         f"{PackageDir.MANIFESTS}/nbaiot_main_manifest.json",
         f"{PackageDir.MANIFESTS}/sensitivity_manifest.json",
         "tables/table3_nbaiot.csv",
@@ -397,13 +389,13 @@ def test_package_never_clears_the_run_outputs(outputs: Path) -> None:
 _VICTIMS = tuple(f"c{i}" for i in range(9))
 
 
-_TRAINING = tuple(range(10))
+_TRAINING = tuple(range(20))
 
 
-_POISONING = tuple(range(100, 110))
+_POISONING = tuple(range(100, 120))
 
 
-_ANALYSIS = tuple(range(300, 310))
+_ANALYSIS = tuple(range(300, 320))
 
 
 def _fpr_fields(objective: AttackerObjective) -> dict[str, float]:
@@ -659,7 +651,7 @@ def test_five_seed_manifest_is_rejected() -> None:
         )
         for seed in range(5)
     )
-    with pytest.raises(ValidationError, match="0..9"):
+    with pytest.raises(ValidationError, match="0..19"):
         payload = _manifest(rows).model_dump()
         payload.update(
             {
@@ -693,8 +685,8 @@ def test_gate2_records_are_objective_matched_and_carry_distributions(built) -> N
     for row in data:
         assert row["control_objective"] == row["objective"]
         assert row["control_source"] == PoisoningSourceStrategy.RANDOM_BENIGN.value
-        assert len(row["per_seed_directional_excess"]) == 10
-        assert row["permutation_p"] == pytest.approx(2 / 1024)
+        assert len(row["per_seed_directional_excess"]) == 20
+        assert row["permutation_p"] == pytest.approx(2 / (2**20))
         assert row["mean_directional_excess"] == pytest.approx(1.0)
 
 
@@ -706,7 +698,7 @@ def test_downstream_records_carry_seed_values_and_intervals(built) -> None:
         if r["summary_metric"] == "victim_delta_tpr"
         and r["policy"] == ThresholdPolicy.LOCAL_THRESHOLD.value
     )
-    assert len(row["per_seed_values"]) == 10
+    assert len(row["per_seed_values"]) == 20
     assert row["bootstrap_ci_lower"] <= row["mean_effect"] <= row["bootstrap_ci_upper"]
     assert 0.0 <= row["permutation_p"] <= 1.0
 
@@ -740,7 +732,7 @@ def test_client_level_effects_one_record_per_victim(built) -> None:
         and r["source"] == PoisoningSourceStrategy.HIGH_SCORE_BENIGN.value
     ]
     assert {r["victim_id"] for r in group} == set(_VICTIMS)
-    assert all(r["n_seeds"] == 10 for r in group)
+    assert all(r["n_seeds"] == 20 for r in group)
 
 
 def test_cluster_stability_summary_compares_fixed_and_recomputed(built) -> None:
@@ -765,7 +757,7 @@ def test_gate_sensitivity_default_cell_matches_protocol(built) -> None:
             r["materiality_factor"],
             r["iqr_floor_factor"],
         )
-        == (8, 5, 0.1, 0.01)
+        == (16, 5, 0.1, 0.01)
     )
     assert default["n_changed_vs_default"] == 0
     assert default["n_full_vulnerability"] == default["n_groups"]
@@ -1201,3 +1193,37 @@ def test_analysis_csv_uses_unix_line_endings(tmp_path: Path) -> None:
     )
 
     assert b"\r" not in csv_path.read_bytes()
+
+
+class TestClaimClassification:
+    """The control-instability flag only demotes a claim when the control confounds it."""
+
+    def test_unstable_control_demotes_to_instability(self) -> None:
+        assert (
+            _classify_claim(True, True, True, True)
+            is ClaimClassification.CALIBRATION_INSTABILITY
+        )
+
+    def test_missing_excess_over_control_demotes_to_instability(self) -> None:
+        assert (
+            _classify_claim(False, True, False, True)
+            is ClaimClassification.CALIBRATION_INSTABILITY
+        )
+
+    def test_all_gates_pass_is_full_vulnerability(self) -> None:
+        assert (
+            _classify_claim(False, True, True, True)
+            is ClaimClassification.FULL_VULNERABILITY
+        )
+
+    def test_threshold_shift_without_downstream_harm_is_mechanism_only(self) -> None:
+        assert (
+            _classify_claim(False, True, True, False)
+            is ClaimClassification.MECHANISM_ONLY
+        )
+
+    def test_no_threshold_shift_is_null(self) -> None:
+        assert (
+            _classify_claim(False, False, True, True)
+            is ClaimClassification.NULL_OR_CONDITIONAL
+        )
