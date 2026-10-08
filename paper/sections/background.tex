@@ -4,49 +4,21 @@
 \subsection{Federated IoT Anomaly Detection and Training-Side Defenses}
 
 Federated intrusion and anomaly detection for IoT has moved beyond plain FedAvg training~\cite{Belenguer2025FLIDSReview,Khang2026P4P,Quyen2025FedKDIDS,rey2022federated,Thein2024PFLIDS}: these studies improve training-time collaboration and robustness metrics, while thresholded autoencoder pipelines still rely on a benign post-training calibration step.
-The N-BaIoT benchmark~\cite{meidan2018nbaiot}, which provides labeled benign and Mirai/BASHLITE traffic for nine physical devices, is a widely used FL-IDS evaluation platform.
+The N-BaIoT benchmark~\cite{meidan2018nbaiot} provides labeled benign and Mirai/BASHLITE traffic for nine physical devices and is also used in FL-IDS evaluation~\cite{Quyen2025FedKDIDS}.
 
-The defenses developed for this setting act on the training phase.
+The cited defenses act on the training phase.
 Byzantine-robust rules, including Krum~\cite{blanchard2017machine}, Trimmed-Mean, and Median~\cite{yin2018byzantine}, filter or downweight outlier gradients before aggregation, and FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
 Recent FL-IDS work extends this training-side view with personalized poisoning defenses, knowledge-distillation verifiers, and probe-guided anti-poisoning pipelines under non-IID IoT data~\cite{Khang2026P4P,Quyen2025FedKDIDS,Thein2024PFLIDS}.
-All of them inspect training data, gradients, model updates, or aggregation inputs; none is specified to observe the later client-local calibration buffer or designed for the post-training calibration channel considered here---a statement about the defenses reviewed here, not a claim that no calibration-stage defense could be built.
+These defenses inspect training data, gradients, model updates, or aggregation inputs; none is specified to observe the later client-local calibration buffer or designed for the post-training calibration channel considered here---a statement about the cited defenses, not a claim that no calibration-stage defense could be built.
 
 \subsection{Threshold Calibration and Adjacent Work}
 
-Kloft \& Laskov~\cite{kloft2010online} study online poisoning in centralized anomaly detection via a continuous training stream, assuming a trusted aggregator or persistent model-update access---both absent from FL's post-training calibration stage, where calibration data never leaves the client and the pipelines considered here perform no server-side sanitization.
+Kloft \& Laskov~\cite{kloft2010online} study online poisoning of centralized anomaly detection through a continuous training stream, rather than one-time post-training calibration.
 FL model poisoning~\cite{bagdasaryan2020backdoor} likewise targets the gradient and weight surface.
-The closest work treats calibration and thresholding as trusted: Laridi et al.~\cite{laridi2024} propose summary-statistics-based federated thresholding without adversarial contamination, and S\'aez-de-C\'amara et al.~\cite{saezdecamara2023} a clustered federated IoT anomaly-detection architecture that assumes a benign calibration pipeline.
+Within federated anomaly detection, Laridi et al.~\cite{laridi2024} propose summary-statistics-based thresholding without adversarial contamination, and S\'aez-de-C\'amara et al.~\cite{saezdecamara2023} study clustered IoT detection. Calibration contamination has been studied elsewhere: Li et al.~\cite{li2024conformalpoison} attack conformal prediction, while Clarkson et al.~\cite{clarkson2024contamination} analyze split conformal prediction with contaminated calibration scores and a robust adjustment. Those settings and guarantees differ from the quantile-thresholded FL anomaly detector here, but they preclude a categorical novelty claim about adversarial calibration.
 The \GLOBAL, \LOCAL, and \CLUSTER policies evaluated here, defined in Section~\ref{sec:method}, follow the partitioning structures of that literature~\cite{ghosh2020efficient,laridi2024,sattler2020clustered}.
 
 \begin{sloppypar}
-Table~\ref{tab:related} positions this study against those lines of work.
-Within the reviewed literature, no prior study isolates post-training threshold calibration as the attacked channel while training data, model, aggregation, and test artifacts remain unchanged, and the security implications of the three policies have not been examined under a calibration-stage adversary.
-This is not a new poisoning taxonomy; the contribution is isolating the channel and measuring policy-dependent victim effects and threshold propagation under a controlled score-level intervention.
+The contribution here is a controlled comparison of policy-dependent victim and non-victim effects in one federated anomaly-detection setting. It does not establish a new poisoning taxonomy or traffic-level attack.
 Section~\ref{sec:threat} states the adversary model.
 \end{sloppypar}
-
-\begin{table}[tb]
-\caption{Positioning relative to adjacent poisoning literature.}
-\label{tab:related}
-\centering
-\footnotesize
-\renewcommand{\arraystretch}{0.92}
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{3.3cm}@{}}
-\toprule
-Prior work type & Attack surface & What changes & Distinction from this work \\
-\midrule
-Training-data poisoning~\cite{biggio2012poisoning,tolpegin2020data} & Training set / labels & Model parameters & Calibration-stage poisoning leaves training data and model unchanged \\
-\addlinespace[3pt]
-FL model poisoning~\cite{bagdasaryan2020backdoor,bhagoji2019analyzing} & Client gradients & Model weights & Needs no gradient access; acts after convergence \\
-\addlinespace[3pt]
-Byzantine aggregation~\cite{blanchard2017machine,yin2018byzantine} & Aggregation inputs & Server aggregate & Does not touch aggregation; harm is post-aggregation \\
-\addlinespace[3pt]
-Centralized AD poisoning~\cite{kloft2010online} & Central train stream & Decision boundary & No server-side sanitizer in the FL calibration pipelines considered \\
-\addlinespace[3pt]
-Threshold / model personalization~\cite{ghosh2020efficient,laridi2024,sattler2020clustered} & Threshold policy & Per-client/cluster $\tau$ & Studies utility, not adversarial contamination \\
-\addlinespace[3pt]
-\textbf{This work} & Calibration scores & Threshold $\tau$ only & Score-level, post-training, single-client \\
-\bottomrule
-\end{tabular}
-\end{table}

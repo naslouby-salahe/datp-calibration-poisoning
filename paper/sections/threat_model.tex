@@ -6,22 +6,22 @@
 Detection proceeds in a fixed sequence: local training, model convergence under FedAvg, benign calibration at each client, threshold construction under the federation's policy, and deployment-time evaluation (Fig.~\ref{fig:attack-surface}).
 Benign calibration is the step attacked here.
 Each client $i$ collects a benign calibration set $\mathcal{C}_i = \{s_1, \ldots, s_{n_i}\}$ of reconstruction scores from its own traffic, then sets its local threshold $\tau_i = \mathrm{quantile}(\mathcal{C}_i,\, q)$ at a fixed quantile $q$ (here $q{=}0.95$), which the federation's policy uses directly or averages (Section~\ref{sec:method}).
-The buffer is collected autonomously by the client once the aggregation round completes, and the defenses considered here neither monitor nor validate it.
+The buffer is collected at the client after aggregation. In the experimental model, threshold-policy code consumes that buffer and recomputes thresholds; the attacker is not given an independent threshold-write operation. This is a specified trust boundary of the experiment, not a demonstrated deployment architecture: an implementation would need to protect threshold computation and policy configuration while accepting unvalidated client scores.
 
 The adversary controls a single compromised client $v$ and can read and modify that client's own calibration buffer before threshold computation. Its access is otherwise restricted.
 It cannot modify training data, training labels, model weights, gradients, the aggregation procedure, test scores, test labels, other clients' data, client eligibility, or the threshold-policy definition, which the federation fixes.
-The reservoir is drawn exclusively from the same client's own benign calibration split (Section~\ref{sec:method}): attack-labeled samples, test scores, and training scores never enter it.
+The main reservoir is drawn from the same client's benign calibration split. A separate sensitivity intervention uses benign training-feature rows from the other devices, scored by the fixed model, as donor scores (Section~\ref{sec:method}); it assumes access beyond the primary single-client threat model. Neither intervention draws from attack-labeled or test samples.
 This capability differs from the access assumed for model-poisoning adversaries rather than being strictly weaker: the adversary needs no gradient crafting or knowledge of the aggregation rule, but assumes read and write access to the calibration buffer.
 
 Because per-client detection harm is measured at the compromised client, ``victim'' refers to client $v$ itself and ``non-victim clients'' to the remaining members.
 Raising the threshold at $v$ reduces that client's own detection rate on attack traffic.
-The contamination also reaches clients the adversary does not control whenever the policy shares thresholds: under \GLOBAL every member receives the contaminated threshold, under \CLUSTER co-cluster members may receive a perturbed one, and under \LOCAL no other client is affected.
+The contamination also reaches clients the adversary does not control whenever the policy shares thresholds: under \GLOBAL every member receives the contaminated threshold; under recomputed \CLUSTER assignment changes can affect clients beyond the victim's original cluster; under \LOCAL no other client is affected.
 
 \subsection{Attack Construction, Controls, and Scope}
 
 Both objectives use the same fixed-budget replacement rule (Replace-Fixed-Budget): at $f{=}0$ no replacement occurs ($m{=}0$) and the cell is the unpoisoned clean baseline, while for $f{>}0$ the attack replaces $m=\max\!\bigl(1,\mathrm{round}(fn_v)\bigr)$ positions of $\mathcal{C}_v$ with scores drawn with replacement from a tail of $\mathcal{C}_v$ itself.
 Threshold-Raise, the primary objective, draws from the top-10\% tail (High-Score-Benign), which increases $\tau_v$ and suppresses alarms at the victim site.
 Threshold-Lower, the secondary and conditional objective, draws from the bottom-10\% tail (Low-Score-Benign), which decreases $\tau_v$, raises the false-positive rate, and may increase cross-client FPR disparity depending on the threshold policy; the accompanying $\Delta\mathrm{TPR}{>}0$ is a mechanical consequence of moving the decision boundary downward and is not a security benefit.
-The matched negative control, Random-Benign, samples uniformly from the full calibration distribution instead of a tail, holding the injection budget fixed while removing the tail structure; any effect of tail structure, not position perturbation, should vanish there.
+The matched negative control, Random-Benign, samples uniformly from the full calibration distribution instead of a tail, holding the injection budget fixed while removing the tail structure. The separate training-feature intervention uses Random-Train-Feature-Benign as its matched control.
 
-Score-level manipulation does not demonstrate realizable raw-traffic generation, which Section~\ref{sec:discussion} takes up as future work; claims are bounded to a single compromised client, and collusion is not evaluated.
+The main intervention reweights observed scores and can create exact duplicates; it does not generate independent benign traffic. The feature-reservoir variant uses real benign feature rows from other devices in the dataset, but the experiment does not establish that a compromised IoT device can access or produce them as network traffic. Primary claims are bounded to one compromised client; collusion is not evaluated.

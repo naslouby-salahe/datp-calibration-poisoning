@@ -1,72 +1,38 @@
 \section{Results}
 \label{sec:results}
 
-\subsection{Clean-Baseline Policy Profile}
-
-Table~\ref{tab:baseline} reports clean-baseline dispersion across all ten seeds; lower CV(FPR) means more uniform per-client false-positive treatment, and \LOCAL is lowest ($0.333 \pm 0.034$), \GLOBAL highest ($0.905 \pm 0.039$), \CLUSTER intermediate ($0.615 \pm 0.143$) with cluster-assignment sensitivity.
-Pairwise gaps, taken as within-seed paired differences, are positive with bootstrap CIs excluding zero: G--L $0.572$ $[0.537, 0.607]$, G--C $0.291$ $[0.214, 0.358]$, C--L $0.281$ $[0.201, 0.374]$ (unrounded per-seed aggregates); Fig.~\ref{fig:clean-fpr} shows the per-client FPR distributions.
-Lower dispersion does not imply better detection: \GLOBAL retains the best P10 Macro-F1, effectively a worst-client value with nine clients, at $0.398$ against \LOCAL's $0.335$.
-
-\begin{figure}[tbp]
+\subsection{Clean policies and score scales}
+The 20-seed clean profile (Table~\ref{tab:baseline}) shows the lowest FPR dispersion under \LOCAL and the highest under \GLOBAL. The paired seed-level Global--Local CV(FPR) difference is 0.595 [0.563, 0.628]; Global--Cluster is 0.297 [0.241, 0.346], and Cluster--Local is 0.298 [0.239, 0.366]. These differences do not establish an overall policy ranking: the P10 client Macro-F1 is 0.398 under \GLOBAL and 0.361 under \LOCAL. Figure~\ref{fig:clean-fpr} illustrates client FPRs in the seed selected by the lower-median Global CV(FPR) among the 20 seeds.
+\begin{figure}[tb]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/fig_clean_fpr.pdf}
-\caption{Clean-baseline FPR heterogeneity is larger under the shared \GLOBAL threshold than under \LOCAL calibration (seed 0).
-All-seed dispersion, including \CLUSTER, is in Table~\ref{tab:baseline}.
-Device labels: DB, doorbell; Tstat, thermostat; SH, SimpleHome; Prov., Provision.}
+\caption{Clean per-client FPR under \GLOBAL and \LOCAL for seed 4, selected as the lower-median Global CV(FPR) among all 20 seeds using clean metrics only. All-seed estimates appear in Table~\ref{tab:baseline}.}
 \label{fig:clean-fpr}
 \end{figure}
-
 \input{tables/table_baseline}
 
-\subsection{Raising Attack: Primary Results}
+Raw local thresholds differ by a mean max/min ratio of 6.85 across devices; their mean cross-client CV is 0.655. The main \GLOBAL policy deploys one identical raw mean threshold to every client, although their score scales are heterogeneous. A scale-normalized Global consensus sensitivity divides each local threshold by that client's clean calibration median, averages the ratios, and back-transforms the mean with each client's median to obtain client-specific deployed thresholds. The clean medians remain frozen under poisoning; test scores and all other evaluation conditions are paired. At $f{=}0.4$ under raising, raw versus normalized victim $\Delta\mathrm{FPR}$ is $-0.00642$ versus $-0.00406$, and clean CV(FPR) is 0.919 versus 1.052. These are different deployment policies; neither is universally better on these metrics.
 
-Table~\ref{tab:main-results} and Fig.~\ref{fig:threshold-shift}(a) report threshold shift and downstream detection harm for High-Score-Benign + Threshold-Raise.
-
+\subsection{Threshold displacement and matched controls}
+Table~\ref{tab:main-results} reports all non-zero policy--fraction cells for the two within-calibration-tail attacks. Gate 2 is the objective-oriented, within-victim-and-seed attack-minus-matched-Random-Benign contrast, with a paired bootstrap interval; controls are never pooled across objectives. Every contrast is positive in 20/20 seed aggregates. Gate 3 passes in all 18 cells: victim TPR loss has 20/20 expected-sign seeds for every raising policy and fraction; for lowering, fleet mean absolute FPR increase has 20/20 for Global and Local at each fraction and 17/20, 17/20, and 18/20 for Cluster at $f{=}0.1,0.2,0.4$. All raising cells pass Gate 1. Lowering passes Gate 1 except Global at $f{=}0.1$, where only 4/20 seeds meet its victim-majority materiality rule. The Gate 3 fleet-FPR witness measures absolute burden, not FPR disparity. These gates measure consistency and materiality, not calibrated significance.
 \input{tables/table_main_results}
 
-\begin{figure}[t]
+At $f{=}0.4$ raising, victim TPR changes by $-6.6$ pp under \GLOBAL, $-7.9$ pp under \LOCAL, and $-5.5$ pp under \CLUSTER. The corresponding 95\% seed-bootstrap intervals are $[-8.2,-4.9]$, $[-10.4,-5.9]$, and $[-7.3,-4.0]$ pp. The victim-level \LOCAL changes range from $-0.03$ pp for SimpleHome XCS7-1002 to $-19.5$ pp for Ennio; the mean does not describe every device. Exact paired decision-count differences average 29,507, 52,300, and 39,998 additional missed attack records per victim experiment, respectively, over device attack test sets of 316,400--968,750 records. The corresponding unweighted mean client-rate differences imply 662, 788, and 550 extra misses per 10,000 attack observations. Both summaries first average the nine victim experiments within each seed and then the 20 seeds; the standardized rates are not ratios of pooled counts. These test-set counts are not fixed-time deployment forecasts.
+\begin{figure}[tb]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_threshold_shift.pdf}
-\caption{Mean threshold shift $\Delta\tau$ vs.\ injection fraction $f$ for raising (a) and lowering (b) attacks.
-Error bars are 95\% bootstrap CIs over 10 seeds; \GLOBAL is diluted by $1/N$, and Random-Benign controls are near-null (Table~\ref{tab:main-results}).
-Panel (b) uses the legend of panel (a).}
-\label{fig:threshold-shift}
+\includegraphics[width=\textwidth]{figures/fig_client_effects.pdf}
+\caption{Victim-level raising $\Delta$TPR (left) and lowering $\Delta$FPR (right) at $f{=}0.4$ over 20 training seeds. Axes show fractional rate differences (multiply by 100 for percentage points); points show client means and bars show observed seed minima and maxima, not confidence intervals. Prov denotes Provision cameras; SH denotes SimpleHome cameras. Client variation is descriptive; the seed remains the independent inferential unit.}
+\label{fig:client-effects}
 \end{figure}
 
-Under raising, all three policies clear Gates 1 and 3 at every non-zero fraction, with a Gate-1 pass rate of 10/10 seeds throughout, a seed passing when at least 5 of its 9 victim clients show a material, sign-correct shift.
-For \LOCAL and \CLUSTER all nine clients are individually material in every seed; for \GLOBAL at $f{=}0.1$ two Provision security cameras (PT-737E and PT-838) are material in only 2/10 and 4/10 seeds respectively and one thermostat in 9/10, yet the victim-majority condition still holds because at least six of the nine are material in every seed.
-The primary and control $\Delta\tau$ intervals are disjoint everywhere, though a control interval covering zero does not imply an exactly zero control effect.
-For the control, mean $\Delta\tau$, averaged over the two objectives, is two orders of magnitude smaller than the tail-injection shift at the same fraction, no seed meets the Gate-1 criterion (0/10), and $|\Delta\mathrm{TPR}|{\le}1$\,pp at every fraction and policy (Table~\ref{tab:main-results} gives representative $f{=}0.4$ rows).
-That magnitude gap is the basis for attributing the targeted effects to tail contamination rather than position perturbation.
-The pooled control rows provide a compact descriptive summary; Gate 2 is evaluated using the objective-matched Random-Benign conditions separately.
+At $f{=}0.4$ lowering, victim $\Delta\mathrm{FPR}$ is $+0.00193$ [0.00165, 0.00224] for \GLOBAL, $+0.03433$ [0.03348, 0.03523] for \LOCAL, and $+0.03410$ [0.02989, 0.03826] for \CLUSTER. Fleet mean absolute FPR rises by 0.00171 [0.00156, 0.00188], 0.00381 [0.00372, 0.00391], and 0.00584 [0.00431, 0.00715], respectively. Fleet $\Delta\mathrm{CV(FPR)}$ is $-0.021$ [$-0.023,-0.019$], $+0.058$ [0.049, 0.067], and $+0.065$ [0.006, 0.116]. Lowering raises victim TPR through a lower decision boundary; it does not improve the security interpretation. Exact paired false-alarm count differences average 16, 335, and 199 per victim experiment, respectively, over device benign test sets of 2,362--31,544 records. The unweighted mean client-rate differences correspond to 19, 343, and 341 additional false alarms per 10,000 benign observations. Counts and rates are averaged over nine victims within each of 20 seeds as above.
 
-Magnitude differs by policy: at $f{=}0.4$, \LOCAL and \CLUSTER give the largest shifts, $\Delta\tau = +0.902$ $[+0.864, +0.944]$ and $+0.899$ $[+0.859, +0.941]$, while \GLOBAL gives a diluted but still material $+0.100$ $[+0.096, +0.105]$.
-The $1/N$ dilution is definitional, yet the residual ($\approx$10\% of the local shift) still produces measurable harm.
+\subsection{Non-victim propagation and cluster stability}
+Under raising at $f{=}0.4$, mean non-victim TPR change is $-3.93$ pp [$-4.96,-2.91$] for \GLOBAL, zero for \LOCAL, and $+1.55$ pp [0.29, 2.89] for recomputed \CLUSTER. Mean non-victim $\Delta\mathrm{FPR}$ is $-0.00643$ [$-0.00697,-0.00592$] for Global and $-0.00011$ [$-0.00214,0.00159$] for Cluster. The Cluster mean conceals assignment-driven gains and losses. Under lowering, non-victim mean $\Delta\mathrm{FPR}$ is $+0.00168$ [0.00154, 0.00184] for Global and $+0.00231$ [0.00077, 0.00358] for Cluster; Local is zero by construction. The corresponding non-victim $\Delta\mathrm{TPR}$ values are $+0.73$ pp [0.35, 1.14] and $+0.63$ pp [$-0.16$, 1.50], respectively; this is the expected tradeoff from a lower threshold, and Cluster's interval includes zero. Global adds a mean 112 false positives across eight non-victims per victim experiment on their full benign test sets.
 
-Mean victim $\Delta\mathrm{TPR}$ is negative and directionally consistent across all ten seeds for all three policies, so Gate 3 passes everywhere.
-At $f{=}0.4$: \LOCAL $-7.9$\,pp, \CLUSTER $-4.9$\,pp, \GLOBAL $-6.1$\,pp.
-\CLUSTER equals its $f{=}0.2$ estimate to one decimal, but no interval on that difference was estimated, so this apparent saturation is not separated from seed-level variation.
-Downstream harm need not track $\Delta\tau$ monotonically, consistent with each policy's clean threshold sitting at a different point of the victim's score distribution; that distribution was not characterized here, so the explanation remains an interpretation.
+For \CLUSTER raising at $f{=}0.4$, 86.7\% of the 180 victim--seed evaluations change the partition; on average, 7.3 of nine clients change their set of cluster co-members. This label-invariant count includes clients affected by another client's move; it is not a count of raw K-means label mismatches. The victim is a singleton in 48.9\% of poisoned evaluations, versus none of the clean ones. Modal cluster sizes remain [4,3,2], and mean victim cluster size changes from 3.21 to 2.48. Holding clean assignments fixed reduces mean victim $\Delta\tau$ from 0.930 to 0.333 and changes mean non-victim $\Delta\mathrm{TPR}$ from $+1.55$ to $-0.83$ pp. Recomputed Cluster behavior is therefore sensitive to assignment changes. In the $K\in\{2,3,4\}$ and $n_{\rm init}\in\{1,10\}$ grid, the $K{=}3$, $f{=}0.4$ raising mean shift is 0.853 for one initialization and 0.930 for ten.
 
-\subsection{Lowering Attack: Secondary Results (Conditional)}
+\subsection{Intervention and gate sensitivity}
+The separate cross-device benign training-feature reservoir is scored with the fixed model and sampled without repeating donor feature rows. At $f{=}0.4$ its high-score raising variant yields mean victim $\Delta\tau$ of 0.024 (Global), 0.214 (Local), and 0.166 (Cluster), below same-calibration-tail values of 0.104, 0.934, and 0.930. Global at $f{=}0.1$ does not pass Gate 1 for this variant. It demonstrates a distinct, score-generating feature source under broader donor access, though not an adversary's ability to obtain or produce those features as traffic. Under the original same-buffer draw, mean duplicate rate at Local $f{=}0.4$ is 0.366 versus 0.012 for an interpolated-tail sensitivity variant, whose mean threshold shift is 0.932 versus 0.934. Interpolation synthesizes scores rather than traffic. Without-replacement and disjoint-tail variants cannot meet the full 40\% budget with the 10\% tail; reduced-budget effects cannot be compared as equal-dose attacks.
 
-Fig.~\ref{fig:threshold-shift}(b) shows threshold shift for Low-Score-Benign + Threshold-Lower, whose goal is to increase false-alarm burden; the $\Delta\mathrm{TPR}{>}0$ below is a threshold-displacement indicator, not a security benefit.
-At $f{=}0.4$, \LOCAL reaches $\Delta\tau = -0.164$ $[-0.176, -0.154]$ with $\Delta\mathrm{TPR} = +11.8$\,pp.
-\CLUSTER reaches $-0.154$ $[-0.167, -0.142]$ with $+10.3$\,pp.
-\GLOBAL is structurally bounded: $\Delta\tau = -0.018$ $[-0.020, -0.017]$, with $\Delta\mathrm{TPR} = +2.1$\,pp, and its Gate 1 passes only at $f{\ge}0.2$.
-
-The disparity metric $\Delta\mathrm{CV(FPR)}$ (dimensionless) is $+0.053$ for \LOCAL (positive in 10 of 10 seeds) and $+0.060$ for \CLUSTER (positive in 8 of 10 seeds), while \GLOBAL shows $-0.019$.
-Under a shared threshold every client's FPR moves in the same direction, which can reduce the coefficient of variation even as absolute FPR rises; that negative value reflects dispersion reduction, not reduced alarm burden.
-Absolute clean$\to$poisoned FPR at $f{=}0.4$: \GLOBAL $0.041\to0.043$, \LOCAL $0.043\to0.046$, \CLUSTER $0.043\to0.049$.
-Lowering a $q{=}0.95$ quantile requires displacing scores in the upper-tail support, which random position replacement achieves with probability $\approx f$, leaving 60\% of that support intact at $f{=}0.4$; \GLOBAL compounds the effect via $1/N$ dilution, so Replace-Fixed-Budget may understate the displacement achievable by a rank-aware replacement strategy.
-
-\subsection{Policy-Differentiation Summary}
-
-\input{tables/table_spillover}
-
-Table~\ref{tab:spillover} quantifies threshold propagation under the raising attack at $f{=}0.4$.
-\GLOBAL applies the same shift to all nine clients, so non-victim $\Delta\tau$ equals victim $\Delta\tau$ by construction; the material non-victim count nonetheless falls below 8/8 in a minority of seeds, because the Gate-1 floor $\delta\tau_{j,s}$ scales with each client's calibration IQR and a shared shift can fall below that floor at the widest-spread clients.
-\CLUSTER produces near-\LOCAL victim shifts ($+0.899$ vs.\ $+0.902$) with smaller victim $\Delta\mathrm{TPR}$ ($-4.9$ vs.\ $-7.9$\,pp), and its non-victim changes include positive and negative values (mean $+0.0003$; std $0.017$ across the 90 victim--seed cells, arising from cluster recomputation and assignment changes rather than aggregation).
-The small mean therefore reflects cancellation, not negligible perturbation: on average 6 of the 8 non-victims meet the Gate-1 criterion, at magnitudes about an order of magnitude below \CLUSTER's weakest victim shift ($+0.253$ at $f{=}0.1$).
-\CLUSTER non-victim true-positive rates were not recomputed.
-\LOCAL yields the highest per-victim shift with no material non-victim shifts at all, by policy design.
+The prespecified gate uses 5/9 victims and 16/20 seeds. The 225-point Cartesian sensitivity grid varies seed support from 12 to 20, victim majority from 3 to 7, the IQR materiality factor from 0.05 to 0.20, and the cross-client IQR floor from 0.005 to 0.020. All three main $f{=}0.4$ raising cells retain Gates 1--3 across the grid; Global and Cluster retain the full-vulnerability classification in 225/225 settings, while Local does so in 219/225 because the control-instability classification changes. Lowering classifications are less stable: Global at $f{=}0.1,0.2,0.4$ differs from baseline in 78, 99, and 45 settings; Cluster at those fractions in 123, 27, and 48, with Gate 3 changing in 90 settings at $f{=}0.1$ and 45 at $f{=}0.4$. Local lowering at $f{=}0.1$ changes in 21 settings, while $f{=}0.2,0.4$ remain stable. Most other main-matrix changes arise from Gate 1 materiality/support or control-instability criteria; the separate feature-reservoir variant is also cutoff-sensitive. Thus the gate classification is conditional on its operational cutoffs; effect sizes and paired intervals remain the quantitative evidence.

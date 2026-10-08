@@ -2,25 +2,22 @@
 \label{sec:intro}
 
 Federated learning has been widely studied for IoT anomaly detection, allowing devices to contribute to a shared model without centralizing raw traffic~\cite{rey2022federated}. Threshold calibration then determines the operating point used by each detector.
-Security work on federated anomaly detection has concentrated on the \emph{training phase}: Byzantine clients injecting adversarial gradients, label-flipping poisoning, or model-inversion attacks~\cite{bhagoji2019analyzing,biggio2012poisoning,tolpegin2020data}.
+Security work has examined training-data poisoning, including attacks on support vector machines~\cite{biggio2012poisoning}, and malicious data or model updates in federated learning~\cite{bhagoji2019analyzing,tolpegin2020data}.
 Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{blanchard2017machine,cao2020fltrust,yin2018byzantine}, and recent FL-IDS work adds personalized, non-IID-robust, knowledge-distillation, and anti-poisoning designs~\cite{Belenguer2025FLIDSReview,Khang2026P4P,Quyen2025FedKDIDS,Thein2024PFLIDS}, all acting on training data, gradients, model updates, or aggregation inputs.
 
 The step that follows has received much less attention: in the \emph{threshold-calibration stage}, each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
 Training- and aggregation-phase defenses complete before this stage begins, and none of the designs cited above is specified to observe or validate the client-local calibration buffer.
-If a single client's benign calibration buffer is contaminated with benign scores from the upper (or lower) tail of that client's own distribution, its threshold moves.
+If a single client's benign calibration buffer is contaminated with upper- or lower-tail scores, its threshold can move. How far the effect propagates depends on the threshold policy.
 
 This paper characterizes that stage under a score-level contamination model in which an adversary controlling one client replaces a fraction~$f$ of that client's calibration buffer with tail-sampled scores from the same client's benign calibration split.
 Model weights, training data, labels, gradients, aggregation, test scores, test labels, and the threshold-policy definition all stay fixed, so score ranking is invariant by construction and only the operating point moves.
-The intervention is therefore not data poisoning relocated to calibration data (Table~\ref{tab:related}): it acts strictly after model convergence and exploits a trust assumption specific to this stage.
+The intervention is post-training calibration-input poisoning; it exploits a trust assumption specific to this stage.
 Its consequences depend on how the federation turns local thresholds into deployed ones.
-That last dependence is the research question: does the choice of a federation-wide, per-client, or cluster-averaged threshold change how far one contaminated buffer propagates and how much it reduces detection?
+We ask how a federation-wide, per-client, or cluster-averaged threshold changes the propagation of one contaminated buffer and the resulting detection loss.
 The evaluation covers all three policies---\GLOBAL (federation-wide mean), \LOCAL (per-client), and \CLUSTER (cluster-averaged)---with each of the nine physical-device clients of N-BaIoT~\cite{meidan2018nbaiot} taken as the compromised client in turn, at four injection fractions.
 
 The paper makes three contributions.
 First, it formalizes a single-client, calibration-only threat model and states the invariants it preserves, isolating the post-training calibration buffer as the attacked channel.
-Second, it reports a paired-seed evaluation of threshold raising and threshold lowering across the three threshold policies, each with a matched Random-Benign negative control that keeps the injection budget fixed but removes the tail structure.
-Third, it characterizes the resulting policy-differentiated behavior: sensitivity at the compromised client, threshold propagation to non-victims, and downstream operating-point harm.
+Second, it reports a 20-seed paired evaluation of threshold raising and lowering across the three policies, with objective-matched negative controls and a separate benign training-feature reservoir.
+Third, it measures victim and non-victim detection outcomes and tests sensitivity to cluster reassignment, score scaling, draw rules, and operational gates.
 All claims are bounded to the nine-device N-BaIoT setting with autoencoder detectors and FedAvg aggregation; the mechanism operates at the score level, and defense design is out of scope.
-
-The remainder of this paper is organized as follows.
-Section~\ref{sec:background} reviews federated IoT anomaly detection, training-side defenses, and adjacent threshold-calibration work; Section~\ref{sec:threat} defines the threat model and attack construction; Section~\ref{sec:method} describes the protocol, threshold policies, attack parameterization, and statistical analysis; Section~\ref{sec:results} presents the clean-baseline and poisoning results; Section~\ref{sec:discussion} discusses findings and limitations; and Section~\ref{sec:conclusion} concludes.

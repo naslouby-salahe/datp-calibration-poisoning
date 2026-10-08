@@ -1,18 +1,15 @@
-\begin{table}[!ht]
-\caption{Clean baseline policy profile on N-BaIoT ($n{=}10$ seeds, 9 clients).
-CV: coefficient of variation; BA: balanced accuracy; P10 F1: P10 Macro-F1; FPR/TPR: client/seed means; $\pm$ is the standard deviation across the ten seeds, not a confidence interval; bold marks the best point estimate, untested for significance; $^*$~std\,$\approx$\,0.0002.}
+\begin{table}[tb]
+\caption{Clean N-BaIoT baseline, 20 training seeds and nine clients. Dispersion and detection values are seed mean $\pm$ SD; FPR is the client/seed mean. CV is population SD / mean across clients; worst BA is the minimum per-client balanced accuracy; P10 Macro-F1 is the 10th percentile of per-client mean benign-class and attack-class F1.}
 \label{tab:baseline}
-\centering
-\footnotesize
+\centering\scriptsize
 \setlength{\tabcolsep}{2pt}
-\renewcommand{\arraystretch}{1.06}
-\begin{tabular}{@{}lcccccc@{}}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-Policy & CV(FPR) & CV(TPR) & Worst BA & P10 F1 & FPR & TPR \\
+Policy & CV(FPR) & CV(TPR) & Worst BA & P10 F1 & FPR\\
 \midrule
-\GLOBAL & 0.905$\pm$0.039 & \textbf{0.255$\pm$0.030} & 0.657$\pm$0.008 & 0.398$\pm$0.053 & 0.041 & 0.793 \\
-\LOCAL  & \textbf{0.333$\pm$0.034} & 0.296$\pm$0.036 & 0.655$\pm$0.005 & 0.335$\pm$0.058 & 0.043 & 0.777 \\
-\CLUSTER& 0.615$\pm$0.143 & 0.313$\pm$0.009 & 0.656$\pm$0.004 & 0.299$\pm$0.000$^*$ & 0.043 & 0.742 \\
+\GLOBAL & .919$\pm$.029 & .255$\pm$.024 & .658$\pm$.007 & .398$\pm$.052 & .04112\\
+\LOCAL & .324$\pm$.058 & .280$\pm$.067 & .673$\pm$.059 & .361$\pm$.135 & .04346\\
+\CLUSTER & .622$\pm$.128 & .295$\pm$.030 & .657$\pm$.004 & .322$\pm$.046 & .04404\\
 \bottomrule
 \end{tabular}
 \end{table}

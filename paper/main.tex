@@ -67,13 +67,7 @@ Cadi Ayyad University, Higher Normal School (ENS), L2IS Laboratory, Marrakech, M
 \maketitle
 
 \begin{abstract}
-Federated learning (FL) defenses for IoT anomaly detection largely target training and aggregation, while the post-training \emph{threshold-calibration stage} lets each client autonomously collect benign calibration scores and derive its detection threshold.
-This paper characterizes that stage under a score-level contamination model: one compromised client replaces a fraction~$f$ of its calibration buffer with tail-sampled benign reconstruction scores, shifting the threshold without altering model weights, training data, gradients, aggregation, test scores, or labels.
-Across \GLOBAL, \LOCAL, and \CLUSTER threshold policies on the N-BaIoT nine-device federation, the raising attack meets a pre-specified material-displacement criterion in every evaluated non-zero policy--fraction condition and reduces the compromised client's true-positive rate by 2.4--7.9 percentage points (pp), including 4.9--7.9\,pp at $f{=}0.4$.
-The lowering attack raises cross-client false-positive-rate disparity for \LOCAL and \CLUSTER, increasing $\mathrm{CV}(\mathrm{FPR})$ by 0.05--0.06 at $f{=}0.4$ under fixed-budget replacement; the associated rise in true-positive rate reflects threshold displacement, not a security benefit.
-Policy choice governs both magnitude and threshold propagation: \LOCAL confines the shift to the compromised client, \CLUSTER produces smaller non-victim threshold perturbations through cluster recomputation and assignment changes, and \GLOBAL dilutes the shift by $1/N$ but applies it federation-wide.
-Non-victim true-positive rates were not recomputed, so effects beyond the compromised client are characterized at the threshold level and, for lowering, at the fleet-FPR level.
-Bounded to N-BaIoT and score substitution, the results describe a vulnerability mechanism rather than a complete traffic-generation attack.
+Post-training calibration turns benign reconstruction scores into anomaly-detection thresholds, yet a compromised client may supply scores to that step after federated training has ended. We characterize single-client calibration contamination under \GLOBAL, \LOCAL, and \CLUSTER threshold policies on nine N-BaIoT devices. In 20 paired training seeds, a within-buffer high-score tail substitution passes the prespecified material-shift rule for every non-zero policy--fraction combination. At 40\% replacement, victim true-positive rate falls by 6.6, 7.9, and 5.5 percentage points, respectively; the corresponding mean non-victim change is $-3.93$ points under Global, zero under Local, and $+1.55$ under recomputed Cluster. Low-score substitution raises absolute false-positive burden under all policies, although Global FPR dispersion falls. Objective-matched Random-Benign contrasts are positive in all 20 seed aggregates in each of the 18 non-zero main-matrix conditions; the separate feature-reservoir variant uses a different matched control. That cross-device benign training-feature reservoir also shifts thresholds, but less than within-buffer tail reuse. Cluster effects depend strongly on assignment changes, and raw Global averaging combines heterogeneous score scales. The experiments establish a policy-dependent score-level vulnerability, not the ability to generate attack traffic with the required scores.
 
 \keywords{Federated Learning \and Anomaly Detection \and IoT Security \and Poisoning Attack \and Threshold Calibration \and Vulnerability Analysis}
 \end{abstract}
@@ -106,7 +100,7 @@ Bounded to N-BaIoT and score substitution, the results describe a vulnerability 
   \node[phaseLabel, above=0.45cm of agg] (trainLabel)
         {Training \& aggregation (covered by surveyed defenses)};
 
-  \node[vuln,   below=1.80cm of model] (thresh) {Threshold~$\tau$};
+  \node[vuln,   below=1.80cm of model] (thresh) {Threshold\\computation};
   \node[vuln,   left=1.60cm of thresh] (cal)    {Calibration\\Buffer};
   \node[attack, left=1.60cm of cal]    (adv)    {Adversary\\(score-level)};
   \node[phaseLabel, text=red!70!black, above=0.45cm of cal] (calLabel)
@@ -137,7 +131,7 @@ Bounded to N-BaIoT and score substitution, the results describe a vulnerability 
 }
 \caption{Attack surface: threshold calibration occurs after FL training.
 Green boxes mark training and aggregation; the dashed red region marks calibration, outside the scope of the defenses surveyed in Section~\ref{sec:background}.
-Score-level access to one client's calibration buffer can shift~$\tau$ without modifying model weights, gradients, or labels.}
+The three policy nodes are alternative computations, not deployment components; score-level access to one client's calibration buffer can shift the resulting threshold(s) without modifying model weights, gradients, or labels.}
 \label{fig:attack-surface}
 \end{figure}
 

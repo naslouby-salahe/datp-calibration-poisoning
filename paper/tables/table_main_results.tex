@@ -1,43 +1,31 @@
 \begin{table}[tb]
-\caption{Calibration-stage poisoning shifts thresholds under all policies (N-BaIoT, $n{=}10$ seeds).
-$\Delta\tau$: mean shift [95\% CI]; G1: Gate-1 seed pass rate; $\Delta$TPR: victim detection-rate change.
-Lowering rows ($\dagger$) report $\Delta\mathrm{CV(FPR)}$, an FPR-disparity metric, as a seed-level mean with no bootstrap interval estimated; Neg.\,Control: Random-Benign at $f{=}0.4$, pooled over both objectives; bold indicates G1 = 0\%.}
+\caption{20-seed main results. Raise/Lower use the original within-calibration tail. $\Delta\tau$ is a signed seed mean; Gate 2 is the positive, objective-oriented contrast against the objective-matched Random-Benign control [paired 95\% CI]. TPR is victim change in percentage points. G1 is the seed pass count; G2 is 20/20 for every row.}
 \label{tab:main-results}
-\centering
-\footnotesize
+\centering\scriptsize
 \setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{0.98}
-\begin{tabular}{@{}llrp{3.6cm}lrr@{}}
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
-Policy & Attack & $f$ & \multicolumn{1}{l}{$\Delta\tau$ [95\% CI]} & G1 & $\Delta$TPR (pp) & $\Delta$CV(FPR) \\
+Policy & Objective & $f$ & $\Delta\tau$ & Gate 2 [95\% CI] & G1 & $\Delta$TPR (pp)\\
 \midrule
-\GLOBAL & Raise & 0.1 & $+0.033\;[+0.031,\,+0.035]$ & 100\% & $-2.4$ & --- \\
- &  & 0.2 & $+0.062\;[+0.059,\,+0.065]$ & 100\% & $-4.6$ & --- \\
- &  & 0.4 & $+0.100\;[+0.096,\,+0.105]$ & 100\% & $-6.1$ & --- \\
-\addlinespace[1pt]
-\LOCAL & Raise & 0.1 & $+0.298\;[+0.281,\,+0.314]$ & 100\% & $-6.0$ & --- \\
- &  & 0.2 & $+0.558\;[+0.535,\,+0.581]$ & 100\% & $-7.3$ & --- \\
- &  & 0.4 & $+0.902\;[+0.864,\,+0.944]$ & 100\% & $-7.9$ & --- \\
-\addlinespace[1pt]
-\CLUSTER & Raise & 0.1 & $+0.253\;[+0.231,\,+0.277]$ & 100\% & $-3.9$ & --- \\
- &  & 0.2 & $+0.504\;[+0.475,\,+0.532]$ & 100\% & $-4.9$ & --- \\
- &  & 0.4 & $+0.899\;[+0.859,\,+0.941]$ & 100\% & $-4.9$ & --- \\
+\GLOBAL & Raise & .1 & +.034 & .034 [.033,.036] & 20/20 & -4.5\\
+ & & .2 & +.063 & .063 [.061,.065] & 20/20 & -5.1\\
+ & & .4 & +.104 & .104 [.101,.107] & 20/20 & -6.6\\
+\LOCAL & Raise & .1 & +.308 & .310 [.298,.323] & 20/20 & -6.5\\
+ & & .2 & +.567 & .563 [.547,.581] & 20/20 & -7.3\\
+ & & .4 & +.934 & .934 [.905,.964] & 20/20 & -7.9\\
+\CLUSTER & Raise & .1 & +.260 & .261 [.238,.282] & 20/20 & -3.9\\
+ & & .2 & +.524 & .527 [.507,.547] & 20/20 & -4.7\\
+ & & .4 & +.930 & .931 [.897,.967] & 20/20 & -5.5\\
 \midrule
-\GLOBAL & Lower$\dagger$ & 0.1 & $-0.006\;[-0.006,\,-0.006]$ & 60\% & $+0.8$ & $-0.007$ \\
- &  & 0.2 & $-0.010\;[-0.011,\,-0.010]$ & 100\% & $+1.1$ & $-0.011$ \\
- &  & 0.4 & $-0.018\;[-0.020,\,-0.017]$ & 100\% & $+2.1$ & $-0.019$ \\
-\addlinespace[1pt]
-\LOCAL & Lower$\dagger$ & 0.1 & $-0.053\;[-0.057,\,-0.049]$ & 100\% & $+2.8$ & $-0.002$ \\
- &  & 0.2 & $-0.094\;[-0.100,\,-0.088]$ & 100\% & $+5.9$ & $+0.005$ \\
- &  & 0.4 & $-0.164\;[-0.176,\,-0.154]$ & 100\% & $+11.8$ & $+0.053$ \\
-\addlinespace[1pt]
-\CLUSTER & Lower$\dagger$ & 0.1 & $-0.047\;[-0.065,\,-0.031]$ & 100\% & $+2.2$ & $+0.007$ \\
- &  & 0.2 & $-0.100\;[-0.115,\,-0.084]$ & 100\% & $+5.4$ & $+0.011$ \\
- &  & 0.4 & $-0.154\;[-0.167,\,-0.142]$ & 100\% & $+10.3$ & $+0.060$ \\
-\midrule
-\GLOBAL & Neg.~Ctrl & 0.4 & $-0.000\;[-0.001,\,+0.001]$ & \textbf{0\%} & $+0.3$ & --- \\
-\LOCAL & Neg.~Ctrl & 0.4 & $-0.002\;[-0.009,\,+0.006]$ & \textbf{0\%} & $+0.9$ & --- \\
-\CLUSTER & Neg.~Ctrl & 0.4 & $-0.009\;[-0.022,\,+0.003]$ & \textbf{0\%} & $+0.4$ & --- \\
+\GLOBAL & Lower & .1 & -.006 & .006 [.005,.006] & 4/20 & +0.1\\
+ & & .2 & -.011 & .012 [.011,.013] & 20/20 & +0.6\\
+ & & .4 & -.019 & .018 [.017,.020] & 20/20 & +1.3\\
+\LOCAL & Lower & .1 & -.056 & .054 [.049,.058] & 20/20 & +3.2\\
+ & & .2 & -.099 & .106 [.098,.115] & 20/20 & +5.5\\
+ & & .4 & -.169 & .166 [.155,.177] & 20/20 & +11.3\\
+\CLUSTER & Lower & .1 & -.056 & .053 [.042,.066] & 20/20 & +3.5\\
+ & & .2 & -.101 & .100 [.086,.114] & 20/20 & +5.2\\
+ & & .4 & -.159 & .156 [.139,.171] & 20/20 & +9.4\\
 \bottomrule
 \end{tabular}
 \end{table}
