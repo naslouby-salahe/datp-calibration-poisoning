@@ -7,7 +7,7 @@ Federated intrusion and anomaly detection for IoT has moved beyond plain FedAvg 
 The N-BaIoT benchmark~\cite{meidan2018nbaiot} provides labeled benign and Mirai/BASHLITE traffic for nine physical devices and is also used in FL-IDS evaluation~\cite{rey2022federated}.
 
 The cited defenses act on the training phase.
-Byzantine-robust rules, including Krum~\cite{feng2025security}, Trimmed-Mean, and Median~\cite{kairouz2021advances}, replace plain averaging with robust aggregation, and FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
+Byzantine-robust rules, including Krum~\cite{blanchard2017krum,feng2025security}, Trimmed-Mean, and Median~\cite{yin2018trimmed,kairouz2021advances}, replace plain averaging with robust aggregation, and FLTrust~\cite{cao2020fltrust} anchors aggregation to a trusted server dataset.
 Recent FL-IDS work extends this training-side view with personalized poisoning defenses under heterogeneous IoT data~\cite{Thein2024PFLIDS}.
 These defenses inspect training data, gradients, model updates, or aggregation inputs; none is specified to observe the later client-local calibration buffer or designed for the post-training calibration channel considered here---a statement about the cited defenses, not a claim that no calibration-stage defense could be built.
 

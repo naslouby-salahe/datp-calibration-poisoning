@@ -2,8 +2,8 @@
 \label{sec:intro}
 
 Federated learning has been widely studied for IoT anomaly detection, allowing devices to contribute to a shared model without centralizing raw traffic~\cite{rey2022federated,bunko2026ppflids}. Threshold calibration then determines the operating point used by each detector.
-Security work has examined training-data poisoning, including attacks on support vector machines~\cite{biggio2018wild}, and malicious data or model updates in federated learning~\cite{wan2024poisoning,tolpegin2020data}.
-Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{feng2025security,cao2020fltrust,kairouz2021advances}, and personalized FL-IDS defenses assess client models during training~\cite{Thein2024PFLIDS}.
+Security work has examined training-data poisoning, including attacks on support vector machines~\cite{biggio2012poisoning,biggio2018wild}, and malicious data or model updates in federated learning~\cite{wan2024poisoning,tolpegin2020data}.
+Aggregation-phase defenses such as FLTrust, Krum, and Trimmed-Mean target exactly this surface~\cite{feng2025security,cao2020fltrust,blanchard2017krum,yin2018trimmed,kairouz2021advances}, and personalized FL-IDS defenses assess client models during training~\cite{Thein2024PFLIDS}.
 
 The step that follows has received much less attention: in the \emph{threshold-calibration stage}, each client collects a window of benign traffic, computes local reconstruction scores, and derives its detection threshold at a fixed quantile~$q$.
 Training- and aggregation-phase defenses complete before this stage begins, and none of the designs cited above is specified to observe or validate the client-local calibration buffer.

@@ -6,7 +6,7 @@
 The evaluation uses N-BaIoT~\cite{meidan2018nbaiot}, a labeled IoT traffic dataset covering nine physical devices across five types (doorbell, baby monitor, security camera, thermostat, webcam), each device forming one federation client; all nine satisfy the $\ge$100-sample calibration eligibility threshold (size range in Table~\ref{tab:repro}).
 Each device's benign stream is partitioned chronologically into a $60\%$ train / $1\%$ gap / $20\%$ calibration / $1\%$ gap / $18\%$ test split, the gaps avoiding temporal leakage, and training and calibration use benign traffic only.
 Attack-labeled records are scaled with each device's training-fitted scaler and used only as the positive class for TPR; they never enter training, calibration, poisoning reservoirs, or injected buffers.
-The federation trains a shared autoencoder on benign traffic using FedAvg~\cite{kairouz2021advances} (Table~\ref{tab:repro}); each client then scores its own traffic with the aggregated model and enters the threshold-calibration stage at $q{=}0.95$.
+The federation trains a shared autoencoder on benign traffic using FedAvg~\cite{mcmahan2017fedavg,kairouz2021advances} (Table~\ref{tab:repro}); each client then scores its own traffic with the aggregated model and enters the threshold-calibration stage at $q{=}0.95$.
 
 \begin{table}[tb]
 \caption{Experimental configuration: architecture, federated training hyperparameters, and calibration settings.}
